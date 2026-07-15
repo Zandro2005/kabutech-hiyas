@@ -1,0 +1,339 @@
+/* Tab switch transition */
+@keyframes tab-fade-in {
+    from {
+        opacity: 0;
+        transform: translateY(10px);
+    }
+
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.tab-animate-in {
+    animation: tab-fade-in 0.6s cubic-bezier(0.16, 1, 0.3, 1);
+    /* Children animate in with a translateY offset (see child-rise-in
+               below). CSS transforms count toward an ancestor's scrollable
+               overflow, so during that brief animation the offset children
+               momentarily "overflow" #app-scroll-area, which is enough to
+               flash its scrollbar in and immediately out. Clipping to this
+               container's own box prevents that transform overshoot from
+               ever reaching the scrollable ancestor, without affecting the
+               tab's normal (non-animating) layout. */
+    overflow: hidden;
+    overflow: clip;
+}
+
+@keyframes tab-fade-out {
+    from {
+        opacity: 1;
+        transform: translateY(0) scale(1);
+    }
+
+    to {
+        opacity: 0;
+        transform: translateY(-8px) scale(0.99);
+    }
+}
+
+.tab-exit-out {
+    animation: tab-fade-out 0.25s ease forwards;
+}
+
+/* Staggered child entrance for elements inside a freshly-shown tab */
+@keyframes child-rise-in {
+    from {
+        opacity: 0;
+        transform: translateY(18px) scale(0.98);
+    }
+
+    to {
+        opacity: 1;
+        transform: translateY(0) scale(1);
+    }
+}
+
+.tab-animate-in>* {
+    animation: child-rise-in 0.7s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+.tab-animate-in>*:nth-child(1) {
+    animation-delay: 0.05s;
+}
+
+.tab-animate-in>*:nth-child(2) {
+    animation-delay: 0.15s;
+}
+
+.tab-animate-in>*:nth-child(3) {
+    animation-delay: 0.25s;
+}
+
+.tab-animate-in>*:nth-child(4) {
+    animation-delay: 0.35s;
+}
+
+.tab-animate-in>*:nth-child(5) {
+    animation-delay: 0.45s;
+}
+
+.tab-animate-in>*:nth-child(6) {
+    animation-delay: 0.55s;
+}
+
+.tab-animate-in>*:nth-child(7) {
+    animation-delay: 0.65s;
+}
+
+.tab-animate-in>*:nth-child(8) {
+    animation-delay: 0.75s;
+}
+
+.tab-animate-in>*:nth-child(n+9) {
+    animation-delay: 0.85s;
+}
+
+/* Batch / list item stagger (applied via JS to dynamically-rendered cards) */
+@keyframes item-pop-in {
+    from {
+        opacity: 0;
+        transform: translateY(10px) scale(0.97);
+    }
+
+    to {
+        opacity: 1;
+        transform: translateY(0) scale(1);
+    }
+}
+
+.item-animate-in {
+    animation: item-pop-in 0.6s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+@keyframes gentle-shake {
+
+    0%,
+    100% {
+        transform: translateX(0);
+    }
+
+    25% {
+        transform: translateX(-4px);
+    }
+
+    75% {
+        transform: translateX(4px);
+    }
+}
+
+/* Ripple effect for interactive elements */
+.ripple-surface {
+    /* Only force relative positioning if the element isn't already
+       positioned (absolute/fixed). Otherwise the ripple JS — which
+       adds this class to ANY clicked <button>, including
+       absolutely-positioned icon buttons like the password show/hide
+       toggle — silently knocks them out of position:absolute back
+       into normal flex flow. That turns them into a real flex
+       sibling of the password input, which then shrinks to share the
+       row's width (the "input collapses" bug). See app.js ripple
+       click handler (~line 570). */
+    position: relative;
+    overflow: hidden;
+}
+
+.absolute.ripple-surface,
+.fixed.ripple-surface {
+    position: absolute;
+}
+
+.ripple-effect {
+    position: absolute;
+    border-radius: 50%;
+    background: rgba(255, 255, 255, 0.45);
+    transform: scale(0);
+    animation: ripple-anim 0.6s ease-out;
+    pointer-events: none;
+}
+
+.dark .ripple-effect,
+.ripple-effect.ripple-dark {
+    background: rgba(0, 69, 33, 0.18);
+}
+
+@keyframes ripple-anim {
+    to {
+        transform: scale(2.5);
+        opacity: 0;
+    }
+}
+
+/* Sensor card tap-to-expand */
+.sensor-card {
+    cursor: pointer;
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.sensor-card:active {
+    transform: scale(0.97);
+}
+
+.sensor-card.expanded {
+    box-shadow: 0px 8px 24px rgba(15, 31, 20, 0.12);
+}
+
+.sensor-detail {
+    max-height: 0;
+    overflow: hidden;
+    transition: max-height 0.35s ease, opacity 0.25s ease, margin-top 0.35s ease;
+    opacity: 0;
+}
+
+.sensor-detail.open {
+    max-height: 120px;
+    opacity: 1;
+    margin-top: 8px;
+}
+
+/* Confidence breakdown panel (Yield AI tab) */
+.confidence-detail {
+    max-height: 0;
+    overflow: hidden;
+    opacity: 0;
+    transition: max-height 0.4s ease, opacity 0.3s ease;
+}
+
+.confidence-detail.open {
+    max-height: 260px;
+    opacity: 1;
+}
+
+/* Grow Log batch card expandable timeline */
+.batch-detail {
+    max-height: 0;
+    overflow: hidden;
+    opacity: 0;
+    transition: max-height 0.4s ease, opacity 0.3s ease;
+}
+
+.batch-detail.open {
+    max-height: 600px;
+    opacity: 1;
+}
+
+.rack-drag-over {
+    outline: 2px dashed var(--color-primary, #16a34a);
+    outline-offset: 2px;
+    background-color: color-mix(in srgb, var(--color-primary, #16a34a) 6%, transparent);
+}
+
+/* --- Rack Detail Subpage: slot grid items --- */
+.rack-slot-btn {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 3px;
+    width: 100%;
+    height: 56px;
+    border-radius: 12px;
+    border-width: 1.5px;
+    border-style: solid;
+    transition: transform 0.12s ease, box-shadow 0.12s ease, outline-color 0.12s ease;
+    cursor: pointer;
+}
+
+.rack-slot-btn:active {
+    transform: scale(0.88);
+}
+
+.rack-slot-btn:hover {
+    box-shadow: 0 0 0 3px rgba(0, 69, 33, 0.18);
+}
+
+/* Bulk-select checkbox overlay — shown on both mobile and desktop so
+           slot selection + bulk actions work on every screen size. Sized up
+           a bit from the original 13px so it's easier to tap. */
+.rd-slot-check {
+    display: flex;
+    position: absolute;
+    top: 4px;
+    left: 4px;
+    z-index: 2;
+}
+
+.rd-slot-check input {
+    width: 18px;
+    height: 18px;
+    accent-color: #0d7a3f;
+    cursor: pointer;
+}
+
+/* Elements only meant for the desktop Rack Detail redesign */
+.rd-desktop-only {
+    display: none;
+}
+
+/* Icon badge + subtitle shown above the Login/Sign up header — desktop
+           form-panel only, hidden on the mobile single-column layout. */
+.desktop-auth-badge,
+.desktop-auth-subtitle {
+    display: none;
+}
+
+/* Top-right header nav links + main content footer — desktop only */
+#header-nav-links {
+    display: none;
+}
+
+#app-main-footer {
+    display: none;
+}
+
+/* Theme Toggle View Transition (Diagonal Wiper) */
+html.theme-transitioning::view-transition-old(root),
+html.theme-transitioning::view-transition-new(root) {
+    animation: none;
+    mix-blend-mode: normal;
+}
+
+html.theme-transitioning::view-transition-new(root) {
+    z-index: 9999;
+    -webkit-mask-image: linear-gradient(to bottom right, black 50%, transparent 50%);
+    mask-image: linear-gradient(to bottom right, black 50%, transparent 50%);
+    -webkit-mask-size: 200% 200%;
+    mask-size: 200% 200%;
+    -webkit-mask-position: 100% 100%;
+    mask-position: 100% 100%;
+    animation: theme-vt-wipe 1.2s cubic-bezier(0.65, 0, 0.35, 1) forwards;
+}
+
+/* The glowing wiper blade drawn using a dedicated view-transition group */
+html.theme-transitioning::view-transition-group(vt-wiper) {
+    z-index: 99999;
+    background-image: linear-gradient(to bottom right, transparent calc(50% - 10px), rgba(74, 222, 128, 0.7) calc(50% - 3px), #4ade80 50%, rgba(74, 222, 128, 0.7) calc(50% + 3px), transparent calc(50% + 10px));
+    background-size: 200% 200%;
+    background-position: 100% 100%;
+    animation: theme-vt-wipe 1.2s cubic-bezier(0.65, 0, 0.35, 1) forwards;
+}
+html.theme-transitioning::view-transition-image-pair(vt-wiper) {
+    display: none;
+}
+
+html.theme-transitioning::view-transition-old(root) {
+    z-index: 1;
+}
+
+@keyframes theme-vt-wipe {
+    0% {
+        -webkit-mask-position: 100% 100%;
+        mask-position: 100% 100%;
+        background-position: 100% 100%;
+    }
+    100% {
+        -webkit-mask-position: 0% 0%;
+        mask-position: 0% 0%;
+        background-position: 0% 0%;
+    }
+}

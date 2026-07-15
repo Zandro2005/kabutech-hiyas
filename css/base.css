@@ -1,0 +1,745 @@
+/* --- Prevent "icon name" text flash before Material Symbols font loads --- */
+.material-symbols-outlined {
+    opacity: 0;
+}
+
+.fonts-ready .material-symbols-outlined {
+    opacity: 1;
+}
+
+/* --- App Boot Loader ---
+   The whole app is kept invisible (not just unmounted — invisible, so
+   layout/measurement code in app.js can still run) until html.app-ready
+   is set by the boot-gate script in index.html. This guarantees nothing
+   half-loaded (icons, unstyled content, uninitialized screens) is ever
+   shown to the user. */
+body>*:not(#app-boot-loader) {
+    visibility: hidden;
+    opacity: 0;
+    transform: translateY(8px);
+}
+
+html.app-ready body>*:not(#app-boot-loader) {
+    visibility: visible;
+    opacity: 1;
+    transform: translateY(0);
+    transition: opacity 0.6s ease-out, transform 0.6s ease-out;
+}
+
+#app-boot-loader {
+    position: fixed;
+    inset: 0;
+    z-index: 9999;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 14px;
+    background: #072211;
+    opacity: 1;
+    transition: opacity 0.4s ease;
+}
+
+#app-boot-loader.app-boot-loader--done {
+    opacity: 0;
+    pointer-events: none;
+}
+
+.app-boot-loader__mark {
+    width: 56px;
+    height: 56px;
+    border-radius: 18px;
+    background: rgba(173, 242, 188, 0.1);
+    border: 1px solid rgba(173, 242, 188, 0.25);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.app-boot-loader__spinner {
+    width: 24px;
+    height: 24px;
+    border-radius: 50%;
+    border: 3px solid rgba(173, 242, 188, 0.25);
+    border-top-color: #adf2bc;
+    animation: app-boot-spin 0.8s linear infinite;
+}
+
+@keyframes app-boot-spin {
+    to {
+        transform: rotate(360deg);
+    }
+}
+
+.app-boot-loader__label {
+    font-family: inherit;
+    font-size: 12px;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: rgba(255, 255, 255, 0.55);
+}
+
+/* --- Highlight pulse: points the user at the Add Batch button after arriving via the + Add Crop FAB --- */
+@keyframes add-crop-pulse-ring {
+    0% {
+        box-shadow: 0 0 0 0 rgba(0, 69, 33, 0.65), 0 2px 8px rgba(0, 69, 33, 0.25);
+    }
+
+    50% {
+        box-shadow: 0 0 0 8px rgba(0, 69, 33, 0.18), 0 4px 16px rgba(0, 69, 33, 0.35);
+    }
+
+    100% {
+        box-shadow: 0 0 0 0 rgba(0, 69, 33, 0), 0 2px 8px rgba(0, 69, 33, 0.25);
+    }
+}
+
+.add-crop-pulse {
+    animation: add-crop-pulse-ring 0.85s ease-in-out infinite;
+    transform: scale(1.06);
+    transition: transform 0.2s ease;
+}
+
+/* --- Animated hint tooltip that appears before the Add Batch button is highlighted --- */
+
+/* --- Force portrait: hide the app and show a rotate prompt in landscape --- */
+#rotate-lock {
+    display: none;
+}
+
+@media (orientation: landscape) and (max-height: 600px) {
+
+    #app-wrapper,
+    #frame-toggle-btn {
+        display: none !important;
+    }
+
+    #rotate-lock {
+        display: flex;
+        position: fixed;
+        inset: 0;
+        z-index: 99999;
+        background: #0d3d1e;
+        color: #fff;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: 16px;
+        text-align: center;
+        padding: 24px;
+    }
+
+    #rotate-lock .material-symbols-outlined {
+        font-size: 56px;
+        opacity: 1;
+        animation: rotate-hint 1.8s ease-in-out infinite;
+    }
+
+    #rotate-lock p {
+        font-family: "Plus Jakarta Sans", sans-serif;
+        font-weight: 700;
+        font-size: 16px;
+        max-width: 280px;
+    }
+}
+
+@keyframes rotate-hint {
+
+    0%,
+    100% {
+        transform: rotate(0deg);
+    }
+
+    50% {
+        transform: rotate(-90deg);
+    }
+}
+
+/* --- Login <-> Register slide transition --- */
+#scene-login,
+#scene-register {
+    transition: transform 0.45s cubic-bezier(0.25, 0.1, 0.25, 1),
+        opacity 0.4s ease;
+    will-change: transform, opacity;
+}
+
+/* Outgoing screen exits fully off-screen to the left */
+.slide-out-left {
+    transform: translateX(-100%);
+}
+
+/* Incoming/outgoing screen sits off-screen to the right */
+.slide-out-right {
+    transform: translateX(100%);
+}
+
+.slide-in {
+    transform: translateX(0);
+}
+
+/* --- Dark Mode Switch --- */
+/* No CSS transition on theme switch — transitioning hundreds of elements
+           simultaneously causes visible lag. The class swap is instant and smooth. */
+
+/* --- Sun ↔ Moon morph animation for theme toggle icons --- */
+
+/* Modern Scrollbars & Transitions */
+.hide-scrollbar::-webkit-scrollbar {
+    display: none;
+}
+
+.hide-scrollbar {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+    overscroll-behavior: contain;
+}
+
+/* Prevent the outer page (html/body) from ever becoming scrollable
+           on real mobile browsers. Without this, dragging near the top/
+           bottom of an inner scroll area (like #app-scroll-area) can chain
+           the scroll gesture up to the document itself — which visually
+           drags the whole app, including the fixed bottom nav bar, up the
+           screen. Locking html/body to the viewport means only the inner
+           .hide-scrollbar panes (which have overscroll-behavior: contain
+           above) can ever scroll. */
+html,
+body {
+    overscroll-behavior: none;
+}
+
+@media (max-width: 767px) {
+
+    html,
+    body {
+        position: fixed !important;
+        inset: 0 !important;
+        width: 100% !important;
+        height: 100% !important;
+        overflow: hidden !important;
+    }
+}
+
+/* Dark mode scrollbar — scoped to scrollable widgets only */
+.dark #alerts-list-container::-webkit-scrollbar,
+.dark #logs-container::-webkit-scrollbar,
+.dark #rack-detail-harvests::-webkit-scrollbar,
+.dark #more-staff-reports-container::-webkit-scrollbar {
+    width: 4px;
+    height: 4px;
+}
+
+.dark #alerts-list-container::-webkit-scrollbar-track,
+.dark #logs-container::-webkit-scrollbar-track,
+.dark #rack-detail-harvests::-webkit-scrollbar-track,
+.dark #more-staff-reports-container::-webkit-scrollbar-track {
+    background: #18181b;
+}
+
+.dark #alerts-list-container::-webkit-scrollbar-thumb,
+.dark #logs-container::-webkit-scrollbar-thumb,
+.dark #rack-detail-harvests::-webkit-scrollbar-thumb,
+.dark #more-staff-reports-container::-webkit-scrollbar-thumb {
+    background: #3f3f46;
+    border-radius: 999px;
+}
+
+.dark #alerts-list-container::-webkit-scrollbar-thumb:hover,
+.dark #logs-container::-webkit-scrollbar-thumb:hover,
+.dark #rack-detail-harvests::-webkit-scrollbar-thumb:hover,
+.dark #more-staff-reports-container::-webkit-scrollbar-thumb:hover {
+    background: #52525b;
+}
+
+/* Firefox — scoped to scrollable widgets only */
+.dark #alerts-list-container,
+.dark #logs-container,
+.dark #more-staff-reports-container {
+    scrollbar-color: #3f3f46 #18181b;
+    scrollbar-width: thin;
+}
+
+.ambient-shadow {
+    box-shadow: 0px 4px 20px rgba(15, 31, 20, 0.05);
+}
+
+.interactive-shadow {
+    box-shadow: 0px 8px 24px rgba(15, 31, 20, 0.08);
+}
+
+.glow-green {
+    box-shadow: 0px 0px 15px rgba(22, 101, 52, 0.25);
+}
+
+.glow-red {
+    box-shadow: 0px 0px 15px rgba(186, 26, 26, 0.3);
+}
+
+.glow-amber {
+    box-shadow: 0px 0px 15px rgba(251, 191, 36, 0.35);
+}
+
+body {
+    font-family: 'Plus Jakarta Sans', sans-serif;
+}
+
+/* Profile ("More") tab: desktop-only redesign is hidden by default
+           and only revealed at the desktop breakpoint (see @media 768px). */
+.profile-desktop-only {
+    display: none;
+}
+
+/* Mobile-only footer at the bottom of the "More" tab (System &
+           Support links). Self-contained explicit CSS — not dependent on
+           Tailwind gap/flex utility classes — mirrors the desktop footer's
+           grouping but stacked for a narrow screen. Visibility is handled
+           by the existing .profile-mobile-only rules (hidden at >=768px). */
+/* Anchor the footer to the very bottom of the "More" tab instead of
+           letting it sit right after the last card with dead space below
+           it. #tab-profile's parent (.desktop-canvas-pad) is min-height:100%
+           of the scroll area, so when the visible cards don't fill that
+           height, block layout leaves the leftover space AFTER the footer
+           (at the end of the box) rather than pushing the footer down to
+           meet the nav bar. Turning the chain into a flex column and giving
+           the footer margin-top:auto moves that leftover space above the
+           footer instead, so the footer sits flush just above the reserved
+           bottom-nav padding, on any tab content length. */
+@media (max-width: 767px) {
+    #app-scroll-area>.desktop-canvas-pad {
+        display: flex !important;
+        flex-direction: column !important;
+    }
+
+    #tab-profile:not(.hidden) {
+        display: flex !important;
+        flex-direction: column !important;
+        flex: 1 1 auto !important;
+        min-height: 0 !important;
+    }
+}
+
+.mobile-app-footer {
+    display: flex !important;
+    flex-direction: column !important;
+    row-gap: 4px !important;
+    margin-top: auto !important;
+    margin-bottom: 0 !important;
+    padding: 8px 4px 2px !important;
+    border-top: 1px solid #c3d1c8 !important;
+}
+
+/* NOTE: the small-phone compaction rule below (max-width: 480px)
+           targets "#app-wrapper [class*='space-y-4']>*+*" which has HIGHER
+           specificity (ID + attribute selector) than the plain class rule
+           above, so it was silently forcing margin-top back down to 0.75rem
+           on phones regardless of what value was set above. This rule
+           re-asserts the intended margin (auto, to push to bottom) with
+           matching/higher specificity (ID + two classes) so it always wins,
+           at every viewport width. */
+#app-wrapper .profile-mobile-only.mobile-app-footer {
+    margin-top: 50vh !important;
+    margin-bottom: 0 !important;
+}
+
+html.dark .mobile-app-footer {
+    border-top: 1px solid #2f5a3c !important;
+}
+
+.mobile-app-footer-title {
+    font-size: 10px;
+    font-weight: 800;
+    letter-spacing: .03em;
+    text-transform: uppercase;
+    text-align: center;
+    color: #032514;
+    margin: 0 0 2px;
+}
+
+html.dark .mobile-app-footer-title {
+    color: #fff;
+}
+
+.mobile-app-footer-desc {
+    font-size: 10px;
+    line-height: 1.3;
+    color: #64748b;
+    margin: 0 0 2px;
+}
+
+html.dark .mobile-app-footer-desc {
+    color: #a1a1aa;
+}
+
+.mobile-app-footer-copy {
+    font-size: 9px;
+    color: #94a3b8;
+    margin: 0;
+}
+
+html.dark .mobile-app-footer-copy {
+    color: #71717a;
+}
+
+.mobile-app-footer-copy-bottom {
+    width: 100%;
+    text-align: center;
+    padding-top: 2px;
+}
+
+/* Single-line link row: no wrapping, links shrink to fit and the
+           row scrolls horizontally on very narrow screens as a fallback
+           rather than wrapping to a second line. */
+.mobile-app-footer-links {
+    display: flex;
+    flex-direction: row;
+    flex-wrap: nowrap !important;
+    justify-content: center;
+    align-items: center;
+    column-gap: 4px;
+    row-gap: 0;
+    width: 100%;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+}
+
+.mobile-app-footer-links::-webkit-scrollbar {
+    display: none;
+}
+
+.mobile-app-footer-link {
+    font-size: 9.5px;
+    font-weight: 700;
+    text-align: inherit;
+    color: #0d7a3f;
+    background: rgba(13, 122, 63, 0.1);
+    border: none;
+    border-radius: 999px;
+    padding: 5px 8px !important;
+    white-space: nowrap;
+    flex-shrink: 0;
+    cursor: pointer;
+}
+
+html.dark .mobile-app-footer-link {
+    color: #4ade80;
+    background: rgba(74, 222, 128, 0.12);
+}
+
+.mobile-app-footer-link:active {
+    color: #fff;
+    background: #0d7a3f;
+}
+
+html.dark .mobile-app-footer-link:active {
+    color: #032514;
+    background: #4ade80;
+}
+
+/* --- User-controlled app zoom ---
+           A single multiplier applied on top of the existing rem scale.
+           Because every size in this app (padding, gaps, text, icons) is
+           already expressed in rem units relative to the html font-size,
+           scaling that one root value scales the whole UI uniformly —
+           no individual element's spacing, padding, or proportions change,
+           they all just get bigger or smaller together, identically. */
+:root {
+    --user-zoom: 1;
+}
+
+html {
+    font-size: calc(16px * var(--user-zoom, 1));
+    overflow-x: hidden;
+    max-width: 100%;
+}
+
+body {
+    overflow-x: hidden;
+    max-width: 100%;
+}
+
+/* Login/Register panels stay at a fixed 90% scale at all times —
+           intentionally NOT tied to --user-zoom, so they look the same
+           regardless of whatever zoom level was last set inside the app. */
+html:has(#scene-login:not(.hidden)),
+html:has(#scene-register:not(.hidden)) {
+    font-size: calc(16px * 0.9);
+}
+
+/* On phone- and tablet-portrait-sized viewports (anything under the
+           768px desktop-sidebar breakpoint), drop the desktop "device
+           mockup" bezel and let the app fill the actual screen — internal
+           layout, styles, and flow are untouched, only the outer frame
+           adapts. This one range (0–767px) is intentionally kept as a
+           single unified breakpoint so phones AND small/medium tablets
+           (portrait) get the exact same properly-fitted, full-screen
+           touch shell — no orphaned "gap" width range in between. */
+@media (max-width: 767px) {
+    body {
+        padding: 0 !important;
+        display: block !important;
+        min-height: 100dvh;
+    }
+
+    /* Remove the sign-up hero sub-text ("Set up your farm, invite your
+               team...") on mobile only — the headline alone is enough there.
+               Desktop keeps it (and it's now bigger, see the >=768px rules). */
+    #scene-register .hero-subtext {
+        display: none !important;
+    }
+
+    #app-wrapper,
+    #app-wrapper.phone-frame {
+        position: fixed !important;
+        inset: 0 !important;
+        width: 100vw !important;
+        max-width: 100vw !important;
+        height: 100dvh !important;
+        max-height: 100dvh !important;
+        border: none !important;
+        border-radius: 0 !important;
+        box-shadow: none !important;
+    }
+
+    /* Shrink overall UI density on small phones — reduces all
+               rem-based text/spacing proportionally without zooming.
+               Scales with viewport width so smaller phones (e.g. 360px)
+               render the same proportions/layout as larger ones (e.g. 430px),
+               instead of staying a fixed px size that causes more wrapping
+               on narrower screens. */
+    html {
+        font-size: calc(clamp(11px, 3.55vw, 14px) * var(--user-zoom, 1));
+    }
+
+    /* Login/Register screens are designed with the standard 16px
+               rem scale — keep their spacing/padding proportions intact
+               on small phones instead of the compacted app-wide scale.
+               Fixed at 90%, independent of --user-zoom (see rule above). */
+    html:has(#scene-login:not(.hidden)),
+    html:has(#scene-register:not(.hidden)) {
+        font-size: calc(16px * 0.9);
+    }
+
+    #app-wrapper [class*="rounded-2xl"][class*="p-4"] {
+        padding: 0.75rem !important;
+    }
+
+    #app-wrapper [class*="space-y-4"]>*+* {
+        margin-top: 0.75rem !important;
+    }
+
+    /* Extra compaction for the Home/Dashboard widgets only */
+    #app-wrapper #home-desktop-view .sensor-card,
+    #app-wrapper #home-desktop-view [class*="rounded-2xl"][class*="p-3.5"] {
+        padding: 0.75rem !important;
+    }
+
+    #app-wrapper #home-desktop-view [class*="rounded-2xl"][class*="p-4"] {
+        padding: 0.875rem !important;
+    }
+
+    #app-wrapper #home-desktop-view .grid[class*="gap-3"] {
+        gap: 0.625rem !important;
+    }
+
+    #app-wrapper #home-desktop-view>*+* {
+        margin-top: 0.875rem !important;
+    }
+
+    /* Dashboard sensor card icons and sparkline charts */
+    #app-wrapper #home-desktop-view .sensor-card .material-symbols-outlined {
+        font-size: 1.15rem !important;
+    }
+
+    #app-wrapper #home-desktop-view .sensor-card canvas {
+        height: 2rem !important;
+    }
+
+    #app-wrapper #home-desktop-view .sensor-card>div[class*="mb-3"] {
+        margin-bottom: 0.75rem !important;
+    }
+
+    #app-wrapper #home-desktop-view .sensor-card [class*="p-2"][class*="rounded-lg"] {
+        padding: 0.5rem !important;
+    }
+
+    /* Restore original mobile home layout styles */
+    #app-wrapper #home-mobile-view .sensor-card,
+    #app-wrapper #home-mobile-view [class*="rounded-2xl"][class*="p-3.5"] {
+        padding: 0.875rem !important;
+    }
+
+    #app-wrapper #home-mobile-view [class*="rounded-2xl"][class*="p-4"] {
+        padding: 1rem !important;
+    }
+
+    #app-wrapper #home-mobile-view .grid[class*="gap-3"] {
+        gap: 0.875rem !important;
+    }
+
+    #app-wrapper #home-mobile-view>*+* {
+        margin-top: 1rem !important;
+    }
+
+    #app-wrapper #home-mobile-view .sensor-card .material-symbols-outlined {
+        font-size: 1.25rem !important;
+    }
+
+    #app-wrapper #home-mobile-view .sensor-card canvas {
+        height: 2.25rem !important;
+    }
+
+    #app-wrapper #home-mobile-view .sensor-card>div[class*="mb-3"] {
+        margin-bottom: 0.875rem !important;
+    }
+
+    #app-wrapper #home-mobile-view .sensor-card [class*="p-2"][class*="rounded-lg"] {
+        padding: 0.625rem !important;
+    }
+
+    /* (Toggles moved outside media query to prevent nesting) */
+
+    /* Bottom nav: admin has 6 tabs vs staff's 5 — shrink icons/labels
+               slightly so all items fit without crowding or overflow. */
+    #app-wrapper nav button .material-symbols-outlined {
+        font-size: 1.35rem !important;
+    }
+
+    #app-wrapper nav button [class*="text-[10px]"] {
+        font-size: 0.65rem !important;
+    }
+
+    #app-wrapper nav:not(.ob-nav) {
+        padding-left: 0.25rem !important;
+        padding-right: 0.25rem !important;
+    }
+
+    /* Controls tab: add breathing room between elements inside
+               each environment parameter card (icon, name, now/target,
+               description, slider, device row). */
+    #app-wrapper #tab-controls [class*="rounded-2xl"][class*="p-4"]>[class*="gap-3"][class*="mb-3"] {
+        gap: 0.875rem !important;
+        margin-bottom: 1rem !important;
+    }
+
+    #app-wrapper #tab-controls [class*="rounded-2xl"][class*="p-4"] p[class*="mt-1.5"] {
+        margin-top: 0.5rem !important;
+    }
+
+    #app-wrapper #tab-controls [class*="rounded-2xl"][class*="p-4"] [class*="mt-3.5"][class*="pt-3.5"] {
+        margin-top: 1.125rem !important;
+        padding-top: 1.125rem !important;
+    }
+
+    #app-wrapper #tab-controls [class*="rounded-2xl"][class*="p-4"] [class*="gap-1.5"] {
+        gap: 0.5rem !important;
+    }
+
+    #app-wrapper #tab-controls [class*="rounded-2xl"][class*="p-4"] [class*="mt-3.5"][class*="pt-3.5"] [class*="gap-2"] {
+        gap: 0.625rem !important;
+    }
+
+    #notch,
+    #home-indicator {
+        display: none !important;
+    }
+
+    .phone-frame>.flex-1 {
+        padding-top: 0 !important;
+    }
+
+    /* Prevent iOS Safari from auto-zooming the page when an input
+               is focused (triggered by font-size < 16px). Visible text
+               size in the layout is unaffected since these inputs already
+               render close to 16px; this just guarantees no zoom. */
+    input,
+    select,
+    textarea {
+        font-size: 16px !important;
+    }
+}
+
+/* Environment Controls: supplemental desktop-only widgets (Automation
+           Center stats, next-action preview, schedule/efficiency mini-cards).
+           Hidden by default so the mobile Controls tab stays exactly as-is;
+           revealed only inside the >=768px media query above. */
+#tab-controls .ctrl-desktop-extra {
+    display: none;
+}
+
+/* Mobile only: stack the Controls columns as flex so we can
+           reorder the pieces — Auto/Manual mode banner on top, the four
+           Setpoint Target cards in the middle, then the mode hint text
+           and Device Schedules widget below. Desktop's merged-card layout
+           is untouched: its "!important" rules simply win once the
+           >=768px media query applies, restoring the normal nesting. */
+#tab-controls .ctrl-desktop-grid {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+}
+
+/* Flatten the right column and its System Mode card so their
+           children become direct, independently-orderable flex items of
+           the grid (mobile only — desktop's !important display:flex
+           rules for these same elements override this automatically). */
+#tab-controls #controls-automation-panel,
+#tab-controls #ctrl-system-mode-card {
+    display: contents;
+}
+
+/* 1. Auto/Manual toggle banner — stays at the very top */
+#tab-controls #ctrl-mode-banner {
+    order: 1;
+}
+
+#tab-controls #mode-warning-label {
+    order: 2;
+}
+
+/* 2. The four Setpoint Target parameter cards */
+#tab-controls .ctrl-desktop-grid>.desktop-col:first-child {
+    order: 3;
+}
+
+/* 3. Mode hint text + Device Schedules widget, moved below the
+           parameter cards */
+#tab-controls #ctrl-manual-hint {
+    order: 4;
+}
+
+#tab-controls #ctrl-locked-hint {
+    order: 5;
+}
+
+#tab-controls #schedule-config-section-mobile {
+    order: 6;
+}
+
+/* Crops tab: supplemental desktop-only widgets (status badges, stat
+           grid, View Full Metrics button, sidebar). Hidden by default so the
+           mobile Crops tab stays exactly as-is; revealed only inside the
+           >=768px media query above. */
+#tab-grow-log .crops-desktop-only {
+    display: none;
+}
+
+/* Responsive visibility toggles matching the app's breakpoint (767px / 768px) */
+#home-desktop-view {
+    display: none !important;
+}
+
+#home-mobile-view {
+    display: block !important;
+}
+
+@media (min-width: 768px) {
+    #home-desktop-view {
+        display: block !important;
+    }
+
+    #home-mobile-view {
+        display: none !important;
+    }
+}
+

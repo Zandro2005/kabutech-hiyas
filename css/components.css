@@ -1,0 +1,132 @@
+/* Custom Toggle Switch */
+.toggle-checkbox:checked {
+    right: 0;
+    border-color: #004521;
+}
+
+.toggle-checkbox:checked+.toggle-label {
+    background-color: #004521;
+}
+
+.toggle-checkbox:checked+.toggle-label:after {
+    transform: translateX(100%);
+    border-color: white;
+}
+
+.toggle-label:after {
+    content: '';
+    position: absolute;
+    top: 2px;
+    left: 2px;
+    width: 20px;
+    height: 20px;
+    background-color: white;
+    border-radius: 50%;
+    transition: transform 0.2s ease-in-out;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+}
+
+/* Ambient Depth for background */
+.ambient-glow-1 {
+    background: radial-gradient(circle at 10% 20%, rgba(146, 214, 162, 0.15) 0%, transparent 40%);
+}
+
+.ambient-glow-2 {
+    background: radial-gradient(circle at 90% 80%, rgba(161, 241, 185, 0.2) 0%, transparent 45%);
+}
+
+/* Subpage light mode: match dashboard app-bg */
+.subpage-panel {
+    background: #f5f9f6 !important;
+}
+
+/* Subpage dark mode: just a whisper of green */
+.dark .subpage-panel {
+    background:
+        radial-gradient(ellipse at 10% 0%, rgba(20, 83, 45, 0.18) 0%, transparent 50%),
+        radial-gradient(ellipse at 85% 90%, rgba(10, 60, 30, 0.13) 0%, transparent 50%),
+        #09090b !important;
+}
+
+/* Report Cards Guaranteed Dark Mode */
+.report-card-container {
+    background-color: #ffffff;
+    border-color: #e2e8f0;
+}
+.report-card-title {
+    color: #0f172a;
+}
+.report-card-desc {
+    color: #475569;
+}
+.report-card-meta {
+    background-color: transparent;
+    color: #64748b;
+}
+
+.dark .report-card-container {
+    background-color: #18181b !important;
+    border-color: #27272a !important;
+}
+.dark .report-card-title {
+    color: #ffffff !important;
+}
+.dark .report-card-desc {
+    color: #ffffff !important;
+}
+.dark .report-card-meta {
+    background-color: transparent !important;
+    color: #a1a1aa !important; /* zinc-400 for better contrast when transparent */
+}
+
+/* Dashboard Widget Panels */
+.widget-panel {
+    background-color: #ffffff;
+    border-color: #e2e8f0;
+}
+.dark .widget-panel {
+    background-color: #18181b !important; /* zinc-900 */
+    border-color: #27272a !important;
+}
+
+.widget-panel-emerald {
+    background-color: #ecfdf5;
+    border-color: #a7f3d0;
+}
+.dark .widget-panel-emerald {
+    background-color: #18181b !important;
+    border-color: #27272a !important;
+}
+
+/* Guaranteed Report Button Styles */
+.report-btn {
+    background-color: #0f172a !important;
+    color: #ffffff !important;
+}
+.dark .report-btn {
+    background-color: #ffffff !important;
+    color: #000000 !important;
+}
+
+/* Mobile ordering for Reports Hub */
+@media (max-width: 767px) {
+    .history-desktop-grid {
+        display: flex !important;
+        flex-direction: column !important;
+        gap: 1.25rem !important;
+    }
+    .history-desktop-grid > div {
+        margin-top: 0 !important;
+    }
+    .reports-col { order: 2; }
+    .right-col { display: contents !important; }
+    .overview-widget { order: 1; }
+    .guidelines-widget { order: 3; }
+}
+
+/* Hide borders in dark mode */
+.dark .dark-no-border {
+    border-top-color: transparent !important;
+    border-color: transparent !important;
+}
+

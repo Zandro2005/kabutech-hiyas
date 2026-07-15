@@ -1,0 +1,18 @@
+{
+  "name": "KabuTech Hiyas - Farm Operations",
+  "short_name": "KabuTech",
+  "description": "Smart Oyster Mushroom Farm Operations & Environment Controls",
+  "start_url": "./index.html",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#f5f9f6",
+  "theme_color": "#004521",
+  "icons": [
+    {
+      "src": "loading_screen/screen.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ]
+}

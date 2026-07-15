@@ -1,0 +1,418 @@
+# KabuTech Firebase Migration — Complete Plan
+
+## Goal
+
+Move **everything that needs shared/persistent data** from localStorage to Firebase, so the app works across devices and supports real multi-user collaboration.
+
+---
+
+## Complete Feature Audit
+
+### 🔐 1. Authentication & User Accounts
+
+| Feature | Current (localStorage) | Firebase Target |
+|---|---|---|
+| Login | `kb_user` — session stored locally | Firebase Auth `signInWithEmailAndPassword()` |
+| Register | `kb_accounts` — plaintext passwords! | Firebase Auth `createUserWithEmailAndPassword()` |
+| Logout | `localStorage.removeItem('kb_user')` | `firebase.auth().signOut()` |
+| Auto-login on refresh | Reads `kb_user` | `onAuthStateChanged()` listener |
+| Remember me | localStorage persistence | Firebase Auth session persistence |
+
+**Functions to change:** `handleLogin()` [L2055](file:///home/zandro/Documents/KabuTech%20App%20v4/js/app.js#L2055), `handleRegister()` [L1969](file:///home/zandro/Documents/KabuTech%20App%20v4/js/app.js#L1969), `handleLogout()` [L2199](file:///home/zandro/Documents/KabuTech%20App%20v4/js/app.js#L2199), `getAccounts()` [L2016](file:///home/zandro/Documents/KabuTech%20App%20v4/js/app.js#L2016), `saveAccounts()` [L2020](file:///home/zandro/Documents/KabuTech%20App%20v4/js/app.js#L2020)
+
+---
+
+### 👥 2. Staff Account Management (Admin CRUD)
+
+This is critical — admin needs to **create, read, update, and delete** staff accounts.
+
+| Feature | Current | Firebase Target |
+|---|---|---|
+| List staff accounts | `getAccounts().filter(role !== 'admin')` | Read from `/kabutech/users` collection |
+| Create staff | Push to `kb_accounts` array | Firebase Auth `createUser()` + write profile to `/kabutech/users/{uid}` |
+| Edit staff (name, password) | Direct array mutation | Update Auth profile + update `/kabutech/users/{uid}` |
+| Delete staff | Filter out of array | Firebase Auth delete user + remove from `/kabutech/users/{uid}` |
+| Search staff | Client-side filter | Client-side filter on cached `/kabutech/users` data |
+
+**Functions to change:** `renderStaffAccountsList()` [L5052](file:///home/zandro/Documents/KabuTech%20App%20v4/js/app.js#L5052), `renderStaffDirectoryDesktop()` [L5096](file:///home/zandro/Documents/KabuTech%20App%20v4/js/app.js#L5096), `openStaffAccountModal()` [L5180](file:///home/zandro/Documents/KabuTech%20App%20v4/js/app.js#L5180), `saveStaffAccount()` [L5230](file:///home/zandro/Documents/KabuTech%20App%20v4/js/app.js#L5230), `confirmDeleteStaff()` [L5288](file:///home/zandro/Documents/KabuTech%20App%20v4/js/app.js#L5288)
+
+> [!IMPORTANT]
+> **Admin creating/deleting other users' Firebase Auth accounts requires a Cloud Function.** Firebase client SDK can only manage the currently signed-in user. We'll use a simple Cloud Function that the admin calls to create/delete staff auth accounts.
+
+**Alternative (simpler):** Admin creates staff profiles in the database only. Staff self-registers through the signup page, and admin "approves" them by linking the profile. This avoids needing Cloud Functions.
+
+---
+
+### 🌱 3. Grow Batches (Racks + Bags)
+
+| Feature | Current | Firebase Target |
+|---|---|---|
+| All rack data | `kb_batches` array | `/kabutech/batches/{batchId}` |
+| Add rack | Push to array → `saveBatches()` | `fbDB.ref('kabutech/batches').push(newRack)` |
+| Edit rack | Mutate array → `saveBatches()` | `fbDB.ref('kabutech/batches/' + id).update(...)` |
+| Delete rack | Filter array → `saveBatches()` | `fbDB.ref('kabutech/batches/' + id).remove()` |
+| Save function | `saveBatches()` [L739](file:///home/zandro/Documents/KabuTech%20App%20v4/js/app.js#L739) | Write to RTDB |
+| Load function | `localStorage.getItem('kb_batches')` [L653](file:///home/zandro/Documents/KabuTech%20App%20v4/js/app.js#L653) | `onValue()` listener |
+
+---
+
+### 🫑 4. Harvest Logs (Inside Bags)
+
+| Feature | Current | Firebase Target |
+|---|---|---|
+| Log harvest per bag | Push `{date, grams}` to `bag.harvestLog[]` | Same — nested inside batch data in RTDB |
+| Bulk harvest | Iterate selected bags → push to each | Same — batch update then `saveBatches()` → RTDB |
+| Replant (clear harvest) | Reset `bag.harvestLog = []` | Same structure, writes to RTDB |
+| Yield calculation | Sum all `harvestLog.grams` across batches | Same client-side calc, data from RTDB |
+
+**Functions to change:** `openBagHarvestModal()` [L4222](file:///home/zandro/Documents/KabuTech%20App%20v4/js/app.js#L4222), `_confirmBulkHarvest()` [L5368](file:///home/zandro/Documents/KabuTech%20App%20v4/js/app.js#L5368), `replantBag()` [L4070](file:///home/zandro/Documents/KabuTech%20App%20v4/js/app.js#L4070), `removeBagSlot()` [L4132](file:///home/zandro/Documents/KabuTech%20App%20v4/js/app.js#L4132)
+
+> [!TIP]
+> Harvest data is nested inside batches (`batches[].bags[].harvestLog[]`), so it migrates automatically when we migrate batches to Firebase. No separate collection needed.
+
+---
+
+### ✅ 5. Tasks
+
+| Feature | Current | Firebase Target |
+|---|---|---|
+| Task list | `kb_tasks` | `/kabutech/tasks/{taskId}` |
+| Add task | Push to array → `saveTasks()` | `fbDB.ref('kabutech/tasks').push(task)` |
+| Update status | Mutate → `saveTasks()` | `fbDB.ref('kabutech/tasks/' + id).update(...)` |
+| Delete task | Filter → `saveTasks()` | `fbDB.ref('kabutech/tasks/' + id).remove()` |
+| Save function | `saveTasks()` [L740](file:///home/zandro/Documents/KabuTech%20App%20v4/js/app.js#L740) | Write to RTDB |
+
+---
+
+### 🚨 6. Alerts
+
+| Feature | Current | Firebase Target |
+|---|---|---|
+| System alerts | `kb_alerts` | `/kabutech/alerts/{alertId}` |
+| Acknowledge alert | Set `acknowledged: true` → `saveAlerts()` | Update in RTDB |
+| Save function | `saveAlerts()` [L742](file:///home/zandro/Documents/KabuTech%20App%20v4/js/app.js#L742) | Write to RTDB |
+
+---
+
+### 📋 7. Staff Reports
+
+| Feature | Current | Firebase Target |
+|---|---|---|
+| Issue reports | `kb_staff_reports` | `/kabutech/staffReports/{reportId}` |
+| Submit report (staff) | Push to array → `saveStaffReports()` | `fbDB.ref('kabutech/staffReports').push(report)` |
+| Admin note/resolve | Mutate → `saveStaffReports()` | Update in RTDB |
+| Save function | `saveStaffReports()` [L743](file:///home/zandro/Documents/KabuTech%20App%20v4/js/app.js#L743) | Write to RTDB |
+
+---
+
+### 📝 8. Event Logs
+
+| Feature | Current | Firebase Target |
+|---|---|---|
+| System event log | `kb_logs` | `/kabutech/logs/{logId}` |
+| Add log entry | `addLog()` → push to array → `saveLogs()` | Push to RTDB |
+| Save function | `saveLogs()` [L741](file:///home/zandro/Documents/KabuTech%20App%20v4/js/app.js#L741) | Write to RTDB |
+
+---
+
+### ⚙️ 9. Settings
+
+| Feature | Current | Firebase Target |
+|---|---|---|
+| Sensor setpoints | `kb_setpoints` | `/kabutech/settings/setpoints` |
+| Schedule config | `kb_schedule_config` | `/kabutech/settings/schedule` |
+| Yield target | `kb_yield_target` | `/kabutech/settings/yieldTarget` |
+
+**Functions to change:** `saveSetpoints()` [L747](file:///home/zandro/Documents/KabuTech%20App%20v4/js/app.js#L747), `saveScheduleConfig()` [L797](file:///home/zandro/Documents/KabuTech%20App%20v4/js/app.js#L797), `saveYieldTarget()` [L744](file:///home/zandro/Documents/KabuTech%20App%20v4/js/app.js#L744), `submitYieldTarget()` [L4301](file:///home/zandro/Documents/KabuTech%20App%20v4/js/app.js#L4301)
+
+---
+
+### 📡 10. Sensor Data & Controls (Future ESP32)
+
+| Feature | Firebase Target |
+|---|---|
+| Live sensor readings | `/kabutech/sensors/live` |
+| Device controls (fan/mister/light) | `/kabutech/controls` |
+| TinyML predictions | `/kabutech/sensors/tinyml` |
+
+---
+
+### 💻 11. Stays in localStorage (Device-Only)
+
+| Key | Reason |
+|---|---|
+| `kb_zoom_level` | Per-screen preference |
+| `kb_zoom_ctrl_top` | Per-screen position |
+| `kb_onboarded` | Per-device onboarding state |
+
+---
+
+## Firebase Database Schema
+
+```json
+{
+  "kabutech": {
+    "users": {
+      "uid_abc123": {
+        "name": "Admin Renz",
+        "email": "admin@kabutech.com",
+        "role": "admin",
+        "createdAt": 1720700000000
+      },
+      "uid_def456": {
+        "name": "Staff Sarah",
+        "email": "staff@kabutech.com",
+        "role": "staff",
+        "createdAt": 1720700000000
+      }
+    },
+    "batches": {
+      "-NxABC": {
+        "id": 1,
+        "rack": "Rack A",
+        "slots": 12,
+        "substrate": "Sawdust",
+        "setupDate": "2026-07-01",
+        "bags": [
+          {
+            "id": 1,
+            "status": "Active",
+            "plantedDate": "2026-07-01",
+            "harvestLog": [
+              { "date": "2026-07-10", "grams": 250 },
+              { "date": "2026-07-15", "grams": 180 }
+            ]
+          }
+        ]
+      }
+    },
+    "tasks": {
+      "-NxDEF": {
+        "id": 1,
+        "title": "Check humidity levels",
+        "assignee": "Staff Sarah",
+        "priority": "High",
+        "status": "Pending",
+        "dueDate": "2026-07-12"
+      }
+    },
+    "logs": {
+      "-NxGHI": {
+        "timestamp": "07/11/2026, 4:30 PM",
+        "msg": "User logged in as Admin.",
+        "type": "success"
+      }
+    },
+    "alerts": {
+      "-NxJKL": {
+        "id": 1,
+        "title": "CO2 Levels High",
+        "desc": "CO2 reached 1200 ppm in Sector B",
+        "severity": "warning",
+        "acknowledged": false,
+        "timestamp": 1720700000000
+      }
+    },
+    "staffReports": {
+      "-NxMNO": {
+        "id": 1,
+        "severity": "High",
+        "title": "Misting nozzle clogged",
+        "desc": "Sector B nozzle needs replacement",
+        "timestamp": "07/11/2026, 2:00 PM",
+        "status": "Open",
+        "read": false,
+        "adminNote": ""
+      }
+    },
+    "settings": {
+      "yieldTarget": 2.20,
+      "setpoints": {
+        "temperature": 23.5,
+        "humidity": 75.0,
+        "light": 500,
+        "co2": 600
+      },
+      "schedule": {}
+    },
+    "sensors": {
+      "live": {
+        "temperature": 0,
+        "humidity": 0,
+        "co2": 0,
+        "light": 0,
+        "esp32_status": "offline"
+      }
+    },
+    "controls": {
+      "mode": "auto",
+      "fans": { "state": false },
+      "misters": { "state": false },
+      "lights": { "state": false }
+    }
+  }
+}
+```
+
+---
+
+## Security Rules
+
+```json
+{
+  "rules": {
+    "kabutech": {
+      "users": {
+        ".read": "auth != null",
+        "$uid": {
+          ".write": "auth != null && (auth.uid === $uid || root.child('kabutech/users/' + auth.uid + '/role').val() === 'admin')"
+        }
+      },
+      "batches": {
+        ".read": "auth != null",
+        ".write": "auth != null"
+      },
+      "tasks": {
+        ".read": "auth != null",
+        ".write": "auth != null"
+      },
+      "logs": {
+        ".read": "auth != null",
+        ".write": "auth != null"
+      },
+      "alerts": {
+        ".read": "auth != null",
+        ".write": "auth != null"
+      },
+      "staffReports": {
+        ".read": "auth != null",
+        ".write": "auth != null"
+      },
+      "settings": {
+        ".read": "auth != null",
+        ".write": "auth != null && root.child('kabutech/users/' + auth.uid + '/role').val() === 'admin'"
+      },
+      "sensors": {
+        ".read": "auth != null",
+        ".write": true
+      },
+      "controls": {
+        ".read": "auth != null",
+        ".write": "auth != null"
+      }
+    }
+  }
+}
+```
+
+---
+
+## Proposed Changes
+
+### [NEW] [js/firebase-config.js](file:///home/zandro/Documents/KabuTech%20App%20v4/js/firebase-config.js)
+
+Core Firebase module:
+- Firebase init with user's config keys
+- `onAuthStateChanged()` — auto-login, session persistence
+- `onValue()` listeners for all 8 data collections
+- Write helper functions (`fbSaveBatches()`, `fbSaveTasks()`, etc.)
+- Connection status monitor (online/offline badge)
+- Staff account CRUD functions (create via Auth, profile via RTDB)
+
+### [MODIFY] [index.html](file:///home/zandro/Documents/KabuTech%20App%20v4/index.html)
+
+- Add 3 Firebase SDK `<script>` tags before `</head>`
+- Add `<script src="./js/firebase-config.js">` after `app.js`
+
+### [MODIFY] [app.js](file:///home/zandro/Documents/KabuTech%20App%20v4/js/app.js)
+
+**8 save functions** → replace localStorage writes with Firebase writes:
+
+| Function | Line | Change to |
+|---|---|---|
+| `saveBatches()` | L739 | `fbDB.ref('kabutech/batches').set(state.growBatches)` |
+| `saveTasks()` | L740 | `fbDB.ref('kabutech/tasks').set(state.tasks)` |
+| `saveLogs()` | L741 | `fbDB.ref('kabutech/logs').set(state.eventLogs)` |
+| `saveAlerts()` | L742 | `fbDB.ref('kabutech/alerts').set(state.alerts)` |
+| `saveStaffReports()` | L743 | `fbDB.ref('kabutech/staffReports').set(state.staffReports)` |
+| `saveYieldTarget()` | L744 | `fbDB.ref('kabutech/settings/yieldTarget').set(...)` |
+| `saveSetpoints()` | L747 | `fbDB.ref('kabutech/settings/setpoints').set(...)` |
+| `saveScheduleConfig()` | L797+ | `fbDB.ref('kabutech/settings/schedule').set(...)` |
+
+**Auth functions** → replace localStorage auth with Firebase Auth:
+
+| Function | Change |
+|---|---|
+| `handleLogin()` | `fbAuth.signInWithEmailAndPassword()` |
+| `handleRegister()` | `fbAuth.createUserWithEmailAndPassword()` |
+| `handleLogout()` | `fbAuth.signOut()` |
+| `getAccounts()` | Read from cached `/kabutech/users` |
+| `saveAccounts()` | Write to `/kabutech/users` |
+
+**Staff CRUD** → use Firebase Auth + RTDB user profiles:
+
+| Function | Change |
+|---|---|
+| `saveStaffAccount()` (create) | `fbAuth.createUserWithEmailAndPassword()` + write profile to `/kabutech/users/{uid}` |
+| `saveStaffAccount()` (edit) | Update `/kabutech/users/{uid}` (name change). Password change via Auth admin |
+| `confirmDeleteStaff()` | Remove from `/kabutech/users/{uid}`. Auth deletion via admin function |
+| `renderStaffAccountsList()` | Read from cached users array (synced via `onValue`) |
+
+**Init/load** → remove all `localStorage.getItem('kb_*')` for data (keep zoom/onboarding):
+
+Data now arrives via `onValue()` listeners set up in `firebase-config.js`.
+
+---
+
+## Open Questions
+
+> [!IMPORTANT]
+> **Staff Account Creation Approach** — Two options:
+> 
+> **Option A (Simple):** Admin creates staff profile in database. Staff signs up themselves through the register page. Admin approves/links them. No Cloud Functions needed.
+> 
+> **Option B (Full control):** Admin creates the Firebase Auth account directly using a Cloud Function. Requires Firebase Blaze plan (pay-as-you-go, but Cloud Functions free tier = 2M calls/month).
+> 
+> Which do you prefer?
+
+> [!IMPORTANT]
+> **Staff Password Reset:** When admin edits a staff account and changes password — with Firebase Auth, password changes for other users require either (a) Cloud Functions or (b) sending a password reset email to the staff member. Which approach?
+
+---
+
+## What You Need to Do (~10 min)
+
+1. Create Firebase project at [console.firebase.google.com](https://console.firebase.google.com) → name it `kabutech-hiyas`
+2. Enable **Email/Password** auth → Build → Authentication → Get Started → Enable
+3. Create **Realtime Database** → Build → Realtime Database → Create → Singapore → Test mode
+4. Register web app → Project Settings → `</>` → Copy `firebaseConfig` → **Paste to me**
+5. Create 2 test users in Auth → Users → Add User:
+   - `admin@kabutech.com` / `kabutech2026`
+   - `staff@kabutech.com` / `kabutech2026`
+
+## What I Will Code (After Config)
+
+1. ✅ Create `js/firebase-config.js` — all listeners, auth, write helpers
+2. ✅ Add Firebase SDK to `index.html`
+3. ✅ Replace all 8 save functions in `app.js`
+4. ✅ Replace auth (login/register/logout) in `app.js`
+5. ✅ Replace staff CRUD to use Firebase users collection
+6. ✅ Add `onAuthStateChanged()` auto-login
+7. ✅ Add online/offline connection badge
+8. ✅ Set security rules in RTDB
+9. ✅ Keep simulation as fallback when no ESP32 is connected
+10. ✅ Test full flow in browser
+
+---
+
+## Verification Plan
+
+| Test | How |
+|---|---|
+| Login with Firebase Auth | Open app → login → check Firebase Console Auth logs |
+| Data persistence | Create a batch → refresh page → batch still there |
+| Multi-device sync | Login on phone + desktop → create task on one → appears on other |
+| Staff CRUD | Admin creates staff → staff can login → admin edits → admin deletes |
+| Harvest logging | Open rack → tap bag → log harvest → check batch data in Firebase |
+| Offline fallback | Disconnect internet → app shows last data + "Offline" badge |
+| Role restrictions | Login as staff → verify admin-only sections hidden |
