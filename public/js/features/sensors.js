@@ -215,7 +215,7 @@ function updateSensorCardStatus() {
         const status = document.getElementById(statusId);
         if (!card) return;
 
-        const base = 'sensor-card bg-white dark:bg-zinc-900 border rounded-3xl p-4 shadow-sm flex flex-col justify-between relative overflow-hidden group transition-all duration-300';
+        const base = 'sensor-card bg-green-gradient border rounded-3xl p-4 shadow-sm flex flex-col justify-between relative overflow-hidden group transition-all duration-300';
         const wasExpanded = card.classList.contains('expanded');
 
         if (level === 'critical') {

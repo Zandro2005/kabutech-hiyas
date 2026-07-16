@@ -86,6 +86,15 @@
     <script src="https://www.gstatic.com/firebasejs/10.0.0/firebase-auth-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.0.0/firebase-database-compat.js"></script>
     <style>
+        /* Custom Dashboard Widget Backgrounds */
+        .bg-green-gradient {
+            background: linear-gradient(135deg, #f0fdf4 0%, #d1fae5 100%) !important;
+        }
+
+        html.dark .bg-green-gradient {
+            background: linear-gradient(135deg, #18181b 0%, #064e3b 100%) !important;
+        }
+
         @media screen and (max-width: 768px) {
 
             #scene-loading,
@@ -94,16 +103,26 @@
             #scene-app {
                 zoom: 0.85;
             }
-            
+
             #scene-app button,
             #scene-app select,
             #scene-app input[type="checkbox"],
             #scene-app input[type="radio"],
             #scene-app input[type="range"],
             #scene-app .ctrl-toggle,
-            #scene-app .sched-dsk-toggle-wrap,
             #scene-app .toggle-label {
                 zoom: 1.15;
+            }
+
+            #btn-quick-fans-mobile,
+            #btn-quick-misters-mobile,
+            #btn-quick-lights-mobile,
+            #tab-controls button,
+            #tab-controls select,
+            #tab-controls input,
+            #tab-controls .ctrl-toggle,
+            #tab-controls .toggle-label {
+                zoom: 1 !important;
             }
         }
 
@@ -115,7 +134,7 @@
             #scene-app {
                 zoom: 0.8;
             }
-            
+
             #scene-app button,
             #scene-app select,
             #scene-app input[type="checkbox"],
@@ -228,13 +247,15 @@
             <div class="flex items-center justify-between gap-2 px-1">
                 <!-- User profile chip -->
                 <div id="sidebar-user-chip" onclick="switchTab('profile')" title="Profile"
-                    class="flex items-center gap-2.5 cursor-pointer bg-white/5 border border-white/10 hover:bg-white/10 py-2 px-3 rounded-2xl transition-all active:scale-95" style="flex: 1;">
-                    <div
-                        class="rounded-full bg-emerald-700 text-white flex items-center justify-center font-bold text-[12px] shadow-sm" style="width: 32px; height: 32px; min-width: 32px; min-height: 32px; flex-shrink: 0;">
+                    class="flex items-center gap-2.5 cursor-pointer bg-white/5 border border-white/10 hover:bg-white/10 py-2 px-3 rounded-2xl transition-all active:scale-95"
+                    style="flex: 1;">
+                    <div class="rounded-full bg-emerald-700 text-white flex items-center justify-center font-bold text-[12px] shadow-sm"
+                        style="width: 32px; height: 32px; min-width: 32px; min-height: 32px; flex-shrink: 0;">
                         <span id="sidebar-user-avatar">A</span>
                     </div>
                     <div id="sidebar-user-text" class="flex flex-col" style="min-width: 0; overflow: hidden;">
-                        <span id="sidebar-user-name" class="text-[12px] font-bold text-white leading-none truncate block">Admin</span>
+                        <span id="sidebar-user-name"
+                            class="text-[12px] font-bold text-white leading-none truncate block">Admin</span>
                         <span id="sidebar-user-role"
                             class="text-[9px] text-zinc-400 font-semibold tracking-wider uppercase mt-1 truncate block">Administrator</span>
                     </div>
@@ -790,7 +811,7 @@
 
                 <!-- TOP HEADER -->
                 <header id="app-header"
-                    class="w-full bg-white dark:bg-[#0e2216] border-b border-[#edf1ee] dark:border-[#1c3826] flex justify-between items-center px-2 sm:px-4 md:px-6 h-16 z-30 shrink-0">
+                    class="w-full bg-transparent md:bg-white dark:bg-transparent md:dark:bg-[#0e2216] border-b border-transparent md:border-[#edf1ee] dark:border-transparent md:dark:border-[#1c3826] flex justify-between items-center px-2 sm:px-4 md:px-6 h-16 z-30 shrink-0">
                     <!-- Left: Title & Live Badge -->
                     <div class="flex items-center gap-1.5 md:gap-3">
                         <h1 class="text-sm md:text-lg font-extrabold text-[#032514] dark:text-white tracking-tight"
@@ -904,7 +925,7 @@
                                 <div class="sensor-grid-desktop w-full">
                                     <!-- Temp -->
                                     <div id="sensor-temp-card"
-                                        class="sensor-card bg-gradient-to-br from-white to-[#e6fcf0]/80 dark:from-zinc-900 dark:to-emerald-950/30 border border-emerald-100 dark:border-emerald-900/40 rounded-3xl p-4 md:p-3.5 shadow-[0_8px_20px_rgba(16,185,129,0.12)] flex flex-col justify-between relative overflow-hidden group transition-all duration-300 active:scale-[0.96] cursor-pointer hover:shadow-[0_12px_25px_rgba(16,185,129,0.2)] hover:-translate-y-1 md:hover:scale-[1.02]">
+                                        class="sensor-card bg-green-gradient border border-emerald-200 dark:border-emerald-900/40 rounded-3xl p-4 md:p-3.5 shadow-[0_8px_20px_rgba(16,185,129,0.12)] flex flex-col justify-between relative overflow-hidden group transition-all duration-300 active:scale-[0.96] cursor-pointer hover:shadow-[0_12px_25px_rgba(16,185,129,0.2)] hover:-translate-y-1 md:hover:scale-[1.02]">
                                         <div class="flex justify-between items-start mb-3 md:mb-2.5 relative z-10">
                                             <div id="sensor-temp-icon-bg"
                                                 class="w-9 h-9 md:w-8 md:h-8 rounded-xl flex items-center justify-center bg-[#e6fcf0] dark:bg-emerald-950/40 text-[#054f24] dark:text-emerald-400">
@@ -948,7 +969,7 @@
 
                                     <!-- Humidity -->
                                     <div id="sensor-humidity-card"
-                                        class="sensor-card bg-gradient-to-br from-white to-[#e8f4fd]/80 dark:from-zinc-900 dark:to-sky-950/30 border border-sky-100 dark:border-sky-900/40 rounded-3xl p-4 md:p-3.5 shadow-[0_8px_20px_rgba(14,165,233,0.12)] flex flex-col justify-between relative overflow-hidden group transition-all duration-300 active:scale-[0.96] cursor-pointer hover:shadow-[0_12px_25px_rgba(14,165,233,0.2)] hover:-translate-y-1 md:hover:scale-[1.02]">
+                                        class="sensor-card bg-green-gradient border border-sky-200 dark:border-sky-900/40 rounded-3xl p-4 md:p-3.5 shadow-[0_8px_20px_rgba(14,165,233,0.12)] flex flex-col justify-between relative overflow-hidden group transition-all duration-300 active:scale-[0.96] cursor-pointer hover:shadow-[0_12px_25px_rgba(14,165,233,0.2)] hover:-translate-y-1 md:hover:scale-[1.02]">
                                         <div class="flex justify-between items-start mb-3 md:mb-2.5 relative z-10">
                                             <div id="sensor-humidity-icon-bg"
                                                 class="w-9 h-9 md:w-8 md:h-8 rounded-xl flex items-center justify-center bg-[#e8f4fd] dark:bg-sky-950/40 text-[#0284c7] dark:text-sky-400">
@@ -991,7 +1012,7 @@
 
                                     <!-- Light Intensity -->
                                     <div id="sensor-light-card"
-                                        class="sensor-card bg-gradient-to-br from-white to-[#fff7ed]/80 dark:from-zinc-900 dark:to-amber-950/30 border border-amber-100 dark:border-amber-900/40 rounded-3xl p-4 md:p-3.5 shadow-[0_8px_20px_rgba(245,158,11,0.12)] flex flex-col justify-between relative overflow-hidden group transition-all duration-300 active:scale-[0.96] cursor-pointer hover:shadow-[0_12px_25px_rgba(245,158,11,0.2)] hover:-translate-y-1 md:hover:scale-[1.02]">
+                                        class="sensor-card bg-green-gradient border border-amber-200 dark:border-amber-900/40 rounded-3xl p-4 md:p-3.5 shadow-[0_8px_20px_rgba(245,158,11,0.12)] flex flex-col justify-between relative overflow-hidden group transition-all duration-300 active:scale-[0.96] cursor-pointer hover:shadow-[0_12px_25px_rgba(245,158,11,0.2)] hover:-translate-y-1 md:hover:scale-[1.02]">
                                         <div class="flex justify-between items-start mb-3 md:mb-2.5 relative z-10">
                                             <div id="sensor-light-icon-bg"
                                                 class="w-9 h-9 md:w-8 md:h-8 rounded-xl flex items-center justify-center bg-[#fff7ed] dark:bg-amber-950/40 text-[#ea580c] dark:text-amber-400">
@@ -1035,7 +1056,7 @@
 
                                     <!-- CO2 Level -->
                                     <div id="sensor-co2-card"
-                                        class="sensor-card bg-gradient-to-br from-white to-[#faf5ff]/80 dark:from-zinc-900 dark:to-purple-950/30 border border-purple-100 dark:border-purple-900/40 rounded-3xl p-4 md:p-3.5 shadow-[0_8px_20px_rgba(168,85,247,0.12)] flex flex-col justify-between relative overflow-hidden group transition-all duration-300 active:scale-[0.96] cursor-pointer hover:shadow-[0_12px_25px_rgba(168,85,247,0.2)] hover:-translate-y-1 md:hover:scale-[1.02]">
+                                        class="sensor-card bg-green-gradient border border-purple-200 dark:border-purple-900/40 rounded-3xl p-4 md:p-3.5 shadow-[0_8px_20px_rgba(168,85,247,0.12)] flex flex-col justify-between relative overflow-hidden group transition-all duration-300 active:scale-[0.96] cursor-pointer hover:shadow-[0_12px_25px_rgba(168,85,247,0.2)] hover:-translate-y-1 md:hover:scale-[1.02]">
                                         <div class="flex justify-between items-start mb-3 md:mb-2.5 relative z-10">
                                             <div id="sensor-co2-icon-bg"
                                                 class="w-9 h-9 md:w-8 md:h-8 rounded-xl flex items-center justify-center bg-[#faf5ff] dark:bg-purple-950/40 text-[#9333ea] dark:text-purple-400">
@@ -1361,7 +1382,7 @@
                                 <div class="grid grid-cols-2 gap-3.5">
                                     <!-- Temp -->
                                     <div id="sensor-temp-card-mobile"
-                                        class="sensor-card bg-white dark:bg-zinc-900 border border-slate-100 dark:border-zinc-800 rounded-2xl p-3.5 shadow-sm flex flex-col justify-between relative overflow-hidden group transition-all duration-300">
+                                        class="sensor-card bg-green-gradient border border-emerald-200 dark:border-emerald-900/40 rounded-2xl p-3.5 shadow-sm flex flex-col justify-between relative overflow-hidden group transition-all duration-300">
                                         <div
                                             class="absolute top-0 right-0 w-12 h-12 bg-primary/5 dark:bg-primary-fixed/5 rounded-bl-full -mr-2 -mt-2">
                                         </div>
@@ -1407,7 +1428,7 @@
                                     </div>
                                     <!-- Humidity -->
                                     <div id="sensor-humidity-card-mobile"
-                                        class="sensor-card bg-white dark:bg-zinc-900 border border-slate-100 dark:border-zinc-800 rounded-2xl p-3.5 shadow-sm flex flex-col justify-between relative overflow-hidden group transition-all duration-300">
+                                        class="sensor-card bg-green-gradient border border-sky-200 dark:border-sky-900/40 rounded-2xl p-3.5 shadow-sm flex flex-col justify-between relative overflow-hidden group transition-all duration-300">
                                         <div
                                             class="absolute top-0 right-0 w-12 h-12 bg-primary/5 dark:bg-primary-fixed/5 rounded-bl-full -mr-2 -mt-2">
                                         </div>
@@ -1454,7 +1475,7 @@
                                     </div>
                                     <!-- Light -->
                                     <div id="sensor-light-card-mobile"
-                                        class="sensor-card bg-white dark:bg-zinc-900 border border-slate-100 dark:border-zinc-800 rounded-2xl p-3.5 shadow-sm flex flex-col justify-between relative overflow-hidden group transition-all duration-300">
+                                        class="sensor-card bg-green-gradient border border-amber-200 dark:border-amber-900/40 rounded-2xl p-3.5 shadow-sm flex flex-col justify-between relative overflow-hidden group transition-all duration-300">
                                         <div
                                             class="absolute top-0 right-0 w-12 h-12 bg-primary/5 dark:bg-primary-fixed/5 rounded-bl-full -mr-2 -mt-2">
                                         </div>
@@ -1500,7 +1521,7 @@
                                     </div>
                                     <!-- CO2 -->
                                     <div id="sensor-co2-card-mobile"
-                                        class="sensor-card bg-white dark:bg-zinc-900 border border-slate-100 dark:border-zinc-800 rounded-2xl p-3.5 shadow-sm flex flex-col justify-between relative overflow-hidden group transition-all duration-300">
+                                        class="sensor-card bg-green-gradient border border-purple-200 dark:border-purple-900/40 rounded-2xl p-3.5 shadow-sm flex flex-col justify-between relative overflow-hidden group transition-all duration-300">
                                         <div
                                             class="absolute top-0 right-0 w-12 h-12 bg-primary/5 dark:bg-primary-fixed/5 rounded-bl-full -mr-2 -mt-2">
                                         </div>
@@ -2866,18 +2887,24 @@
                             <div class="flex items-center justify-between gap-4 mb-5 md:mb-6">
                                 <div>
                                     <div class="flex items-center gap-2 mb-1">
-                                        <div class="w-8 h-8 rounded-full bg-primary/10 dark:bg-emerald-900/30 flex items-center justify-center text-primary dark:text-emerald-400">
+                                        <div
+                                            class="w-8 h-8 rounded-full bg-primary/10 dark:bg-emerald-900/30 flex items-center justify-center text-primary dark:text-emerald-400">
                                             <span class="material-symbols-outlined text-[18px]">campaign</span>
                                         </div>
-                                        <h2 class="text-[20px] font-extrabold text-slate-900 dark:text-white tracking-tight">Reports Hub</h2>
+                                        <h2
+                                            class="text-[20px] font-extrabold text-slate-900 dark:text-white tracking-tight">
+                                            Reports Hub</h2>
                                     </div>
                                     <p class="text-[13px] text-slate-500 dark:text-zinc-400 sm:ml-10"
                                         id="history-subtitle">A record of issues you've reported and their status</p>
                                 </div>
                                 <button onclick="openReportModal()" style="width: max-content;"
                                     class="group relative overflow-hidden flex items-center justify-center gap-2 report-btn text-[13px] font-bold py-2 px-4 md:py-2.5 md:px-5 rounded-xl active:scale-95 transition-all shrink-0 hover:shadow-lg hover:shadow-slate-900/20 dark:hover:shadow-white/20">
-                                    <div class="absolute inset-0 bg-white/20 dark:bg-black/10 translate-y-full group-hover:translate-y-0 transition-transform duration-300"></div>
-                                    <span class="material-symbols-outlined text-[16px] md:text-[18px] relative z-10">add_circle</span>
+                                    <div
+                                        class="absolute inset-0 bg-white/20 dark:bg-black/10 translate-y-full group-hover:translate-y-0 transition-transform duration-300">
+                                    </div>
+                                    <span
+                                        class="material-symbols-outlined text-[16px] md:text-[18px] relative z-10">add_circle</span>
                                     <span class="relative z-10 hidden sm:inline">New Report</span>
                                     <span class="relative z-10 sm:hidden">Report</span>
                                 </button>
@@ -2890,7 +2917,8 @@
                                     <div id="history-reports-container" class="space-y-3 md:space-y-4">
                                         <div
                                             class="flex flex-col items-center justify-center py-10 gap-2 text-slate-400 dark:text-zinc-500 bg-white dark:bg-zinc-900 rounded-2xl border border-slate-200 dark:border-zinc-800">
-                                            <span class="material-symbols-outlined text-[42px] opacity-50">mark_email_read</span>
+                                            <span
+                                                class="material-symbols-outlined text-[42px] opacity-50">mark_email_read</span>
                                             <p class="text-[13px] font-semibold">No reports submitted yet.</p>
                                         </div>
                                     </div>
@@ -2899,89 +2927,133 @@
                                 <!-- Right Column: Report Overview stats + Reporting Guidelines -->
                                 <div class="right-col flex flex-col" style="gap: 1.25rem;">
                                     <!-- Sleek Report Overview Dashboard -->
-                                    <div class="overview-widget widget-panel border rounded-2xl md:rounded-3xl p-4 md:p-5 shadow-sm relative overflow-hidden">
+                                    <div
+                                        class="overview-widget widget-panel border rounded-2xl md:rounded-3xl p-4 md:p-5 shadow-sm relative overflow-hidden">
                                         <!-- Decorative Background Elements -->
-                                        <div class="absolute -top-10 -right-10 w-32 h-32 bg-emerald-400/10 dark:bg-emerald-400/5 blur-[30px] rounded-full pointer-events-none"></div>
-                                        <div class="absolute -bottom-10 -left-10 w-32 h-32 bg-teal-400/10 dark:bg-blue-400/5 blur-[30px] rounded-full pointer-events-none"></div>
-                                        
+                                        <div
+                                            class="absolute -top-10 -right-10 w-32 h-32 bg-emerald-400/10 dark:bg-emerald-400/5 blur-[30px] rounded-full pointer-events-none">
+                                        </div>
+                                        <div
+                                            class="absolute -bottom-10 -left-10 w-32 h-32 bg-teal-400/10 dark:bg-blue-400/5 blur-[30px] rounded-full pointer-events-none">
+                                        </div>
+
                                         <div class="relative z-10">
                                             <div class="flex items-center justify-between mb-4">
                                                 <div class="flex items-center gap-2">
-                                                    <div class="w-7 h-7 rounded-lg bg-emerald-200/50 dark:bg-zinc-800 flex items-center justify-center">
-                                                        <span class="material-symbols-outlined text-[16px] text-emerald-700 dark:text-emerald-400">monitoring</span>
+                                                    <div
+                                                        class="w-7 h-7 rounded-lg bg-emerald-200/50 dark:bg-zinc-800 flex items-center justify-center">
+                                                        <span
+                                                            class="material-symbols-outlined text-[16px] text-emerald-700 dark:text-emerald-400">monitoring</span>
                                                     </div>
-                                                    <h3 class="text-[14px] font-extrabold tracking-wide text-emerald-900 dark:text-white">Overview</h3>
+                                                    <h3
+                                                        class="text-[14px] font-extrabold tracking-wide text-emerald-900 dark:text-white">
+                                                        Overview</h3>
                                                 </div>
-                                                <span class="flex items-center gap-1.5 text-[9px] font-extrabold uppercase tracking-widest text-emerald-600 dark:text-emerald-400 bg-emerald-200/50 dark:bg-emerald-900/20 border border-emerald-300/50 dark:border-emerald-800/30 px-2 py-1 rounded-md">
-                                                    <span class="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
+                                                <span
+                                                    class="flex items-center gap-1.5 text-[9px] font-extrabold uppercase tracking-widest text-emerald-600 dark:text-emerald-400 bg-emerald-200/50 dark:bg-emerald-900/20 border border-emerald-300/50 dark:border-emerald-800/30 px-2 py-1 rounded-md">
+                                                    <span
+                                                        class="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
                                                     Live
                                                 </span>
                                             </div>
-                                            
+
                                             <div class="grid grid-cols-2 gap-2.5">
                                                 <!-- Total -->
-                                                <div class="bg-white/60 dark:bg-zinc-800/40 border border-emerald-100 dark:border-zinc-700/50 rounded-xl p-2.5 flex flex-col items-center justify-center hover:bg-white/80 dark:hover:bg-zinc-800/60 transition-colors">
-                                                    <span id="report-stats-total" class="text-2xl font-extrabold text-emerald-900 dark:text-white mb-0.5 tracking-tight">0</span>
-                                                    <span class="text-[9px] uppercase font-bold tracking-wider text-emerald-600/70 dark:text-zinc-400">Total Reports</span>
+                                                <div
+                                                    class="bg-white/60 dark:bg-zinc-800/40 border border-emerald-100 dark:border-zinc-700/50 rounded-xl p-2.5 flex flex-col items-center justify-center hover:bg-white/80 dark:hover:bg-zinc-800/60 transition-colors">
+                                                    <span id="report-stats-total"
+                                                        class="text-2xl font-extrabold text-emerald-900 dark:text-white mb-0.5 tracking-tight">0</span>
+                                                    <span
+                                                        class="text-[9px] uppercase font-bold tracking-wider text-emerald-600/70 dark:text-zinc-400">Total
+                                                        Reports</span>
                                                 </div>
                                                 <!-- Open -->
-                                                <div class="bg-white/60 dark:bg-zinc-800/40 border border-emerald-100 dark:border-zinc-700/50 rounded-xl p-2.5 flex flex-col items-center justify-center hover:bg-white/80 dark:hover:bg-zinc-800/60 transition-colors">
-                                                    <span id="report-stats-open" class="text-2xl font-extrabold text-amber-600 dark:text-amber-400 mb-0.5 tracking-tight">0</span>
-                                                    <span class="text-[9px] uppercase font-bold tracking-wider text-emerald-600/70 dark:text-zinc-400">Open</span>
+                                                <div
+                                                    class="bg-white/60 dark:bg-zinc-800/40 border border-emerald-100 dark:border-zinc-700/50 rounded-xl p-2.5 flex flex-col items-center justify-center hover:bg-white/80 dark:hover:bg-zinc-800/60 transition-colors">
+                                                    <span id="report-stats-open"
+                                                        class="text-2xl font-extrabold text-amber-600 dark:text-amber-400 mb-0.5 tracking-tight">0</span>
+                                                    <span
+                                                        class="text-[9px] uppercase font-bold tracking-wider text-emerald-600/70 dark:text-zinc-400">Open</span>
                                                 </div>
                                                 <!-- Investigating -->
-                                                <div class="bg-white/60 dark:bg-zinc-800/40 border border-emerald-100 dark:border-zinc-700/50 rounded-xl p-2.5 flex flex-col items-center justify-center hover:bg-white/80 dark:hover:bg-zinc-800/60 transition-colors">
-                                                    <span id="report-stats-investigating" class="text-2xl font-extrabold text-blue-600 dark:text-blue-400 mb-0.5 tracking-tight">0</span>
-                                                    <span class="text-[9px] uppercase font-bold tracking-wider text-emerald-600/70 dark:text-zinc-400">Investigating</span>
+                                                <div
+                                                    class="bg-white/60 dark:bg-zinc-800/40 border border-emerald-100 dark:border-zinc-700/50 rounded-xl p-2.5 flex flex-col items-center justify-center hover:bg-white/80 dark:hover:bg-zinc-800/60 transition-colors">
+                                                    <span id="report-stats-investigating"
+                                                        class="text-2xl font-extrabold text-blue-600 dark:text-blue-400 mb-0.5 tracking-tight">0</span>
+                                                    <span
+                                                        class="text-[9px] uppercase font-bold tracking-wider text-emerald-600/70 dark:text-zinc-400">Investigating</span>
                                                 </div>
                                                 <!-- Resolved -->
-                                                <div class="bg-white/60 dark:bg-zinc-800/40 border border-emerald-100 dark:border-zinc-700/50 rounded-xl p-2.5 flex flex-col items-center justify-center hover:bg-white/80 dark:hover:bg-zinc-800/60 transition-colors">
-                                                    <span id="report-stats-resolved" class="text-2xl font-extrabold text-emerald-600 dark:text-emerald-400 mb-0.5 tracking-tight">0</span>
-                                                    <span class="text-[9px] uppercase font-bold tracking-wider text-emerald-600/70 dark:text-zinc-400">Resolved</span>
+                                                <div
+                                                    class="bg-white/60 dark:bg-zinc-800/40 border border-emerald-100 dark:border-zinc-700/50 rounded-xl p-2.5 flex flex-col items-center justify-center hover:bg-white/80 dark:hover:bg-zinc-800/60 transition-colors">
+                                                    <span id="report-stats-resolved"
+                                                        class="text-2xl font-extrabold text-emerald-600 dark:text-emerald-400 mb-0.5 tracking-tight">0</span>
+                                                    <span
+                                                        class="text-[9px] uppercase font-bold tracking-wider text-emerald-600/70 dark:text-zinc-400">Resolved</span>
                                                 </div>
                                             </div>
                                         </div>
                                     </div>
 
                                     <!-- Interactive Guidelines Card -->
-                                    <div class="guidelines-widget widget-panel border rounded-3xl p-5 md:p-6 shadow-sm group hover:border-blue-500/30 transition-colors">
+                                    <div
+                                        class="guidelines-widget widget-panel border rounded-3xl p-5 md:p-6 shadow-sm group hover:border-blue-500/30 transition-colors">
                                         <div class="flex items-center gap-2 mb-4 text-slate-800 dark:text-white">
-                                            <div class="w-8 h-8 rounded-xl bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400 flex items-center justify-center shrink-0">
+                                            <div
+                                                class="w-8 h-8 rounded-xl bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400 flex items-center justify-center shrink-0">
                                                 <span class="material-symbols-outlined text-[18px]">gavel</span>
                                             </div>
                                             <h3 class="text-[15px] font-extrabold">Reporting Guidelines</h3>
                                         </div>
-                                        
+
                                         <div class="space-y-3.5 pl-1">
                                             <div class="flex gap-3 items-start">
-                                                <div class="w-5 h-5 rounded-full bg-slate-100 dark:bg-zinc-800 flex items-center justify-center shrink-0 mt-0.5">
-                                                    <span class="material-symbols-outlined text-[12px] text-slate-500">done</span>
+                                                <div
+                                                    class="w-5 h-5 rounded-full bg-slate-100 dark:bg-zinc-800 flex items-center justify-center shrink-0 mt-0.5">
+                                                    <span
+                                                        class="material-symbols-outlined text-[12px] text-slate-500">done</span>
                                                 </div>
-                                                <p class="text-[12px] font-medium text-slate-600 dark:text-zinc-400 leading-snug pt-0.5">Identify exactly which rack or equipment is affected.</p>
+                                                <p
+                                                    class="text-[12px] font-medium text-slate-600 dark:text-zinc-400 leading-snug pt-0.5">
+                                                    Identify exactly which rack or equipment is affected.</p>
                                             </div>
                                             <div class="flex gap-3 items-start">
-                                                <div class="w-5 h-5 rounded-full bg-slate-100 dark:bg-zinc-800 flex items-center justify-center shrink-0 mt-0.5">
-                                                    <span class="material-symbols-outlined text-[12px] text-slate-500">done</span>
+                                                <div
+                                                    class="w-5 h-5 rounded-full bg-slate-100 dark:bg-zinc-800 flex items-center justify-center shrink-0 mt-0.5">
+                                                    <span
+                                                        class="material-symbols-outlined text-[12px] text-slate-500">done</span>
                                                 </div>
-                                                <p class="text-[12px] font-medium text-slate-600 dark:text-zinc-400 leading-snug pt-0.5">Describe the visual state of the crops (color, texture).</p>
+                                                <p
+                                                    class="text-[12px] font-medium text-slate-600 dark:text-zinc-400 leading-snug pt-0.5">
+                                                    Describe the visual state of the crops (color, texture).</p>
                                             </div>
                                             <div class="flex gap-3 items-start">
-                                                <div class="w-5 h-5 rounded-full bg-slate-100 dark:bg-zinc-800 flex items-center justify-center shrink-0 mt-0.5">
-                                                    <span class="material-symbols-outlined text-[12px] text-slate-500">done</span>
+                                                <div
+                                                    class="w-5 h-5 rounded-full bg-slate-100 dark:bg-zinc-800 flex items-center justify-center shrink-0 mt-0.5">
+                                                    <span
+                                                        class="material-symbols-outlined text-[12px] text-slate-500">done</span>
                                                 </div>
-                                                <p class="text-[12px] font-medium text-slate-600 dark:text-zinc-400 leading-snug pt-0.5">Note any exact readings from nearby sensors.</p>
+                                                <p
+                                                    class="text-[12px] font-medium text-slate-600 dark:text-zinc-400 leading-snug pt-0.5">
+                                                    Note any exact readings from nearby sensors.</p>
                                             </div>
                                         </div>
-                                        
+
                                         <div class="mt-5 pt-5 border-t border-slate-100 dark-no-border">
-                                            <div class="flex items-center justify-between bg-red-50 dark:bg-red-950/20 rounded-2xl p-4 border border-red-100 dark:border-red-900/30">
+                                            <div
+                                                class="flex items-center justify-between bg-red-50 dark:bg-red-950/20 rounded-2xl p-4 border border-red-100 dark:border-red-900/30">
                                                 <div class="flex items-center gap-2.5 text-red-600 dark:text-red-400">
-                                                    <div class="w-8 h-8 rounded-full bg-red-100 dark:bg-red-900/40 flex items-center justify-center">
-                                                        <span class="material-symbols-outlined text-[18px] animate-pulse">emergency</span>
+                                                    <div
+                                                        class="w-8 h-8 rounded-full bg-red-100 dark:bg-red-900/40 flex items-center justify-center">
+                                                        <span
+                                                            class="material-symbols-outlined text-[18px] animate-pulse">emergency</span>
                                                     </div>
-                                                    <span class="text-[11px] font-extrabold uppercase tracking-wide">Urgent?</span>
+                                                    <span
+                                                        class="text-[11px] font-extrabold uppercase tracking-wide">Urgent?</span>
                                                 </div>
-                                                <p class="text-[11px] text-red-700 dark:text-red-300 font-bold text-right max-w-[140px] leading-tight">Use local intercom to reach shift manager</p>
+                                                <p
+                                                    class="text-[11px] text-red-700 dark:text-red-300 font-bold text-right max-w-[140px] leading-tight">
+                                                    Use local intercom to reach shift manager</p>
                                             </div>
                                         </div>
                                     </div>
