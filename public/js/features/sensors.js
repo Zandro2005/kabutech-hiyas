@@ -221,20 +221,21 @@ function updateSensorDOM(forceFromZero) {
 }
 
 function updateSensorCardStatus() {
-    function applyCardState(cardId, gaugeId, statusId, level, defaultColorClass) {
+    function applyCardState(cardId, gaugeId, statusId, level) {
         const gauge = document.getElementById(gaugeId);
         const status = document.getElementById(statusId);
+        const suffix = gaugeId.replace('gauge-', '');
 
         const textSz = cardId.includes('-mobile') ? 'text-[10px]' : 'text-[10px] md:text-[11px]';
 
         if (level === 'critical') {
-            if (gauge) gauge.className.baseVal = `gauge-path text-red-500`;
+            if (gauge) gauge.setAttribute('stroke', `url(#arc-grad-critical-${suffix})`);
             if (status) { status.className = `${textSz} font-extrabold text-red-600 dark:text-red-400`; status.innerText = 'Critical'; }
         } else if (level === 'warning') {
-            if (gauge) gauge.className.baseVal = `gauge-path text-amber-500`;
+            if (gauge) gauge.setAttribute('stroke', `url(#arc-grad-warning-${suffix})`);
             if (status) { status.className = `${textSz} font-extrabold text-amber-600 dark:text-amber-400`; status.innerText = 'Warning'; }
         } else {
-            if (gauge) gauge.className.baseVal = `gauge-path ${defaultColorClass}`;
+            if (gauge) gauge.setAttribute('stroke', `url(#arc-grad-normal-${suffix})`);
             if (status) { status.className = `${textSz} font-extrabold text-emerald-600 dark:text-emerald-400`; status.innerText = 'Nominal'; }
         }
     }
@@ -242,25 +243,37 @@ function updateSensorCardStatus() {
     setSensorDOMStatic();
     if (typeof updateRadialGauges === 'function') updateRadialGauges();
 
-    const t = state.currentTemp;
-    const tLevel = (t < 15 || t > 32) ? 'critical' : (t < 18 || t > 28) ? 'warning' : 'normal';
-    applyCardState('sensor-temp-card', 'gauge-temp', 'sensor-temp-status', tLevel, 'text-emerald-500');
-    applyCardState('sensor-temp-card-mobile', 'gauge-temp-mobile', 'sensor-temp-status-mobile', tLevel, 'text-emerald-500');
+    // The setpoint represents the maximum of the gauge.
+    // If the value reaches or exceeds the setpoint (>= 100%), it's critical.
+    // If it's getting close (>= 85%), it's warning.
+    // Otherwise, it's normal (green).
+    function getLevel(val, target) {
+        if (!target) return 'normal';
+        const pct = val / target;
+        if (pct >= 1.0) return 'critical';
+        if (pct >= 0.85) return 'warning';
+        return 'normal';
+    }
 
-    const h = state.currentHumidity;
-    const hLevel = (h < 45 || h > 95) ? 'critical' : (h < 60 || h > 85) ? 'warning' : 'normal';
-    applyCardState('sensor-humidity-card', 'gauge-humidity', 'sensor-humidity-status', hLevel, 'text-emerald-500');
-    applyCardState('sensor-humidity-card-mobile', 'gauge-humidity-mobile', 'sensor-humidity-status-mobile', hLevel, 'text-emerald-500');
+    const tTarget = Math.max(state.tempSetpoint || 24, 1);
+    const tLevel = getLevel(state.currentTemp, tTarget);
+    applyCardState('sensor-temp-card', 'gauge-temp', 'sensor-temp-status', tLevel);
+    applyCardState('sensor-temp-card-mobile', 'gauge-temp-mobile', 'sensor-temp-status-mobile', tLevel);
 
-    const l = state.currentLight;
-    const lLevel = (l < 80 || l > 950) ? 'critical' : (l < 200 || l > 800) ? 'warning' : 'normal';
-    applyCardState('sensor-light-card', 'gauge-light', 'sensor-light-status', lLevel, 'text-emerald-500');
-    applyCardState('sensor-light-card-mobile', 'gauge-light-mobile', 'sensor-light-status-mobile', lLevel, 'text-emerald-500');
+    const hTarget = Math.max(state.humiditySetpoint || 65, 1);
+    const hLevel = getLevel(state.currentHumidity, hTarget);
+    applyCardState('sensor-humidity-card', 'gauge-humidity', 'sensor-humidity-status', hLevel);
+    applyCardState('sensor-humidity-card-mobile', 'gauge-humidity-mobile', 'sensor-humidity-status-mobile', hLevel);
 
-    const c = state.currentCO2;
-    const cLevel = c > 1200 ? 'critical' : c > 800 ? 'warning' : 'normal';
-    applyCardState('sensor-co2-card', 'gauge-co2', 'sensor-co2-status', cLevel, 'text-emerald-500');
-    applyCardState('sensor-co2-card-mobile', 'gauge-co2-mobile', 'sensor-co2-status-mobile', cLevel, 'text-emerald-500');
+    const lTarget = Math.max(state.lightSetpoint || 400, 1);
+    const lLevel = getLevel(state.currentLight, lTarget);
+    applyCardState('sensor-light-card', 'gauge-light', 'sensor-light-status', lLevel);
+    applyCardState('sensor-light-card-mobile', 'gauge-light-mobile', 'sensor-light-status-mobile', lLevel);
+
+    const cTarget = Math.max(state.co2Setpoint || 800, 1);
+    const cLevel = getLevel(state.currentCO2, cTarget);
+    applyCardState('sensor-co2-card', 'gauge-co2', 'sensor-co2-status', cLevel);
+    applyCardState('sensor-co2-card-mobile', 'gauge-co2-mobile', 'sensor-co2-status-mobile', cLevel);
     // Keep co2-trend badge in sync
     const co2Trend = document.getElementById('co2-trend');
     if (co2Trend && cLevel === 'critical') {
@@ -302,51 +315,127 @@ function updateSystemStatusMsg() {
 
 // Cooldown tracker: stores last trigger time per alert title (ms)
 // --- RADIAL GAUGES ---
-function updateRadialGauges() {
-    const maxOffset = 119.38; // length of semi-circle path
+function initRadialGauges() {
+    const gauges = ['temp', 'humidity', 'light', 'co2'];
     
-    function getGaugePct(val, mapping) {
-        if (val <= mapping[0][0]) return mapping[0][1];
-        if (val >= mapping[mapping.length - 1][0]) return mapping[mapping.length - 1][1];
-        for (let i = 0; i < mapping.length - 1; i++) {
-            const v1 = mapping[i][0], p1 = mapping[i][1];
-            const v2 = mapping[i+1][0], p2 = mapping[i+1][1];
-            if (val >= v1 && val <= v2) {
-                return p1 + (p2 - p1) * ((val - v1) / (v2 - v1));
+    gauges.forEach(key => {
+        ['', '-mobile'].forEach(suffix => {
+            const card = document.getElementById(`sensor-${key}-card${suffix}`);
+            if (!card) return;
+            const svg = card.querySelector('svg');
+            if (!svg) return;
+            
+            svg.setAttribute('viewBox', '0 0 100 70');
+            const textContainer = svg.nextElementSibling;
+            if (textContainer) {
+                textContainer.style.marginTop = '-0.5rem';
             }
-        }
-        return 0.5;
-    }
+            
+            let ticksHTML = '';
+            // We create 5 fixed tick text elements evenly spaced across the arc.
+            // Values will be injected dynamically in updateRadialGauges based on setpoint.
+            for (let i = 0; i <= 4; i++) {
+                const pct = i * 0.25;
+                const angle = -90 + (pct * 180);
+                const rad = angle * Math.PI / 180;
+                const tx = 50 + 26 * Math.sin(rad);
+                const ty = 55 - 26 * Math.cos(rad);
+                ticksHTML += `<text id="tick-${key}${suffix}-${i}" x="${tx}" y="${ty}" fill="currentColor" style="font-size: 4.5px;" class="font-bold text-slate-400 dark:text-zinc-500" text-anchor="middle" dominant-baseline="middle">0</text>`;
+            }
 
-    // Map critical low to 0-10%, warn low to 10-25%, nominal to 25-75% (mid 50%),
-    // warn high to 75-90%, critical high to 90-100%.
-    const mappings = {
-        temp: [ [12, 0], [15, 0.1], [18, 0.25], [23, 0.5], [28, 0.75], [32, 0.9], [35, 1] ],
-        humidity: [ [30, 0], [45, 0.1], [60, 0.25], [72.5, 0.5], [85, 0.75], [95, 0.9], [100, 1] ],
-        light: [ [0, 0], [80, 0.1], [200, 0.25], [500, 0.5], [800, 0.75], [950, 0.9], [1050, 1] ],
-        co2: [ [400, 0], [600, 0.25], [800, 0.5], [1200, 0.9], [1500, 1] ]
-    };
+            svg.innerHTML = `
+<defs>
+    <linearGradient id="needle-grad-${key}${suffix}" x1="0%" y1="0%" x2="0%" y2="100%">
+        <stop offset="0%" stop-color="currentColor" stop-opacity="1"></stop>
+        <stop offset="100%" stop-color="currentColor" stop-opacity="0"></stop>
+    </linearGradient>
+    <linearGradient id="arc-grad-normal-${key}${suffix}" x1="0%" y1="0%" x2="100%" y2="100%">
+        <stop offset="0%" stop-color="#059669" />
+        <stop offset="100%" stop-color="#34d399" />
+    </linearGradient>
+    <linearGradient id="arc-grad-warning-${key}${suffix}" x1="0%" y1="0%" x2="100%" y2="100%">
+        <stop offset="0%" stop-color="#d97706" />
+        <stop offset="100%" stop-color="#fbbf24" />
+    </linearGradient>
+    <linearGradient id="arc-grad-critical-${key}${suffix}" x1="0%" y1="0%" x2="100%" y2="100%">
+        <stop offset="0%" stop-color="#dc2626" />
+        <stop offset="100%" stop-color="#f87171" />
+    </linearGradient>
+</defs>
+<path id="gauge-bg-${key}${suffix}" d="M 10,55 A 40,40 0 0,1 90,55" fill="none" stroke="currentColor" class="text-slate-200 dark:text-zinc-800" stroke-width="12" stroke-linecap="butt" stroke-dasharray="0 0 251.32" style="transition: stroke-dasharray 1s ease-out;" />
+<path id="gauge-${key}${suffix}" d="M 10,55 A 40,40 0 0,1 90,55" fill="none" class="gauge-path" stroke-width="12" stroke-linecap="butt" stroke-dasharray="0 251.32" stroke-dashoffset="0" style="transition: stroke-dasharray 1s ease-out, stroke 0.3s, color 0.3s; opacity: 0.60;" />
+<polygon id="target-marker-${key}${suffix}" points="47.5,15 52.5,15 50,9" fill="#f59e0b" style="transform-origin: 50px 55px; transform: rotate(90deg); transition: transform 1s ease-out; opacity: 0.8;" />
+<g class="ticks-container">${ticksHTML}</g>
+<g id="gauge-needle-${key}${suffix}" style="transform-origin: 50px 55px; transform: rotate(-90deg); transition: transform 1s ease-out;">
+    <polygon points="49,55 51,55 50,22" fill="url(#needle-grad-${key}${suffix})" class="text-slate-500 dark:text-zinc-400"/>
+    <circle cx="50" cy="55" r="3" fill="currentColor" class="text-slate-700 dark:text-zinc-300"/>
+</g>`;
+        });
+    });
+    
+    // Apply initial colors to the newly injected SVG nodes
+    updateSensorCardStatus();
+}
 
+function updateRadialGauges() {
+    const maxOffset = 125.66; // PI * 40
+    
+    // Using sensible fallback minimums just in case state setpoint is 0 or uninitialized
     const gauges = [
-        { key: 'temp', val: state.currentTemp },
-        { key: 'humidity', val: state.currentHumidity },
-        { key: 'light', val: state.currentLight },
-        { key: 'co2', val: state.currentCO2 }
+        { key: 'temp', val: state.currentTemp, target: Math.max(state.tempSetpoint || 24, 10) },
+        { key: 'humidity', val: state.currentHumidity, target: Math.max(state.humiditySetpoint || 65, 10) },
+        { key: 'light', val: state.currentLight, target: Math.max(state.lightSetpoint || 400, 10) },
+        { key: 'co2', val: state.currentCO2, target: Math.max(state.co2Setpoint || 800, 10) }
     ];
     
     gauges.forEach(g => {
-        let pct = getGaugePct(g.val, mappings[g.key]);
-        const offset = maxOffset - (pct * maxOffset);
+        // The gauge linearly scales so it ends exactly at the setpoint max!
+        const maxVal = g.target;
+        let pct = g.val / maxVal;
+        if (pct < 0) pct = 0;
+        if (pct > 1) pct = 1;
         
-        const pathDesktop = document.getElementById(`gauge-${g.key}`);
-        if (pathDesktop) pathDesktop.style.strokeDashoffset = offset;
+        const angle = -90 + (pct * 180);
         
-        const pathMobile = document.getElementById(`gauge-${g.key}-mobile`);
-        if (pathMobile) pathMobile.style.strokeDashoffset = offset;
+        ['', '-mobile'].forEach(suffix => {
+            const path = document.getElementById(`gauge-${g.key}${suffix}`);
+            const bgPath = document.getElementById(`gauge-bg-${g.key}${suffix}`);
+            if (path) {
+                const len = path.getTotalLength ? path.getTotalLength() : 125.66;
+                path.style.strokeDashoffset = '0';
+                path.style.strokeDasharray = `${pct * len} 251.32`;
+                
+                if (bgPath) {
+                    // Draw a gap for the filled portion, then a dash for the remainder
+                    bgPath.style.strokeDasharray = `0 ${pct * len} 251.32`;
+                }
+            }
+            
+            const needle = document.getElementById(`gauge-needle-${g.key}${suffix}`);
+            if (needle) needle.style.transform = `rotate(${angle}deg)`;
+            
+            // Dynamically update the evenly spaced tick labels based on the current setpoint max
+            for (let i = 0; i <= 4; i++) {
+                const tickEl = document.getElementById(`tick-${g.key}${suffix}-${i}`);
+                if (tickEl) {
+                    let tickVal = maxVal * (i * 0.25);
+                    // Format tick values for clean readability
+                    if (maxVal < 50) {
+                        tickEl.textContent = Number.isInteger(tickVal) ? tickVal : tickVal.toFixed(1);
+                    } else {
+                        tickEl.textContent = Math.round(tickVal);
+                    }
+                }
+            }
+        });
     });
 }
 
-setInterval(() => { updateRadialGauges(); updateLastUpdated(); updateFarmHealthScore(); }, 3000);
+document.addEventListener('DOMContentLoaded', () => {
+    initRadialGauges();
+});
+
+setInterval(() => { updateRadialGauges(); updateSensorCardStatus(); updateLastUpdated(); updateFarmHealthScore(); }, 3000);
 
 
 // --- LAST UPDATED TIMESTAMP ---
