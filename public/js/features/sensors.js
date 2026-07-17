@@ -140,8 +140,11 @@ const SENSOR_CONFIGS = [
 function setSensorDOMStatic() {
     SENSOR_CONFIGS.forEach(s => {
         const v = s.getVal();
+        const text = v.toFixed(s.decimals) + s.suffix;
         const el = document.getElementById(`sensor-${s.key}`);
-        if (el) el.innerText = v.toFixed(s.decimals) + s.suffix;
+        if (el) el.innerText = text;
+        const mobileEl = document.getElementById(`sensor-${s.key}-mobile`);
+        if (mobileEl) mobileEl.innerText = text;
         const ctrlEl = document.getElementById(`ctrl-current-${s.key}`);
         if (ctrlEl) ctrlEl.innerText = v.toFixed(s.decimals);
     });
@@ -156,6 +159,8 @@ function playSensorIntroAnimation() {
     SENSOR_CONFIGS.forEach(s => {
         const v = s.getVal();
         countUpElement(document.getElementById(`sensor-${s.key}`), v, { decimals: s.decimals, suffix: s.suffix, duration, from: 0 });
+        const mobileEl = document.getElementById(`sensor-${s.key}-mobile`);
+        if (mobileEl) countUpElement(mobileEl, v, { decimals: s.decimals, suffix: s.suffix, duration, from: 0 });
         const ctrlEl = document.getElementById(`ctrl-current-${s.key}`);
         if (ctrlEl) countUpElement(ctrlEl, v, { decimals: s.decimals, duration, from: 0, key: `ctrl-current-${s.key}` });
     });
@@ -164,18 +169,20 @@ function playSensorIntroAnimation() {
 
 function updateSensorDOM(forceFromZero) {
     // Calculate trends vs previous reading
-    function getTrendHTML(current, previous, unit, higherIsBad) {
+    function getTrendHTML(current, previous, unit, higherIsBad, isMobile=false) {
         const diff = current - previous;
         const pct = previous !== 0 ? Math.abs((diff / previous) * 100).toFixed(1) : '0.0';
         const isUp = diff > 0.05;
         const isDown = diff < -0.05;
+        const textSz = isMobile ? 'text-[10px]' : 'text-[10px] md:text-[11px]';
+        
         if (!isUp && !isDown) {
-            return `<span class="flex items-center text-on-surface-variant dark:text-zinc-400 text-caption bg-surface-variant dark:bg-zinc-800 px-1.5 py-0.5 rounded-full"><span class="material-symbols-outlined text-[12px] mr-0.5">horizontal_rule</span> 0%</span>`;
+            return `<span class="flex items-center justify-center gap-0.5 w-full font-extrabold text-slate-400 dark:text-zinc-500 ${textSz}"><span class="material-symbols-outlined text-[12px]">horizontal_rule</span> 0%</span>`;
         }
         const alertTrend = (higherIsBad && isUp) || (!higherIsBad && isDown);
-        const color = alertTrend ? 'text-error-red bg-error-container' : 'text-success-green dark:text-emerald-400 bg-success-green/10 dark:bg-emerald-950/40';
+        const color = alertTrend ? 'text-red-500' : 'text-emerald-500 dark:text-emerald-400';
         const arrow = isUp ? 'arrow_upward' : 'arrow_downward';
-        return `<span class="flex items-center ${color} text-caption px-1.5 py-0.5 rounded-full"><span class="material-symbols-outlined text-[12px] mr-0.5">${arrow}</span>${pct}%</span>`;
+        return `<span class="flex items-center justify-center gap-0.5 w-full font-extrabold ${color} ${textSz}"><span class="material-symbols-outlined text-[12px]">${arrow}</span>${pct}%</span>`;
     }
 
     // Use short animation on recurring ticks so numbers are never mid-animation
@@ -187,11 +194,17 @@ function updateSensorDOM(forceFromZero) {
     SENSOR_CONFIGS.forEach(s => {
         const v = s.getVal();
         countUpElement(document.getElementById(`sensor-${s.key}`), v, { decimals: s.decimals, suffix: s.suffix, duration: introDuration, from: animFrom[s.key] });
+        const mobileEl = document.getElementById(`sensor-${s.key}-mobile`);
+        if (mobileEl) countUpElement(mobileEl, v, { decimals: s.decimals, suffix: s.suffix, duration: introDuration, from: animFrom[s.key] });
         
         if (s.key !== 'co2') {
             const trendEl = document.getElementById(`${s.key}-trend`);
             if (trendEl) {
-                trendEl.outerHTML = getTrendHTML(v, prevReadings[s.key], s.suffix.trim(), false).replace('<span class="flex', `<span id="${s.key}-trend" class="flex`);
+                trendEl.outerHTML = getTrendHTML(v, prevReadings[s.key], s.suffix.trim(), false, false).replace('<span class="flex', `<span id="${s.key}-trend" class="flex`);
+            }
+            const trendElMobile = document.getElementById(`${s.key}-trend-mobile`);
+            if (trendElMobile) {
+                trendElMobile.outerHTML = getTrendHTML(v, prevReadings[s.key], s.suffix.trim(), false, true).replace('<span class="flex', `<span id="${s.key}-trend-mobile" class="flex`);
             }
         }
         
@@ -208,73 +221,52 @@ function updateSensorDOM(forceFromZero) {
 }
 
 function updateSensorCardStatus() {
-    // Helper: apply normal / warning / critical classes to a card
-    function applyCardState(cardId, iconBgId, statusId, level) {
-        const card = document.getElementById(cardId);
-        const icon = document.getElementById(iconBgId);
+    function applyCardState(cardId, gaugeId, statusId, level, defaultColorClass) {
+        const gauge = document.getElementById(gaugeId);
         const status = document.getElementById(statusId);
-        if (!card) return;
 
-        const base = 'sensor-card bg-green-gradient border rounded-3xl p-4 shadow-sm flex flex-col justify-between relative overflow-hidden group transition-all duration-300';
-        const wasExpanded = card.classList.contains('expanded');
+        const textSz = cardId.includes('-mobile') ? 'text-[10px]' : 'text-[10px] md:text-[11px]';
 
         if (level === 'critical') {
-            card.className = base + ' border-slate-100 dark:border-zinc-800';
-            if (icon) icon.className = 'w-9 h-9 rounded-xl flex items-center justify-center bg-red-100 dark:bg-red-950/40 text-red-700 dark:text-red-400';
-            if (status) { status.className = 'font-bold text-red-600 dark:text-red-400'; status.innerText = 'Critical'; }
+            if (gauge) gauge.className.baseVal = `gauge-path text-red-500`;
+            if (status) { status.className = `${textSz} font-extrabold text-red-600 dark:text-red-400`; status.innerText = 'Critical'; }
         } else if (level === 'warning') {
-            card.className = base + ' border-slate-100 dark:border-zinc-800';
-            if (icon) icon.className = 'w-9 h-9 rounded-xl flex items-center justify-center bg-yellow-100 dark:bg-yellow-950/40 text-yellow-700 dark:text-yellow-400';
-            if (status) { status.className = 'font-bold text-yellow-600 dark:text-yellow-400'; status.innerText = 'Warning'; }
+            if (gauge) gauge.className.baseVal = `gauge-path text-amber-500`;
+            if (status) { status.className = `${textSz} font-extrabold text-amber-600 dark:text-amber-400`; status.innerText = 'Warning'; }
         } else {
-            // Normal state: use specific design colors for each card's icon; border stays neutral (no highlight)
-            let iconClass = 'w-9 h-9 rounded-xl flex items-center justify-center ';
-            let borderClass = ' border-slate-100 dark:border-zinc-800';
-
-            if (cardId === 'sensor-temp-card') {
-                iconClass += 'bg-[#e6fcf0] dark:bg-emerald-950/40 text-[#054f24] dark:text-emerald-400';
-            } else if (cardId === 'sensor-humidity-card') {
-                iconClass += 'bg-[#e8f4fd] dark:bg-sky-950/40 text-[#0284c7] dark:text-sky-400';
-            } else if (cardId === 'sensor-light-card') {
-                iconClass += 'bg-[#fff7ed] dark:bg-amber-950/40 text-[#ea580c] dark:text-amber-400';
-            } else if (cardId === 'sensor-co2-card') {
-                iconClass += 'bg-[#faf5ff] dark:bg-purple-950/40 text-[#9333ea] dark:text-purple-400';
-            } else {
-                iconClass += 'bg-slate-50 dark:bg-zinc-800 text-slate-500';
-            }
-
-            card.className = base + borderClass;
-            if (icon) icon.className = iconClass;
-            if (status) { status.className = 'font-bold text-[#15803d] dark:text-emerald-400'; status.innerText = 'Nominal'; }
+            if (gauge) gauge.className.baseVal = `gauge-path ${defaultColorClass}`;
+            if (status) { status.className = `${textSz} font-extrabold text-emerald-600 dark:text-emerald-400`; status.innerText = 'Nominal'; }
         }
-        if (wasExpanded) card.classList.add('expanded');
     }
 
-    // Snap displayed values immediately — no animation lag so color always matches number
     setSensorDOMStatic();
+    if (typeof updateRadialGauges === 'function') updateRadialGauges();
 
-    // Evaluate state from actual state values (never from DOM)
     const t = state.currentTemp;
-    applyCardState('sensor-temp-card', 'sensor-temp-icon-bg', 'sensor-temp-status',
-        (t < 15 || t > 32) ? 'critical' : (t < 18 || t > 28) ? 'warning' : 'normal');
+    const tLevel = (t < 15 || t > 32) ? 'critical' : (t < 18 || t > 28) ? 'warning' : 'normal';
+    applyCardState('sensor-temp-card', 'gauge-temp', 'sensor-temp-status', tLevel, 'text-emerald-500');
+    applyCardState('sensor-temp-card-mobile', 'gauge-temp-mobile', 'sensor-temp-status-mobile', tLevel, 'text-emerald-500');
 
     const h = state.currentHumidity;
-    applyCardState('sensor-humidity-card', 'sensor-humidity-icon-bg', 'sensor-humidity-status',
-        (h < 45 || h > 95) ? 'critical' : (h < 60 || h > 85) ? 'warning' : 'normal');
+    const hLevel = (h < 45 || h > 95) ? 'critical' : (h < 60 || h > 85) ? 'warning' : 'normal';
+    applyCardState('sensor-humidity-card', 'gauge-humidity', 'sensor-humidity-status', hLevel, 'text-emerald-500');
+    applyCardState('sensor-humidity-card-mobile', 'gauge-humidity-mobile', 'sensor-humidity-status-mobile', hLevel, 'text-emerald-500');
 
     const l = state.currentLight;
-    applyCardState('sensor-light-card', 'sensor-light-icon-bg', 'sensor-light-status',
-        (l < 80 || l > 950) ? 'critical' : (l < 200 || l > 800) ? 'warning' : 'normal');
+    const lLevel = (l < 80 || l > 950) ? 'critical' : (l < 200 || l > 800) ? 'warning' : 'normal';
+    applyCardState('sensor-light-card', 'gauge-light', 'sensor-light-status', lLevel, 'text-emerald-500');
+    applyCardState('sensor-light-card-mobile', 'gauge-light-mobile', 'sensor-light-status-mobile', lLevel, 'text-emerald-500');
 
-    const co2Level = state.currentCO2;
-    const co2Status = co2Level > 1200 ? 'critical' : co2Level > 800 ? 'warning' : 'normal';
-    applyCardState('sensor-co2-card', 'sensor-co2-icon-bg', 'sensor-co2-status', co2Status);
+    const c = state.currentCO2;
+    const cLevel = c > 1200 ? 'critical' : c > 800 ? 'warning' : 'normal';
+    applyCardState('sensor-co2-card', 'gauge-co2', 'sensor-co2-status', cLevel, 'text-emerald-500');
+    applyCardState('sensor-co2-card-mobile', 'gauge-co2-mobile', 'sensor-co2-status-mobile', cLevel, 'text-emerald-500');
     // Keep co2-trend badge in sync
     const co2Trend = document.getElementById('co2-trend');
-    if (co2Trend && co2Status === 'critical') {
+    if (co2Trend && cLevel === 'critical') {
         co2Trend.className = 'flex items-center text-error-red font-caption text-caption bg-error-container px-1.5 py-0.5 rounded-full';
         co2Trend.innerHTML = `<span class="material-symbols-outlined text-[12px] mr-0.5 animate-bounce">arrow_upward</span> DANGER`;
-    } else if (co2Trend && co2Status === 'warning') {
+    } else if (co2Trend && cLevel === 'warning') {
         co2Trend.className = 'flex items-center text-warning-gold font-caption text-caption bg-warning-gold/15 px-1.5 py-0.5 rounded-full';
         co2Trend.innerHTML = `<span class="material-symbols-outlined text-[12px] mr-0.5">warning</span> HIGH`;
     } else if (co2Trend) {
@@ -309,163 +301,53 @@ function updateSystemStatusMsg() {
 }
 
 // Cooldown tracker: stores last trigger time per alert title (ms)
-// --- SPARKLINES ---
-const sparkHistory = { temp: [], humidity: [], light: [], co2: [] };
-const sparkPoints = {}; // canvasId -> { points, data, unit }
-const SPARK_MAX = 20;
-const sparkUnits = { 'spark-temp': '°C', 'spark-humidity': '%', 'spark-light': ' µmol', 'spark-co2': ' ppm' };
-const sparkDecimals = { 'spark-temp': 1, 'spark-humidity': 0, 'spark-light': 0, 'spark-co2': 0 };
-
-function pushSparkData() {
-    sparkHistory.temp.push(state.currentTemp);
-    sparkHistory.humidity.push(state.currentHumidity);
-    sparkHistory.light.push(state.currentLight);
-    sparkHistory.co2.push(state.currentCO2);
-    ['temp', 'humidity', 'light', 'co2'].forEach(k => { if (sparkHistory[k].length > SPARK_MAX) sparkHistory[k].shift(); });
-}
-function drawSparkline(canvasId, data, color) {
-    const canvases = [];
-    const el1 = document.getElementById(canvasId);
-    if (el1) {
-        const selector = `#${canvasId}, #${canvasId}-mobile`;
-        const found = document.querySelectorAll(selector);
-        found.forEach(c => canvases.push(c));
-    }
-    if (canvases.length === 0 || data.length < 2) return;
-
-    canvases.forEach(canvas => {
-        const ctx = canvas.getContext('2d');
-        canvas.width = canvas.offsetWidth || 120;
-        ctx.clearRect(0, 0, canvas.width, canvas.height);
-        const min = Math.min(...data), max = Math.max(...data), range = max - min || 1;
-        const w = canvas.width, h = canvas.height, pad = 2;
-        const points = data.map((v, i) => ({
-            x: pad + (i / (data.length - 1)) * (w - pad * 2),
-            y: h - pad - ((v - min) / range) * (h - pad * 2)
-        }));
-
-        // Save for tooltip hit-testing
-        sparkPoints[canvas.id || canvasId] = { points, data };
-
-        // Subtle gradient fill under the line for a richer, more "alive" look
-        const gradient = ctx.createLinearGradient(0, 0, 0, h);
-        gradient.addColorStop(0, color + '33');
-        gradient.addColorStop(1, color + '00');
-        ctx.beginPath();
-        points.forEach((p, i) => i === 0 ? ctx.moveTo(p.x, p.y) : ctx.lineTo(p.x, p.y));
-        ctx.lineTo(points[points.length - 1].x, h);
-        ctx.lineTo(points[0].x, h);
-        ctx.closePath();
-        ctx.fillStyle = gradient;
-        ctx.fill();
-
-        // The line itself
-        ctx.beginPath();
-        points.forEach((p, i) => i === 0 ? ctx.moveTo(p.x, p.y) : ctx.lineTo(p.x, p.y));
-        ctx.strokeStyle = color; ctx.lineWidth = 1.5; ctx.lineJoin = 'round'; ctx.stroke();
-
-        // Pulsing dot on the latest reading
-        const last = points[points.length - 1];
-        ctx.beginPath();
-        ctx.arc(last.x, last.y, 2, 0, Math.PI * 2);
-        ctx.fillStyle = color;
-        ctx.fill();
-
-        // Highlight dot for tooltip hover (if active)
-        const active = sparkActive[canvas.id || canvasId];
-        if (active != null && points[active]) {
-            const p = points[active];
-            ctx.beginPath();
-            ctx.arc(p.x, p.y, 3, 0, Math.PI * 2);
-            ctx.fillStyle = color;
-            ctx.fill();
-            ctx.beginPath();
-            ctx.arc(p.x, p.y, 5, 0, Math.PI * 2);
-            ctx.strokeStyle = color;
-            ctx.lineWidth = 1;
-            ctx.stroke();
+// --- RADIAL GAUGES ---
+function updateRadialGauges() {
+    const maxOffset = 119.38; // length of semi-circle path
+    
+    function getGaugePct(val, mapping) {
+        if (val <= mapping[0][0]) return mapping[0][1];
+        if (val >= mapping[mapping.length - 1][0]) return mapping[mapping.length - 1][1];
+        for (let i = 0; i < mapping.length - 1; i++) {
+            const v1 = mapping[i][0], p1 = mapping[i][1];
+            const v2 = mapping[i+1][0], p2 = mapping[i+1][1];
+            if (val >= v1 && val <= v2) {
+                return p1 + (p2 - p1) * ((val - v1) / (v2 - v1));
+            }
         }
-    });
-}
-function updateSparklines() {
-    pushSparkData();
-    drawSparkline('spark-temp', sparkHistory.temp, '#16a34a');
-    drawSparkline('spark-humidity', sparkHistory.humidity, '#d9383a');
-    drawSparkline('spark-light', sparkHistory.light, '#d9383a');
-    drawSparkline('spark-co2', sparkHistory.co2, '#eab308');
-}
-
-// --- Sparkline tooltips ---
-const sparkActive = {}; // canvasId -> index of active point (or null)
-function getSparkTooltip() {
-    let el = document.getElementById('spark-tooltip');
-    if (!el) {
-        el = document.createElement('div');
-        el.id = 'spark-tooltip';
-        el.className = 'fixed pointer-events-none z-[150] bg-slate-900/90 dark:bg-zinc-100/95 text-white dark:text-zinc-900 text-[10px] font-bold px-2 py-1 rounded-lg shadow-lg transition-opacity duration-100 opacity-0';
-        document.body.appendChild(el);
+        return 0.5;
     }
-    return el;
-}
-function handleSparkPointer(e, canvasId) {
-    const info = sparkPoints[canvasId];
-    const canvas = document.getElementById(canvasId);
-    if (!info || !canvas) return;
-    const rect = canvas.getBoundingClientRect();
-    const clientX = e.touches ? e.touches[0].clientX : e.clientX;
-    const clientY = e.touches ? e.touches[0].clientY : e.clientY;
-    const x = clientX - rect.left;
 
-    // Find nearest point by x position
-    let nearest = 0, nearestDist = Infinity;
-    info.points.forEach((p, i) => {
-        const d = Math.abs(p.x - x);
-        if (d < nearestDist) { nearestDist = d; nearest = i; }
-    });
-
-    sparkActive[canvasId] = nearest;
-    const value = info.data[nearest];
-    const decimals = sparkDecimals[canvasId] ?? 0;
-    const unit = sparkUnits[canvasId] || '';
-    const ago = info.data.length - 1 - nearest;
-    const tooltip = getSparkTooltip();
-    tooltip.textContent = `${value.toFixed(decimals)}${unit} · ${ago === 0 ? 'now' : ago * 3 + 's ago'}`;
-    tooltip.style.opacity = '1';
-    tooltip.style.left = clientX + 'px';
-    tooltip.style.top = (clientY - 32) + 'px';
-    tooltip.style.transform = 'translateX(-50%)';
-
-    // Redraw to show highlight dot
-    const colorMap = {
-        'spark-temp': '#16a34a', 'spark-humidity': '#d9383a', 'spark-light': '#d9383a',
-        'spark-co2': '#eab308'
+    // Map critical low to 0-10%, warn low to 10-25%, nominal to 25-75% (mid 50%),
+    // warn high to 75-90%, critical high to 90-100%.
+    const mappings = {
+        temp: [ [12, 0], [15, 0.1], [18, 0.25], [23, 0.5], [28, 0.75], [32, 0.9], [35, 1] ],
+        humidity: [ [30, 0], [45, 0.1], [60, 0.25], [72.5, 0.5], [85, 0.75], [95, 0.9], [100, 1] ],
+        light: [ [0, 0], [80, 0.1], [200, 0.25], [500, 0.5], [800, 0.75], [950, 0.9], [1050, 1] ],
+        co2: [ [400, 0], [600, 0.25], [800, 0.5], [1200, 0.9], [1500, 1] ]
     };
-    drawSparkline(canvasId, sparkHistory[canvasId.replace('spark-', '')], colorMap[canvasId]);
-}
-function clearSparkPointer(canvasId) {
-    sparkActive[canvasId] = null;
-    const tooltip = document.getElementById('spark-tooltip');
-    if (tooltip) tooltip.style.opacity = '0';
-    const colorMap = {
-        'spark-temp': '#16a34a', 'spark-humidity': '#d9383a', 'spark-light': '#d9383a',
-        'spark-co2': '#eab308'
-    };
-    drawSparkline(canvasId, sparkHistory[canvasId.replace('spark-', '')], colorMap[canvasId]);
-}
-function initSparkTooltips() {
-    ['spark-temp', 'spark-humidity', 'spark-light', 'spark-co2'].forEach(id => {
-        const canvas = document.getElementById(id);
-        if (!canvas) return;
-        canvas.style.cursor = 'crosshair';
-        canvas.addEventListener('mousemove', (e) => handleSparkPointer(e, id));
-        canvas.addEventListener('mouseleave', () => clearSparkPointer(id));
-        canvas.addEventListener('touchstart', (e) => { handleSparkPointer(e, id); }, { passive: true });
-        canvas.addEventListener('touchmove', (e) => { handleSparkPointer(e, id); }, { passive: true });
-        canvas.addEventListener('touchend', () => clearSparkPointer(id));
+
+    const gauges = [
+        { key: 'temp', val: state.currentTemp },
+        { key: 'humidity', val: state.currentHumidity },
+        { key: 'light', val: state.currentLight },
+        { key: 'co2', val: state.currentCO2 }
+    ];
+    
+    gauges.forEach(g => {
+        let pct = getGaugePct(g.val, mappings[g.key]);
+        const offset = maxOffset - (pct * maxOffset);
+        
+        const pathDesktop = document.getElementById(`gauge-${g.key}`);
+        if (pathDesktop) pathDesktop.style.strokeDashoffset = offset;
+        
+        const pathMobile = document.getElementById(`gauge-${g.key}-mobile`);
+        if (pathMobile) pathMobile.style.strokeDashoffset = offset;
     });
 }
-initSparkTooltips();
-setInterval(() => { updateSparklines(); updateLastUpdated(); updateFarmHealthScore(); }, 3000);
+
+setInterval(() => { updateRadialGauges(); updateLastUpdated(); updateFarmHealthScore(); }, 3000);
+
 
 // --- LAST UPDATED TIMESTAMP ---
 function updateLastUpdated() {
@@ -473,3 +355,21 @@ function updateLastUpdated() {
     if (el) el.innerText = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
 }
 
+
+// --- SENSOR CARD EXPANSION ---
+document.addEventListener('DOMContentLoaded', () => {
+    document.querySelectorAll('.sensor-card').forEach(card => {
+        card.addEventListener('click', () => {
+            const grid = card.querySelector('.sensor-info-grid');
+            if (grid) {
+                if (grid.classList.contains('max-h-0')) {
+                    grid.classList.remove('max-h-0', 'opacity-0');
+                    grid.classList.add('max-h-[200px]', 'opacity-100', 'mt-4');
+                } else {
+                    grid.classList.add('max-h-0', 'opacity-0');
+                    grid.classList.remove('max-h-[200px]', 'opacity-100', 'mt-4');
+                }
+            }
+        });
+    });
+});

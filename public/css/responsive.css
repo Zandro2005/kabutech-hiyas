@@ -520,25 +520,6 @@ html.dark #scene-register .dark\:bg-zinc-950 {
         background-color: #eef3ef !important;
     }
 
-    /* Home tab cards: wash each card with a whisper of its own icon
-               accent color (green/blue/amber/purple, already used in the
-               palette) instead of flat white, so the dashboard feels less
-               stark without introducing any new colors. */
-    html:not(.dark) #sensor-temp-card {
-        background: linear-gradient(150deg, #f1fdf5 0%, #ffffff 65%) !important;
-    }
-
-    html:not(.dark) #sensor-humidity-card {
-        background: linear-gradient(150deg, #f0f8ff 0%, #ffffff 65%) !important;
-    }
-
-    html:not(.dark) #sensor-light-card {
-        background: linear-gradient(150deg, #fffaf0 0%, #ffffff 65%) !important;
-    }
-
-    html:not(.dark) #sensor-co2-card {
-        background: linear-gradient(150deg, #faf5ff 0%, #ffffff 65%) !important;
-    }
 
     html:not(.dark) #tab-home .bg-white.rounded-3xl {
         background-color: #f6faf7 !important;
@@ -4581,7 +4562,7 @@ html.dark #scene-register .dark\:bg-zinc-950 {
         font-size: 15px !important;
     }
 
-    #home-desktop-view .sensor-grid-desktop .sensor-card>div:first-child {
+    #home-desktop-view .sensor-grid-desktop .sensor-card>div.legacy-header-class-not-used {
         margin-bottom: 20px !important;
     }
 

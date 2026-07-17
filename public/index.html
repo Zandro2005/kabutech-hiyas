@@ -94,6 +94,13 @@
         html.dark .bg-green-gradient {
             background: linear-gradient(135deg, #18181b 0%, #064e3b 100%) !important;
         }
+        
+        /* SVG Gauge Gradient Overrides */
+        .gauge-path.text-emerald-500 { stroke: url(#grad-emerald) !important; color: transparent; }
+        .gauge-path.text-sky-500 { stroke: url(#grad-sky) !important; color: transparent; }
+        .gauge-path.text-amber-500 { stroke: url(#grad-amber) !important; color: transparent; }
+        .gauge-path.text-purple-500 { stroke: url(#grad-purple) !important; color: transparent; }
+        .gauge-path.text-red-500 { stroke: url(#grad-red) !important; color: transparent; }
 
         @media screen and (max-width: 768px) {
 
@@ -151,6 +158,32 @@
 
 <body
     class="bg-app-bg dark:bg-zinc-950 text-on-surface antialiased min-h-screen select-none relative overflow-hidden transition-colors duration-300">
+
+    <!-- Global SVG Gradients for Gauges -->
+    <svg class="w-0 h-0 absolute pointer-events-none">
+        <defs>
+            <linearGradient id="grad-emerald" x1="0%" y1="0%" x2="100%" y2="0%">
+                <stop offset="0%" stop-color="#10b981" />
+                <stop offset="100%" stop-color="#34d399" />
+            </linearGradient>
+            <linearGradient id="grad-sky" x1="0%" y1="0%" x2="100%" y2="0%">
+                <stop offset="0%" stop-color="#0ea5e9" />
+                <stop offset="100%" stop-color="#38bdf8" />
+            </linearGradient>
+            <linearGradient id="grad-amber" x1="0%" y1="0%" x2="100%" y2="0%">
+                <stop offset="0%" stop-color="#f59e0b" />
+                <stop offset="100%" stop-color="#fbbf24" />
+            </linearGradient>
+            <linearGradient id="grad-purple" x1="0%" y1="0%" x2="100%" y2="0%">
+                <stop offset="0%" stop-color="#a855f7" />
+                <stop offset="100%" stop-color="#c084fc" />
+            </linearGradient>
+            <linearGradient id="grad-red" x1="0%" y1="0%" x2="100%" y2="0%">
+                <stop offset="0%" stop-color="#ef4444" />
+                <stop offset="100%" stop-color="#f87171" />
+            </linearGradient>
+        </defs>
+    </svg>
 
     <!-- App Boot Loader: covers the entire app until fonts, page resources,
          and app.js init have ALL finished. Uses a pure-CSS spinner (no icon
@@ -926,175 +959,246 @@
                                     <!-- Temp -->
                                     <div id="sensor-temp-card"
                                         class="sensor-card bg-green-gradient border border-emerald-200 dark:border-emerald-900/40 rounded-3xl p-4 md:p-3.5 shadow-[0_8px_20px_rgba(16,185,129,0.12)] flex flex-col justify-between relative overflow-hidden group transition-all duration-300 active:scale-[0.96] cursor-pointer hover:shadow-[0_12px_25px_rgba(16,185,129,0.2)] hover:-translate-y-1 md:hover:scale-[1.02]">
-                                        <div class="flex justify-between items-start mb-3 md:mb-2.5 relative z-10">
-                                            <div id="sensor-temp-icon-bg"
-                                                class="w-9 h-9 md:w-8 md:h-8 rounded-xl flex items-center justify-center bg-[#e6fcf0] dark:bg-emerald-950/40 text-[#054f24] dark:text-emerald-400">
-                                                <span class="material-symbols-outlined text-[20px] md:text-[18px]"
-                                                    style="font-variation-settings: 'FILL' 1;">device_thermostat</span>
+                                        <div class="flex flex-col items-center justify-center h-full relative z-10 w-full pt-4">
+                                            <!-- Top: Gauge -->
+                                            <div class="relative w-full flex flex-col justify-center items-center">
+                                                <div class="relative w-[80%] md:w-[75%] max-w-[200px] flex flex-col items-center">
+                                                    <svg viewBox="0 0 100 55" class="w-full h-auto overflow-visible drop-shadow-sm">
+                                                        <defs>
+                                                            <mask id="gauge-mask-temp" maskUnits="userSpaceOnUse">
+                                                            <line x1="50" y1="21" x2="50" y2="3" stroke="white" stroke-width="4.5" stroke-linecap="round" transform="rotate(-90 50 50)" />
+                                                            <line x1="50" y1="21" x2="50" y2="3" stroke="white" stroke-width="4.5" stroke-linecap="round" transform="rotate(-75 50 50)" />
+                                                            <line x1="50" y1="21" x2="50" y2="3" stroke="white" stroke-width="4.5" stroke-linecap="round" transform="rotate(-60 50 50)" />
+                                                            <line x1="50" y1="21" x2="50" y2="3" stroke="white" stroke-width="4.5" stroke-linecap="round" transform="rotate(-45 50 50)" />
+                                                            <line x1="50" y1="21" x2="50" y2="3" stroke="white" stroke-width="4.5" stroke-linecap="round" transform="rotate(-30 50 50)" />
+                                                            <line x1="50" y1="21" x2="50" y2="3" stroke="white" stroke-width="4.5" stroke-linecap="round" transform="rotate(-15 50 50)" />
+                                                            <line x1="50" y1="21" x2="50" y2="3" stroke="white" stroke-width="4.5" stroke-linecap="round" transform="rotate(0 50 50)" />
+                                                            <line x1="50" y1="21" x2="50" y2="3" stroke="white" stroke-width="4.5" stroke-linecap="round" transform="rotate(15 50 50)" />
+                                                            <line x1="50" y1="21" x2="50" y2="3" stroke="white" stroke-width="4.5" stroke-linecap="round" transform="rotate(30 50 50)" />
+                                                            <line x1="50" y1="21" x2="50" y2="3" stroke="white" stroke-width="4.5" stroke-linecap="round" transform="rotate(45 50 50)" />
+                                                            <line x1="50" y1="21" x2="50" y2="3" stroke="white" stroke-width="4.5" stroke-linecap="round" transform="rotate(60 50 50)" />
+                                                            <line x1="50" y1="21" x2="50" y2="3" stroke="white" stroke-width="4.5" stroke-linecap="round" transform="rotate(75 50 50)" />
+                                                            <line x1="50" y1="21" x2="50" y2="3" stroke="white" stroke-width="4.5" stroke-linecap="round" transform="rotate(90 50 50)" />
+                                                            </mask>
+                                                        </defs>
+                                                        <!-- Background track -->
+                                                        <path d="M 12,50 A 38,38 0 0,1 88,50" fill="none" stroke="currentColor" class="text-slate-200 dark:text-zinc-800" stroke-width="16" mask="url(#gauge-mask-temp)" />
+                                                        <!-- Active track -->
+                                                        <path id="gauge-temp" d="M 12,50 A 38,38 0 0,1 88,50" fill="none" stroke="currentColor" class="gauge-path text-emerald-500" stroke-width="16" stroke-linecap="butt" stroke-dasharray="119.38" stroke-dashoffset="119.38" mask="url(#gauge-mask-temp)" style="transition: stroke-dashoffset 1s ease-out, stroke 0.3s, color 0.3s;" />
+                                                    </svg>
+                                                    <div class="flex flex-col items-center z-20 w-full text-center mt-[-1.5rem] md:mt-[-1.5rem] pb-2">
+                                                        <span id="sensor-temp" style="font-size: 28px;" class="font-extrabold text-slate-800 dark:text-white leading-none">28.9&deg;C</span>
+                                                        <span style="font-size: 11px;" class="font-bold text-slate-400 dark:text-zinc-500 mt-1.5 uppercase tracking-widest">Temperature</span>
+                                                    </div>
+                                                </div>
                                             </div>
-                                            <span id="temp-trend"
-                                                class="flex items-center text-[#15803d] font-bold text-xs md:text-[10px] gap-0.5">
-                                                <span
-                                                    class="material-symbols-outlined text-xs md:text-[11px]">arrow_upward</span>~
-                                                2.7%
-                                            </span>
-                                        </div>
-                                        <div class="relative z-10 mt-0.5">
-                                            <p
-                                                class="text-xs md:text-[11px] font-semibold text-slate-400 dark:text-zinc-400 mb-0.5">
-                                                Temperature</p>
-                                            <p class="text-2xl md:text-xl text-slate-800 dark:text-white font-extrabold"
-                                                id="sensor-temp">28.9&deg;C</p>
-                                            <canvas id="spark-temp" height="24"
-                                                class="w-full mt-1.5 opacity-80"></canvas>
-
-                                            <!-- Keep sensor-detail hidden/accordion functional but styled -->
-                                            <div class="sensor-detail">
-                                                <div
-                                                    class="border-t border-slate-100 dark:border-zinc-800 pt-2 text-[10px] text-slate-500 dark:text-zinc-400 space-y-1">
-                                                    <div class="flex justify-between"><span>Optimal range</span><span
-                                                            class="font-bold text-slate-700 dark:text-white">22&deg;C
-                                                            &ndash; 26&deg;C</span></div>
-                                                    <div class="flex justify-between"><span>Sensor</span><span
-                                                            class="font-bold text-slate-700 dark:text-white">DHT22
-                                                            &ndash;
-                                                            Sector A</span></div>
-                                                    <div class="flex justify-between"><span>Status</span><span
-                                                            id="sensor-temp-status"
-                                                            class="font-bold text-success-green">Nominal</span></div>
+                                            
+                                            <!-- Bottom: 2x2 Info Grid -->
+                                            <div class="sensor-info-grid grid grid-cols-2 gap-2 w-full transition-all duration-300 max-h-0 opacity-0 overflow-hidden">
+                                                <div class="bg-black/5 dark:bg-white/5 rounded-xl p-2 flex flex-col items-center justify-center text-center">
+                                                    <span class="text-[8px] md:text-[8px] text-slate-500 dark:text-zinc-400 font-semibold mb-0.5 uppercase tracking-wide">Status</span>
+                                                    <span id="sensor-temp-status" class="text-[10px] md:text-[11px] font-extrabold text-emerald-600 dark:text-emerald-400">Nominal</span>
+                                                </div>
+                                                <div class="bg-black/5 dark:bg-white/5 rounded-xl p-2 flex flex-col items-center justify-center text-center">
+                                                    <span class="text-[8px] md:text-[8px] text-slate-500 dark:text-zinc-400 font-semibold mb-0.5 uppercase tracking-wide">Trend</span>
+                                                    <span id="temp-trend" class="text-[10px] md:text-[11px] font-extrabold text-slate-700 dark:text-slate-300 flex items-center justify-center gap-0.5 w-full">
+                                                        <span class="material-symbols-outlined text-[12px]">arrow_upward</span>2.7%
+                                                    </span>
+                                                </div>
+                                                <div class="bg-black/5 dark:bg-white/5 rounded-xl p-2 flex flex-col items-center justify-center text-center">
+                                                    <span class="text-[8px] md:text-[8px] text-slate-500 dark:text-zinc-400 font-semibold mb-0.5 uppercase tracking-wide">Optimal</span>
+                                                    <span class="text-[10px] md:text-[10px] font-bold text-slate-700 dark:text-slate-300 whitespace-nowrap">22&deg;C - 26&deg;C</span>
+                                                </div>
+                                                <div class="bg-black/5 dark:bg-white/5 rounded-xl p-2 flex flex-col items-center justify-center text-center">
+                                                    <span class="text-[8px] md:text-[8px] text-slate-500 dark:text-zinc-400 font-semibold mb-0.5 uppercase tracking-wide">Sensor</span>
+                                                    <span class="text-[10px] md:text-[10px] font-bold text-slate-700 dark:text-slate-300 whitespace-nowrap overflow-hidden text-ellipsis w-full max-w-full">DHT22 - A</span>
                                                 </div>
                                             </div>
                                         </div>
-                                    </div>
+ </div>
 
                                     <!-- Humidity -->
                                     <div id="sensor-humidity-card"
-                                        class="sensor-card bg-green-gradient border border-sky-200 dark:border-sky-900/40 rounded-3xl p-4 md:p-3.5 shadow-[0_8px_20px_rgba(14,165,233,0.12)] flex flex-col justify-between relative overflow-hidden group transition-all duration-300 active:scale-[0.96] cursor-pointer hover:shadow-[0_12px_25px_rgba(14,165,233,0.2)] hover:-translate-y-1 md:hover:scale-[1.02]">
-                                        <div class="flex justify-between items-start mb-3 md:mb-2.5 relative z-10">
-                                            <div id="sensor-humidity-icon-bg"
-                                                class="w-9 h-9 md:w-8 md:h-8 rounded-xl flex items-center justify-center bg-[#e8f4fd] dark:bg-sky-950/40 text-[#0284c7] dark:text-sky-400">
-                                                <span class="material-symbols-outlined text-[20px] md:text-[18px]"
-                                                    style="font-variation-settings: 'FILL' 1;">water_drop</span>
+                                        class="sensor-card bg-green-gradient border border-emerald-200 dark:border-emerald-900/40 rounded-3xl p-4 md:p-3.5 shadow-[0_8px_20px_rgba(16,185,129,0.12)] flex flex-col justify-between relative overflow-hidden group transition-all duration-300 active:scale-[0.96] cursor-pointer hover:shadow-[0_12px_25px_rgba(16,185,129,0.2)] hover:-translate-y-1 md:hover:scale-[1.02]">
+                                        <div class="flex flex-col items-center justify-center h-full relative z-10 w-full pt-4">
+                                            <!-- Top: Gauge -->
+                                            <div class="relative w-full flex flex-col justify-center items-center">
+                                                <div class="relative w-[80%] md:w-[75%] max-w-[200px] flex flex-col items-center">
+                                                    <svg viewBox="0 0 100 55" class="w-full h-auto overflow-visible drop-shadow-sm">
+                                                        <defs>
+                                                            <mask id="gauge-mask-humidity" maskUnits="userSpaceOnUse">
+                                                            <line x1="50" y1="21" x2="50" y2="3" stroke="white" stroke-width="4.5" stroke-linecap="round" transform="rotate(-90 50 50)" />
+                                                            <line x1="50" y1="21" x2="50" y2="3" stroke="white" stroke-width="4.5" stroke-linecap="round" transform="rotate(-75 50 50)" />
+                                                            <line x1="50" y1="21" x2="50" y2="3" stroke="white" stroke-width="4.5" stroke-linecap="round" transform="rotate(-60 50 50)" />
+                                                            <line x1="50" y1="21" x2="50" y2="3" stroke="white" stroke-width="4.5" stroke-linecap="round" transform="rotate(-45 50 50)" />
+                                                            <line x1="50" y1="21" x2="50" y2="3" stroke="white" stroke-width="4.5" stroke-linecap="round" transform="rotate(-30 50 50)" />
+                                                            <line x1="50" y1="21" x2="50" y2="3" stroke="white" stroke-width="4.5" stroke-linecap="round" transform="rotate(-15 50 50)" />
+                                                            <line x1="50" y1="21" x2="50" y2="3" stroke="white" stroke-width="4.5" stroke-linecap="round" transform="rotate(0 50 50)" />
+                                                            <line x1="50" y1="21" x2="50" y2="3" stroke="white" stroke-width="4.5" stroke-linecap="round" transform="rotate(15 50 50)" />
+                                                            <line x1="50" y1="21" x2="50" y2="3" stroke="white" stroke-width="4.5" stroke-linecap="round" transform="rotate(30 50 50)" />
+                                                            <line x1="50" y1="21" x2="50" y2="3" stroke="white" stroke-width="4.5" stroke-linecap="round" transform="rotate(45 50 50)" />
+                                                            <line x1="50" y1="21" x2="50" y2="3" stroke="white" stroke-width="4.5" stroke-linecap="round" transform="rotate(60 50 50)" />
+                                                            <line x1="50" y1="21" x2="50" y2="3" stroke="white" stroke-width="4.5" stroke-linecap="round" transform="rotate(75 50 50)" />
+                                                            <line x1="50" y1="21" x2="50" y2="3" stroke="white" stroke-width="4.5" stroke-linecap="round" transform="rotate(90 50 50)" />
+                                                            </mask>
+                                                        </defs>
+                                                        <!-- Background track -->
+                                                        <path d="M 12,50 A 38,38 0 0,1 88,50" fill="none" stroke="currentColor" class="text-slate-200 dark:text-zinc-800" stroke-width="16" mask="url(#gauge-mask-humidity)" />
+                                                        <!-- Active track -->
+                                                        <path id="gauge-humidity" d="M 12,50 A 38,38 0 0,1 88,50" fill="none" stroke="currentColor" class="gauge-path text-sky-500" stroke-width="16" stroke-linecap="butt" stroke-dasharray="119.38" stroke-dashoffset="119.38" mask="url(#gauge-mask-humidity)" style="transition: stroke-dashoffset 1s ease-out, stroke 0.3s, color 0.3s;" />
+                                                    </svg>
+                                                    <div class="flex flex-col items-center z-20 w-full text-center mt-[-1.5rem] md:mt-[-1.5rem] pb-2">
+                                                        <span id="sensor-humidity" style="font-size: 28px;" class="font-extrabold text-slate-800 dark:text-white leading-none">42%</span>
+                                                        <span style="font-size: 11px;" class="font-bold text-slate-400 dark:text-zinc-500 mt-1.5 uppercase tracking-widest">Humidity</span>
+                                                    </div>
+                                                </div>
                                             </div>
-                                            <span id="humidity-trend"
-                                                class="flex items-center text-[#d9383a] font-bold text-xs md:text-[10px] gap-0.5">
-                                                <span
-                                                    class="material-symbols-outlined text-xs md:text-[11px]">arrow_downward</span>~
-                                                3.7%
-                                            </span>
-                                        </div>
-                                        <div class="relative z-10 mt-0.5">
-                                            <p
-                                                class="text-xs md:text-[11px] font-semibold text-slate-400 dark:text-zinc-400 mb-0.5">
-                                                Humidity</p>
-                                            <p class="text-2xl md:text-xl text-slate-800 dark:text-white font-extrabold"
-                                                id="sensor-humidity">42%</p>
-                                            <canvas id="spark-humidity" height="24"
-                                                class="w-full mt-1.5 opacity-80"></canvas>
-
-                                            <div class="sensor-detail">
-                                                <div
-                                                    class="border-t border-slate-100 dark:border-zinc-800 pt-2 text-[10px] text-slate-500 dark:text-zinc-400 space-y-1">
-                                                    <div class="flex justify-between"><span>Optimal range</span><span
-                                                            class="font-bold text-slate-700 dark:text-white">65% &ndash;
-                                                            80%</span></div>
-                                                    <div class="flex justify-between"><span>Sensor</span><span
-                                                            class="font-bold text-slate-700 dark:text-white">DHT22
-                                                            &ndash;
-                                                            Sector A</span></div>
-                                                    <div class="flex justify-between"><span>Status</span><span
-                                                            id="sensor-humidity-status"
-                                                            class="font-bold text-success-green">Nominal</span></div>
+                                            
+                                            <!-- Bottom: 2x2 Info Grid -->
+                                            <div class="sensor-info-grid grid grid-cols-2 gap-2 w-full transition-all duration-300 max-h-0 opacity-0 overflow-hidden">
+                                                <div class="bg-black/5 dark:bg-white/5 rounded-xl p-2 flex flex-col items-center justify-center text-center">
+                                                    <span class="text-[8px] md:text-[8px] text-slate-500 dark:text-zinc-400 font-semibold mb-0.5 uppercase tracking-wide">Status</span>
+                                                    <span id="sensor-humidity-status" class="text-[10px] md:text-[11px] font-extrabold text-sky-600 dark:text-sky-400">Nominal</span>
+                                                </div>
+                                                <div class="bg-black/5 dark:bg-white/5 rounded-xl p-2 flex flex-col items-center justify-center text-center">
+                                                    <span class="text-[8px] md:text-[8px] text-slate-500 dark:text-zinc-400 font-semibold mb-0.5 uppercase tracking-wide">Trend</span>
+                                                    <span id="humidity-trend" class="text-[10px] md:text-[11px] font-extrabold text-slate-700 dark:text-slate-300 flex items-center justify-center gap-0.5 w-full">
+                                                        <span class="material-symbols-outlined text-[12px]">arrow_downward</span>3.7%
+                                                    </span>
+                                                </div>
+                                                <div class="bg-black/5 dark:bg-white/5 rounded-xl p-2 flex flex-col items-center justify-center text-center">
+                                                    <span class="text-[8px] md:text-[8px] text-slate-500 dark:text-zinc-400 font-semibold mb-0.5 uppercase tracking-wide">Optimal</span>
+                                                    <span class="text-[10px] md:text-[10px] font-bold text-slate-700 dark:text-slate-300 whitespace-nowrap">65% - 80%</span>
+                                                </div>
+                                                <div class="bg-black/5 dark:bg-white/5 rounded-xl p-2 flex flex-col items-center justify-center text-center">
+                                                    <span class="text-[8px] md:text-[8px] text-slate-500 dark:text-zinc-400 font-semibold mb-0.5 uppercase tracking-wide">Sensor</span>
+                                                    <span class="text-[10px] md:text-[10px] font-bold text-slate-700 dark:text-slate-300 whitespace-nowrap overflow-hidden text-ellipsis w-full max-w-full">DHT22 - A</span>
                                                 </div>
                                             </div>
                                         </div>
-                                    </div>
+ </div>
 
                                     <!-- Light Intensity -->
                                     <div id="sensor-light-card"
-                                        class="sensor-card bg-green-gradient border border-amber-200 dark:border-amber-900/40 rounded-3xl p-4 md:p-3.5 shadow-[0_8px_20px_rgba(245,158,11,0.12)] flex flex-col justify-between relative overflow-hidden group transition-all duration-300 active:scale-[0.96] cursor-pointer hover:shadow-[0_12px_25px_rgba(245,158,11,0.2)] hover:-translate-y-1 md:hover:scale-[1.02]">
-                                        <div class="flex justify-between items-start mb-3 md:mb-2.5 relative z-10">
-                                            <div id="sensor-light-icon-bg"
-                                                class="w-9 h-9 md:w-8 md:h-8 rounded-xl flex items-center justify-center bg-[#fff7ed] dark:bg-amber-950/40 text-[#ea580c] dark:text-amber-400">
-                                                <span class="material-symbols-outlined text-[20px] md:text-[18px]"
-                                                    style="font-variation-settings: 'FILL' 1;">light_mode</span>
+                                        class="sensor-card bg-green-gradient border border-emerald-200 dark:border-emerald-900/40 rounded-3xl p-4 md:p-3.5 shadow-[0_8px_20px_rgba(16,185,129,0.12)] flex flex-col justify-between relative overflow-hidden group transition-all duration-300 active:scale-[0.96] cursor-pointer hover:shadow-[0_12px_25px_rgba(16,185,129,0.2)] hover:-translate-y-1 md:hover:scale-[1.02]">
+                                        <div class="flex flex-col items-center justify-center h-full relative z-10 w-full pt-4">
+                                            <!-- Top: Gauge -->
+                                            <div class="relative w-full flex flex-col justify-center items-center">
+                                                <div class="relative w-[80%] md:w-[75%] max-w-[200px] flex flex-col items-center">
+                                                    <svg viewBox="0 0 100 55" class="w-full h-auto overflow-visible drop-shadow-sm">
+                                                        <defs>
+                                                            <mask id="gauge-mask-light" maskUnits="userSpaceOnUse">
+                                                            <line x1="50" y1="21" x2="50" y2="3" stroke="white" stroke-width="4.5" stroke-linecap="round" transform="rotate(-90 50 50)" />
+                                                            <line x1="50" y1="21" x2="50" y2="3" stroke="white" stroke-width="4.5" stroke-linecap="round" transform="rotate(-75 50 50)" />
+                                                            <line x1="50" y1="21" x2="50" y2="3" stroke="white" stroke-width="4.5" stroke-linecap="round" transform="rotate(-60 50 50)" />
+                                                            <line x1="50" y1="21" x2="50" y2="3" stroke="white" stroke-width="4.5" stroke-linecap="round" transform="rotate(-45 50 50)" />
+                                                            <line x1="50" y1="21" x2="50" y2="3" stroke="white" stroke-width="4.5" stroke-linecap="round" transform="rotate(-30 50 50)" />
+                                                            <line x1="50" y1="21" x2="50" y2="3" stroke="white" stroke-width="4.5" stroke-linecap="round" transform="rotate(-15 50 50)" />
+                                                            <line x1="50" y1="21" x2="50" y2="3" stroke="white" stroke-width="4.5" stroke-linecap="round" transform="rotate(0 50 50)" />
+                                                            <line x1="50" y1="21" x2="50" y2="3" stroke="white" stroke-width="4.5" stroke-linecap="round" transform="rotate(15 50 50)" />
+                                                            <line x1="50" y1="21" x2="50" y2="3" stroke="white" stroke-width="4.5" stroke-linecap="round" transform="rotate(30 50 50)" />
+                                                            <line x1="50" y1="21" x2="50" y2="3" stroke="white" stroke-width="4.5" stroke-linecap="round" transform="rotate(45 50 50)" />
+                                                            <line x1="50" y1="21" x2="50" y2="3" stroke="white" stroke-width="4.5" stroke-linecap="round" transform="rotate(60 50 50)" />
+                                                            <line x1="50" y1="21" x2="50" y2="3" stroke="white" stroke-width="4.5" stroke-linecap="round" transform="rotate(75 50 50)" />
+                                                            <line x1="50" y1="21" x2="50" y2="3" stroke="white" stroke-width="4.5" stroke-linecap="round" transform="rotate(90 50 50)" />
+                                                            </mask>
+                                                        </defs>
+                                                        <!-- Background track -->
+                                                        <path d="M 12,50 A 38,38 0 0,1 88,50" fill="none" stroke="currentColor" class="text-slate-200 dark:text-zinc-800" stroke-width="16" mask="url(#gauge-mask-light)" />
+                                                        <!-- Active track -->
+                                                        <path id="gauge-light" d="M 12,50 A 38,38 0 0,1 88,50" fill="none" stroke="currentColor" class="gauge-path text-amber-500" stroke-width="16" stroke-linecap="butt" stroke-dasharray="119.38" stroke-dashoffset="119.38" mask="url(#gauge-mask-light)" style="transition: stroke-dashoffset 1s ease-out, stroke 0.3s, color 0.3s;" />
+                                                    </svg>
+                                                    <div class="flex flex-col items-center z-20 w-full text-center mt-[-1.5rem] md:mt-[-1.5rem] pb-2">
+                                                        <span id="sensor-light" style="font-size: 28px;" class="font-extrabold text-slate-800 dark:text-white leading-none">149 &micro;mol</span>
+                                                        <span style="font-size: 11px;" class="font-bold text-slate-400 dark:text-zinc-500 mt-1.5 uppercase tracking-widest">Light Level</span>
+                                                    </div>
+                                                </div>
                                             </div>
-                                            <span id="light-trend"
-                                                class="flex items-center text-[#d9383a] font-bold text-xs md:text-[10px] gap-0.5">
-                                                <span
-                                                    class="material-symbols-outlined text-xs md:text-[11px]">arrow_downward</span>~
-                                                10.8%
-                                            </span>
-                                        </div>
-                                        <div class="relative z-10 mt-0.5">
-                                            <p
-                                                class="text-xs md:text-[11px] font-semibold text-slate-400 dark:text-zinc-400 mb-0.5">
-                                                Light Intensity</p>
-                                            <p class="text-2xl md:text-xl text-slate-800 dark:text-white font-extrabold"
-                                                id="sensor-light">149 &micro;mol</p>
-                                            <canvas id="spark-light" height="24"
-                                                class="w-full mt-1.5 opacity-80"></canvas>
-
-                                            <div class="sensor-detail">
-                                                <div
-                                                    class="border-t border-slate-100 dark:border-zinc-800 pt-2 text-[10px] text-slate-500 dark:text-zinc-400 space-y-1">
-                                                    <div class="flex justify-between"><span>Optimal range</span><span
-                                                            class="font-bold text-slate-700 dark:text-white">300 &ndash;
-                                                            500
-                                                            &micro;mol</span></div>
-                                                    <div class="flex justify-between"><span>Sensor</span><span
-                                                            class="font-bold text-slate-700 dark:text-white">LUX-100
-                                                            &ndash;
-                                                            Sector A</span></div>
-                                                    <div class="flex justify-between"><span>Status</span><span
-                                                            id="sensor-light-status"
-                                                            class="font-bold text-success-green">Nominal</span></div>
+                                            
+                                            <!-- Bottom: 2x2 Info Grid -->
+                                            <div class="sensor-info-grid grid grid-cols-2 gap-2 w-full transition-all duration-300 max-h-0 opacity-0 overflow-hidden">
+                                                <div class="bg-black/5 dark:bg-white/5 rounded-xl p-2 flex flex-col items-center justify-center text-center">
+                                                    <span class="text-[8px] md:text-[8px] text-slate-500 dark:text-zinc-400 font-semibold mb-0.5 uppercase tracking-wide">Status</span>
+                                                    <span id="sensor-light-status" class="text-[10px] md:text-[11px] font-extrabold text-amber-600 dark:text-amber-400">Nominal</span>
+                                                </div>
+                                                <div class="bg-black/5 dark:bg-white/5 rounded-xl p-2 flex flex-col items-center justify-center text-center">
+                                                    <span class="text-[8px] md:text-[8px] text-slate-500 dark:text-zinc-400 font-semibold mb-0.5 uppercase tracking-wide">Trend</span>
+                                                    <span id="light-trend" class="text-[10px] md:text-[11px] font-extrabold text-slate-700 dark:text-slate-300 flex items-center justify-center gap-0.5 w-full">
+                                                        <span class="material-symbols-outlined text-[12px]">arrow_downward</span>10.8%
+                                                    </span>
+                                                </div>
+                                                <div class="bg-black/5 dark:bg-white/5 rounded-xl p-2 flex flex-col items-center justify-center text-center">
+                                                    <span class="text-[8px] md:text-[8px] text-slate-500 dark:text-zinc-400 font-semibold mb-0.5 uppercase tracking-wide">Optimal</span>
+                                                    <span class="text-[10px] md:text-[10px] font-bold text-slate-700 dark:text-slate-300 whitespace-nowrap">300 - 500</span>
+                                                </div>
+                                                <div class="bg-black/5 dark:bg-white/5 rounded-xl p-2 flex flex-col items-center justify-center text-center">
+                                                    <span class="text-[8px] md:text-[8px] text-slate-500 dark:text-zinc-400 font-semibold mb-0.5 uppercase tracking-wide">Sensor</span>
+                                                    <span class="text-[10px] md:text-[10px] font-bold text-slate-700 dark:text-slate-300 whitespace-nowrap overflow-hidden text-ellipsis w-full max-w-full">LUX-100 - A</span>
                                                 </div>
                                             </div>
                                         </div>
-                                    </div>
+ </div>
 
                                     <!-- CO2 Level -->
                                     <div id="sensor-co2-card"
-                                        class="sensor-card bg-green-gradient border border-purple-200 dark:border-purple-900/40 rounded-3xl p-4 md:p-3.5 shadow-[0_8px_20px_rgba(168,85,247,0.12)] flex flex-col justify-between relative overflow-hidden group transition-all duration-300 active:scale-[0.96] cursor-pointer hover:shadow-[0_12px_25px_rgba(168,85,247,0.2)] hover:-translate-y-1 md:hover:scale-[1.02]">
-                                        <div class="flex justify-between items-start mb-3 md:mb-2.5 relative z-10">
-                                            <div id="sensor-co2-icon-bg"
-                                                class="w-9 h-9 md:w-8 md:h-8 rounded-xl flex items-center justify-center bg-[#faf5ff] dark:bg-purple-950/40 text-[#9333ea] dark:text-purple-400">
-                                                <span class="material-symbols-outlined text-[20px] md:text-[18px]"
-                                                    style="font-variation-settings: 'FILL' 1;">co2</span>
+                                        class="sensor-card bg-green-gradient border border-emerald-200 dark:border-emerald-900/40 rounded-3xl p-4 md:p-3.5 shadow-[0_8px_20px_rgba(16,185,129,0.12)] flex flex-col justify-between relative overflow-hidden group transition-all duration-300 active:scale-[0.96] cursor-pointer hover:shadow-[0_12px_25px_rgba(16,185,129,0.2)] hover:-translate-y-1 md:hover:scale-[1.02]">
+                                        <div class="flex flex-col items-center justify-center h-full relative z-10 w-full pt-4">
+                                            <!-- Top: Gauge -->
+                                            <div class="relative w-full flex flex-col justify-center items-center">
+                                                <div class="relative w-[80%] md:w-[75%] max-w-[200px] flex flex-col items-center">
+                                                    <svg viewBox="0 0 100 55" class="w-full h-auto overflow-visible drop-shadow-sm">
+                                                        <defs>
+                                                            <mask id="gauge-mask-co2" maskUnits="userSpaceOnUse">
+                                                            <line x1="50" y1="21" x2="50" y2="3" stroke="white" stroke-width="4.5" stroke-linecap="round" transform="rotate(-90 50 50)" />
+                                                            <line x1="50" y1="21" x2="50" y2="3" stroke="white" stroke-width="4.5" stroke-linecap="round" transform="rotate(-75 50 50)" />
+                                                            <line x1="50" y1="21" x2="50" y2="3" stroke="white" stroke-width="4.5" stroke-linecap="round" transform="rotate(-60 50 50)" />
+                                                            <line x1="50" y1="21" x2="50" y2="3" stroke="white" stroke-width="4.5" stroke-linecap="round" transform="rotate(-45 50 50)" />
+                                                            <line x1="50" y1="21" x2="50" y2="3" stroke="white" stroke-width="4.5" stroke-linecap="round" transform="rotate(-30 50 50)" />
+                                                            <line x1="50" y1="21" x2="50" y2="3" stroke="white" stroke-width="4.5" stroke-linecap="round" transform="rotate(-15 50 50)" />
+                                                            <line x1="50" y1="21" x2="50" y2="3" stroke="white" stroke-width="4.5" stroke-linecap="round" transform="rotate(0 50 50)" />
+                                                            <line x1="50" y1="21" x2="50" y2="3" stroke="white" stroke-width="4.5" stroke-linecap="round" transform="rotate(15 50 50)" />
+                                                            <line x1="50" y1="21" x2="50" y2="3" stroke="white" stroke-width="4.5" stroke-linecap="round" transform="rotate(30 50 50)" />
+                                                            <line x1="50" y1="21" x2="50" y2="3" stroke="white" stroke-width="4.5" stroke-linecap="round" transform="rotate(45 50 50)" />
+                                                            <line x1="50" y1="21" x2="50" y2="3" stroke="white" stroke-width="4.5" stroke-linecap="round" transform="rotate(60 50 50)" />
+                                                            <line x1="50" y1="21" x2="50" y2="3" stroke="white" stroke-width="4.5" stroke-linecap="round" transform="rotate(75 50 50)" />
+                                                            <line x1="50" y1="21" x2="50" y2="3" stroke="white" stroke-width="4.5" stroke-linecap="round" transform="rotate(90 50 50)" />
+                                                            </mask>
+                                                        </defs>
+                                                        <!-- Background track -->
+                                                        <path d="M 12,50 A 38,38 0 0,1 88,50" fill="none" stroke="currentColor" class="text-slate-200 dark:text-zinc-800" stroke-width="16" mask="url(#gauge-mask-co2)" />
+                                                        <!-- Active track -->
+                                                        <path id="gauge-co2" d="M 12,50 A 38,38 0 0,1 88,50" fill="none" stroke="currentColor" class="gauge-path text-purple-500" stroke-width="16" stroke-linecap="butt" stroke-dasharray="119.38" stroke-dashoffset="119.38" mask="url(#gauge-mask-co2)" style="transition: stroke-dashoffset 1s ease-out, stroke 0.3s, color 0.3s;" />
+                                                    </svg>
+                                                    <div class="flex flex-col items-center z-20 w-full text-center mt-[-1.5rem] md:mt-[-1.5rem] pb-2">
+                                                        <span id="sensor-co2" style="font-size: 28px;" class="font-extrabold text-slate-800 dark:text-white leading-none">960 ppm</span>
+                                                        <span style="font-size: 11px;" class="font-bold text-slate-400 dark:text-zinc-500 mt-1.5 uppercase tracking-widest">CO2 Level</span>
+                                                    </div>
+                                                </div>
                                             </div>
-                                            <span id="co2-trend"
-                                                class="px-2 md:px-1.5 py-0.5 rounded bg-[#fef3c7] text-[#b45309] text-xs md:text-[9px] font-extrabold tracking-wider border border-[#f59e0b]/20">
-                                                HIGH
-                                            </span>
-                                        </div>
-                                        <div class="relative z-10 mt-0.5">
-                                            <p
-                                                class="text-xs md:text-[11px] font-semibold text-slate-400 dark:text-zinc-400 mb-0.5">
-                                                CO2 Level</p>
-                                            <p class="text-2xl md:text-xl text-slate-800 dark:text-white font-extrabold"
-                                                id="sensor-co2">960 ppm</p>
-                                            <canvas id="spark-co2" height="24"
-                                                class="w-full mt-1.5 opacity-80"></canvas>
-
-                                            <div class="sensor-detail">
-                                                <div
-                                                    class="border-t border-slate-100 dark:border-zinc-800 pt-2 text-[10px] text-slate-500 dark:text-zinc-400 space-y-1">
-                                                    <div class="flex justify-between"><span>Optimal range</span><span
-                                                            class="font-bold text-slate-700 dark:text-white">400 &ndash;
-                                                            800
-                                                            ppm</span></div>
-                                                    <div class="flex justify-between"><span>Sensor</span><span
-                                                            class="font-bold text-slate-700 dark:text-white">MH-Z19
-                                                            &ndash;
-                                                            Sector A</span></div>
-                                                    <div class="flex justify-between"><span>Status</span><span
-                                                            id="sensor-co2-status"
-                                                            class="font-bold text-success-green">Nominal</span></div>
+                                            
+                                            <!-- Bottom: 2x2 Info Grid -->
+                                            <div class="sensor-info-grid grid grid-cols-2 gap-2 w-full transition-all duration-300 max-h-0 opacity-0 overflow-hidden">
+                                                <div class="bg-black/5 dark:bg-white/5 rounded-xl p-2 flex flex-col items-center justify-center text-center">
+                                                    <span class="text-[8px] md:text-[8px] text-slate-500 dark:text-zinc-400 font-semibold mb-0.5 uppercase tracking-wide">Status</span>
+                                                    <span id="sensor-co2-status" class="text-[10px] md:text-[11px] font-extrabold text-purple-600 dark:text-purple-400">Nominal</span>
+                                                </div>
+                                                <div class="bg-black/5 dark:bg-white/5 rounded-xl p-2 flex flex-col items-center justify-center text-center">
+                                                    <span class="text-[8px] md:text-[8px] text-slate-500 dark:text-zinc-400 font-semibold mb-0.5 uppercase tracking-wide">Trend</span>
+                                                    <span id="co2-trend" class="text-[10px] md:text-[11px] font-extrabold text-slate-700 dark:text-slate-300 flex items-center justify-center gap-0.5 w-full">
+                                                        <span class="material-symbols-outlined text-[12px]">warning</span>HIGH
+                                                    </span>
+                                                </div>
+                                                <div class="bg-black/5 dark:bg-white/5 rounded-xl p-2 flex flex-col items-center justify-center text-center">
+                                                    <span class="text-[8px] md:text-[8px] text-slate-500 dark:text-zinc-400 font-semibold mb-0.5 uppercase tracking-wide">Optimal</span>
+                                                    <span class="text-[10px] md:text-[10px] font-bold text-slate-700 dark:text-slate-300 whitespace-nowrap">400 - 800</span>
+                                                </div>
+                                                <div class="bg-black/5 dark:bg-white/5 rounded-xl p-2 flex flex-col items-center justify-center text-center">
+                                                    <span class="text-[8px] md:text-[8px] text-slate-500 dark:text-zinc-400 font-semibold mb-0.5 uppercase tracking-wide">Sensor</span>
+                                                    <span class="text-[10px] md:text-[10px] font-bold text-slate-700 dark:text-slate-300 whitespace-nowrap overflow-hidden text-ellipsis w-full max-w-full">MH-Z19 - A</span>
                                                 </div>
                                             </div>
                                         </div>
-                                    </div>
+ </div>
                                 </div>
 
                                 <!-- Keep Last Updated Timestamp & hidden stats in a small compact bar with added margin under it -->
@@ -1382,190 +1486,244 @@
                                 <div class="grid grid-cols-2 gap-3.5">
                                     <!-- Temp -->
                                     <div id="sensor-temp-card-mobile"
-                                        class="sensor-card bg-green-gradient border border-emerald-200 dark:border-emerald-900/40 rounded-2xl p-3.5 shadow-sm flex flex-col justify-between relative overflow-hidden group transition-all duration-300">
-                                        <div
-                                            class="absolute top-0 right-0 w-12 h-12 bg-primary/5 dark:bg-primary-fixed/5 rounded-bl-full -mr-2 -mt-2">
-                                        </div>
-                                        <div class="flex justify-between items-start mb-3 relative z-10">
-                                            <div id="sensor-temp-icon-bg-mobile"
-                                                class="bg-surface-soft dark:bg-zinc-800 p-2 rounded-lg text-primary dark:text-primary-fixed">
-                                                <span class="material-symbols-outlined text-[18px]"
-                                                    style="font-variation-settings: 'FILL' 1;">device_thermostat</span>
-                                            </div>
-                                            <span id="temp-trend-mobile"
-                                                class="flex items-center text-success-green dark:text-emerald-400 text-caption bg-success-green/10 dark:bg-emerald-950/40 px-1.5 py-0.5 rounded-full">
-                                                <span
-                                                    class="material-symbols-outlined text-[12px] mr-0.5">arrow_upward</span>
-                                                0.1%
-                                            </span>
-                                        </div>
-                                        <div class="relative z-10">
-                                            <p class="text-caption text-on-surface-variant dark:text-zinc-400 mb-0.5">
-                                                Temperature</p>
-                                            <p class="text-headline-md text-brand-deep dark:text-primary-fixed font-extrabold"
-                                                id="sensor-temp-mobile">24.2&deg;C</p>
-                                            <canvas id="spark-temp-mobile" height="24"
-                                                class="w-full mt-1 opacity-60"></canvas>
-                                            <div class="sensor-detail">
-                                                <div
-                                                    class="border-t border-muted dark:border-zinc-800 pt-2 text-[10px] text-on-surface-variant dark:text-zinc-400 space-y-1">
-                                                    <div class="flex justify-between"><span>Optimal range</span><span
-                                                            class="font-bold text-on-surface dark:text-white">22&deg;C
-                                                            &ndash;
-                                                            26&deg;C</span></div>
-                                                    <div class="flex justify-between"><span>Sensor</span><span
-                                                            class="font-bold text-on-surface dark:text-white">DHT22
-                                                            &ndash;
-                                                            Sector
-                                                            A</span></div>
-                                                    <div class="flex justify-between"><span>Status</span><span
-                                                            id="sensor-temp-status-mobile"
-                                                            class="font-bold text-success-green dark:text-emerald-400">Nominal</span>
+                                        class="sensor-card min-h-[260px] bg-green-gradient border-2 border-emerald-300 dark:border-emerald-700/60 rounded-2xl p-3.5 shadow-md flex flex-col justify-between relative overflow-hidden group transition-all duration-300">
+                                        <div class="flex flex-col items-center justify-center h-full relative z-10 w-full pt-4">
+                                            <!-- Top: Gauge -->
+                                            <div class="relative w-full flex flex-col justify-center items-center">
+                                                <div class="relative w-[80%] md:w-[75%] max-w-[200px] flex flex-col items-center">
+                                                    <svg viewBox="0 0 100 55" class="w-full h-auto overflow-visible drop-shadow-sm">
+                                                        <defs>
+                                                            <mask id="gauge-mask-temp-mobile" maskUnits="userSpaceOnUse">
+                                                            <line x1="50" y1="21" x2="50" y2="3" stroke="white" stroke-width="4.5" stroke-linecap="round" transform="rotate(-90 50 50)" />
+                                                            <line x1="50" y1="21" x2="50" y2="3" stroke="white" stroke-width="4.5" stroke-linecap="round" transform="rotate(-75 50 50)" />
+                                                            <line x1="50" y1="21" x2="50" y2="3" stroke="white" stroke-width="4.5" stroke-linecap="round" transform="rotate(-60 50 50)" />
+                                                            <line x1="50" y1="21" x2="50" y2="3" stroke="white" stroke-width="4.5" stroke-linecap="round" transform="rotate(-45 50 50)" />
+                                                            <line x1="50" y1="21" x2="50" y2="3" stroke="white" stroke-width="4.5" stroke-linecap="round" transform="rotate(-30 50 50)" />
+                                                            <line x1="50" y1="21" x2="50" y2="3" stroke="white" stroke-width="4.5" stroke-linecap="round" transform="rotate(-15 50 50)" />
+                                                            <line x1="50" y1="21" x2="50" y2="3" stroke="white" stroke-width="4.5" stroke-linecap="round" transform="rotate(0 50 50)" />
+                                                            <line x1="50" y1="21" x2="50" y2="3" stroke="white" stroke-width="4.5" stroke-linecap="round" transform="rotate(15 50 50)" />
+                                                            <line x1="50" y1="21" x2="50" y2="3" stroke="white" stroke-width="4.5" stroke-linecap="round" transform="rotate(30 50 50)" />
+                                                            <line x1="50" y1="21" x2="50" y2="3" stroke="white" stroke-width="4.5" stroke-linecap="round" transform="rotate(45 50 50)" />
+                                                            <line x1="50" y1="21" x2="50" y2="3" stroke="white" stroke-width="4.5" stroke-linecap="round" transform="rotate(60 50 50)" />
+                                                            <line x1="50" y1="21" x2="50" y2="3" stroke="white" stroke-width="4.5" stroke-linecap="round" transform="rotate(75 50 50)" />
+                                                            <line x1="50" y1="21" x2="50" y2="3" stroke="white" stroke-width="4.5" stroke-linecap="round" transform="rotate(90 50 50)" />
+                                                            </mask>
+                                                        </defs>
+                                                        <!-- Background track -->
+                                                        <path d="M 12,50 A 38,38 0 0,1 88,50" fill="none" stroke="currentColor" class="text-slate-200 dark:text-zinc-800" stroke-width="16" mask="url(#gauge-mask-temp-mobile)" />
+                                                        <!-- Active track -->
+                                                        <path id="gauge-temp-mobile" d="M 12,50 A 38,38 0 0,1 88,50" fill="none" stroke="currentColor" class="gauge-path text-emerald-500" stroke-width="16" stroke-linecap="butt" stroke-dasharray="119.38" stroke-dashoffset="119.38" mask="url(#gauge-mask-temp-mobile)" style="transition: stroke-dashoffset 1s ease-out, stroke 0.3s, color 0.3s;" />
+                                                    </svg>
+                                                    <div class="flex flex-col items-center z-20 w-full text-center mt-[-1.5rem] md:mt-[-1.5rem] pb-2">
+                                                        <span id="sensor-temp-mobile" class="text-[18px] sm:text-[20px] md:text-[24px] font-extrabold text-slate-800 dark:text-white leading-none">28.9&deg;C</span>
+                                                        <span class="text-[8px] sm:text-[9px] md:text-[10px] font-bold text-slate-400 dark:text-zinc-500 mt-1.5 uppercase tracking-widest">Temperature</span>
                                                     </div>
                                                 </div>
                                             </div>
+                                            
+                                            <!-- Bottom: 2x2 Info Grid -->
+                                            <div class="sensor-info-grid grid grid-cols-2 gap-2 w-full transition-all duration-300 max-h-0 opacity-0 overflow-hidden">
+                                                <div class="bg-black/5 dark:bg-white/5 rounded-xl p-2 flex flex-col items-center justify-center text-center">
+                                                    <span class="text-[8px] md:text-[8px] text-slate-500 dark:text-zinc-400 font-semibold mb-0.5 uppercase tracking-wide">Status</span>
+                                                    <span id="sensor-temp-status-mobile" class="text-[10px] md:text-[11px] font-extrabold text-emerald-600 dark:text-emerald-400">Nominal</span>
+                                                </div>
+                                                <div class="bg-black/5 dark:bg-white/5 rounded-xl p-2 flex flex-col items-center justify-center text-center">
+                                                    <span class="text-[8px] md:text-[8px] text-slate-500 dark:text-zinc-400 font-semibold mb-0.5 uppercase tracking-wide">Trend</span>
+                                                    <span id="temp-trend-mobile" class="text-[10px] md:text-[11px] font-extrabold text-slate-700 dark:text-slate-300 flex items-center justify-center gap-0.5 w-full">
+                                                        <span class="material-symbols-outlined text-[12px]">arrow_upward</span>2.7%
+                                                    </span>
+                                                </div>
+                                                <div class="bg-black/5 dark:bg-white/5 rounded-xl p-2 flex flex-col items-center justify-center text-center">
+                                                    <span class="text-[8px] md:text-[8px] text-slate-500 dark:text-zinc-400 font-semibold mb-0.5 uppercase tracking-wide">Optimal</span>
+                                                    <span class="text-[10px] md:text-[10px] font-bold text-slate-700 dark:text-slate-300 whitespace-nowrap">22&deg;C - 26&deg;C</span>
+                                                </div>
+                                                <div class="bg-black/5 dark:bg-white/5 rounded-xl p-2 flex flex-col items-center justify-center text-center">
+                                                    <span class="text-[8px] md:text-[8px] text-slate-500 dark:text-zinc-400 font-semibold mb-0.5 uppercase tracking-wide">Sensor</span>
+                                                    <span class="text-[10px] md:text-[10px] font-bold text-slate-700 dark:text-slate-300 whitespace-nowrap overflow-hidden text-ellipsis w-full max-w-full">DHT22 - A</span>
+                                                </div>
+                                            </div>
                                         </div>
-                                    </div>
+ </div>
                                     <!-- Humidity -->
                                     <div id="sensor-humidity-card-mobile"
-                                        class="sensor-card bg-green-gradient border border-sky-200 dark:border-sky-900/40 rounded-2xl p-3.5 shadow-sm flex flex-col justify-between relative overflow-hidden group transition-all duration-300">
-                                        <div
-                                            class="absolute top-0 right-0 w-12 h-12 bg-primary/5 dark:bg-primary-fixed/5 rounded-bl-full -mr-2 -mt-2">
-                                        </div>
-                                        <div class="flex justify-between items-start mb-3 relative z-10">
-                                            <div id="sensor-humidity-icon-bg-mobile"
-                                                class="bg-surface-soft dark:bg-zinc-800 p-2 rounded-lg text-primary dark:text-primary-fixed">
-                                                <span class="material-symbols-outlined text-[18px]"
-                                                    style="font-variation-settings: 'FILL' 1;">water_drop</span>
-                                            </div>
-                                            <span id="humidity-trend-mobile"
-                                                class="flex items-center text-on-surface-variant dark:text-zinc-400 text-caption bg-surface-variant dark:bg-zinc-800 px-1.5 py-0.5 rounded-full">
-                                                <span
-                                                    class="material-symbols-outlined text-[12px] mr-0.5">horizontal_rule</span>
-                                                0%
-                                            </span>
-                                        </div>
-                                        <div class="relative z-10">
-                                            <p class="text-caption text-on-surface-variant dark:text-zinc-400 mb-0.5">
-                                                Humidity
-                                            </p>
-                                            <p class="text-headline-md text-brand-deep dark:text-primary-fixed font-extrabold"
-                                                id="sensor-humidity-mobile">68%</p>
-                                            <canvas id="spark-humidity-mobile" height="24"
-                                                class="w-full mt-1 opacity-60"></canvas>
-                                            <div class="sensor-detail">
-                                                <div
-                                                    class="border-t border-muted dark:border-zinc-800 pt-2 text-[10px] text-on-surface-variant dark:text-zinc-400 space-y-1">
-                                                    <div class="flex justify-between"><span>Optimal range</span><span
-                                                            class="font-bold text-on-surface dark:text-white">65%
-                                                            &ndash;
-                                                            80%</span></div>
-                                                    <div class="flex justify-between"><span>Sensor</span><span
-                                                            class="font-bold text-on-surface dark:text-white">DHT22
-                                                            &ndash;
-                                                            Sector
-                                                            A</span></div>
-                                                    <div class="flex justify-between"><span>Status</span><span
-                                                            id="sensor-humidity-status-mobile"
-                                                            class="font-bold text-success-green dark:text-emerald-400">Nominal</span>
+                                        class="sensor-card min-h-[260px] bg-green-gradient border-2 border-emerald-300 dark:border-emerald-700/60 rounded-2xl p-3.5 shadow-md flex flex-col justify-between relative overflow-hidden group transition-all duration-300">
+                                        <div class="flex flex-col items-center justify-center h-full relative z-10 w-full pt-4">
+                                            <!-- Top: Gauge -->
+                                            <div class="relative w-full flex flex-col justify-center items-center">
+                                                <div class="relative w-[80%] md:w-[75%] max-w-[200px] flex flex-col items-center">
+                                                    <svg viewBox="0 0 100 55" class="w-full h-auto overflow-visible drop-shadow-sm">
+                                                        <defs>
+                                                            <mask id="gauge-mask-humidity-mobile" maskUnits="userSpaceOnUse">
+                                                            <line x1="50" y1="21" x2="50" y2="3" stroke="white" stroke-width="4.5" stroke-linecap="round" transform="rotate(-90 50 50)" />
+                                                            <line x1="50" y1="21" x2="50" y2="3" stroke="white" stroke-width="4.5" stroke-linecap="round" transform="rotate(-75 50 50)" />
+                                                            <line x1="50" y1="21" x2="50" y2="3" stroke="white" stroke-width="4.5" stroke-linecap="round" transform="rotate(-60 50 50)" />
+                                                            <line x1="50" y1="21" x2="50" y2="3" stroke="white" stroke-width="4.5" stroke-linecap="round" transform="rotate(-45 50 50)" />
+                                                            <line x1="50" y1="21" x2="50" y2="3" stroke="white" stroke-width="4.5" stroke-linecap="round" transform="rotate(-30 50 50)" />
+                                                            <line x1="50" y1="21" x2="50" y2="3" stroke="white" stroke-width="4.5" stroke-linecap="round" transform="rotate(-15 50 50)" />
+                                                            <line x1="50" y1="21" x2="50" y2="3" stroke="white" stroke-width="4.5" stroke-linecap="round" transform="rotate(0 50 50)" />
+                                                            <line x1="50" y1="21" x2="50" y2="3" stroke="white" stroke-width="4.5" stroke-linecap="round" transform="rotate(15 50 50)" />
+                                                            <line x1="50" y1="21" x2="50" y2="3" stroke="white" stroke-width="4.5" stroke-linecap="round" transform="rotate(30 50 50)" />
+                                                            <line x1="50" y1="21" x2="50" y2="3" stroke="white" stroke-width="4.5" stroke-linecap="round" transform="rotate(45 50 50)" />
+                                                            <line x1="50" y1="21" x2="50" y2="3" stroke="white" stroke-width="4.5" stroke-linecap="round" transform="rotate(60 50 50)" />
+                                                            <line x1="50" y1="21" x2="50" y2="3" stroke="white" stroke-width="4.5" stroke-linecap="round" transform="rotate(75 50 50)" />
+                                                            <line x1="50" y1="21" x2="50" y2="3" stroke="white" stroke-width="4.5" stroke-linecap="round" transform="rotate(90 50 50)" />
+                                                            </mask>
+                                                        </defs>
+                                                        <!-- Background track -->
+                                                        <path d="M 12,50 A 38,38 0 0,1 88,50" fill="none" stroke="currentColor" class="text-slate-200 dark:text-zinc-800" stroke-width="16" mask="url(#gauge-mask-humidity-mobile)" />
+                                                        <!-- Active track -->
+                                                        <path id="gauge-humidity-mobile" d="M 12,50 A 38,38 0 0,1 88,50" fill="none" stroke="currentColor" class="gauge-path text-sky-500" stroke-width="16" stroke-linecap="butt" stroke-dasharray="119.38" stroke-dashoffset="119.38" mask="url(#gauge-mask-humidity-mobile)" style="transition: stroke-dashoffset 1s ease-out, stroke 0.3s, color 0.3s;" />
+                                                    </svg>
+                                                    <div class="flex flex-col items-center z-20 w-full text-center mt-[-1.5rem] md:mt-[-1.5rem] pb-2">
+                                                        <span id="sensor-humidity-mobile" class="text-[18px] sm:text-[20px] md:text-[24px] font-extrabold text-slate-800 dark:text-white leading-none">42%</span>
+                                                        <span class="text-[8px] sm:text-[9px] md:text-[10px] font-bold text-slate-400 dark:text-zinc-500 mt-1.5 uppercase tracking-widest">Humidity</span>
                                                     </div>
                                                 </div>
                                             </div>
+                                            
+                                            <!-- Bottom: 2x2 Info Grid -->
+                                            <div class="sensor-info-grid grid grid-cols-2 gap-2 w-full transition-all duration-300 max-h-0 opacity-0 overflow-hidden">
+                                                <div class="bg-black/5 dark:bg-white/5 rounded-xl p-2 flex flex-col items-center justify-center text-center">
+                                                    <span class="text-[8px] md:text-[8px] text-slate-500 dark:text-zinc-400 font-semibold mb-0.5 uppercase tracking-wide">Status</span>
+                                                    <span id="sensor-humidity-status-mobile" class="text-[10px] md:text-[11px] font-extrabold text-sky-600 dark:text-sky-400">Nominal</span>
+                                                </div>
+                                                <div class="bg-black/5 dark:bg-white/5 rounded-xl p-2 flex flex-col items-center justify-center text-center">
+                                                    <span class="text-[8px] md:text-[8px] text-slate-500 dark:text-zinc-400 font-semibold mb-0.5 uppercase tracking-wide">Trend</span>
+                                                    <span id="humidity-trend-mobile" class="text-[10px] md:text-[11px] font-extrabold text-slate-700 dark:text-slate-300 flex items-center justify-center gap-0.5 w-full">
+                                                        <span class="material-symbols-outlined text-[12px]">arrow_downward</span>3.7%
+                                                    </span>
+                                                </div>
+                                                <div class="bg-black/5 dark:bg-white/5 rounded-xl p-2 flex flex-col items-center justify-center text-center">
+                                                    <span class="text-[8px] md:text-[8px] text-slate-500 dark:text-zinc-400 font-semibold mb-0.5 uppercase tracking-wide">Optimal</span>
+                                                    <span class="text-[10px] md:text-[10px] font-bold text-slate-700 dark:text-slate-300 whitespace-nowrap">65% - 80%</span>
+                                                </div>
+                                                <div class="bg-black/5 dark:bg-white/5 rounded-xl p-2 flex flex-col items-center justify-center text-center">
+                                                    <span class="text-[8px] md:text-[8px] text-slate-500 dark:text-zinc-400 font-semibold mb-0.5 uppercase tracking-wide">Sensor</span>
+                                                    <span class="text-[10px] md:text-[10px] font-bold text-slate-700 dark:text-slate-300 whitespace-nowrap overflow-hidden text-ellipsis w-full max-w-full">DHT22 - A</span>
+                                                </div>
+                                            </div>
                                         </div>
-                                    </div>
+ </div>
                                     <!-- Light -->
                                     <div id="sensor-light-card-mobile"
-                                        class="sensor-card bg-green-gradient border border-amber-200 dark:border-amber-900/40 rounded-2xl p-3.5 shadow-sm flex flex-col justify-between relative overflow-hidden group transition-all duration-300">
-                                        <div
-                                            class="absolute top-0 right-0 w-12 h-12 bg-primary/5 dark:bg-primary-fixed/5 rounded-bl-full -mr-2 -mt-2">
-                                        </div>
-                                        <div class="flex justify-between items-start mb-3 relative z-10">
-                                            <div id="sensor-light-icon-bg-mobile"
-                                                class="bg-surface-soft dark:bg-zinc-800 p-2 rounded-lg text-primary dark:text-primary-fixed">
-                                                <span class="material-symbols-outlined text-[18px]"
-                                                    style="font-variation-settings: 'FILL' 1;">light_mode</span>
-                                            </div>
-                                            <span id="light-trend-mobile"
-                                                class="flex items-center text-success-green dark:text-emerald-400 text-caption bg-success-green/10 dark:bg-emerald-950/40 px-1.5 py-0.5 rounded-full">
-                                                <span
-                                                    class="material-symbols-outlined text-[12px] mr-0.5">arrow_upward</span>
-                                                1.5%
-                                            </span>
-                                        </div>
-                                        <div class="relative z-10">
-                                            <p class="text-caption text-on-surface-variant dark:text-zinc-400 mb-0.5">
-                                                Light
-                                                Intensity</p>
-                                            <p class="text-headline-md text-brand-deep dark:text-primary-fixed font-extrabold"
-                                                id="sensor-light-mobile">420 &micro;mol</p>
-                                            <canvas id="spark-light-mobile" height="24"
-                                                class="w-full mt-1 opacity-60"></canvas>
-                                            <div class="sensor-detail">
-                                                <div
-                                                    class="border-t border-muted dark:border-zinc-800 pt-2 text-[10px] text-on-surface-variant dark:text-zinc-400 space-y-1">
-                                                    <div class="flex justify-between"><span>Optimal range</span><span
-                                                            class="font-bold text-on-surface dark:text-white">300
-                                                            &ndash; 500
-                                                            &micro;mol</span></div>
-                                                    <div class="flex justify-between"><span>Sensor</span><span
-                                                            class="font-bold text-on-surface dark:text-white">LUX-100
-                                                            &ndash;
-                                                            Sector A</span></div>
-                                                    <div class="flex justify-between"><span>Status</span><span
-                                                            id="sensor-light-status-mobile"
-                                                            class="font-bold text-success-green dark:text-emerald-400">Nominal</span>
+                                        class="sensor-card min-h-[260px] bg-green-gradient border-2 border-emerald-300 dark:border-emerald-700/60 rounded-2xl p-3.5 shadow-md flex flex-col justify-between relative overflow-hidden group transition-all duration-300">
+                                        <div class="flex flex-col items-center justify-center h-full relative z-10 w-full pt-4">
+                                            <!-- Top: Gauge -->
+                                            <div class="relative w-full flex flex-col justify-center items-center">
+                                                <div class="relative w-[80%] md:w-[75%] max-w-[200px] flex flex-col items-center">
+                                                    <svg viewBox="0 0 100 55" class="w-full h-auto overflow-visible drop-shadow-sm">
+                                                        <defs>
+                                                            <mask id="gauge-mask-light-mobile" maskUnits="userSpaceOnUse">
+                                                            <line x1="50" y1="21" x2="50" y2="3" stroke="white" stroke-width="4.5" stroke-linecap="round" transform="rotate(-90 50 50)" />
+                                                            <line x1="50" y1="21" x2="50" y2="3" stroke="white" stroke-width="4.5" stroke-linecap="round" transform="rotate(-75 50 50)" />
+                                                            <line x1="50" y1="21" x2="50" y2="3" stroke="white" stroke-width="4.5" stroke-linecap="round" transform="rotate(-60 50 50)" />
+                                                            <line x1="50" y1="21" x2="50" y2="3" stroke="white" stroke-width="4.5" stroke-linecap="round" transform="rotate(-45 50 50)" />
+                                                            <line x1="50" y1="21" x2="50" y2="3" stroke="white" stroke-width="4.5" stroke-linecap="round" transform="rotate(-30 50 50)" />
+                                                            <line x1="50" y1="21" x2="50" y2="3" stroke="white" stroke-width="4.5" stroke-linecap="round" transform="rotate(-15 50 50)" />
+                                                            <line x1="50" y1="21" x2="50" y2="3" stroke="white" stroke-width="4.5" stroke-linecap="round" transform="rotate(0 50 50)" />
+                                                            <line x1="50" y1="21" x2="50" y2="3" stroke="white" stroke-width="4.5" stroke-linecap="round" transform="rotate(15 50 50)" />
+                                                            <line x1="50" y1="21" x2="50" y2="3" stroke="white" stroke-width="4.5" stroke-linecap="round" transform="rotate(30 50 50)" />
+                                                            <line x1="50" y1="21" x2="50" y2="3" stroke="white" stroke-width="4.5" stroke-linecap="round" transform="rotate(45 50 50)" />
+                                                            <line x1="50" y1="21" x2="50" y2="3" stroke="white" stroke-width="4.5" stroke-linecap="round" transform="rotate(60 50 50)" />
+                                                            <line x1="50" y1="21" x2="50" y2="3" stroke="white" stroke-width="4.5" stroke-linecap="round" transform="rotate(75 50 50)" />
+                                                            <line x1="50" y1="21" x2="50" y2="3" stroke="white" stroke-width="4.5" stroke-linecap="round" transform="rotate(90 50 50)" />
+                                                            </mask>
+                                                        </defs>
+                                                        <!-- Background track -->
+                                                        <path d="M 12,50 A 38,38 0 0,1 88,50" fill="none" stroke="currentColor" class="text-slate-200 dark:text-zinc-800" stroke-width="16" mask="url(#gauge-mask-light-mobile)" />
+                                                        <!-- Active track -->
+                                                        <path id="gauge-light-mobile" d="M 12,50 A 38,38 0 0,1 88,50" fill="none" stroke="currentColor" class="gauge-path text-amber-500" stroke-width="16" stroke-linecap="butt" stroke-dasharray="119.38" stroke-dashoffset="119.38" mask="url(#gauge-mask-light-mobile)" style="transition: stroke-dashoffset 1s ease-out, stroke 0.3s, color 0.3s;" />
+                                                    </svg>
+                                                    <div class="flex flex-col items-center z-20 w-full text-center mt-[-1.5rem] md:mt-[-1.5rem] pb-2">
+                                                        <span id="sensor-light-mobile" class="text-[18px] sm:text-[20px] md:text-[24px] font-extrabold text-slate-800 dark:text-white leading-none">149 &micro;mol</span>
+                                                        <span class="text-[8px] sm:text-[9px] md:text-[10px] font-bold text-slate-400 dark:text-zinc-500 mt-1.5 uppercase tracking-widest">Light Level</span>
                                                     </div>
                                                 </div>
                                             </div>
+                                            
+                                            <!-- Bottom: 2x2 Info Grid -->
+                                            <div class="sensor-info-grid grid grid-cols-2 gap-2 w-full transition-all duration-300 max-h-0 opacity-0 overflow-hidden">
+                                                <div class="bg-black/5 dark:bg-white/5 rounded-xl p-2 flex flex-col items-center justify-center text-center">
+                                                    <span class="text-[8px] md:text-[8px] text-slate-500 dark:text-zinc-400 font-semibold mb-0.5 uppercase tracking-wide">Status</span>
+                                                    <span id="sensor-light-status-mobile" class="text-[10px] md:text-[11px] font-extrabold text-amber-600 dark:text-amber-400">Nominal</span>
+                                                </div>
+                                                <div class="bg-black/5 dark:bg-white/5 rounded-xl p-2 flex flex-col items-center justify-center text-center">
+                                                    <span class="text-[8px] md:text-[8px] text-slate-500 dark:text-zinc-400 font-semibold mb-0.5 uppercase tracking-wide">Trend</span>
+                                                    <span id="light-trend-mobile" class="text-[10px] md:text-[11px] font-extrabold text-slate-700 dark:text-slate-300 flex items-center justify-center gap-0.5 w-full">
+                                                        <span class="material-symbols-outlined text-[12px]">arrow_downward</span>10.8%
+                                                    </span>
+                                                </div>
+                                                <div class="bg-black/5 dark:bg-white/5 rounded-xl p-2 flex flex-col items-center justify-center text-center">
+                                                    <span class="text-[8px] md:text-[8px] text-slate-500 dark:text-zinc-400 font-semibold mb-0.5 uppercase tracking-wide">Optimal</span>
+                                                    <span class="text-[10px] md:text-[10px] font-bold text-slate-700 dark:text-slate-300 whitespace-nowrap">300 - 500</span>
+                                                </div>
+                                                <div class="bg-black/5 dark:bg-white/5 rounded-xl p-2 flex flex-col items-center justify-center text-center">
+                                                    <span class="text-[8px] md:text-[8px] text-slate-500 dark:text-zinc-400 font-semibold mb-0.5 uppercase tracking-wide">Sensor</span>
+                                                    <span class="text-[10px] md:text-[10px] font-bold text-slate-700 dark:text-slate-300 whitespace-nowrap overflow-hidden text-ellipsis w-full max-w-full">LUX-100 - A</span>
+                                                </div>
+                                            </div>
                                         </div>
-                                    </div>
+ </div>
                                     <!-- CO2 -->
                                     <div id="sensor-co2-card-mobile"
-                                        class="sensor-card bg-green-gradient border border-purple-200 dark:border-purple-900/40 rounded-2xl p-3.5 shadow-sm flex flex-col justify-between relative overflow-hidden group transition-all duration-300">
-                                        <div
-                                            class="absolute top-0 right-0 w-12 h-12 bg-primary/5 dark:bg-primary-fixed/5 rounded-bl-full -mr-2 -mt-2">
-                                        </div>
-                                        <div class="flex justify-between items-start mb-3 relative z-10">
-                                            <div id="sensor-co2-icon-bg-mobile"
-                                                class="bg-surface-soft dark:bg-zinc-800 p-2 rounded-lg text-primary dark:text-primary-fixed">
-                                                <span class="material-symbols-outlined text-[18px]"
-                                                    style="font-variation-settings: 'FILL' 1;">co2</span>
-                                            </div>
-                                            <span id="co2-trend-mobile"
-                                                class="flex items-center text-on-surface-variant dark:text-zinc-400 text-caption bg-surface-variant dark:bg-zinc-800 px-1.5 py-0.5 rounded-full">
-                                                <span
-                                                    class="material-symbols-outlined text-[12px] mr-0.5">horizontal_rule</span><span
-                                                    class="co2-trend-val-mobile">0%</span>
-                                            </span>
-                                        </div>
-                                        <div class="relative z-10">
-                                            <p class="text-caption text-on-surface-variant dark:text-zinc-400 mb-0.5">
-                                                CO2
-                                                Level
-                                            </p>
-                                            <p class="text-headline-md text-brand-deep dark:text-primary-fixed font-extrabold"
-                                                id="sensor-co2-mobile">420 ppm</p>
-                                            <canvas id="spark-co2-mobile" height="24"
-                                                class="w-full mt-1 opacity-60"></canvas>
-                                            <div class="sensor-detail">
-                                                <div
-                                                    class="border-t border-muted dark:border-zinc-800 pt-2 text-[10px] text-on-surface-variant dark:text-zinc-400 space-y-1">
-                                                    <div class="flex justify-between"><span>Optimal range</span><span
-                                                            class="font-bold text-on-surface dark:text-white">400
-                                                            &ndash; 800
-                                                            ppm</span></div>
-                                                    <div class="flex justify-between"><span>Sensor</span><span
-                                                            class="font-bold text-on-surface dark:text-white">MH-Z19
-                                                            &ndash;
-                                                            Sector A</span></div>
-                                                    <div class="flex justify-between"><span>Status</span><span
-                                                            id="sensor-co2-status-mobile"
-                                                            class="font-bold text-success-green dark:text-emerald-400">Nominal</span>
+                                        class="sensor-card min-h-[260px] bg-green-gradient border-2 border-emerald-300 dark:border-emerald-700/60 rounded-2xl p-3.5 shadow-md flex flex-col justify-between relative overflow-hidden group transition-all duration-300">
+                                        <div class="flex flex-col items-center justify-center h-full relative z-10 w-full pt-4">
+                                            <!-- Top: Gauge -->
+                                            <div class="relative w-full flex flex-col justify-center items-center">
+                                                <div class="relative w-[80%] md:w-[75%] max-w-[200px] flex flex-col items-center">
+                                                    <svg viewBox="0 0 100 55" class="w-full h-auto overflow-visible drop-shadow-sm">
+                                                        <defs>
+                                                            <mask id="gauge-mask-co2-mobile" maskUnits="userSpaceOnUse">
+                                                            <line x1="50" y1="21" x2="50" y2="3" stroke="white" stroke-width="4.5" stroke-linecap="round" transform="rotate(-90 50 50)" />
+                                                            <line x1="50" y1="21" x2="50" y2="3" stroke="white" stroke-width="4.5" stroke-linecap="round" transform="rotate(-75 50 50)" />
+                                                            <line x1="50" y1="21" x2="50" y2="3" stroke="white" stroke-width="4.5" stroke-linecap="round" transform="rotate(-60 50 50)" />
+                                                            <line x1="50" y1="21" x2="50" y2="3" stroke="white" stroke-width="4.5" stroke-linecap="round" transform="rotate(-45 50 50)" />
+                                                            <line x1="50" y1="21" x2="50" y2="3" stroke="white" stroke-width="4.5" stroke-linecap="round" transform="rotate(-30 50 50)" />
+                                                            <line x1="50" y1="21" x2="50" y2="3" stroke="white" stroke-width="4.5" stroke-linecap="round" transform="rotate(-15 50 50)" />
+                                                            <line x1="50" y1="21" x2="50" y2="3" stroke="white" stroke-width="4.5" stroke-linecap="round" transform="rotate(0 50 50)" />
+                                                            <line x1="50" y1="21" x2="50" y2="3" stroke="white" stroke-width="4.5" stroke-linecap="round" transform="rotate(15 50 50)" />
+                                                            <line x1="50" y1="21" x2="50" y2="3" stroke="white" stroke-width="4.5" stroke-linecap="round" transform="rotate(30 50 50)" />
+                                                            <line x1="50" y1="21" x2="50" y2="3" stroke="white" stroke-width="4.5" stroke-linecap="round" transform="rotate(45 50 50)" />
+                                                            <line x1="50" y1="21" x2="50" y2="3" stroke="white" stroke-width="4.5" stroke-linecap="round" transform="rotate(60 50 50)" />
+                                                            <line x1="50" y1="21" x2="50" y2="3" stroke="white" stroke-width="4.5" stroke-linecap="round" transform="rotate(75 50 50)" />
+                                                            <line x1="50" y1="21" x2="50" y2="3" stroke="white" stroke-width="4.5" stroke-linecap="round" transform="rotate(90 50 50)" />
+                                                            </mask>
+                                                        </defs>
+                                                        <!-- Background track -->
+                                                        <path d="M 12,50 A 38,38 0 0,1 88,50" fill="none" stroke="currentColor" class="text-slate-200 dark:text-zinc-800" stroke-width="16" mask="url(#gauge-mask-co2-mobile)" />
+                                                        <!-- Active track -->
+                                                        <path id="gauge-co2-mobile" d="M 12,50 A 38,38 0 0,1 88,50" fill="none" stroke="currentColor" class="gauge-path text-purple-500" stroke-width="16" stroke-linecap="butt" stroke-dasharray="119.38" stroke-dashoffset="119.38" mask="url(#gauge-mask-co2-mobile)" style="transition: stroke-dashoffset 1s ease-out, stroke 0.3s, color 0.3s;" />
+                                                    </svg>
+                                                    <div class="flex flex-col items-center z-20 w-full text-center mt-[-1.5rem] md:mt-[-1.5rem] pb-2">
+                                                        <span id="sensor-co2-mobile" class="text-[18px] sm:text-[20px] md:text-[24px] font-extrabold text-slate-800 dark:text-white leading-none">960 ppm</span>
+                                                        <span class="text-[8px] sm:text-[9px] md:text-[10px] font-bold text-slate-400 dark:text-zinc-500 mt-1.5 uppercase tracking-widest">CO2 Level</span>
                                                     </div>
                                                 </div>
                                             </div>
+                                            
+                                            <!-- Bottom: 2x2 Info Grid -->
+                                            <div class="sensor-info-grid grid grid-cols-2 gap-2 w-full transition-all duration-300 max-h-0 opacity-0 overflow-hidden">
+                                                <div class="bg-black/5 dark:bg-white/5 rounded-xl p-2 flex flex-col items-center justify-center text-center">
+                                                    <span class="text-[8px] md:text-[8px] text-slate-500 dark:text-zinc-400 font-semibold mb-0.5 uppercase tracking-wide">Status</span>
+                                                    <span id="sensor-co2-status-mobile" class="text-[10px] md:text-[11px] font-extrabold text-purple-600 dark:text-purple-400">Nominal</span>
+                                                </div>
+                                                <div class="bg-black/5 dark:bg-white/5 rounded-xl p-2 flex flex-col items-center justify-center text-center">
+                                                    <span class="text-[8px] md:text-[8px] text-slate-500 dark:text-zinc-400 font-semibold mb-0.5 uppercase tracking-wide">Trend</span>
+                                                    <span id="co2-trend-mobile" class="text-[10px] md:text-[11px] font-extrabold text-slate-700 dark:text-slate-300 flex items-center justify-center gap-0.5 w-full">
+                                                        <span class="material-symbols-outlined text-[12px]">warning</span>HIGH
+                                                    </span>
+                                                </div>
+                                                <div class="bg-black/5 dark:bg-white/5 rounded-xl p-2 flex flex-col items-center justify-center text-center">
+                                                    <span class="text-[8px] md:text-[8px] text-slate-500 dark:text-zinc-400 font-semibold mb-0.5 uppercase tracking-wide">Optimal</span>
+                                                    <span class="text-[10px] md:text-[10px] font-bold text-slate-700 dark:text-slate-300 whitespace-nowrap">400 - 800</span>
+                                                </div>
+                                                <div class="bg-black/5 dark:bg-white/5 rounded-xl p-2 flex flex-col items-center justify-center text-center">
+                                                    <span class="text-[8px] md:text-[8px] text-slate-500 dark:text-zinc-400 font-semibold mb-0.5 uppercase tracking-wide">Sensor</span>
+                                                    <span class="text-[10px] md:text-[10px] font-bold text-slate-700 dark:text-slate-300 whitespace-nowrap overflow-hidden text-ellipsis w-full max-w-full">MH-Z19 - A</span>
+                                                </div>
+                                            </div>
                                         </div>
-                                    </div>
+ </div>
                                 </div>
 
                                 <!-- Last Updated Timestamp -->

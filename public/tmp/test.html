@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html>
+<head>
+<script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-gray-100 p-8">
+
+<div class="sensor-card bg-green-gradient border border-emerald-200 rounded-[28px] p-5 shadow-sm flex flex-col relative overflow-hidden group transition-all duration-300 w-full max-w-sm mx-auto bg-white">
+   
+   <div class="flex justify-between items-center w-full mb-2">
+       <div class="w-8 h-8 rounded-xl bg-emerald-50 flex items-center justify-center text-emerald-600">
+           <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path></svg>
+       </div>
+       <!-- We can put trend here later -->
+   </div>
+
+   <div class="relative w-full aspect-[2/1.1] flex items-end justify-center mb-6 mt-2">
+      <svg viewBox="0 0 200 110" class="absolute top-0 left-0 w-full h-full" id="svg-test">
+      </svg>
+      <div class="flex flex-col items-center z-10 text-center mb-[-5px]">
+          <span class="text-4xl font-extrabold text-slate-800" id="val">28.9</span>
+          <span class="text-[11px] font-bold text-slate-400 uppercase tracking-widest mt-1">Temperature</span>
+      </div>
+   </div>
+
+   <div class="grid grid-cols-2 gap-2 w-full mt-auto">
+      <div class="bg-slate-50 rounded-xl p-3 flex flex-col items-start border border-slate-100">
+         <span class="text-[10px] text-slate-400 font-bold uppercase tracking-wider mb-0.5">Optimal</span>
+         <span class="text-sm font-extrabold text-slate-700">22-26 °C</span>
+      </div>
+      <div class="bg-slate-50 rounded-xl p-3 flex flex-col items-start border border-slate-100">
+         <span class="text-[10px] text-slate-400 font-bold uppercase tracking-wider mb-0.5">Status</span>
+         <span class="text-sm font-extrabold text-emerald-600">Nominal</span>
+      </div>
+      <div class="bg-slate-50 rounded-xl p-3 flex flex-col items-start border border-slate-100">
+         <span class="text-[10px] text-slate-400 font-bold uppercase tracking-wider mb-0.5">Trend</span>
+         <span class="text-sm font-extrabold text-emerald-600 flex items-center gap-1"><svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M5 10l7-7m0 0l7 7m-7-7v18"></path></svg> 2.7%</span>
+      </div>
+      <div class="bg-slate-50 rounded-xl p-3 flex flex-col items-start border border-slate-100">
+         <span class="text-[10px] text-slate-400 font-bold uppercase tracking-wider mb-0.5">Sensor</span>
+         <span class="text-sm font-extrabold text-slate-700">DHT22</span>
+      </div>
+   </div>
+</div>
+
+<script>
+    function draw(percent, color) {
+        const svg = document.getElementById('svg-test');
+        const numSegments = 12;
+        const gapAngle = 5; 
+        const totalAngle = 180;
+        const segmentAngle = (totalAngle - (numSegments - 1) * gapAngle) / numSegments;
+        let html = '';
+        const cx = 100, cy = 100, r = 85;
+        for (let i = 0; i < numSegments; i++) {
+            const startAngle = 180 + i * (segmentAngle + gapAngle);
+            const endAngle = startAngle + segmentAngle;
+            const startRad = startAngle * Math.PI / 180;
+            const endRad = endAngle * Math.PI / 180;
+            const x1 = cx + r * Math.cos(startRad);
+            const y1 = cy + r * Math.sin(startRad);
+            const x2 = cx + r * Math.cos(endRad);
+            const y2 = cy + r * Math.sin(endRad);
+            
+            // For rounded caps, the arc logic might be weird if segment is short. 
+            // SVG line is easier:
+            // x1,y1 to x2,y2 is a straight line, but arc is curved. Since angle is small, arc is fine.
+            const filled = (i / (numSegments - 1)) <= percent;
+            const strokeColor = filled ? color : '#f1f5f9';
+            html += `<path d="M ${x1} ${y1} A ${r} ${r} 0 0 1 ${x2} ${y2}" stroke="${strokeColor}" stroke-width="14" stroke-linecap="round" fill="none" />`;
+        }
+        svg.innerHTML = html;
+    }
+    draw(0.7, '#10b981');
+</script>
+</body>
+</html>
