@@ -1,6 +1,18 @@
 const alertCooldowns = {};
 const ALERT_COOLDOWN_MS = 120000; // 2 minutes between same alert re-firing
 
+// Mobile browsers require a user interaction to prompt for Notification permissions.
+// We request permission on the very first tap/click anywhere on the screen.
+function requestNotificationPermission() {
+    if ("Notification" in window && Notification.permission === "default") {
+        Notification.requestPermission();
+    }
+    document.removeEventListener('click', requestNotificationPermission);
+    document.removeEventListener('touchstart', requestNotificationPermission);
+}
+document.addEventListener('click', requestNotificationPermission, { once: true });
+document.addEventListener('touchstart', requestNotificationPermission, { once: true });
+
 // Check environmental readings against bounds to auto-create alerts
 function checkAlertThresholds() {
     const now = Date.now();
@@ -106,12 +118,27 @@ function triggerSystemAlert(title, desc, severity) {
 
     // Trigger OS/Desktop notification
     if ("Notification" in window) {
+        const notifTitle = `KabuTech Alert: ${title}`;
+        const notifOptions = { body: desc, icon: '/loading_screen/screen.png' };
+        
+        const fireNotification = () => {
+            if (navigator.serviceWorker && navigator.serviceWorker.controller) {
+                navigator.serviceWorker.ready.then(reg => {
+                    reg.showNotification(notifTitle, notifOptions);
+                }).catch(() => {
+                    new Notification(notifTitle, notifOptions);
+                });
+            } else {
+                new Notification(notifTitle, notifOptions);
+            }
+        };
+
         if (Notification.permission === "granted") {
-            new Notification(`KabuTech Alert: ${title}`, { body: desc });
+            fireNotification();
         } else if (Notification.permission !== "denied") {
             Notification.requestPermission().then(permission => {
                 if (permission === "granted") {
-                    new Notification(`KabuTech Alert: ${title}`, { body: desc });
+                    fireNotification();
                 }
             });
         }
