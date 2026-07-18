@@ -107,19 +107,26 @@ function triggerSystemAlert(title, desc, severity) {
     state.alerts.unshift(newAlert);
     saveAlerts();
     renderAlertsList();
-    showToast(`${title} alert triggered!`, 'error');
+    // Removed toast notification per user request
     addLog(`SYSTEM ALERT: ${title} (${desc})`, 'error');
 
     // Trigger device vibration
-    if (navigator.vibrate) {
+    if (navigator.vibrate && state.currentUser) {
         if (severity === 'critical') navigator.vibrate([500, 250, 500, 250, 500]);
         else navigator.vibrate([300, 100, 300]);
     }
 
-    // Trigger OS/Desktop notification
-    if ("Notification" in window) {
+    const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+
+    // Trigger OS/Desktop notification only on mobile devices
+    if ("Notification" in window && state.currentUser && isMobile) {
         const notifTitle = `KabuTech Alert: ${title}`;
-        const notifOptions = { body: desc, icon: '/loading_screen/screen.png' };
+        const notifOptions = { 
+            body: desc, 
+            icon: '/loading_screen/screen.png',
+            tag: 'kabutech-system-alert', // Ensures only one notification pops up at a time
+            requireInteraction: true // Keep notification persistent until user interaction
+        };
         
         const fireNotification = () => {
             if (navigator.serviceWorker && navigator.serviceWorker.controller) {
