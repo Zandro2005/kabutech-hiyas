@@ -169,13 +169,13 @@ function playSensorIntroAnimation() {
 
 function updateSensorDOM(forceFromZero) {
     // Calculate trends vs previous reading
-    function getTrendHTML(current, previous, unit, higherIsBad, isMobile=false) {
+    function getTrendHTML(current, previous, unit, higherIsBad, isMobile = false) {
         const diff = current - previous;
         const pct = previous !== 0 ? Math.abs((diff / previous) * 100).toFixed(1) : '0.0';
         const isUp = diff > 0.05;
         const isDown = diff < -0.05;
         const textSz = isMobile ? 'text-[10px]' : 'text-[10px] md:text-[11px]';
-        
+
         if (!isUp && !isDown) {
             return `<span class="flex items-center justify-center gap-0.5 w-full font-extrabold text-slate-400 dark:text-zinc-500 ${textSz}"><span class="material-symbols-outlined text-[12px]">horizontal_rule</span> 0%</span>`;
         }
@@ -196,7 +196,7 @@ function updateSensorDOM(forceFromZero) {
         countUpElement(document.getElementById(`sensor-${s.key}`), v, { decimals: s.decimals, suffix: s.suffix, duration: introDuration, from: animFrom[s.key] });
         const mobileEl = document.getElementById(`sensor-${s.key}-mobile`);
         if (mobileEl) countUpElement(mobileEl, v, { decimals: s.decimals, suffix: s.suffix, duration: introDuration, from: animFrom[s.key] });
-        
+
         if (s.key !== 'co2') {
             const trendEl = document.getElementById(`${s.key}-trend`);
             if (trendEl) {
@@ -207,7 +207,7 @@ function updateSensorDOM(forceFromZero) {
                 trendElMobile.outerHTML = getTrendHTML(v, prevReadings[s.key], s.suffix.trim(), false, true).replace('<span class="flex', `<span id="${s.key}-trend-mobile" class="flex`);
             }
         }
-        
+
         const ctrlEl = document.getElementById(`ctrl-current-${s.key}`);
         if (ctrlEl) countUpElement(ctrlEl, v, { decimals: s.decimals, duration: introDuration, from: animFrom[s.key], key: `ctrl-current-${s.key}` });
     });
@@ -317,20 +317,20 @@ function updateSystemStatusMsg() {
 // --- RADIAL GAUGES ---
 function initRadialGauges() {
     const gauges = ['temp', 'humidity', 'light', 'co2'];
-    
+
     gauges.forEach(key => {
         ['', '-mobile'].forEach(suffix => {
             const card = document.getElementById(`sensor-${key}-card${suffix}`);
             if (!card) return;
             const svg = card.querySelector('svg');
             if (!svg) return;
-            
+
             svg.setAttribute('viewBox', '0 0 100 70');
             const textContainer = svg.nextElementSibling;
             if (textContainer) {
                 textContainer.style.marginTop = '-0.5rem';
             }
-            
+
             let ticksHTML = '';
             // We create 5 fixed tick text elements evenly spaced across the arc.
             // Values will be injected dynamically in updateRadialGauges based on setpoint.
@@ -340,46 +340,42 @@ function initRadialGauges() {
                 const rad = angle * Math.PI / 180;
                 const tx = 50 + 26 * Math.sin(rad);
                 const ty = 55 - 26 * Math.cos(rad);
-                ticksHTML += `<text id="tick-${key}${suffix}-${i}" x="${tx}" y="${ty}" fill="currentColor" style="font-size: 4.5px;" class="font-bold text-slate-400 dark:text-zinc-500" text-anchor="middle" dominant-baseline="middle">0</text>`;
+                ticksHTML += `<text id="tick-${key}${suffix}-${i}" x="${tx}" y="${ty}" fill="currentColor" style="font-size: 4.5px;" class="font-bold text-slate-500 dark:text-zinc-300" text-anchor="middle" dominant-baseline="middle">0</text>`;
             }
 
             svg.innerHTML = `
 <defs>
-    <linearGradient id="needle-grad-${key}${suffix}" x1="0%" y1="0%" x2="0%" y2="100%">
-        <stop offset="0%" stop-color="currentColor" stop-opacity="1"></stop>
-        <stop offset="100%" stop-color="currentColor" stop-opacity="0"></stop>
+    <linearGradient id="arc-grad-normal-${key}${suffix}" x1="0%" y1="100%" x2="100%" y2="0%">
+        <stop offset="0%" stop-color="#059669" stop-opacity="0.05" />
+        <stop offset="100%" stop-color="#10b981" stop-opacity="1" />
     </linearGradient>
-    <linearGradient id="arc-grad-normal-${key}${suffix}" x1="0%" y1="0%" x2="100%" y2="100%">
-        <stop offset="0%" stop-color="#059669" />
-        <stop offset="100%" stop-color="#34d399" />
+    <linearGradient id="arc-grad-warning-${key}${suffix}" x1="0%" y1="100%" x2="100%" y2="0%">
+        <stop offset="0%" stop-color="#d97706" stop-opacity="0.05" />
+        <stop offset="100%" stop-color="#f59e0b" stop-opacity="1" />
     </linearGradient>
-    <linearGradient id="arc-grad-warning-${key}${suffix}" x1="0%" y1="0%" x2="100%" y2="100%">
-        <stop offset="0%" stop-color="#d97706" />
-        <stop offset="100%" stop-color="#fbbf24" />
-    </linearGradient>
-    <linearGradient id="arc-grad-critical-${key}${suffix}" x1="0%" y1="0%" x2="100%" y2="100%">
-        <stop offset="0%" stop-color="#dc2626" />
-        <stop offset="100%" stop-color="#f87171" />
+    <linearGradient id="arc-grad-critical-${key}${suffix}" x1="0%" y1="100%" x2="100%" y2="0%">
+        <stop offset="0%" stop-color="#dc2626" stop-opacity="0.05" />
+        <stop offset="100%" stop-color="#ef4444" stop-opacity="1" />
     </linearGradient>
 </defs>
 <path id="gauge-bg-${key}${suffix}" d="M 10,55 A 40,40 0 0,1 90,55" fill="none" stroke="currentColor" class="text-slate-200 dark:text-zinc-800" stroke-width="12" stroke-linecap="butt" stroke-dasharray="0 0 251.32" style="transition: stroke-dasharray 1s ease-out;" />
-<path id="gauge-${key}${suffix}" d="M 10,55 A 40,40 0 0,1 90,55" fill="none" class="gauge-path" stroke-width="12" stroke-linecap="butt" stroke-dasharray="0 251.32" stroke-dashoffset="0" style="transition: stroke-dasharray 1s ease-out, stroke 0.3s, color 0.3s; opacity: 0.60;" />
+<path id="gauge-${key}${suffix}" d="M 10,55 A 40,40 0 0,1 90,55" fill="none" class="gauge-path" stroke-width="12" stroke-linecap="butt" stroke-dasharray="0 251.32" stroke-dashoffset="0" style="transition: stroke-dasharray 1s ease-out, stroke 0.3s;" />
 <polygon id="target-marker-${key}${suffix}" points="47.5,15 52.5,15 50,9" fill="#f59e0b" style="transform-origin: 50px 55px; transform: rotate(90deg); transition: transform 1s ease-out; opacity: 0.8;" />
 <g class="ticks-container">${ticksHTML}</g>
 <g id="gauge-needle-${key}${suffix}" style="transform-origin: 50px 55px; transform: rotate(-90deg); transition: transform 1s ease-out;">
-    <polygon points="49,55 51,55 50,22" fill="url(#needle-grad-${key}${suffix})" class="text-slate-500 dark:text-zinc-400"/>
-    <circle cx="50" cy="55" r="3" fill="currentColor" class="text-slate-700 dark:text-zinc-300"/>
+    <polygon points="49,55 51,55 50,22" fill="currentColor" class="text-slate-500 dark:text-white"/>
+    <circle cx="50" cy="55" r="3" fill="currentColor" class="text-slate-700 dark:text-white"/>
 </g>`;
         });
     });
-    
+
     // Apply initial colors to the newly injected SVG nodes
     updateSensorCardStatus();
 }
 
 function updateRadialGauges() {
     const maxOffset = 125.66; // PI * 40
-    
+
     // Using sensible fallback minimums just in case state setpoint is 0 or uninitialized
     const gauges = [
         { key: 'temp', val: state.currentTemp, target: Math.max(state.tempSetpoint || 24, 10) },
@@ -387,16 +383,23 @@ function updateRadialGauges() {
         { key: 'light', val: state.currentLight, target: Math.max(state.lightSetpoint || 400, 10) },
         { key: 'co2', val: state.currentCO2, target: Math.max(state.co2Setpoint || 800, 10) }
     ];
-    
+
     gauges.forEach(g => {
         // The gauge linearly scales so it ends exactly at the setpoint max!
         const maxVal = g.target;
         let pct = g.val / maxVal;
         if (pct < 0) pct = 0;
         if (pct > 1) pct = 1;
-        
+
         const angle = -90 + (pct * 180);
-        
+
+        // Calculate relative coordinates for the gradient's x2/y2 vector so the alpha fade ends exactly at the needle
+        const rad = angle * Math.PI / 180;
+        const needleX = 50 + 40 * Math.sin(rad);
+        const needleY = 55 - 40 * Math.cos(rad);
+        const relX = ((needleX - 10) / 80) * 100;
+        const relY = ((needleY - 15) / 40) * 100;
+
         ['', '-mobile'].forEach(suffix => {
             const path = document.getElementById(`gauge-${g.key}${suffix}`);
             const bgPath = document.getElementById(`gauge-bg-${g.key}${suffix}`);
@@ -404,16 +407,26 @@ function updateRadialGauges() {
                 const len = path.getTotalLength ? path.getTotalLength() : 125.66;
                 path.style.strokeDashoffset = '0';
                 path.style.strokeDasharray = `${pct * len} 251.32`;
-                
+
                 if (bgPath) {
                     // Draw a gap for the filled portion, then a dash for the remainder
                     bgPath.style.strokeDasharray = `0 ${pct * len} 251.32`;
                 }
             }
-            
+
+            // Dynamically sweep the gradient vector to track the needle
+            const gradIds = [`arc-grad-normal-${g.key}${suffix}`, `arc-grad-warning-${g.key}${suffix}`, `arc-grad-critical-${g.key}${suffix}`];
+            gradIds.forEach(id => {
+                const grad = document.getElementById(id);
+                if (grad) {
+                    grad.setAttribute('x2', `${relX}%`);
+                    grad.setAttribute('y2', `${relY}%`);
+                }
+            });
+
             const needle = document.getElementById(`gauge-needle-${g.key}${suffix}`);
             if (needle) needle.style.transform = `rotate(${angle}deg)`;
-            
+
             // Dynamically update the evenly spaced tick labels based on the current setpoint max
             for (let i = 0; i <= 4; i++) {
                 const tickEl = document.getElementById(`tick-${g.key}${suffix}-${i}`);

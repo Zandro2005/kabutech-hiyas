@@ -34,6 +34,28 @@ function checkAlertThresholds() {
         }
     }
 
+    // Check general parameter thresholds (User requested)
+    const checkParam = (name, val, target, titleBase) => {
+        if (!target) return;
+        const pct = val / target;
+        if (pct >= 1.0) {
+            if (canFire(`${titleBase} Critical`)) {
+                alertCooldowns[`${titleBase} Critical`] = now;
+                triggerSystemAlert(`${titleBase} Critical`, `${name} reached critical level at ${val.toFixed(1)}.`, 'critical');
+            }
+        } else if (pct >= 0.85) {
+            if (canFire(`${titleBase} Warning`)) {
+                alertCooldowns[`${titleBase} Warning`] = now;
+                triggerSystemAlert(`${titleBase} Warning`, `${name} reached warning level at ${val.toFixed(1)}.`, 'warning');
+            }
+        }
+    };
+
+    checkParam('Temperature', state.currentTemp, Math.max(state.tempSetpoint || 24, 1), 'Temperature');
+    checkParam('Humidity', state.currentHumidity, Math.max(state.humiditySetpoint || 65, 1), 'Humidity');
+    checkParam('Light', state.currentLight, Math.max(state.lightSetpoint || 400, 1), 'Light');
+    checkParam('CO2', state.currentCO2, Math.max(state.co2Setpoint || 800, 1), 'CO2');
+
     // Adjust indicator dot on navigation bar
     const dot = document.getElementById('nav-alert-dot');
     const activeAlerts = state.alerts.filter(a => !a.acknowledged);
@@ -75,6 +97,25 @@ function triggerSystemAlert(title, desc, severity) {
     renderAlertsList();
     showToast(`${title} alert triggered!`, 'error');
     addLog(`SYSTEM ALERT: ${title} (${desc})`, 'error');
+
+    // Trigger device vibration
+    if (navigator.vibrate) {
+        if (severity === 'critical') navigator.vibrate([500, 250, 500, 250, 500]);
+        else navigator.vibrate([300, 100, 300]);
+    }
+
+    // Trigger OS/Desktop notification
+    if ("Notification" in window) {
+        if (Notification.permission === "granted") {
+            new Notification(`KabuTech Alert: ${title}`, { body: desc });
+        } else if (Notification.permission !== "denied") {
+            Notification.requestPermission().then(permission => {
+                if (permission === "granted") {
+                    new Notification(`KabuTech Alert: ${title}`, { body: desc });
+                }
+            });
+        }
+    }
 }
 
 function dismissBannerAlert() {
