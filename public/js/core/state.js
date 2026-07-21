@@ -12,10 +12,10 @@ let state = {
     co2Setpoint: 600,
     systemMode: 'auto', // auto or manual
 
-    currentTemp: 24.2,
-    currentHumidity: 68.0,
-    currentCO2: 420,
-    currentLight: 420,
+    currentTemp: 18.0,
+    currentHumidity: 55.0,
+    currentCO2: 400,
+    currentLight: 300,
 
     deviceStates: {
         fans: true,

@@ -214,8 +214,9 @@ function pushCtrlNotification(msg, type = 'info', icon = null) {
 
 function updateTempSetpoint(val) {
     document.getElementById('val-temp-setpoint').innerText = parseFloat(val).toFixed(1);
+    state.tempSetpoint = parseFloat(val);
+    if (typeof updateRadialGauges === 'function') updateRadialGauges();
     _debouncedSetpoint('temp', () => {
-        state.tempSetpoint = parseFloat(val);
         saveSetpoints();
         showToast(`Temperature target set to ${state.tempSetpoint.toFixed(1)}°C`, 'info');
         addLog(`Temperature setpoint changed to ${state.tempSetpoint.toFixed(1)}°C.`, 'info');
@@ -224,8 +225,9 @@ function updateTempSetpoint(val) {
 
 function updateHumiditySetpoint(val) {
     document.getElementById('val-humidity-setpoint').innerText = val;
+    state.humiditySetpoint = parseInt(val);
+    if (typeof updateRadialGauges === 'function') updateRadialGauges();
     _debouncedSetpoint('humidity', () => {
-        state.humiditySetpoint = parseInt(val);
         saveSetpoints();
         showToast(`Humidity target set to ${state.humiditySetpoint}%`, 'info');
     });
@@ -234,8 +236,9 @@ function updateHumiditySetpoint(val) {
 function updateLightSetpoint(val) {
     const el = document.getElementById('val-light-setpoint');
     if (el) el.innerText = val;
+    state.lightSetpoint = parseInt(val);
+    if (typeof updateRadialGauges === 'function') updateRadialGauges();
     _debouncedSetpoint('light', () => {
-        state.lightSetpoint = parseInt(val);
         saveSetpoints();
         showToast(`Light target set to ${state.lightSetpoint} µmol`, 'info');
     });
@@ -243,8 +246,9 @@ function updateLightSetpoint(val) {
 
 function commitCO2Setpoint(val) {
     document.getElementById('val-co2-setpoint').innerText = val;
+    state.co2Setpoint = parseInt(val);
+    if (typeof updateRadialGauges === 'function') updateRadialGauges();
     _debouncedSetpoint('co2', () => {
-        state.co2Setpoint = parseInt(val);
         saveSetpoints();
         showToast(`CO2 target set to ${state.co2Setpoint} ppm`, 'info');
         addLog(`CO2 setpoint changed to ${state.co2Setpoint} ppm.`, 'info');

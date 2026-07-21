@@ -1,5 +1,6 @@
 const alertCooldowns = {};
 const ALERT_COOLDOWN_MS = 120000; // 2 minutes between same alert re-firing
+const appStartTime = Date.now(); // Record app launch time for alert delay
 
 // Mobile browsers require a user interaction to prompt for Notification permissions.
 // We request permission on the very first tap/click anywhere on the screen.
@@ -24,49 +25,52 @@ function checkAlertThresholds() {
         return true;
     }
 
-    // Alerts only fire when a simulation anomaly is active.
-    // Normal sensor readings showing HIGH on the dashboard do NOT trigger alerts.
-    const anySimulationActive = state.anomalies.co2Spike || state.anomalies.overheat || state.anomalies.misterJammed;
+    // Wait 30 seconds after app startup to avoid immediate spam of simulation alerts
+    if (now - appStartTime >= 30000) {
+        // Alerts only fire when a simulation anomaly is active.
+        // Normal sensor readings showing HIGH on the dashboard do NOT trigger alerts.
+        const anySimulationActive = state.anomalies.co2Spike || state.anomalies.overheat || state.anomalies.misterJammed;
 
-    if (anySimulationActive) {
-        // CO2 alert — only during co2Spike simulation
-        if (state.anomalies.co2Spike && state.currentCO2 > 1200 && canFire('CO2 Levels High')) {
-            alertCooldowns['CO2 Levels High'] = now;
-            triggerSystemAlert('CO2 Levels High', `CO2 level reached ${Math.round(state.currentCO2)} ppm in Sector B. Ventilation triggered.`, 'warning');
+        if (anySimulationActive) {
+            // CO2 alert — only during co2Spike simulation
+            if (state.anomalies.co2Spike && state.currentCO2 > 1200 && canFire('CO2 Levels High')) {
+                alertCooldowns['CO2 Levels High'] = now;
+                triggerSystemAlert('CO2 Levels High', `CO2 level reached ${Math.round(state.currentCO2)} ppm in Sector B. Ventilation triggered.`, 'warning');
+            }
+            // Humidity alert — only during misterJammed simulation
+            if (state.anomalies.misterJammed && state.currentHumidity < 45 && canFire('Critical Low Humidity')) {
+                alertCooldowns['Critical Low Humidity'] = now;
+                triggerSystemAlert('Critical Low Humidity', `Humidity dropped to ${Math.round(state.currentHumidity)}%. Crop growth impaired!`, 'critical');
+            }
+            // Temp alert — only during overheat simulation
+            if (state.anomalies.overheat && state.currentTemp > 32 && canFire('High Temperature Alarm')) {
+                alertCooldowns['High Temperature Alarm'] = now;
+                triggerSystemAlert('High Temperature Alarm', `Crop temperature spiked to ${state.currentTemp.toFixed(1)}°C. Cooldown fans enabled.`, 'critical');
+            }
         }
-        // Humidity alert — only during misterJammed simulation
-        if (state.anomalies.misterJammed && state.currentHumidity < 45 && canFire('Critical Low Humidity')) {
-            alertCooldowns['Critical Low Humidity'] = now;
-            triggerSystemAlert('Critical Low Humidity', `Humidity dropped to ${Math.round(state.currentHumidity)}%. Crop growth impaired!`, 'critical');
-        }
-        // Temp alert — only during overheat simulation
-        if (state.anomalies.overheat && state.currentTemp > 32 && canFire('High Temperature Alarm')) {
-            alertCooldowns['High Temperature Alarm'] = now;
-            triggerSystemAlert('High Temperature Alarm', `Crop temperature spiked to ${state.currentTemp.toFixed(1)}°C. Cooldown fans enabled.`, 'critical');
-        }
+
+        // Check general parameter thresholds (User requested)
+        const checkParam = (name, val, target, titleBase) => {
+            if (!target) return;
+            const pct = val / target;
+            if (pct >= 1.0) {
+                if (canFire(`${titleBase} Critical`)) {
+                    alertCooldowns[`${titleBase} Critical`] = now;
+                    triggerSystemAlert(`${titleBase} Critical`, `${name} reached critical level at ${val.toFixed(1)}.`, 'critical');
+                }
+            } else if (pct >= 0.85) {
+                if (canFire(`${titleBase} Warning`)) {
+                    alertCooldowns[`${titleBase} Warning`] = now;
+                    triggerSystemAlert(`${titleBase} Warning`, `${name} reached warning level at ${val.toFixed(1)}.`, 'warning');
+                }
+            }
+        };
+
+        checkParam('Temperature', state.currentTemp, Math.max(state.tempSetpoint || 24, 1), 'Temperature');
+        checkParam('Humidity', state.currentHumidity, Math.max(state.humiditySetpoint || 65, 1), 'Humidity');
+        checkParam('Light', state.currentLight, Math.max(state.lightSetpoint || 400, 1), 'Light');
+        checkParam('CO2', state.currentCO2, Math.max(state.co2Setpoint || 800, 1), 'CO2');
     }
-
-    // Check general parameter thresholds (User requested)
-    const checkParam = (name, val, target, titleBase) => {
-        if (!target) return;
-        const pct = val / target;
-        if (pct >= 1.0) {
-            if (canFire(`${titleBase} Critical`)) {
-                alertCooldowns[`${titleBase} Critical`] = now;
-                triggerSystemAlert(`${titleBase} Critical`, `${name} reached critical level at ${val.toFixed(1)}.`, 'critical');
-            }
-        } else if (pct >= 0.85) {
-            if (canFire(`${titleBase} Warning`)) {
-                alertCooldowns[`${titleBase} Warning`] = now;
-                triggerSystemAlert(`${titleBase} Warning`, `${name} reached warning level at ${val.toFixed(1)}.`, 'warning');
-            }
-        }
-    };
-
-    checkParam('Temperature', state.currentTemp, Math.max(state.tempSetpoint || 24, 1), 'Temperature');
-    checkParam('Humidity', state.currentHumidity, Math.max(state.humiditySetpoint || 65, 1), 'Humidity');
-    checkParam('Light', state.currentLight, Math.max(state.lightSetpoint || 400, 1), 'Light');
-    checkParam('CO2', state.currentCO2, Math.max(state.co2Setpoint || 800, 1), 'CO2');
 
     // Adjust indicator dot on navigation bar
     const dot = document.getElementById('nav-alert-dot');
