@@ -2395,7 +2395,7 @@
                             <!-- Main Two-Column Grid for Desktop -->
                             <div class="grid grid-cols-1 lg:grid-cols-2 gap-4 yield-desktop-grid">
                                 <!-- Left Column: Bento KPIs & Breakdowns -->
-                                <div class="flex flex-col gap-4 h-full" id="yield-col-left">
+                                <div class="space-y-4" id="yield-col-left">
                                     <!-- Yield KPI Bento Row -->
                                     <div id="yield-kpi-row" class="grid grid-cols-5 gap-3.5">
                                         <!-- Actual Yield Card (full-width primary) -->
@@ -2570,8 +2570,8 @@
                                     </div>
                                     
                                     <!-- Daily Harvest Breakdown -->
-                                    <div class="flex flex-col flex-grow bg-surface-container-lowest dark:bg-zinc-900 rounded-2xl p-4 border border-muted dark:border-zinc-800 shadow-sm min-h-0">
-                                        <div class="flex items-center justify-between mb-3 shrink-0">
+                                    <div class="bg-surface-container-lowest dark:bg-zinc-900 rounded-2xl p-4 border border-muted dark:border-zinc-800 shadow-sm">
+                                        <div class="flex items-center justify-between mb-3">
                                             <div class="flex items-center gap-1.5 text-brand-deep dark:text-primary-fixed">
                                                 <span class="material-symbols-outlined text-[18px]">calendar_today</span>
                                                 <h3 class="text-[13px] font-bold uppercase tracking-wider">Daily Harvests</h3>
@@ -2581,7 +2581,7 @@
                                                 <span>Export Data</span>
                                             </button>
                                         </div>
-                                        <div id="yield-daily-list" class="space-y-2 flex-grow overflow-y-auto pr-1 -mr-1 custom-scrollbar">
+                                        <div id="yield-daily-list" class="space-y-2 max-h-[300px] overflow-y-auto pr-1 -mr-1 custom-scrollbar">
                                             <p class="text-[12px] text-on-surface-variant dark:text-zinc-500 italic text-center py-4">Loading harvest data...</p>
                                         </div>
                                     </div>
@@ -2824,6 +2824,20 @@
                                                     class="text-[11px] text-on-surface-variant dark:text-zinc-400 leading-relaxed">
                                                 </p>
                                             </div>
+                                        </div>
+                                    </div>
+
+                                    <!-- Desktop-only: Yield Drivers panel -->
+                                    <div id="yield-drivers-card"
+                                        class="yield-desktop-extra bg-surface-container-lowest dark:bg-zinc-900 rounded-2xl border border-muted dark:border-zinc-800 shadow-sm p-4">
+                                        <p class="text-body-sm font-bold text-brand-deep dark:text-white mb-3">Yield
+                                            Drivers</p>
+                                        <div id="yield-drivers-list" class="space-y-2.5">
+                                            <!-- Dynamically populated from state.growBatches -->
+                                        </div>
+                                        <button onclick="switchTab('grow-log')"
+                                            class="w-full mt-3 bg-surface-container-lowest dark:bg-zinc-900 border border-muted dark:border-zinc-700 rounded-xl py-2.5 text-[10px] font-extrabold uppercase tracking-wide text-brand-deep dark:text-white active:scale-[0.98] transition-all">
+                                            View All Racks</button>
                                     </div>
                                 </div>
                             </div>
