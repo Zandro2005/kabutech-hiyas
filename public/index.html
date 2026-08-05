@@ -77,9 +77,9 @@
     <link href="./css/base.css" rel="stylesheet">
     <link href="./css/layout.css" rel="stylesheet">
     <link href="./css/components.css" rel="stylesheet">
-    <link href="./css/features.css" rel="stylesheet">
+    <link href="./css/features.css?v=2" rel="stylesheet">
     <link href="./css/animations.css" rel="stylesheet">
-    <link href="./css/responsive.css" rel="stylesheet">
+    <link href="./css/responsive.css?v=2" rel="stylesheet">
 
     <!-- Firebase SDK -->
     <script src="https://www.gstatic.com/firebasejs/10.0.0/firebase-app-compat.js"></script>
@@ -102,57 +102,7 @@
         .gauge-path.text-purple-500 { stroke: url(#grad-purple) !important; color: transparent; }
         .gauge-path.text-red-500 { stroke: url(#grad-red) !important; color: transparent; }
 
-        @media screen and (max-width: 768px) {
 
-            #scene-loading,
-            #scene-login,
-            #scene-register,
-            #scene-app {
-                zoom: 0.85;
-            }
-
-            #scene-app button,
-            #scene-app select,
-            #scene-app input[type="checkbox"],
-            #scene-app input[type="radio"],
-            #scene-app input[type="range"],
-            #scene-app .ctrl-toggle,
-            #scene-app .toggle-label {
-                zoom: 1.15;
-            }
-
-            #btn-quick-fans-mobile,
-            #btn-quick-misters-mobile,
-            #btn-quick-lights-mobile,
-            #tab-controls button,
-            #tab-controls select,
-            #tab-controls input,
-            #tab-controls .ctrl-toggle,
-            #tab-controls .toggle-label {
-                zoom: 1 !important;
-            }
-        }
-
-        @media screen and (max-width: 400px) {
-
-            #scene-loading,
-            #scene-login,
-            #scene-register,
-            #scene-app {
-                zoom: 0.8;
-            }
-
-            #scene-app button,
-            #scene-app select,
-            #scene-app input[type="checkbox"],
-            #scene-app input[type="radio"],
-            #scene-app input[type="range"],
-            #scene-app .ctrl-toggle,
-            #scene-app .sched-dsk-toggle-wrap,
-            #scene-app .toggle-label {
-                zoom: 1.25;
-            }
-        }
     </style>
 </head>
 
@@ -840,7 +790,7 @@
 
             <!-- 3. MAIN APP VIEW SCENE (With Shell Navigation) -->
             <div id="scene-app"
-                class="hidden absolute inset-0 z-40 bg-app-bg dark:bg-zinc-950 flex flex-col overflow-hidden transition-all duration-500">
+                class="hidden absolute inset-0 bg-app-bg dark:bg-zinc-950 flex flex-col overflow-hidden transition-all duration-500">
 
                 <!-- TOP HEADER -->
                 <header id="app-header"
@@ -2915,126 +2865,90 @@
                                     </div>
                                 </div>
                             </div>
-
-                            <!-- Mobile-only: Quick Add Batch Button (Admin Only) -->
-                            <button id="btn-mobile-init-batch" onclick="openAddBatchModal()"
-                                class="w-full flex items-center justify-center gap-2 bg-primary hover:bg-primary/90 text-white font-bold py-3.5 rounded-xl shadow-md transition-all active:scale-[0.98]"
-                                style="margin-top: 24px;">
-                                <span class="material-symbols-outlined text-[20px]"
-                                    style="font-variation-settings: 'FILL' 1;">add_circle</span>
-                                Initialize New Batch
-                            </button>
-
-                            <!-- Main Two-Column Grid for Desktop -->
-                            <div class="desktop-grid crops-desktop-grid space-y-4 md:space-y-0">
-                                <!-- Left Column: Rack cards -->
-                                <div class="desktop-col">
-                                    <div id="active-batches-list" class="space-y-6 pt-5"></div>
+                            <!-- Crop Analytics Widgets (Added at Top) -->
+                            <div class="crop-analytics-grid mt-4">
+                                <!-- Harvest Yield -->
+                                <div class="crop-card">
+                                    <div class="flex items-center gap-2 mb-3">
+                                        <div class="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center text-primary dark:text-primary-fixed">
+                                            <span class="material-symbols-outlined text-[22px]">grass</span>
+                                        </div>
+                                        <h3 class="text-base font-extrabold text-on-background dark:text-white">Harvest Yield</h3>
+                                    </div>
+                                    <div id="crop-widget-harvest-content">
+                                        <div class="animate-pulse flex space-x-4">
+                                            <div class="flex-1 space-y-4 py-1">
+                                                <div class="h-4 bg-slate-200 dark:bg-zinc-700 rounded w-3/4"></div>
+                                                <div class="space-y-2">
+                                                    <div class="h-2 bg-slate-200 dark:bg-zinc-700 rounded"></div>
+                                                    <div class="h-2 bg-slate-200 dark:bg-zinc-700 rounded w-5/6"></div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
                                 </div>
-
-                                <!-- Right Column (desktop-only): Quick Batch Add + System Health -->
-                                <div class="crops-desktop-only desktop-col space-y-4 pt-5" style="margin-top: -10px;">
-                                    <!-- Quick Batch Add (admin only) -->
-                                    <div id="quick-batch-add-card" class="crops-side-card">
-                                        <p class="crops-side-title">Quick Batch Add</p>
-                                        <p class="crops-side-desc">Set your defaults here and jump straight into the
-                                            full Add Rack form with them pre-filled.</p>
-                                        <div class="crops-side-field">
-                                            <label class="crops-side-label">Substrate Type</label>
-                                            <select id="quick-batch-substrate" class="crops-side-select">
-                                                <option value="Sawdust + Bran">Sawdust + Bran</option>
-                                                <option value="Straw Mix">Straw Mix</option>
-                                                <option value="Coco Coir">Coco Coir</option>
-                                            </select>
+                                <!-- Rack Utilization -->
+                                <div class="crop-card">
+                                    <div class="flex items-center gap-2 mb-3">
+                                        <div class="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center text-primary dark:text-primary-fixed">
+                                            <span class="material-symbols-outlined text-[22px]" style="font-variation-settings: 'FILL' 1;">inventory_2</span>
                                         </div>
-                                        <div class="crops-side-field" style="margin-bottom:0;">
-                                            <label class="crops-side-label">Quantity (Bags)</label>
-                                            <input id="quick-batch-qty" type="number" min="1" value="10"
-                                                class="crops-side-input" />
-                                        </div>
-                                        <button id="quick-batch-init-btn" onclick="initQuickBatchFromSidebar()"
-                                            class="crops-side-btn">Initialize Batch</button>
+                                        <h3 class="text-base font-extrabold text-on-background dark:text-white">Rack Utilization</h3>
                                     </div>
-
-                                    <!-- Report a Crop Issue (staff only) -->
-                                    <div id="crop-report-issue-card" class="hidden crops-side-card">
-                                        <p class="crops-side-title">Report a Crop Issue</p>
-                                        <p class="crops-side-desc">Notice contamination, slow growth, or a rack that
-                                            needs attention? Send a report straight to the administrator.</p>
-                                        <div class="flex items-center justify-between crops-side-field"
-                                            style="margin-bottom:0.75rem;">
-                                            <span class="crops-side-label" style="margin-bottom:0;">Open Reports</span>
-                                            <span id="crop-report-open-count"
-                                                class="text-[13px] font-extrabold text-on-background dark:text-white">0</span>
+                                    <div id="crop-widget-util-content">
+                                        <div class="animate-pulse flex space-x-4">
+                                            <div class="flex-1 space-y-4 py-1">
+                                                <div class="h-4 bg-slate-200 dark:bg-zinc-700 rounded w-3/4"></div>
+                                                <div class="space-y-2">
+                                                    <div class="h-2 bg-slate-200 dark:bg-zinc-700 rounded"></div>
+                                                    <div class="h-2 bg-slate-200 dark:bg-zinc-700 rounded w-5/6"></div>
+                                                </div>
+                                            </div>
                                         </div>
-                                        <button onclick="openReportModal()" class="crops-side-btn"
-                                            style="display:flex; align-items:center; justify-content:center; gap:6px;">
-                                            <span class="material-symbols-outlined text-[16px]">report_problem</span>
-                                            Report an Issue
-                                        </button>
                                     </div>
-
-                                    <!-- System Health -->
-                                    <div class="crops-side-card">
-                                        <div class="crops-health-header">
-                                            <p class="crops-side-title">System Health</p>
-                                            <span class="crops-health-live"><span
-                                                    class="crops-health-live-dot"></span>Live</span>
+                                </div>
+                                <!-- Crop Health -->
+                                <div class="crop-card">
+                                    <div class="flex items-center gap-2 mb-3">
+                                        <div class="w-10 h-10 rounded-full bg-red-500/10 flex items-center justify-center text-red-500">
+                                            <span class="material-symbols-outlined text-[22px]">biotech</span>
                                         </div>
-                                        <p class="crops-side-desc">Live environmental readings across active grow
-                                            racks.</p>
-
-                                        <div class="crops-health-row">
-                                            <div class="crops-health-label-row">
-                                                <span>Temperature</span><span
-                                                    id="crops-health-temp">&mdash;&deg;C</span>
-                                            </div>
-                                            <div class="crops-health-track">
-                                                <div id="crops-health-temp-fill" class="crops-health-fill"
-                                                    style="width:0%"></div>
+                                        <h3 class="text-base font-extrabold text-on-background dark:text-white">Crop Health Monitor</h3>
+                                    </div>
+                                    <div id="crop-widget-health-content">
+                                        <div class="animate-pulse flex space-x-4">
+                                            <div class="flex-1 space-y-4 py-1">
+                                                <div class="h-4 bg-slate-200 dark:bg-zinc-700 rounded w-3/4"></div>
+                                                <div class="space-y-2">
+                                                    <div class="h-2 bg-slate-200 dark:bg-zinc-700 rounded"></div>
+                                                    <div class="h-2 bg-slate-200 dark:bg-zinc-700 rounded w-5/6"></div>
+                                                </div>
                                             </div>
                                         </div>
-                                        <div class="crops-health-row">
-                                            <div class="crops-health-label-row">
-                                                <span>Humidity</span><span id="crops-health-humidity">&mdash;%</span>
-                                            </div>
-                                            <div class="crops-health-track">
-                                                <div id="crops-health-humidity-fill" class="crops-health-fill"
-                                                    style="width:0%"></div>
-                                            </div>
+                                    </div>
+                                </div>
+                                <!-- Growth Cycles -->
+                                <div class="crop-card">
+                                    <div class="flex items-center gap-2 mb-3">
+                                        <div class="w-10 h-10 rounded-full bg-emerald-500/10 flex items-center justify-center text-emerald-500">
+                                            <span class="material-symbols-outlined text-[22px]">model_training</span>
                                         </div>
-                                        <div class="crops-health-row">
-                                            <div class="crops-health-label-row">
-                                                <span>CO2 Levels</span><span id="crops-health-co2">&mdash; ppm</span>
+                                        <h3 class="text-base font-extrabold text-on-background dark:text-white">Growth Cycles</h3>
+                                    </div>
+                                    <div id="crop-widget-cycles-content">
+                                        <div class="animate-pulse flex space-x-4">
+                                            <div class="flex-1 space-y-4 py-1">
+                                                <div class="h-4 bg-slate-200 dark:bg-zinc-700 rounded w-3/4"></div>
+                                                <div class="space-y-2">
+                                                    <div class="h-2 bg-slate-200 dark:bg-zinc-700 rounded"></div>
+                                                    <div class="h-2 bg-slate-200 dark:bg-zinc-700 rounded w-5/6"></div>
+                                                </div>
                                             </div>
-                                            <div class="crops-health-track">
-                                                <div id="crops-health-co2-fill" class="crops-health-fill"
-                                                    style="width:0%"></div>
-                                            </div>
-                                        </div>
-                                        <div class="crops-health-row">
-                                            <div class="crops-health-label-row">
-                                                <span>Light</span><span id="crops-health-light">&mdash;
-                                                    &micro;mol</span>
-                                            </div>
-                                            <div class="crops-health-track">
-                                                <div id="crops-health-light-fill" class="crops-health-fill"
-                                                    style="width:0%"></div>
-                                            </div>
-                                        </div>
-
-                                        <div id="crops-health-summary" class="crops-health-summary">
-                                            <span class="material-symbols-outlined"
-                                                style="font-variation-settings:'FILL' 1">check_circle</span>
-                                            <span class="crops-health-summary-text">
-                                                <span id="crops-health-summary-text">All systems nominal</span>
-                                                <span class="crops-health-summary-sub" id="crops-health-updated">Updated
-                                                    just now</span>
-                                            </span>
                                         </div>
                                     </div>
                                 </div>
                             </div>
+
                         </div>
 
                         <!-- TAB E: DIAGNOSTICS placeholder (kept for tab switching logic compatibility) -->
@@ -3991,138 +3905,11 @@
                     </div>
                 </div>
 
-                <!-- Sub-page: Rack Detail (Manage Crop > click card) -->
-                <div id="subpage-rack-detail" class="subpage-panel">
-                    <div class="flex-1 overflow-y-auto hide-scrollbar pb-28">
-                        <!-- Page Header -->
-                        <div id="rack-detail-header"
-                            class="relative overflow-hidden bg-gradient-to-br from-primary to-on-secondary-container dark:from-[#1a5c35] dark:to-[#0d3d20] px-5 pt-5 pb-7">
-                            <div class="pointer-events-none absolute -top-6 -right-6 w-36 h-36 rounded-full bg-white/5">
-                            </div>
-                            <div
-                                class="pointer-events-none absolute -bottom-8 -left-4 w-28 h-28 rounded-full bg-white/5">
-                            </div>
-                            <div class="flex items-start justify-between gap-3 mb-4">
-                                <div class="flex items-center gap-3">
-                                    <button onclick="closeSubPage('subpage-rack-detail')" id="rack-detail-back-btn"
-                                        class="text-white/80 hover:text-white p-1.5 -ml-1 rounded-full active:scale-90 transition-all bg-white/10 shrink-0">
-                                        <span class="material-symbols-outlined text-[20px]">arrow_back</span>
-                                    </button>
-                                    <div>
-                                        <div class="flex items-center gap-2 flex-wrap">
-                                            <p id="rack-detail-eyebrow"
-                                                class="text-[11px] font-bold text-white/55 uppercase tracking-widest mb-1">
-                                                Rack Detail</p>
-                                            <span id="rd-status-badge"
-                                                class="rd-desktop-only items-center gap-1 text-[10px] font-extrabold uppercase tracking-wide px-2.5 py-1 rounded-full mb-1"></span>
-                                        </div>
-                                        <h2 id="rack-detail-title"
-                                            class="text-[24px] font-extrabold text-white leading-tight tracking-tight">
-                                            Rack A</h2>
-                                        <p id="rd-desc"
-                                            class="rd-desktop-only text-[12px] text-slate-500 dark:text-zinc-400 mt-1">
-                                            Managed high-precision substrate slots for precision cultivation.</p>
-                                    </div>
-                                </div>
-                                <!-- Desktop-only info chips: Substrate / Set up -->
-                                <div class="rd-desktop-only items-center gap-2 shrink-0">
-                                    <div class="rd-info-chip">
-                                        <span class="rd-info-chip-label">Substrate</span>
-                                        <span id="rd-info-substrate" class="rd-info-chip-value"></span>
-                                    </div>
-                                    <div class="rd-info-chip">
-                                        <span class="rd-info-chip-label">Set up</span>
-                                        <span id="rd-info-setup" class="rd-info-chip-value"></span>
-                                    </div>
-                                </div>
-                            </div>
-                            <!-- Summary pills (mobile only — desktop shows badges in the Substrate Slots card) -->
-                            <div id="rack-detail-pills" class="flex items-center gap-2 flex-wrap pl-1">
-                                <!-- populated dynamically -->
-                            </div>
-                        </div>
 
-                        <!-- Content -->
-                        <div class="px-5 pt-6 pb-6 space-y-6">
-
-                            <!-- Substrate Slots (plain block on mobile, becomes a white
-                                 card with a header/toolbar on the desktop redesign) -->
-                            <div id="rd-slots-card" class="rd-slots-card">
-
-                                <!-- Toolbar: title + ALL/EMPTY badges are desktop-only, but Select All +
-                                     Bulk Action are always rendered so selection/bulk actions work on mobile too -->
-                                <div class="rd-slots-card-head">
-                                    <div class="rd-desktop-only rd-slots-card-head-left">
-                                        <h3 class="rd-slots-title">Substrate Slots</h3>
-                                        <span id="rd-badge-all" class="rd-badge rd-badge-blue">ALL 20</span>
-                                        <span id="rd-badge-empty" class="rd-badge rd-badge-gray">EMPTY 20</span>
-                                    </div>
-                                    <div class="rd-slots-card-head-right">
-                                        <label class="rd-select-all">
-                                            <input type="checkbox" id="rd-select-all-cb"
-                                                onchange="toggleRackDetailSelectAll(this)">
-                                            <span>Select All</span>
-                                        </label>
-                                        <button id="rd-bulk-action-btn" onclick="toggleRackDetailBulkMenu(event)"
-                                            class="rd-bulk-btn" disabled>
-                                            <span class="material-symbols-outlined text-[15px]">bolt</span>Bulk
-                                            Action
-                                        </button>
-                                        <div id="rd-bulk-menu" class="rd-bulk-menu hidden"></div>
-                                    </div>
-                                </div>
-
-                                <!-- Filter chips -->
-                                <div id="rack-detail-filter-chips"
-                                    class="rd-filter-chips flex gap-1.5 flex-wrap justify-center">
-                                </div>
-
-                                <!-- Slot grid — 5 columns on mobile, 10 columns on desktop -->
-                                <div id="rack-detail-slot-grid" class="min-h-[60px]"></div>
-
-                                <!-- Legend -->
-                                <div
-                                    class="rd-legend flex items-center justify-center flex-wrap gap-x-5 gap-y-2 text-[12px] text-on-surface-variant dark:text-zinc-400">
-                                    <span class="flex items-center gap-1.5"><span
-                                            class="w-3.5 h-3.5 rounded bg-primary/70 dark:bg-emerald-600 inline-block"></span>Active</span>
-                                    <span class="flex items-center gap-1.5"><span
-                                            class="w-3.5 h-3.5 rounded bg-amber-400 dark:bg-amber-500 inline-block"></span>Harvested</span>
-                                    <span class="flex items-center gap-1.5"><span
-                                            class="w-3.5 h-3.5 rounded bg-slate-300 dark:bg-zinc-600 inline-block"></span>Replaced</span>
-                                    <span class="flex items-center gap-1.5"><span
-                                            class="w-3.5 h-3.5 rounded bg-red-400 dark:bg-red-600 inline-block"></span>Flagged</span>
-                                </div>
-                            </div>
-
-                            <!-- Divider (mobile only — desktop cards have their own padding) -->
-                            <div class="border-t border-slate-100 dark:border-zinc-800 rd-mobile-only"></div>
-
-                            <!-- Recent Harvests -->
-                            <div id="rd-harvests-card" class="rd-harvests-card space-y-3">
-                                <div class="flex items-center justify-between">
-                                    <p
-                                        class="text-[12px] font-extrabold text-on-background dark:text-white uppercase tracking-wide">
-                                        Recent Harvests</p>
-                                    <span id="rack-detail-total-yield"
-                                        class="text-[17px] font-extrabold text-success-green dark:text-emerald-400"></span>
-                                </div>
-                                <div id="rack-detail-harvests" class="space-y-2 max-h-48 overflow-y-auto"></div>
-                            </div>
-
-                            <!-- Divider -->
-                            <div class="border-t border-slate-100 dark:border-zinc-800 rd-mobile-only"></div>
-
-                            <!-- Setup date row (mobile only — desktop shows Set Up in the header chip) -->
-                            <div id="rack-detail-actions" class="flex items-center justify-between rd-mobile-only">
-                                <span id="rack-detail-setup-date"
-                                    class="text-[12px] text-on-surface-variant dark:text-zinc-500"></span>
-                                <!-- Edit/delete buttons are on the rack card in Manage Crop -->
-                                <button id="rack-detail-edit-btn" class="hidden"></button>
-                                <button id="rack-detail-delete-btn" class="hidden"></button>
-                            </div>
-                        </div>
-                    </div>
-                </div>
+                <!-- Modals: Harvest, Capacity, Contamination -->
+                <div id="modal-harvest" class="hidden"></div>
+                <div id="modal-capacity" class="hidden"></div>
+                <div id="modal-contamination" class="hidden"></div>
 
                 <!-- Sub-page: Live Farm View -->
                 <div id="subpage-live-view" class="subpage-panel">
@@ -4969,7 +4756,7 @@
                      guarantees even spacing between ALL visible tabs: 5 slots for staff
                      (Home, Controls, [FAB], Report, More), 6 for admin (Yield AI added). -->
                 <nav
-                    class="absolute bottom-0 left-0 w-full z-40 flex items-center px-2 pb-5 pt-2 bg-surface-container/95 dark:bg-zinc-900/95 border-t border-muted/80 dark:border-zinc-800 backdrop-blur-md rounded-t-2xl shadow-[0px_-4px_24px_rgba(15,31,20,0.08)] shrink-0 select-none">
+                    class="absolute bottom-0 left-0 w-full z-40 flex items-center px-2 pb-5 pt-2 bg-app-bg/95 dark:bg-zinc-950/95 border-t border-muted/80 dark:border-zinc-800 backdrop-blur-md rounded-t-2xl shadow-[0px_-4px_24px_rgba(15,31,20,0.08)] shrink-0 select-none">
                     <button id="nav-home" onclick="switchTab('home')"
                         class="flex-1 flex flex-col items-center justify-center text-primary dark:text-primary-fixed py-1 active:scale-95 transition-transform duration-150">
                         <span class="material-symbols-outlined text-[22px]"
@@ -5022,7 +4809,7 @@
 
     <!-- Help / System Info Menu Modal -->
     <div id="modal-help-menu" onclick="if(event.target===this) closeHelpMenu()"
-        class="hidden fixed inset-0 z-[100] flex items-end sm:items-center justify-center sm:p-4 bg-slate-900/40 dark:bg-black/60 backdrop-blur-sm transition-all duration-300">
+        class="hidden fixed inset-0 z-50 flex items-end sm:items-center justify-center sm:p-4 bg-slate-900/40 dark:bg-black/60 backdrop-blur-sm transition-all duration-300">
         <div id="modal-help-menu-card"
             class="bg-white dark:bg-zinc-900 border border-slate-100 dark:border-zinc-800 rounded-t-[32px] sm:rounded-3xl w-full max-w-[400px] shadow-[0_-10px_40px_rgba(0,0,0,0.1)] dark:shadow-[0_-10px_40px_rgba(0,0,0,0.5)] relative z-10 flex flex-col transition-all duration-300 transform translate-y-full sm:translate-y-0 sm:scale-95 opacity-0 overflow-hidden">
             <!-- Green Header Block -->
@@ -5254,6 +5041,138 @@
 
 
     <!-- Modal: Add Rack -->
+    <!-- ===================== -->
+    <!-- WIDGET ACTION MODALS -->
+    <!-- ===================== -->
+
+    <!-- Log Harvest Modal -->
+    <div id="modal-log-harvest"
+        class="hidden fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm">
+        <div id="modal-log-harvest-inner"
+            class="bg-surface-container-lowest dark:bg-zinc-900 border border-muted dark:border-zinc-800 rounded-3xl p-5 w-full max-w-[320px] shadow-2xl relative flex flex-col gap-4">
+            
+            <div class="flex justify-between items-center">
+                <h3 class="text-body-lg font-bold text-brand-deep dark:text-primary-fixed flex items-center gap-1.5">
+                    <span class="material-symbols-outlined" style="font-variation-settings:'FILL' 1">grass</span> Log Harvest
+                </h3>
+                <button onclick="closeWidgetModal('modal-log-harvest')" class="text-slate-400 dark:text-zinc-500 hover:text-slate-600 dark:hover:text-white p-1 rounded-full transition-colors">
+                    <span class="material-symbols-outlined">close</span>
+                </button>
+            </div>
+
+            <div class="flex flex-col gap-3">
+                <div class="flex flex-col gap-1">
+                    <label class="text-[10px] font-bold text-on-surface-variant dark:text-zinc-400 uppercase tracking-wide">Select Rack</label>
+                    <select id="harvest-rack-select"
+                        class="bg-surface-soft dark:bg-zinc-800 border border-outline-variant dark:border-zinc-700 rounded-xl py-2 px-3 text-body-sm focus:border-primary text-on-surface dark:text-white appearance-none">
+                    </select>
+                </div>
+                
+                <div class="flex flex-col gap-1">
+                    <label class="text-[10px] font-bold text-on-surface-variant dark:text-zinc-400 uppercase tracking-wide">Yield (Grams)</label>
+                    <input type="number" id="harvest-grams" placeholder="e.g. 500" min="1"
+                        class="bg-surface-soft dark:bg-zinc-800 border border-outline-variant dark:border-zinc-700 rounded-xl py-2 px-3 text-body-sm focus:border-primary text-on-surface dark:text-white">
+                </div>
+                
+                <p id="harvest-error" class="hidden text-[11px] font-bold text-red-500"></p>
+                
+                <button onclick="submitLogHarvest()"
+                    class="bg-primary dark:bg-primary-container text-on-primary dark:text-white py-2.5 rounded-xl font-bold active:scale-95 transition-all text-center mt-2">
+                    Save Harvest
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Update Capacity Modal -->
+    <div id="modal-update-capacity"
+        class="hidden fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm">
+        <div id="modal-update-capacity-inner"
+            class="bg-surface-container-lowest dark:bg-zinc-900 border border-muted dark:border-zinc-800 rounded-3xl p-5 w-full max-w-[360px] shadow-2xl relative flex flex-col gap-4">
+            
+            <div class="flex justify-between items-center">
+                <h3 class="text-body-lg font-bold text-brand-deep dark:text-primary-fixed flex items-center gap-1.5">
+                    <span class="material-symbols-outlined" style="font-variation-settings:'FILL' 1">inventory_2</span> Update Capacity
+                </h3>
+                <button onclick="closeWidgetModal('modal-update-capacity')" class="text-slate-400 dark:text-zinc-500 hover:text-slate-600 dark:hover:text-white p-1 rounded-full transition-colors">
+                    <span class="material-symbols-outlined">close</span>
+                </button>
+            </div>
+
+            <div class="flex flex-col gap-3">
+                <div class="flex flex-col gap-1">
+                    <label class="text-[10px] font-bold text-on-surface-variant dark:text-zinc-400 uppercase tracking-wide">Select Rack</label>
+                    <select id="capacity-rack-select"
+                        class="bg-surface-soft dark:bg-zinc-800 border border-outline-variant dark:border-zinc-700 rounded-xl py-2.5 px-3 text-body-sm focus:border-primary text-on-surface dark:text-white appearance-none">
+                    </select>
+                </div>
+                
+                <div class="grid grid-cols-2 gap-2">
+                    <div class="flex flex-col gap-1">
+                        <label class="text-[10px] font-bold text-on-surface-variant dark:text-zinc-400 uppercase tracking-wide">Active Bags</label>
+                        <input type="number" id="capacity-active" min="0"
+                            class="bg-surface-soft dark:bg-zinc-800 border border-outline-variant dark:border-zinc-700 rounded-xl py-2.5 px-3 text-body-sm focus:border-primary text-on-surface dark:text-white">
+                    </div>
+                    <div class="flex flex-col gap-1">
+                        <label class="text-[10px] font-bold text-on-surface-variant dark:text-zinc-400 uppercase tracking-wide">Empty Bags</label>
+                        <input type="number" id="capacity-empty" min="0"
+                            class="bg-surface-soft dark:bg-zinc-800 border border-outline-variant dark:border-zinc-700 rounded-xl py-2.5 px-3 text-body-sm focus:border-primary text-on-surface dark:text-white">
+                    </div>
+                </div>
+                
+                <p id="capacity-error" class="hidden text-[11px] font-bold text-red-500"></p>
+                
+                <button onclick="submitUpdateCapacity()"
+                    class="w-full bg-primary text-on-primary py-3 rounded-full text-[13px] font-bold shadow-md shadow-primary/20 hover:bg-primary/90 transition-colors mt-2">
+                    Save Capacity
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Flag Contamination Modal -->
+    <div id="modal-flag-contamination"
+        class="hidden fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm">
+        <div id="modal-flag-contamination-inner"
+            class="bg-surface-container-lowest dark:bg-zinc-900 border border-muted dark:border-zinc-800 rounded-3xl p-5 w-full max-w-[360px] shadow-2xl relative flex flex-col gap-4">
+            
+            <div class="flex justify-between items-center">
+                <h3 class="text-body-lg font-bold text-red-600 dark:text-red-500 flex items-center gap-1.5">
+                    <span class="material-symbols-outlined" style="font-variation-settings:'FILL' 1">biotech</span> Flag Contamination
+                </h3>
+                <button onclick="closeWidgetModal('modal-flag-contamination')" class="text-slate-400 dark:text-zinc-500 hover:text-slate-600 dark:hover:text-white p-1 rounded-full transition-colors">
+                    <span class="material-symbols-outlined">close</span>
+                </button>
+            </div>
+
+            <div class="flex flex-col gap-3">
+                <div class="flex flex-col gap-1">
+                    <label class="text-[10px] font-bold text-on-surface-variant dark:text-zinc-400 uppercase tracking-wide">Select Rack</label>
+                    <select id="contam-rack-select"
+                        class="bg-surface-soft dark:bg-zinc-800 border border-outline-variant dark:border-zinc-700 rounded-xl py-2.5 px-3 text-body-sm focus:border-primary text-on-surface dark:text-white appearance-none">
+                    </select>
+                </div>
+                
+                <div class="flex flex-col gap-1">
+                    <label class="text-[10px] font-bold text-on-surface-variant dark:text-zinc-400 uppercase tracking-wide">Bags to Flag</label>
+                    <input type="number" id="contam-count" placeholder="e.g. 2" min="1"
+                        class="bg-surface-soft dark:bg-zinc-800 border border-outline-variant dark:border-zinc-700 rounded-xl py-2.5 px-3 text-body-sm focus:border-red-500 text-on-surface dark:text-white">
+                </div>
+                
+                <p id="contam-error" class="hidden text-[11px] font-bold text-red-500"></p>
+                
+                <button onclick="submitContamination()"
+                    class="w-full bg-red-600 text-white py-3 rounded-full text-[13px] font-bold shadow-md shadow-red-500/20 hover:bg-red-700 transition-colors mt-2">
+                    Flag Bags
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- ===================== -->
+    <!-- EXISTING MODALS -->
+    <!-- ===================== -->
+
     <div id="modal-add-batch"
         class="hidden fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm">
         <div id="modal-add-batch-inner"
@@ -5781,7 +5700,7 @@
     <script src="./js/features/sensors.js"></script>
     <script src="./js/features/controls.js"></script>
     <script src="./js/features/schedule.js"></script>
-    <script src="./js/features/batches.js"></script>
+    <script src="./js/features/batches.js?v=2"></script>
     <script src="./js/features/yield.js"></script>
     <script src="./js/features/tasks.js"></script>
     <script src="./js/features/alerts.js"></script>
@@ -5790,7 +5709,7 @@
     <script src="./js/features/logs.js"></script>
     <script src="./js/features/dashboard.js"></script>
     <script src="./js/features/live-view.js"></script>
-
+    <script src="./js/features/crop-analytics.js?v=2"></script>
     <!-- Desktop enhancements -->
     <script src="./js/desktop/zoom.js"></script>
     <script src="./js/desktop/sidebar.js"></script>
