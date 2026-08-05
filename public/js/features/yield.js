@@ -199,6 +199,7 @@ function switchYieldPeriod(period) {
 function initYieldAnalytics() {
     if (!document.getElementById('ya-bars')) return;
     renderYieldAnalytics(!_yaInitDone);
+    renderDailyHarvests();
     _yaInitDone = true;
 }
 
@@ -611,3 +612,171 @@ function closeYAPinpoint() {
     if (panel) { panel.style.maxHeight = '0px'; panel.style.opacity = '0'; }
 }
 // ================= END YIELD ANALYTICS ENGINE =================
+
+// ================= REPORT GENERATOR & DAILY VIEW =================
+
+function aggregateHarvestData() {
+    let rawHarvests = [];
+    
+    // Parse all harvests
+    if (state.growBatches) {
+        Object.values(state.growBatches).forEach(rack => {
+            if (!rack) return;
+            const rackName = rack.rack || 'Unknown Rack';
+            
+            // Bags
+            if (rack.bags) {
+                Object.values(rack.bags).forEach(bag => {
+                    if (bag && bag.harvestLog) {
+                        bag.harvestLog.forEach(log => {
+                            if (log && log.date && log.grams) {
+                                rawHarvests.push({
+                                    date: new Date(log.date),
+                                    grams: log.grams,
+                                    rack: rackName
+                                });
+                            }
+                        });
+                    }
+                });
+            }
+            
+            // Historical
+            if (rack.historicalHarvests) {
+                Object.values(rack.historicalHarvests).forEach(log => {
+                    if (log && log.date && log.grams) {
+                        rawHarvests.push({
+                            date: new Date(log.date),
+                            grams: log.grams,
+                            rack: rackName
+                        });
+                    }
+                });
+            }
+        });
+    }
+
+    // Sort descending
+    rawHarvests.sort((a, b) => b.date - a.date);
+
+    // Grouping
+    const dailyMap = {};
+    const monthlyMap = {};
+    const semiMap = {};
+    const annualMap = {};
+
+    rawHarvests.forEach(h => {
+        const dStr = h.date.toISOString().split('T')[0]; // YYYY-MM-DD
+        const mStr = `${h.date.getFullYear()}-${String(h.date.getMonth()+1).padStart(2, '0')}`; // YYYY-MM
+        const sStr = `${h.date.getFullYear()}-H${h.date.getMonth() < 6 ? 1 : 2}`; // Semi-annual (H1/H2)
+        const yStr = `${h.date.getFullYear()}`;
+
+        if (!dailyMap[dStr]) dailyMap[dStr] = 0;
+        dailyMap[dStr] += h.grams;
+
+        if (!monthlyMap[mStr]) monthlyMap[mStr] = 0;
+        monthlyMap[mStr] += h.grams;
+
+        if (!semiMap[sStr]) semiMap[sStr] = 0;
+        semiMap[sStr] += h.grams;
+
+        if (!annualMap[yStr]) annualMap[yStr] = 0;
+        annualMap[yStr] += h.grams;
+    });
+
+    return { rawHarvests, dailyMap, monthlyMap, semiMap, annualMap };
+}
+
+function renderDailyHarvests() {
+    const listEl = document.getElementById('yield-daily-list');
+    if (!listEl) return;
+
+    const data = aggregateHarvestData();
+    const days = Object.keys(data.dailyMap).sort((a, b) => new Date(b) - new Date(a));
+
+    if (days.length === 0) {
+        listEl.innerHTML = `<p class="text-[12px] text-on-surface-variant dark:text-zinc-500 italic text-center py-4">No harvests recorded yet.</p>`;
+        return;
+    }
+
+    let html = '';
+    days.forEach(dStr => {
+        const dateObj = new Date(dStr);
+        const displayDate = dateObj.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+        const grams = data.dailyMap[dStr];
+        const kg = (grams / 1000).toFixed(2);
+        
+        html += `
+            <div class="flex items-center justify-between p-2 rounded-lg bg-surface-soft dark:bg-zinc-800 border border-slate-100 dark:border-zinc-700/50">
+                <span class="text-[13px] font-bold text-on-surface dark:text-zinc-300">${displayDate}</span>
+                <div class="text-right">
+                    <span class="text-[13px] font-extrabold text-secondary dark:text-emerald-400 block leading-tight">${kg} kg</span>
+                    <span class="text-[9px] font-bold text-on-surface-variant dark:text-zinc-500 uppercase tracking-wider">${grams}g</span>
+                </div>
+            </div>
+        `;
+    });
+
+    listEl.innerHTML = html;
+}
+
+function generateYieldExcelReport() {
+    if (typeof XLSX === 'undefined') {
+        alert("Excel export library is still loading. Please try again in a few seconds.");
+        return;
+    }
+
+    const data = aggregateHarvestData();
+    
+    // 1. Daily Sheet
+    const dailyRows = [["Date", "Total Yield (g)", "Total Yield (kg)"]];
+    Object.keys(data.dailyMap).sort((a,b) => new Date(b)-new Date(a)).forEach(d => {
+        const grams = data.dailyMap[d];
+        dailyRows.push([d, grams, grams / 1000]);
+    });
+
+    // 2. Monthly Sheet
+    const monthlyRows = [["Month", "Total Yield (g)", "Total Yield (kg)"]];
+    Object.keys(data.monthlyMap).sort((a,b) => new Date(b)-new Date(a)).forEach(m => {
+        const grams = data.monthlyMap[m];
+        monthlyRows.push([m, grams, grams / 1000]);
+    });
+
+    // 3. Semi-Annual Sheet
+    const semiRows = [["Period", "Total Yield (g)", "Total Yield (kg)"]];
+    Object.keys(data.semiMap).sort((a,b) => b.localeCompare(a)).forEach(s => {
+        const grams = data.semiMap[s];
+        semiRows.push([s, grams, grams / 1000]);
+    });
+
+    // 4. Annual Sheet
+    const annualRows = [["Year", "Total Yield (g)", "Total Yield (kg)"]];
+    Object.keys(data.annualMap).sort((a,b) => b.localeCompare(a)).forEach(y => {
+        const grams = data.annualMap[y];
+        annualRows.push([y, grams, grams / 1000]);
+    });
+
+    // Create workbook
+    const wb = XLSX.utils.book_new();
+
+    const wsDaily = XLSX.utils.aoa_to_sheet(dailyRows);
+    const wsMonthly = XLSX.utils.aoa_to_sheet(monthlyRows);
+    const wsSemi = XLSX.utils.aoa_to_sheet(semiRows);
+    const wsAnnual = XLSX.utils.aoa_to_sheet(annualRows);
+
+    // Apply column widths
+    const wscols = [{wch:15}, {wch:15}, {wch:15}];
+    wsDaily['!cols'] = wscols;
+    wsMonthly['!cols'] = wscols;
+    wsSemi['!cols'] = wscols;
+    wsAnnual['!cols'] = wscols;
+
+    XLSX.utils.book_append_sheet(wb, wsDaily, "Daily Harvests");
+    XLSX.utils.book_append_sheet(wb, wsMonthly, "Monthly Overview");
+    XLSX.utils.book_append_sheet(wb, wsSemi, "Semi-Annual Overview");
+    XLSX.utils.book_append_sheet(wb, wsAnnual, "Annual Overview");
+
+    const dateStr = new Date().toISOString().split('T')[0];
+    XLSX.writeFile(wb, `KabuTech_Yield_Report_${dateStr}.xlsx`);
+}
+
