@@ -66,14 +66,14 @@ function getAppRect() {
 }
 
 function positionModalOverApp(modalId) {
-    const r = getAppRect();
     const el = document.getElementById(modalId);
     el.style.position = 'fixed';
-    el.style.left = r.left + 'px';
-    el.style.top = r.top + 'px';
-    el.style.width = r.width + 'px';
-    el.style.height = r.height + 'px';
+    el.style.left = '0px';
+    el.style.top = '0px';
+    el.style.width = '100%';
+    el.style.height = '100%';
     el.style.display = 'flex';
+    el.style.zIndex = '9999';
 }
 
 function updateSliderFill(input) {
