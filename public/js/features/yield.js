@@ -664,27 +664,33 @@ function aggregateHarvestData() {
     const monthlyMap = {};
     const semiMap = {};
     const annualMap = {};
+    
+    // Set to keep track of all unique racks ever harvested
+    const allRacks = new Set();
+
+    function initMapEntry() {
+        return { totalGrams: 0, harvestCount: 0, racks: {} };
+    }
 
     rawHarvests.forEach(h => {
+        allRacks.add(h.rack);
+        
         const dStr = h.date.toISOString().split('T')[0]; // YYYY-MM-DD
         const mStr = `${h.date.getFullYear()}-${String(h.date.getMonth()+1).padStart(2, '0')}`; // YYYY-MM
         const sStr = `${h.date.getFullYear()}-H${h.date.getMonth() < 6 ? 1 : 2}`; // Semi-annual (H1/H2)
         const yStr = `${h.date.getFullYear()}`;
 
-        if (!dailyMap[dStr]) dailyMap[dStr] = 0;
-        dailyMap[dStr] += h.grams;
-
-        if (!monthlyMap[mStr]) monthlyMap[mStr] = 0;
-        monthlyMap[mStr] += h.grams;
-
-        if (!semiMap[sStr]) semiMap[sStr] = 0;
-        semiMap[sStr] += h.grams;
-
-        if (!annualMap[yStr]) annualMap[yStr] = 0;
-        annualMap[yStr] += h.grams;
+        [dailyMap, monthlyMap, semiMap, annualMap].forEach((map, idx) => {
+            const key = [dStr, mStr, sStr, yStr][idx];
+            if (!map[key]) map[key] = initMapEntry();
+            map[key].totalGrams += h.grams;
+            map[key].harvestCount += 1;
+            if (!map[key].racks[h.rack]) map[key].racks[h.rack] = 0;
+            map[key].racks[h.rack] += h.grams;
+        });
     });
 
-    return { rawHarvests, dailyMap, monthlyMap, semiMap, annualMap };
+    return { rawHarvests, dailyMap, monthlyMap, semiMap, annualMap, allRacks: Array.from(allRacks).sort() };
 }
 
 function renderDailyHarvests() {
@@ -703,12 +709,16 @@ function renderDailyHarvests() {
     days.forEach(dStr => {
         const dateObj = new Date(dStr);
         const displayDate = dateObj.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
-        const grams = data.dailyMap[dStr];
+        const entry = data.dailyMap[dStr];
+        const grams = entry.totalGrams;
         const kg = (grams / 1000).toFixed(2);
         
         html += `
             <div class="flex items-center justify-between p-2 rounded-lg bg-surface-soft dark:bg-zinc-800 border border-slate-100 dark:border-zinc-700/50">
-                <span class="text-[13px] font-bold text-on-surface dark:text-zinc-300">${displayDate}</span>
+                <div>
+                    <span class="text-[13px] font-bold text-on-surface dark:text-zinc-300 block">${displayDate}</span>
+                    <span class="text-[9px] font-semibold text-on-surface-variant dark:text-zinc-500">${entry.harvestCount} harvests</span>
+                </div>
                 <div class="text-right">
                     <span class="text-[13px] font-extrabold text-secondary dark:text-emerald-400 block leading-tight">${kg} kg</span>
                     <span class="text-[9px] font-bold text-on-surface-variant dark:text-zinc-500 uppercase tracking-wider">${grams}g</span>
@@ -727,33 +737,54 @@ function generateYieldExcelReport() {
     }
 
     const data = aggregateHarvestData();
+    const racks = data.allRacks; // Array of unique rack names
+
+    // Helper to generate headers
+    const buildHeaders = (timeLabel) => [
+        timeLabel, 
+        "Total Yield (kg)", 
+        "Total Yield (g)", 
+        "Harvest Count", 
+        "Avg Yield/Harvest (kg)",
+        ...racks.map(r => `[${r}] Yield (kg)`)
+    ];
+
+    // Helper to generate a row from map entry
+    const buildRow = (key, entry) => {
+        const kg = (entry.totalGrams / 1000).toFixed(2);
+        const avg = entry.harvestCount ? ((entry.totalGrams / entry.harvestCount) / 1000).toFixed(3) : 0;
+        const row = [key, Number(kg), entry.totalGrams, entry.harvestCount, Number(avg)];
+        
+        // Add rack breakdowns
+        racks.forEach(r => {
+            const rackGrams = entry.racks[r] || 0;
+            row.push(Number((rackGrams / 1000).toFixed(2)));
+        });
+        return row;
+    };
     
     // 1. Daily Sheet
-    const dailyRows = [["Date", "Total Yield (g)", "Total Yield (kg)"]];
+    const dailyRows = [buildHeaders("Date")];
     Object.keys(data.dailyMap).sort((a,b) => new Date(b)-new Date(a)).forEach(d => {
-        const grams = data.dailyMap[d];
-        dailyRows.push([d, grams, grams / 1000]);
+        dailyRows.push(buildRow(d, data.dailyMap[d]));
     });
 
     // 2. Monthly Sheet
-    const monthlyRows = [["Month", "Total Yield (g)", "Total Yield (kg)"]];
+    const monthlyRows = [buildHeaders("Month")];
     Object.keys(data.monthlyMap).sort((a,b) => new Date(b)-new Date(a)).forEach(m => {
-        const grams = data.monthlyMap[m];
-        monthlyRows.push([m, grams, grams / 1000]);
+        monthlyRows.push(buildRow(m, data.monthlyMap[m]));
     });
 
     // 3. Semi-Annual Sheet
-    const semiRows = [["Period", "Total Yield (g)", "Total Yield (kg)"]];
+    const semiRows = [buildHeaders("Period")];
     Object.keys(data.semiMap).sort((a,b) => b.localeCompare(a)).forEach(s => {
-        const grams = data.semiMap[s];
-        semiRows.push([s, grams, grams / 1000]);
+        semiRows.push(buildRow(s, data.semiMap[s]));
     });
 
     // 4. Annual Sheet
-    const annualRows = [["Year", "Total Yield (g)", "Total Yield (kg)"]];
+    const annualRows = [buildHeaders("Year")];
     Object.keys(data.annualMap).sort((a,b) => b.localeCompare(a)).forEach(y => {
-        const grams = data.annualMap[y];
-        annualRows.push([y, grams, grams / 1000]);
+        annualRows.push(buildRow(y, data.annualMap[y]));
     });
 
     // Create workbook
@@ -765,7 +796,7 @@ function generateYieldExcelReport() {
     const wsAnnual = XLSX.utils.aoa_to_sheet(annualRows);
 
     // Apply column widths
-    const wscols = [{wch:15}, {wch:15}, {wch:15}];
+    const wscols = [{wch:15}, {wch:18}, {wch:15}, {wch:15}, {wch:22}, ...racks.map(() => ({wch: 16}))];
     wsDaily['!cols'] = wscols;
     wsMonthly['!cols'] = wscols;
     wsSemi['!cols'] = wscols;

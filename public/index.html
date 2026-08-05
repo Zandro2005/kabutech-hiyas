@@ -2384,15 +2384,12 @@
 
                         <!-- TAB C: YIELD ANALYTICS -->
                         <div id="tab-yield" class="hidden space-y-4">
-                            <div class="mb-3 flex items-start justify-between">
-                                <div>
-                                    <h2 class="text-headline-sm font-bold text-on-background dark:text-white">Yield Analytics</h2>
-                                    <p class="text-caption text-on-surface-variant dark:text-zinc-400">Harvest data per rack, tracked and compared over time.</p>
-                                </div>
-                                <button onclick="generateYieldExcelReport()" class="flex items-center gap-1.5 px-3 py-1.5 bg-secondary text-white dark:bg-emerald-600 dark:text-white rounded-lg text-[12px] font-bold shadow-sm hover:opacity-90 transition-opacity whitespace-nowrap">
-                                    <span class="material-symbols-outlined text-[16px]">download</span>
-                                    <span class="hidden sm:inline">Export Report</span>
-                                </button>
+                            <div class="mb-3">
+                                <h2 class="text-headline-sm font-bold text-on-background dark:text-white">Yield
+                                    Analytics
+                                </h2>
+                                <p class="text-caption text-on-surface-variant dark:text-zinc-400">Harvest data per
+                                    rack, tracked and compared over time.</p>
                             </div>
 
                             <!-- Main Two-Column Grid for Desktop -->
@@ -2574,9 +2571,15 @@
                                     
                                     <!-- Daily Harvest Breakdown -->
                                     <div class="bg-surface-container-lowest dark:bg-zinc-900 rounded-2xl p-4 border border-muted dark:border-zinc-800 shadow-sm">
-                                        <div class="flex items-center gap-1.5 mb-3 text-brand-deep dark:text-primary-fixed">
-                                            <span class="material-symbols-outlined text-[18px]">calendar_today</span>
-                                            <h3 class="text-[13px] font-bold uppercase tracking-wider">Daily Harvests</h3>
+                                        <div class="flex items-center justify-between mb-3">
+                                            <div class="flex items-center gap-1.5 text-brand-deep dark:text-primary-fixed">
+                                                <span class="material-symbols-outlined text-[18px]">calendar_today</span>
+                                                <h3 class="text-[13px] font-bold uppercase tracking-wider">Daily Harvests</h3>
+                                            </div>
+                                            <button onclick="generateYieldExcelReport()" class="flex items-center gap-1 px-2.5 py-1.5 bg-secondary/10 dark:bg-emerald-950/40 text-secondary dark:text-emerald-400 border border-secondary/20 dark:border-emerald-800 rounded-lg text-[10px] font-bold active:scale-95 transition-all whitespace-nowrap">
+                                                <span class="material-symbols-outlined text-[14px]">download</span>
+                                                <span>Export Data</span>
+                                            </button>
                                         </div>
                                         <div id="yield-daily-list" class="space-y-2 max-h-[300px] overflow-y-auto pr-1 -mr-1 custom-scrollbar">
                                             <p class="text-[12px] text-on-surface-variant dark:text-zinc-500 italic text-center py-4">Loading harvest data...</p>
