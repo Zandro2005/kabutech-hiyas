@@ -2569,23 +2569,7 @@
                                         </div>
                                     </div>
                                     
-                                    <!-- Daily Harvest Breakdown -->
-                                    <div class="bg-surface-container-lowest dark:bg-zinc-900 rounded-2xl p-4 border border-muted dark:border-zinc-800 shadow-sm">
-                                        <div class="flex items-center justify-between mb-3">
-                                            <div class="flex items-center gap-1.5 text-brand-deep dark:text-primary-fixed">
-                                                <span class="material-symbols-outlined text-[18px]">calendar_today</span>
-                                                <h3 class="text-[13px] font-bold uppercase tracking-wider">Daily Harvests</h3>
-                                            </div>
-                                            <button onclick="generateYieldExcelReport()" class="flex items-center gap-1 px-2.5 py-1.5 bg-secondary/10 dark:bg-emerald-950/40 text-secondary dark:text-emerald-400 border border-secondary/20 dark:border-emerald-800 rounded-lg text-[10px] font-bold active:scale-95 transition-all whitespace-nowrap">
-                                                <span class="material-symbols-outlined text-[14px]">download</span>
-                                                <span>Export Data</span>
-                                            </button>
-                                        </div>
-                                        <div id="yield-daily-list" class="space-y-2 max-h-[300px] overflow-y-auto pr-1 -mr-1 custom-scrollbar">
-                                            <p class="text-[12px] text-on-surface-variant dark:text-zinc-500 italic text-center py-4">Loading harvest data...</p>
-                                        </div>
-                                    </div>
-                                </div>
+                                    <!-- Daily Harvest Breakdown (Moved to Carousel) -->                                </div>
 
                                 <!-- Right Column: Graph & Pinpoint details -->
                                 <div class="space-y-4" id="yield-col-right">
@@ -2614,6 +2598,10 @@
                                             <!-- Period tabs -->
                                             <div
                                                 class="flex items-center gap-1 bg-surface-soft dark:bg-zinc-800 rounded-full p-0.5">
+                                                <button id="ya-tab-daily" onclick="switchYieldPeriod('daily')"
+                                                    class="ya-period-tab text-[9px] font-extrabold px-2.5 py-1 rounded-full transition-all duration-200 text-on-surface-variant dark:text-zinc-400">
+                                                    Daily
+                                                </button>
                                                 <button id="ya-tab-monthly" onclick="switchYieldPeriod('monthly')"
                                                     class="ya-period-tab text-[9px] font-extrabold px-2.5 py-1 rounded-full transition-all duration-200 bg-primary text-on-primary dark:bg-primary-container dark:text-white">
                                                     Monthly
@@ -2628,8 +2616,14 @@
                                                 </button>
                                             </div>
                                         </div>
+                                        </div>
 
-                                        <!-- Summary KPI strip -->
+                                        <!-- CAROUSEL WRAPPER -->
+                                        <div class="flex w-full relative overflow-hidden">
+                                            
+                                            <!-- FORECAST CAROUSEL ITEM -->
+                                            <div id="yield-forecast-content" class="w-full shrink-0 transition-transform duration-300 ease-in-out transform translate-x-0 flex flex-col">
+                                                <!-- Summary KPI strip -->
                                         <div class="border-b border-muted dark:border-zinc-800">
                                             <div class="flex items-center gap-1 px-4 pt-2.5 pb-0.5">
                                                 <span
@@ -2757,7 +2751,27 @@
                                                 </div>
                                             </div>
                                         </div>
+                                        <!-- End FORECAST CAROUSEL ITEM -->
+
+                                        <!-- DAILY CAROUSEL ITEM -->
+                                        <div id="yield-daily-content" class="w-full shrink-0 transition-transform duration-300 ease-in-out transform translate-x-0 flex flex-col p-4 bg-surface-container-lowest dark:bg-zinc-900 border-l border-muted dark:border-zinc-800">
+                                            <div class="flex items-center justify-between mb-3">
+                                                <div class="flex items-center gap-1.5 text-brand-deep dark:text-primary-fixed">
+                                                    <span class="material-symbols-outlined text-[18px]">calendar_today</span>
+                                                    <h3 class="text-[13px] font-bold uppercase tracking-wider">Daily Harvests</h3>
+                                                </div>
+                                                <button onclick="generateYieldExcelReport()" class="flex items-center gap-1 px-2.5 py-1.5 bg-secondary/10 dark:bg-emerald-950/40 text-secondary dark:text-emerald-400 border border-secondary/20 dark:border-emerald-800 rounded-lg text-[10px] font-bold active:scale-95 transition-all whitespace-nowrap">
+                                                    <span class="material-symbols-outlined text-[14px]">download</span>
+                                                    <span>Export Data</span>
+                                                </button>
+                                            </div>
+                                            <div id="yield-daily-list" class="space-y-2 max-h-[300px] overflow-y-auto pr-1 -mr-1 custom-scrollbar">
+                                                <p class="text-[12px] text-on-surface-variant dark:text-zinc-500 italic text-center py-4">Loading harvest data...</p>
+                                            </div>
+                                        </div>
+                                        <!-- End DAILY CAROUSEL ITEM -->
                                     </div>
+                                    <!-- End CAROUSEL WRAPPER -->
 
                                     <!-- Pinpoint Detail Panel -->
                                     <div id="ya-pinpoint-panel"
@@ -5718,7 +5732,7 @@
     <script src="./js/features/controls.js"></script>
     <script src="./js/features/schedule.js"></script>
     <script src="./js/features/batches.js?v=2"></script>
-    <script src="./js/features/yield.js?v=5"></script>
+    <script src="./js/features/yield.js?v=6"></script>
     <script src="./js/features/tasks.js"></script>
     <script src="./js/features/alerts.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/xlsx/dist/xlsx.full.min.js"></script>

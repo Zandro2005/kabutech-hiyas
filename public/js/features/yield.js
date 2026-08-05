@@ -183,6 +183,7 @@ let _yaInitDone = false;
 function switchYieldPeriod(period) {
     if (_yaCurPeriod === period && _yaInitDone) return;
     _yaCurPeriod = period;
+    
     // Update tab button styles
     document.querySelectorAll('.ya-period-tab').forEach(btn => {
         const isActive = btn.id === `ya-tab-${period}`;
@@ -191,9 +192,31 @@ function switchYieldPeriod(period) {
                 ? 'bg-primary text-on-primary dark:bg-primary-container dark:text-white'
                 : 'text-on-surface-variant dark:text-zinc-400');
     });
+    
     _yaSelectedIdx = null;
     closeYAPinpoint();
-    renderYieldAnalytics(true);
+
+    const forecastEl = document.getElementById('yield-forecast-content');
+    const dailyEl = document.getElementById('yield-daily-content');
+    const headerTitle = document.querySelector('#yield-analytics-section .text-body-sm.font-bold');
+    const headerSubtitle = document.querySelector('#yield-analytics-section .text-\\[10px\\].font-semibold');
+    
+    if (period === 'daily') {
+        // Slide left to show daily
+        if (forecastEl) forecastEl.classList.add('-translate-x-full');
+        if (dailyEl) dailyEl.classList.add('-translate-x-full');
+        if (headerTitle) headerTitle.innerText = "Daily Harvests Breakdown";
+        if (headerSubtitle) headerSubtitle.innerText = "Detailed log of all recorded yields";
+    } else {
+        // Slide right to show forecast chart
+        if (forecastEl) forecastEl.classList.remove('-translate-x-full');
+        if (dailyEl) dailyEl.classList.remove('-translate-x-full');
+        if (headerTitle) headerTitle.innerText = "Yield Forecast Comparison";
+        if (headerSubtitle) headerSubtitle.innerText = "Historical Actuals vs. Predicted AI Targets";
+        
+        // Render chart
+        renderYieldAnalytics(true);
+    }
 }
 
 function initYieldAnalytics() {
