@@ -5446,3 +5446,10 @@ html.dark #scene-register .dark\:bg-zinc-950 {
         transform: scale(1) translateY(0) rotateX(0deg);
     }
 }
+/* Mobile layout for crop analytics widgets */
+@media (max-width: 767px) {
+    .crop-analytics-grid {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 0.75rem;
+    }
+}
