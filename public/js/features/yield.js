@@ -742,24 +742,27 @@ function generateYieldExcelReport() {
     // Helper to generate headers
     const buildHeaders = (timeLabel) => [
         timeLabel, 
-        "Harvest Count", 
         "Total Yield (kg)", 
-        "Total Yield (g)", 
+        "Harvest Count", 
         "Avg Yield/Harvest (kg)",
-        ...racks.map(r => `[${r}] Yield (kg)`)
+        ...racks.map(r => `[${r}] Yield (kg)`),
+        "Total Yield (g)"
     ];
 
     // Helper to generate a row from map entry
     const buildRow = (key, entry) => {
         const kg = (entry.totalGrams / 1000).toFixed(2);
         const avg = entry.harvestCount ? ((entry.totalGrams / entry.harvestCount) / 1000).toFixed(3) : 0;
-        const row = [key, entry.harvestCount, Number(kg), entry.totalGrams, Number(avg)];
+        const row = [key, Number(kg), entry.harvestCount, Number(avg)];
         
         // Add rack breakdowns
         racks.forEach(r => {
             const rackGrams = entry.racks[r] || 0;
             row.push(Number((rackGrams / 1000).toFixed(2)));
         });
+        
+        // Add total grams at the end
+        row.push(entry.totalGrams);
         return row;
     };
     
@@ -796,7 +799,7 @@ function generateYieldExcelReport() {
     const wsAnnual = XLSX.utils.aoa_to_sheet(annualRows);
 
     // Apply column widths
-    const wscols = [{wch:15}, {wch:15}, {wch:18}, {wch:15}, {wch:22}, ...racks.map(() => ({wch: 16}))];
+    const wscols = [{wch:15}, {wch:18}, {wch:15}, {wch:22}, ...racks.map(() => ({wch: 16})), {wch:15}];
     wsDaily['!cols'] = wscols;
     wsMonthly['!cols'] = wscols;
     wsSemi['!cols'] = wscols;
