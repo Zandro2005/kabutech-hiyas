@@ -210,11 +210,6 @@ function applyRoleNavRestrictions(role) {
         // Hide Add Rack button for staff (read-only)
         const addBatchBtn = document.getElementById('btn-add-batch-inline');
         if (addBatchBtn) addBatchBtn.style.display = 'none';
-        // Hide rack-level edit/delete inside the subpage for staff
-        const editBtn = document.getElementById('rack-detail-edit-btn');
-        if (editBtn) editBtn.style.display = 'none';
-        const deleteBtn = document.getElementById('rack-detail-delete-btn');
-        if (deleteBtn) deleteBtn.style.display = 'none';
     } else {
         adminOnlyNavs.forEach(id => { const el = document.getElementById(id); if (el) el.style.display = 'flex'; });
         adminOnlyTabs.forEach(id => { const el = document.getElementById(id); if (el) el.classList.remove('hidden'); });
@@ -258,11 +253,6 @@ function applyRoleNavRestrictions(role) {
         // Restore Add Rack button for admin
         const addBatchBtn = document.getElementById('btn-add-batch-inline');
         if (addBatchBtn) addBatchBtn.style.display = '';
-        // Restore rack-level edit/delete inside subpage for admin
-        const editBtn = document.getElementById('rack-detail-edit-btn');
-        if (editBtn) editBtn.style.display = '';
-        const deleteBtn = document.getElementById('rack-detail-delete-btn');
-        if (deleteBtn) deleteBtn.style.display = '';
     }
 }
 

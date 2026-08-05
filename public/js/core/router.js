@@ -146,12 +146,6 @@ function triggerTabContentAnimations(tabId) {
 // --- Sub-page slide-in navigation ---
 let _activeSubPage = null;
 
-// ── Rack Detail Subpage ─────────────────────────────────────────────
-let _rackDetailFilter = 'all';
-// Desktop-only bulk selection state
-let _rackDetailSelected = new Set();
-let _rackDetailCurrentRackId = null;
-
 // ────────────────────────────────────────────────────────────────────
 
 function openSubPage(id) {
@@ -197,7 +191,7 @@ const _origSwitchTab = switchTab;
     if (!_st) return;
     window.switchTab = function (tabId) {
         // Close all sub-pages on tab switch
-        ['subpage-alerts', 'subpage-staff-reports', 'subpage-staff-accounts', 'subpage-tasks', 'subpage-logs', 'subpage-rack-detail', 'subpage-live-view', 'subpage-schedule-config'].forEach(id => {
+        ['subpage-alerts', 'subpage-staff-reports', 'subpage-staff-accounts', 'subpage-tasks', 'subpage-logs', 'subpage-live-view', 'subpage-schedule-config'].forEach(id => {
             const p = document.getElementById(id);
             if (p) { p.classList.remove('subpage-open', 'subpage-closing'); }
         });

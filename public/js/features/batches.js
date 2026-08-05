@@ -28,31 +28,28 @@ function initQuickBatchFromSidebar() {
 }
 
 function renderBatches() {
-    const container = document.getElementById('active-batches-list');
-    container.innerHTML = '';
     const racks = state.growBatches;
     const countEl = document.getElementById('grow-log-batch-count');
     const bagEl = document.getElementById('grow-log-bag-count');
+    
+    // Always render the new analytics widgets
+    if (typeof renderCropAnalyticsWidgets === 'function') {
+        renderCropAnalyticsWidgets();
+    }
+    
+    const container = document.getElementById('active-batches-list');
+    if (!container) return; // UI uses widgets only now
+    
+    container.innerHTML = '';
+    
     if (countEl) countEl.textContent = racks.length === 1 ? '1 rack' : `${racks.length} racks`;
     if (bagEl) {
-        const total = racks.reduce((s, r) => s + (r.bags ? r.bags.length : 0), 0);
+        const total = racks.reduce((s, r) => s + (r.bags ? Object.values(r.bags).filter(b => b != null).length : 0), 0);
         bagEl.textContent = total === 1 ? '1 bag' : `${total} bags`;
     }
     if (racks.length === 0) {
         container.innerHTML = `<div class="flex flex-col items-center justify-center py-8 gap-2 text-slate-400 dark:text-zinc-500"><span class="material-symbols-outlined text-[36px]">shelves</span><p class="text-[11px] font-semibold">No racks yet. Add one to start.</p></div>`;
-        // Refresh the detail subpage if open (rack was deleted)
-        if (_activeSubPage === 'subpage-rack-detail') closeSubPage('subpage-rack-detail');
         return;
-    }
-    // Refresh rack detail subpage if it's currently open
-    if (_activeSubPage === 'subpage-rack-detail') {
-        const titleEl = document.getElementById('rack-detail-title');
-        if (titleEl) {
-            const rackName = titleEl.textContent;
-            const rack = racks.find(r => r.rack === rackName);
-            if (rack) renderRackDetailSubpage(rack);
-            else closeSubPage('subpage-rack-detail');
-        }
     }
     
     // Filter out nulls created by manual Firebase array deletions
@@ -71,7 +68,8 @@ function renderBatches() {
         const contaminated = bags.filter(b => b.status === 'Contaminated').length;
         let totalG = bags.reduce((s, b) => s + b.harvestLog.reduce((hs, h) => hs + h.grams, 0), 0);
         if (rack.historicalHarvests) {
-            totalG += rack.historicalHarvests.reduce((s, h) => s + h.grams, 0);
+            const hist = Object.values(rack.historicalHarvests).filter(h => h != null);
+            totalG += hist.reduce((s, h) => s + h.grams, 0);
         }
         const rackFilterKey = `_slotFilter_${rack.id}`;
         const isAdmin = state.currentUser && state.currentUser.role === 'admin';
@@ -170,8 +168,6 @@ function renderBatches() {
                             <span>Set up ${rack.setupDate}</span>
                         </div>
                         <div class="flex items-center gap-2">
-                            <button onclick="event.stopPropagation(); openRackDetailSubpage(${rack.id})"
-                                class="crops-desktop-only crops-metrics-btn">View Full Metrics</button>
                             ${isAdmin ? `
                             <button onclick="event.stopPropagation(); openEditBatchModal(${rack.id})"
                                 title="Edit Rack"
@@ -190,26 +186,6 @@ function renderBatches() {
         const dragHandle = card.querySelector('.drag-handle');
 
         dragHandle.addEventListener('click', e => e.stopPropagation());
-
-        // Click anywhere on the card (except drag handle) → open rack detail subpage
-        // Use pointerdown/pointerup with movement threshold to distinguish taps from scrolls
-        let _cardPointerStart = null;
-        card.addEventListener('pointerdown', (e) => {
-            if (e.target.closest('.drag-handle')) return;
-            if (e.target.closest('button')) return; // let inner buttons handle themselves
-            _cardPointerStart = { x: e.clientX, y: e.clientY };
-        }, { passive: true });
-        card.addEventListener('pointerup', (e) => {
-            if (!_cardPointerStart) return;
-            if (e.target.closest('.drag-handle')) return;
-            if (e.target.closest('button')) return;
-            const dx = Math.abs(e.clientX - _cardPointerStart.x);
-            const dy = Math.abs(e.clientY - _cardPointerStart.y);
-            _cardPointerStart = null;
-            if (dx > 8 || dy > 10) return; // moved too much → was a scroll, not a tap
-            openRackDetailSubpage(rack.id);
-        }, { passive: true });
-        card.addEventListener('pointercancel', () => { _cardPointerStart = null; }, { passive: true });
 
         dragHandle.addEventListener('pointerdown', e => {
             e.preventDefault();
@@ -280,6 +256,10 @@ function renderBatches() {
             document.addEventListener('pointerup', onUp);
         });
     });
+
+    if (typeof renderCropAnalyticsWidgets === 'function') {
+        renderCropAnalyticsWidgets();
+    }
 }
 
 function setSlotFilter(rackId, filter, btn) {
@@ -400,10 +380,15 @@ function openBagActionModal(rackId, bagId) {
                     <!-- Harvest log mini list -->
                     ${bag.harvestLog.length > 0 ? `
                     <div class="max-h-24 overflow-y-auto space-y-1">
-                        ${bag.harvestLog.slice().reverse().map(h => `
-                        <div class="flex justify-between text-[10px] bg-surface-soft dark:bg-zinc-800/50 rounded-lg px-2.5 py-1.5">
+                        ${bag.harvestLog.map((h, originalIndex) => ({ h, originalIndex })).reverse().map(({ h, originalIndex }) => `
+                        <div class="flex justify-between items-center text-[10px] bg-surface-soft dark:bg-zinc-800/50 rounded-lg px-2.5 py-1.5">
                             <span class="text-on-surface-variant dark:text-zinc-400">${h.date}</span>
-                            <span class="font-bold text-success-green dark:text-emerald-400">+${h.grams} g</span>
+                            <div class="flex items-center gap-2">
+                                <span class="font-bold text-success-green dark:text-emerald-400">+${h.grams} g</span>
+                                <button onclick="deleteHarvestLog(${rackId}, ${bagId}, ${originalIndex})" class="w-6 h-6 flex items-center justify-center text-slate-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/30 rounded-md transition-colors" title="Delete this harvest record">
+                                    <span class="material-symbols-outlined text-[15px]">delete</span>
+                                </button>
+                            </div>
                         </div>`).join('')}
                     </div>` : ''}
                     <!-- Actions -->
@@ -603,6 +588,35 @@ function saveBagEdit(rackId, bagId) {
     document.getElementById('modal-bag-edit').remove();
     saveBatches(); renderBatches();
     showToast(`Slot ${bagId} updated.`, 'success');
+}
+
+// Delete a specific harvest log entry
+function deleteHarvestLog(rackId, bagId, index) {
+    const rack = state.growBatches.find(r => r.id === rackId);
+    if (!rack) return;
+    const bag = rack.bags.find(b => b.id === bagId);
+    if (!bag || !bag.harvestLog || !bag.harvestLog[index]) return;
+
+    showConfirm({
+        title: 'Delete Harvest Record?',
+        body: `Are you sure you want to delete this ${bag.harvestLog[index].grams}g harvest on ${bag.harvestLog[index].date} from Slot ${bagId}? This cannot be undone.`,
+        icon: 'delete', iconBg: 'bg-red-100 dark:bg-red-950/40', iconColor: 'text-red-500',
+        okLabel: 'Delete', okIcon: 'delete', okBg: 'bg-red-500 hover:bg-red-600',
+        onConfirm: () => {
+            bag.harvestLog.splice(index, 1);
+            saveBatches();
+            renderBatches();
+            
+            // Re-render modal if it's still open
+            const existingModal = document.getElementById('modal-bag-action');
+            if (existingModal) {
+                existingModal.remove();
+                openBagActionModal(rackId, bagId);
+            }
+            
+            showToast('Harvest record deleted.', 'info');
+        }
+    });
 }
 
 // Open harvest modal for a specific bag slot
@@ -920,458 +934,3 @@ function submitAddBatch(e) {
     showToast(`${rackName} added with ${slots} bag slots.`, 'success');
 }
 
-function openRackDetailSubpage(rackId) {
-    const rack = state.growBatches.find(r => r.id === rackId);
-    if (!rack) return;
-    _rackDetailFilter = 'all';
-    _rackDetailSelected = new Set();
-    _rackDetailCurrentRackId = rackId;
-    renderRackDetailSubpage(rack);
-    openSubPage('subpage-rack-detail');
-}
-
-function renderRackDetailSubpage(rack) {
-    const bags = rack.bags || [];
-    const activeBags = bags.filter(b => b.status === 'Active').length;
-    const replaced = bags.filter(b => b.status === 'Replaced').length;
-    const contaminated = bags.filter(b => b.status === 'Contaminated').length;
-    const emptySlots = bags.filter(b => b.status === 'Empty').length;
-    let totalG = bags.reduce((s, b) => s + b.harvestLog.reduce((hs, h) => hs + h.grams, 0), 0);
-    if (rack.historicalHarvests) {
-        totalG += rack.historicalHarvests.reduce((s, h) => s + h.grams, 0);
-    }
-
-    _rackDetailCurrentRackId = rack.id;
-
-    document.getElementById('rack-detail-title').textContent = rack.rack;
-
-    const pillsEl = document.getElementById('rack-detail-pills');
-    pillsEl.innerHTML = [
-        { label: activeBags + ' Active', cls: 'bg-white/20 text-white' },
-        { label: replaced + ' Replaced', cls: 'bg-white/15 text-white/80' },
-        contaminated > 0 ? { label: contaminated + ' Flagged \u26A0', cls: 'bg-red-500/70 text-white' } : null,
-        emptySlots > 0 ? { label: emptySlots + ' Empty', cls: 'bg-white/10 text-white/60' } : null,
-        { label: rack.substrate, cls: 'bg-white/15 text-white/80' },
-    ].filter(Boolean).map(p =>
-        '<span class="text-[11px] font-bold px-3 py-1 rounded-full ' + p.cls + '">' + p.label + '</span>'
-    ).join('');
-
-    // Desktop-only: environment status badge (Stable vs Needs Attention)
-    const statusBadge = document.getElementById('rd-status-badge');
-    if (statusBadge) {
-        if (contaminated > 0) {
-            statusBadge.className = 'rd-desktop-only rd-attention items-center gap-1 text-[10px] font-extrabold uppercase tracking-wide px-2.5 py-1 rounded-full mb-1';
-            statusBadge.innerHTML = '<span class="material-symbols-outlined text-[12px]">warning</span>Needs Attention';
-        } else {
-            statusBadge.className = 'rd-desktop-only rd-stable items-center gap-1 text-[10px] font-extrabold uppercase tracking-wide px-2.5 py-1 rounded-full mb-1';
-            statusBadge.innerHTML = '\u25CF Stable Environment';
-        }
-    }
-
-    // Desktop-only: header info chips
-    const infoSubstrate = document.getElementById('rd-info-substrate');
-    const infoSetup = document.getElementById('rd-info-setup');
-    if (infoSubstrate) infoSubstrate.textContent = rack.substrate;
-    if (infoSetup) infoSetup.textContent = rack.setupDate;
-
-    // Desktop-only: Substrate Slots card badges
-    const badgeAll = document.getElementById('rd-badge-all');
-    const badgeEmpty = document.getElementById('rd-badge-empty');
-    if (badgeAll) badgeAll.textContent = 'ALL ' + bags.length;
-    if (badgeEmpty) badgeEmpty.textContent = 'EMPTY ' + emptySlots;
-
-    _renderRackDetailChips(rack.id, bags, replaced, contaminated);
-    renderRackDetailSlotGrid(rack, _rackDetailFilter);
-    updateRackDetailBulkUI();
-
-    document.getElementById('rack-detail-total-yield').textContent = totalG + ' g total';
-
-    const harvestsEl = document.getElementById('rack-detail-harvests');
-    
-    // Inject Tab Buttons if historical data exists
-    let tabsContainer = document.getElementById('rack-detail-harvest-tabs');
-    if (!tabsContainer) {
-        tabsContainer = document.createElement('div');
-        tabsContainer.id = 'rack-detail-harvest-tabs';
-        harvestsEl.parentNode.insertBefore(tabsContainer, harvestsEl);
-    }
-    if (rack.historicalHarvests && rack.historicalHarvests.length > 0) {
-        tabsContainer.innerHTML = `
-            <div class="flex items-center gap-2 mb-2">
-                <button id="btn-harvests-current" class="px-3 py-1 rounded-lg text-[11px] font-bold transition-all ${!window._currentHarvestTabIsHistory ? 'bg-primary text-white' : 'bg-slate-100 dark:bg-zinc-800 text-slate-600 dark:text-zinc-400 hover:bg-slate-200 dark:hover:bg-zinc-700'}">Current</button>
-                <button id="btn-harvests-history" class="px-3 py-1 rounded-lg text-[11px] font-bold transition-all ${window._currentHarvestTabIsHistory ? 'bg-primary text-white' : 'bg-slate-100 dark:bg-zinc-800 text-slate-600 dark:text-zinc-400 hover:bg-slate-200 dark:hover:bg-zinc-700'}">History (Archived)</button>
-            </div>
-        `;
-    } else {
-        tabsContainer.innerHTML = '';
-        window._currentHarvestTabIsHistory = false;
-    }
-
-    function drawHarvests() {
-        const isHistory = window._currentHarvestTabIsHistory;
-        let aggregatedHarvests = [];
-
-        if (isHistory) {
-            const histMap = {};
-            (rack.historicalHarvests || []).forEach(h => {
-                if (!histMap[h.slot]) histMap[h.slot] = { slot: h.slot, grams: 0, count: 0, lastDate: h.date };
-                histMap[h.slot].grams += h.grams;
-                histMap[h.slot].count++;
-                if (new Date(h.date) > new Date(histMap[h.slot].lastDate)) histMap[h.slot].lastDate = h.date;
-            });
-            aggregatedHarvests = Object.values(histMap).sort((a, b) => b.grams - a.grams);
-        } else {
-            aggregatedHarvests = bags
-                .filter(b => b.harvestLog.length > 0)
-                .map(b => {
-                    const grams = b.harvestLog.reduce((s, h) => s + h.grams, 0);
-                    const count = b.harvestLog.length;
-                    const lastDate = b.harvestLog[b.harvestLog.length - 1].date;
-                    return { slot: b.id, grams, count, lastDate };
-                })
-                .sort((a, b) => b.grams - a.grams);
-        }
-
-        if (aggregatedHarvests.length) {
-            const half = Math.ceil(aggregatedHarvests.length / 2);
-            const leftHarvests = aggregatedHarvests.slice(0, half);
-            const rightHarvests = aggregatedHarvests.slice(half);
-
-            const renderRow = (h) => `
-                <div class="flex items-center justify-between border-b border-slate-100/60 dark:border-zinc-700/30 py-1.5 last:border-0 group ${!isHistory ? `cursor-pointer" onclick="openBagActionModal(${rack.id}, ${h.slot})"` : 'cursor-default"'} >
-                    <div class="flex items-center gap-2">
-                       <div class="w-[20px] h-[20px] rounded-md bg-primary/10 dark:bg-emerald-950/30 text-primary dark:text-emerald-400 flex items-center justify-center font-extrabold text-[10px] shadow-sm">${h.slot}</div>
-                       <span class="text-[9px] font-bold text-slate-400 dark:text-zinc-500">${h.count}x</span>
-                    </div>
-                    <div class="flex flex-col items-end justify-center">
-                        <span class="text-[11px] font-extrabold text-success-green dark:text-emerald-400 group-hover:scale-105 inline-block transition-transform transform origin-right">+${h.grams}g</span>
-                        <span class="text-[8px] font-medium text-slate-400 dark:text-zinc-500">${h.lastDate.substring(5).replace('-', '/')}</span>
-                    </div>
-                </div>`;
-
-            harvestsEl.className = ""; // clear previous classes
-            harvestsEl.innerHTML = `
-            <div class="w-full border border-slate-100 dark:border-zinc-700/50 rounded-xl bg-white dark:bg-zinc-900/40 shadow-sm flex flex-col overflow-hidden">
-                <div class="grid grid-cols-2 px-3 py-1.5 bg-slate-50/80 dark:bg-zinc-800/30 border-b border-slate-100 dark:border-zinc-700/50 items-center">
-                    <div class="flex justify-between items-center" style="padding-right: 20px;">
-                        <span class="text-[8px] font-extrabold text-slate-500 dark:text-zinc-400 uppercase tracking-wider">Slot</span>
-                        <span class="text-[8px] font-extrabold text-slate-500 dark:text-zinc-400 uppercase tracking-wider">Yield</span>
-                    </div>
-                    <div class="flex justify-between items-center border-l-2 border-slate-200 dark:border-zinc-600" style="padding-left: 20px;">
-                        <span class="text-[8px] font-extrabold text-slate-500 dark:text-zinc-400 uppercase tracking-wider">Slot</span>
-                        <span class="text-[8px] font-extrabold text-slate-500 dark:text-zinc-400 uppercase tracking-wider">Yield</span>
-                    </div>
-                </div>
-                <div class="overflow-y-auto overscroll-contain max-h-[160px]" style="-webkit-overflow-scrolling: touch;">
-                    <div class="grid grid-cols-2 px-3">
-                        <div class="flex flex-col" style="padding-right: 20px;">
-                            ${leftHarvests.map(renderRow).join('')}
-                        </div>
-                        <div class="flex flex-col border-l-2 border-slate-200 dark:border-zinc-600" style="padding-left: 20px;">
-                            ${rightHarvests.map(renderRow).join('')}
-                        </div>
-                    </div>
-                </div>
-            </div>`;
-        } else {
-            harvestsEl.className = "space-y-2";
-            harvestsEl.innerHTML = '<p class="text-[12px] text-slate-400 dark:text-zinc-500 text-center py-5">No ' + (isHistory ? 'historical ' : '') + 'harvests recorded yet.</p>';
-        }
-    }
-
-    drawHarvests();
-
-    const btnCurr = document.getElementById('btn-harvests-current');
-    const btnHist = document.getElementById('btn-harvests-history');
-    if (btnCurr && btnHist) {
-        btnCurr.onclick = () => { window._currentHarvestTabIsHistory = false; renderRackDetailSubpage(rack); };
-        btnHist.onclick = () => { window._currentHarvestTabIsHistory = true; renderRackDetailSubpage(rack); };
-    }
-
-    document.getElementById('rack-detail-setup-date').textContent = 'Set up: ' + rack.setupDate;
-    document.getElementById('rack-detail-edit-btn').onclick = function () { closeSubPage('subpage-rack-detail'); setTimeout(function () { openEditBatchModal(rack.id); }, 360); };
-    document.getElementById('rack-detail-delete-btn').onclick = function () { closeSubPage('subpage-rack-detail'); setTimeout(function () { removeRack(rack.id); }, 360); };
-
-    // Show/hide edit & delete based on role (admin only)
-    const isAdmin = state.currentUser && state.currentUser.role === 'admin';
-    const editBtn = document.getElementById('rack-detail-edit-btn');
-    const deleteBtn = document.getElementById('rack-detail-delete-btn');
-    if (editBtn) editBtn.style.display = isAdmin ? '' : 'none';
-    if (deleteBtn) deleteBtn.style.display = isAdmin ? '' : 'none';
-}
-
-function _renderRackDetailChips(rackId, bags, replaced, contaminated) {
-    const emptyCount = bags.filter(b => b.status === 'Empty').length;
-    const filters = [
-        { key: 'all', label: 'All', count: bags.length },
-        { key: 'active', label: 'Active', count: bags.filter(b => b.status === 'Active' && b.harvestLog.length === 0).length },
-        { key: 'harvested', label: 'Harvested', count: bags.filter(b => b.status === 'Active' && b.harvestLog.length > 0).length },
-        { key: 'replaced', label: 'Replaced', count: replaced },
-        { key: 'contaminated', label: 'Flagged', count: contaminated },
-        { key: 'empty', label: 'Empty', count: emptyCount },
-    ];
-    const chipsEl = document.getElementById('rack-detail-filter-chips');
-    chipsEl.innerHTML = filters.map(function (f) {
-        if (f.key !== 'all' && f.count === 0) return ''; // hide zero-count chips
-        const isActive = f.key === _rackDetailFilter;
-        const isContam = f.key === 'contaminated';
-        const isEmpty = f.key === 'empty';
-        const cls = isActive
-            ? (isContam ? 'bg-red-500 text-white border-red-500' : isEmpty ? 'bg-slate-500 text-white border-slate-500' : 'bg-primary text-white border-primary')
-            : (isContam && f.count > 0 ? 'text-red-500 dark:text-red-400 bg-red-50 dark:bg-red-950/30 border-red-300 dark:border-red-700' : isEmpty && f.count > 0 ? 'text-slate-500 dark:text-zinc-400 bg-slate-50 dark:bg-zinc-800 border-slate-300 dark:border-zinc-600' : 'text-on-surface-variant dark:text-zinc-400 bg-surface-soft dark:bg-zinc-800 border-outline-variant dark:border-zinc-700');
-        return '<button onclick="setRackDetailFilter(' + rackId + ',\'' + f.key + '\')" class="text-[10px] font-bold px-2.5 py-1 rounded-full border transition-all ' + cls + '">' + f.label + ' <span class="opacity-70">' + f.count + '</span></button>';
-    }).join('');
-}
-
-// Shared filter predicate — used by both the slot grid and the bulk
-// "Select All" logic so they always agree on what's "currently visible".
-function _rackDetailMatchesFilter(bag, filter) {
-    if (filter === 'all') return true;
-    if (filter === 'active') return bag.status === 'Active' && bag.harvestLog.length === 0;
-    if (filter === 'harvested') return bag.status === 'Active' && bag.harvestLog.length > 0;
-    if (filter === 'replaced') return bag.status === 'Replaced';
-    if (filter === 'contaminated') return bag.status === 'Contaminated';
-    if (filter === 'empty') return bag.status === 'Empty';
-    return true;
-}
-
-function renderRackDetailSlotGrid(rack, filter) {
-    const bags = rack.bags || [];
-    const filtered = bags.filter(function (bag) { return _rackDetailMatchesFilter(bag, filter); });
-    const grid = document.getElementById('rack-detail-slot-grid');
-    if (!filtered.length) {
-        grid.innerHTML = '<p class="text-[12px] text-slate-400 dark:text-zinc-500 text-center w-full py-6">No slots match this filter.</p>';
-        return;
-    }
-    grid.innerHTML = filtered.map(function (bag) {
-        const isSelected = _rackDetailSelected.has(bag.id);
-        // Desktop-only bulk-select checkbox overlay — stops propagation so the
-        // slot's own click (which opens the bag action modal) still fires normally.
-        const checkHtml = '<label class="rd-slot-check" onclick="event.stopPropagation()">' +
-            '<input type="checkbox" ' + (isSelected ? 'checked' : '') + ' onchange="toggleRackDetailSlotSelect(' + bag.id + ', this)"></label>';
-        let color, textColor, label, borderCls;
-        if (bag.status === 'Empty') {
-            return '<div onclick="openBagActionModal(' + rack.id + ',' + bag.id + ')" class="rack-slot-btn' + (isSelected ? ' rd-selected' : '') + ' bg-surface-soft dark:bg-zinc-800/40 border-2 border-dashed border-slate-300 dark:border-zinc-600 opacity-70 hover:opacity-100">' +
-                checkHtml +
-                '<span class="material-symbols-outlined text-[18px] text-slate-400 dark:text-zinc-500">add</span>' +
-                '<span class="text-[8px] font-semibold text-slate-400 dark:text-zinc-500 leading-none text-center">' + bag.id + '</span>' +
-                '</div>';
-        }
-        if (bag.status === 'Replaced') { color = 'bg-slate-200 dark:bg-zinc-700'; textColor = 'text-slate-500 dark:text-white'; label = 'Replaced'; borderCls = 'border-slate-300 dark:border-zinc-600'; }
-        else if (bag.status === 'Contaminated') { color = 'bg-red-100 dark:bg-red-950/60'; textColor = 'text-red-600 dark:text-white'; label = 'Flagged'; borderCls = 'border-red-300 dark:border-red-800'; }
-        else if (bag.harvestLog.length > 0) { color = 'bg-amber-100 dark:bg-amber-950/50'; textColor = 'text-amber-700 dark:text-white'; label = bag.harvestLog.length + '\u00D7'; borderCls = 'border-amber-300 dark:border-amber-800'; }
-        else { color = 'bg-primary/10 dark:bg-zinc-800 rack-slot-active'; textColor = 'text-primary dark:text-white'; label = 'Active'; borderCls = 'border-primary/20 dark:border-zinc-700'; }
-        return '<div onclick="openBagActionModal(' + rack.id + ',' + bag.id + ')" class="rack-slot-btn' + (isSelected ? ' rd-selected' : '') + ' ' + color + ' ' + borderCls + '">' +
-            checkHtml +
-            '<span class="text-[12px] font-extrabold ' + textColor + '">' + bag.id + '</span>' +
-            '<span class="text-[10px] font-semibold ' + textColor + ' leading-none text-center">' + label + '</span>' +
-            '</div>';
-    }).join('');
-}
-
-function setRackDetailFilter(rackId, filter) {
-    _rackDetailFilter = filter;
-    const rack = state.growBatches.find(r => r.id === rackId);
-    if (!rack) return;
-    const bags = rack.bags || [];
-    const replaced = bags.filter(b => b.status === 'Replaced').length;
-    const contaminated = bags.filter(b => b.status === 'Contaminated').length;
-    _renderRackDetailChips(rackId, bags, replaced, contaminated);
-    renderRackDetailSlotGrid(rack, filter);
-    updateRackDetailBulkUI();
-}
-
-// ── Rack Detail: Bulk selection & Bulk Action (desktop) ─────────────
-function toggleRackDetailSlotSelect(bagId, checkboxEl) {
-    if (checkboxEl.checked) _rackDetailSelected.add(bagId);
-    else _rackDetailSelected.delete(bagId);
-    const slotEl = checkboxEl.closest('.rack-slot-btn');
-    if (slotEl) slotEl.classList.toggle('rd-selected', checkboxEl.checked);
-    updateRackDetailBulkUI();
-}
-
-function toggleRackDetailSelectAll(cb) {
-    const rack = state.growBatches.find(r => r.id === _rackDetailCurrentRackId);
-    if (!rack) return;
-    const filtered = (rack.bags || []).filter(b => _rackDetailMatchesFilter(b, _rackDetailFilter));
-    filtered.forEach(function (b) {
-        if (cb.checked) _rackDetailSelected.add(b.id);
-        else _rackDetailSelected.delete(b.id);
-    });
-    renderRackDetailSlotGrid(rack, _rackDetailFilter);
-    updateRackDetailBulkUI();
-}
-
-function updateRackDetailBulkUI() {
-    const btn = document.getElementById('rd-bulk-action-btn');
-    const selectAllCb = document.getElementById('rd-select-all-cb');
-    if (!btn) return;
-    const count = _rackDetailSelected.size;
-    btn.disabled = count === 0;
-    btn.innerHTML = '<span class="material-symbols-outlined text-[15px]">bolt</span>Bulk Action' + (count > 0 ? ' (' + count + ')' : '');
-    if (selectAllCb) {
-        const rack = state.growBatches.find(r => r.id === _rackDetailCurrentRackId);
-        if (rack) {
-            const filtered = (rack.bags || []).filter(b => _rackDetailMatchesFilter(b, _rackDetailFilter));
-            const allSelected = filtered.length > 0 && filtered.every(b => _rackDetailSelected.has(b.id));
-            const someSelected = filtered.some(b => _rackDetailSelected.has(b.id));
-            selectAllCb.checked = allSelected;
-            selectAllCb.indeterminate = someSelected && !allSelected;
-        } else {
-            selectAllCb.checked = false;
-            selectAllCb.indeterminate = false;
-        }
-    }
-    if (count === 0) closeRackDetailBulkMenu();
-}
-
-function toggleRackDetailBulkMenu(e) {
-    if (e) e.stopPropagation();
-    const menu = document.getElementById('rd-bulk-menu');
-    if (!menu) return;
-    if (_rackDetailSelected.size === 0) { showToast('Select at least one slot first.', 'info'); return; }
-    if (menu.classList.contains('hidden')) {
-        const rack = state.growBatches.find(r => r.id === _rackDetailCurrentRackId);
-        const selectedIds = Array.from(_rackDetailSelected);
-        const eligibleCounts = { harvest: 0, harvest_plant: 0, replaced: 0, contaminated: 0, empty: 0 };
-        
-        if (rack) {
-            selectedIds.forEach(function (id) {
-                const bag = rack.bags.find(b => b.id === id);
-                if (!bag) return;
-                if (bag.status === 'Active') { eligibleCounts.harvest++; eligibleCounts.replaced++; }
-                if (bag.status !== 'Contaminated') eligibleCounts.harvest_plant++;
-                if (bag.status !== 'Empty' && bag.status !== 'Contaminated') eligibleCounts.contaminated++;
-                if (bag.status !== 'Empty') eligibleCounts.empty++;
-            });
-        }
-
-        menu.innerHTML = [
-            { key: 'harvest', icon: 'grocery', label: 'Log Harvest for Selected', eligible: eligibleCounts.harvest },
-            { key: 'harvest_plant', icon: 'compost', label: 'Plant / Replant Selected', eligible: eligibleCounts.harvest_plant },
-            { key: 'replaced', icon: 'swap_horiz', label: 'Mark as Replaced', eligible: eligibleCounts.replaced },
-            { key: 'contaminated', icon: 'bug_report', label: 'Flag as Contaminated', danger: true, eligible: eligibleCounts.contaminated },
-            { key: 'empty', icon: 'delete', label: 'Clear Slots (Empty)', danger: true, eligible: eligibleCounts.empty },
-        ].map(function (a) {
-            const disabled = a.eligible === 0;
-            const label = a.label + (!disabled && a.eligible < selectedIds.length ? ' (' + a.eligible + ' valid)' : '');
-            return '<button class="' + (a.danger ? 'rd-danger' : '') + (disabled ? ' rd-bulk-menu-btn-disabled' : '') + '" onclick="rackDetailBulkApply(\'' + a.key + '\')"' +
-                (disabled ? ' title="No valid slots selected for this action"' : '') +
-                '><span class="material-symbols-outlined text-[16px]">' + a.icon + '</span>' + label + '</button>';
-        }).join('');
-        menu.classList.remove('hidden');
-        setTimeout(function () { document.addEventListener('click', _rackDetailBulkMenuOutsideClick); }, 0);
-    } else {
-        closeRackDetailBulkMenu();
-    }
-}
-
-function closeRackDetailBulkMenu() {
-    const menu = document.getElementById('rd-bulk-menu');
-    if (menu) menu.classList.add('hidden');
-    document.removeEventListener('click', _rackDetailBulkMenuOutsideClick);
-}
-
-function _rackDetailBulkMenuOutsideClick(e) {
-    const menu = document.getElementById('rd-bulk-menu');
-    const btn = document.getElementById('rd-bulk-action-btn');
-    if (!menu || menu.classList.contains('hidden')) return;
-    if (menu.contains(e.target) || (btn && btn.contains(e.target))) return;
-    closeRackDetailBulkMenu();
-}
-
-// "Mark as Replaced" bulk action — only ever runs on ids that were
-// already filtered down to Active slots by rackDetailBulkApply().
-function rackDetailBulkApplyReplaced(rack, eligibleIds, skipped) {
-    const body = eligibleIds.length + ' slot(s) will be marked Replaced and their harvest history cleared.' +
-        (skipped > 0 ? ' (' + skipped + ' selected slot(s) skipped — no active plant.)' : '');
-    showConfirm({
-        title: 'Mark Selected Slots as Replaced?',
-        body: body,
-        icon: 'swap_horiz', okLabel: 'Mark Replaced', okBg: 'bg-primary hover:bg-primary/90',
-        iconBg: 'bg-primary/10 dark:bg-emerald-950/40', iconColor: 'text-primary dark:text-emerald-400',
-        onConfirm: function () {
-            let applied = 0;
-            eligibleIds.forEach(function (bagId) {
-                const bag = rack.bags.find(b => b.id === bagId);
-                if (!bag) return;
-                bag.status = 'Replaced';
-                archiveHarvestLog(rack, bag);
-                applied++;
-            });
-            _rackDetailSelected.clear();
-            saveBatches(); renderBatches();
-            const openRack = state.growBatches.find(r => r.id === rack.id);
-            if (openRack) renderRackDetailSubpage(openRack);
-            addLog('Bulk action "Mark Replaced" applied to ' + applied + ' slot(s) on ' + rack.rack + '.', 'success');
-            showToast('Mark Replaced applied to ' + applied + ' slot(s).', 'success');
-        }
-    });
-}
-
-function rackDetailBulkApply(action) {
-    const rack = state.growBatches.find(r => r.id === _rackDetailCurrentRackId);
-    if (!rack) return;
-    const ids = Array.from(_rackDetailSelected);
-    if (!ids.length) return;
-    closeRackDetailBulkMenu();
-
-    const eligibleIds = ids.filter(function (bagId) {
-        const bag = rack.bags.find(b => b.id === bagId);
-        if (!bag) return false;
-        if (action === 'harvest' || action === 'replaced') return bag.status === 'Active';
-        if (action === 'harvest_plant') return bag.status !== 'Contaminated';
-        if (action === 'contaminated') return bag.status !== 'Empty' && bag.status !== 'Contaminated';
-        if (action === 'empty') return bag.status !== 'Empty';
-        return true;
-    });
-
-    const skipped = ids.length - eligibleIds.length;
-    if (eligibleIds.length === 0) {
-        showToast('None of the selected slots are valid for this action.', 'info');
-        return;
-    }
-
-    if (action === 'harvest') {
-        openBulkHarvestModal(eligibleIds, rack, skipped);
-        return;
-    }
-    if (action === 'replaced') {
-        rackDetailBulkApplyReplaced(rack, eligibleIds, skipped);
-        return;
-    }
-
-    const actionMeta = {
-        harvest_plant: { title: 'Plant / Replant Selected Slots?', body: eligibleIds.length + ' slot(s) will be set to a fresh Active bag. Any existing history will be archived.' + (skipped > 0 ? ' (' + skipped + ' flagged slot(s) skipped)' : ''), icon: 'compost', okLabel: 'Plant / Replant', okBg: 'bg-primary hover:bg-primary/90', iconBg: 'bg-primary/10 dark:bg-emerald-950/40', iconColor: 'text-primary dark:text-emerald-400', logType: 'success' },
-        contaminated: { title: 'Flag Selected Slots as Contaminated?', body: eligibleIds.length + ' slot(s) will be flagged contaminated. You can replant them after removal.' + (skipped > 0 ? ' (' + skipped + ' empty/flagged slot(s) skipped)' : ''), icon: 'bug_report', okLabel: 'Flag Slots', okBg: 'bg-red-500 hover:bg-red-600', iconBg: 'bg-red-100 dark:bg-red-950/40', iconColor: 'text-red-500', logType: 'error' },
-        empty: { title: 'Clear Selected Slots?', body: eligibleIds.length + ' slot(s) will be emptied and their data cleared. This cannot be undone.' + (skipped > 0 ? ' (' + skipped + ' already empty slot(s) skipped)' : ''), icon: 'delete_forever', okLabel: 'Clear Slots', okBg: 'bg-red-600 hover:bg-red-700', iconBg: 'bg-red-100 dark:bg-red-950/40', iconColor: 'text-red-500', logType: 'warning' },
-    }[action];
-    if (!actionMeta) return;
-
-    showConfirm({
-        title: actionMeta.title,
-        body: actionMeta.body,
-        icon: actionMeta.icon, iconBg: actionMeta.iconBg, iconColor: actionMeta.iconColor,
-        okLabel: actionMeta.okLabel, okIcon: actionMeta.icon, okBg: actionMeta.okBg,
-        onConfirm: function () {
-            let applied = 0;
-            eligibleIds.forEach(function (bagId) {
-                const bag = rack.bags.find(b => b.id === bagId);
-                if (!bag) return;
-                if (action === 'harvest_plant') { bag.status = 'Active'; archiveHarvestLog(rack, bag); bag.plantedDate = new Date().toLocaleDateString('en-CA'); }
-                else if (action === 'contaminated') { bag.status = 'Contaminated'; }
-                else if (action === 'empty') { bag.status = 'Empty'; archiveHarvestLog(rack, bag); bag.substrate = null; bag.plantedDate = null; bag.notes = null; }
-                applied++;
-            });
-            _rackDetailSelected.clear();
-            saveBatches(); renderBatches();
-            const openRack = state.growBatches.find(r => r.id === _rackDetailCurrentRackId);
-            if (openRack) renderRackDetailSubpage(openRack);
-            addLog('Bulk action "' + actionMeta.okLabel + '" applied to ' + applied + ' slot(s) on ' + rack.rack + '.', actionMeta.logType);
-            showToast(actionMeta.okLabel + ' applied to ' + applied + ' slot(s).', actionMeta.logType === 'error' ? 'warning' : actionMeta.logType);
-            if (action === 'contaminated') {
-                triggerSystemAlert('Contamination flagged: ' + rack.rack, applied + ' slot(s) in ' + rack.rack + ' flagged for contamination via bulk action.', 'warning');
-            }
-        }
-    });
-}
