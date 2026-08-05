@@ -133,7 +133,7 @@ function runSimulationTick() {
 const SENSOR_CONFIGS = [
     { key: 'temp', getVal: () => state.currentTemp, decimals: 1, suffix: '\u00B0C' },
     { key: 'humidity', getVal: () => state.currentHumidity, decimals: 0, suffix: '%' },
-    { key: 'light', getVal: () => state.currentLight, decimals: 0, suffix: ' \u00B5mol' },
+    { key: 'light', getVal: () => state.currentLight, decimals: 0, suffix: ' Lux' },
     { key: 'co2', getVal: () => state.currentCO2, decimals: 0, suffix: ' ppm' }
 ];
 

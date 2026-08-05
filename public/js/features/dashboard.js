@@ -46,7 +46,7 @@ function updateCropsHealthPanel() {
     setMetric('crops-health-co2-fill', 'crops-health-co2',
         (co2 / 1500) * 100, Math.round(co2) + ' ppm', co2Level);
     setMetric('crops-health-light-fill', 'crops-health-light',
-        (l / 1000) * 100, Math.round(l) + ' \u00B5mol', lightLevel);
+        (l / 1000) * 100, Math.round(l) + ' Lux', lightLevel);
 
     // Roll the four metrics up into one overall status line
     const levels = [tempLevel, humLevel, co2Level, lightLevel];

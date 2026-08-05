@@ -240,7 +240,7 @@ function updateLightSetpoint(val) {
     if (typeof updateRadialGauges === 'function') updateRadialGauges();
     _debouncedSetpoint('light', () => {
         saveSetpoints();
-        showToast(`Light target set to ${state.lightSetpoint} µmol`, 'info');
+        showToast(`Light target set to ${state.lightSetpoint} Lux`, 'info');
     });
 }
 
