@@ -742,9 +742,9 @@ function generateYieldExcelReport() {
     // Helper to generate headers
     const buildHeaders = (timeLabel) => [
         timeLabel, 
-        "Total Yield (kg)", 
+        "Harvest Count",
         "Total Yield (g)", 
-        "Harvest Count", 
+        "Total Yield (kg)", 
         "Avg Yield/Harvest (kg)",
         ...racks.map(r => `[${r}] Yield (kg)`)
     ];
@@ -753,7 +753,14 @@ function generateYieldExcelReport() {
     const buildRow = (key, entry) => {
         const kg = (entry.totalGrams / 1000).toFixed(2);
         const avg = entry.harvestCount ? ((entry.totalGrams / entry.harvestCount) / 1000).toFixed(3) : 0;
-        const row = [key, Number(kg), entry.totalGrams, entry.harvestCount, Number(avg)];
+        
+        const row = [
+            key, 
+            entry.harvestCount, 
+            entry.totalGrams, 
+            Number(kg), 
+            Number(avg)
+        ];
         
         // Add rack breakdowns
         racks.forEach(r => {
