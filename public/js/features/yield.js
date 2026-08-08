@@ -183,7 +183,6 @@ let _yaInitDone = false;
 function switchYieldPeriod(period) {
     if (_yaCurPeriod === period && _yaInitDone) return;
     _yaCurPeriod = period;
-    
     // Update tab button styles
     document.querySelectorAll('.ya-period-tab').forEach(btn => {
         const isActive = btn.id === `ya-tab-${period}`;
@@ -192,31 +191,9 @@ function switchYieldPeriod(period) {
                 ? 'bg-primary text-on-primary dark:bg-primary-container dark:text-white'
                 : 'text-on-surface-variant dark:text-zinc-400');
     });
-    
     _yaSelectedIdx = null;
     closeYAPinpoint();
-
-    const forecastEl = document.getElementById('yield-forecast-content');
-    const dailyEl = document.getElementById('yield-daily-content');
-    const headerTitle = document.querySelector('#yield-analytics-section .text-body-sm.font-bold');
-    const headerSubtitle = document.querySelector('#yield-analytics-section .text-\\[10px\\].font-semibold');
-    
-    if (period === 'daily') {
-        // Slide left to show daily
-        if (forecastEl) forecastEl.classList.add('-translate-x-full');
-        if (dailyEl) dailyEl.classList.add('-translate-x-full');
-        if (headerTitle) headerTitle.innerText = "Daily Harvests Breakdown";
-        if (headerSubtitle) headerSubtitle.innerText = "Detailed log of all recorded yields";
-    } else {
-        // Slide right to show forecast chart
-        if (forecastEl) forecastEl.classList.remove('-translate-x-full');
-        if (dailyEl) dailyEl.classList.remove('-translate-x-full');
-        if (headerTitle) headerTitle.innerText = "Yield Forecast Comparison";
-        if (headerSubtitle) headerSubtitle.innerText = "Historical Actuals vs. Predicted AI Targets";
-        
-        // Render chart
-        renderYieldAnalytics(true);
-    }
+    renderYieldAnalytics(true);
 }
 
 function initYieldAnalytics() {
@@ -654,7 +631,7 @@ function aggregateHarvestData() {
                         bag.harvestLog.forEach(log => {
                             if (log && log.date && log.grams) {
                                 rawHarvests.push({
-                                    date: new Date(log.date),
+                                    date: log.date, // YYYY-MM-DD string
                                     grams: log.grams,
                                     rack: rackName
                                 });
@@ -669,7 +646,7 @@ function aggregateHarvestData() {
                 Object.values(rack.historicalHarvests).forEach(log => {
                     if (log && log.date && log.grams) {
                         rawHarvests.push({
-                            date: new Date(log.date),
+                            date: log.date, // YYYY-MM-DD string
                             grams: log.grams,
                             rack: rackName
                         });
@@ -679,8 +656,8 @@ function aggregateHarvestData() {
         });
     }
 
-    // Sort descending
-    rawHarvests.sort((a, b) => b.date - a.date);
+    // Sort descending by date string
+    rawHarvests.sort((a, b) => b.date.localeCompare(a.date));
 
     // Grouping
     const dailyMap = {};
@@ -698,10 +675,19 @@ function aggregateHarvestData() {
     rawHarvests.forEach(h => {
         allRacks.add(h.rack);
         
-        const dStr = h.date.toISOString().split('T')[0]; // YYYY-MM-DD
-        const mStr = `${h.date.getFullYear()}-${String(h.date.getMonth()+1).padStart(2, '0')}`; // YYYY-MM
-        const sStr = `${h.date.getFullYear()}-H${h.date.getMonth() < 6 ? 1 : 2}`; // Semi-annual (H1/H2)
-        const yStr = `${h.date.getFullYear()}`;
+        // Ensure standard YYYY-MM-DD formatting, then parse manually
+        const parts = h.date.split('-');
+        if (parts.length !== 3) return; // Skip invalid dates
+        
+        const yyyy = parts[0];
+        const mm = parts[1].padStart(2, '0');
+        const dd = parts[2].padStart(2, '0');
+        const monthNum = parseInt(mm, 10) - 1;
+        
+        const dStr = `${yyyy}-${mm}-${dd}`;
+        const mStr = `${yyyy}-${mm}`;
+        const sStr = `${yyyy}-H${monthNum < 6 ? 1 : 2}`;
+        const yStr = `${yyyy}`;
 
         [dailyMap, monthlyMap, semiMap, annualMap].forEach((map, idx) => {
             const key = [dStr, mStr, sStr, yStr][idx];
@@ -721,28 +707,40 @@ function renderDailyHarvests() {
     if (!listEl) return;
 
     const data = aggregateHarvestData();
-    const days = Object.keys(data.dailyMap).sort((a, b) => new Date(b) - new Date(a));
+    let days = Object.keys(data.dailyMap).sort((a, b) => new Date(b) - new Date(a));
 
     if (days.length === 0) {
         listEl.innerHTML = `<p class="text-[12px] text-on-surface-variant dark:text-zinc-500 italic text-center py-4">No harvests recorded yet.</p>`;
         return;
     }
+    
+    const limitSelect = document.getElementById('daily-harvest-limit');
+    let limit = limitSelect ? limitSelect.value : '5';
+    
+    if (limit !== 'all') {
+        const numLimit = parseInt(limit, 10);
+        if (!isNaN(numLimit)) {
+            days = days.slice(0, numLimit);
+        }
+    }
 
     let html = '';
     days.forEach(dStr => {
-        const dateObj = new Date(dStr);
-        const displayDate = dateObj.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+        const parts = dStr.split('-');
+        const displayDate = `${parseInt(parts[1], 10)}-${parseInt(parts[2], 10)}-${parts[0]}`;
         const entry = data.dailyMap[dStr];
         const grams = entry.totalGrams;
         const kg = (grams / 1000).toFixed(2);
+        const racksArray = Object.keys(entry.racks);
+        const racksDisplay = racksArray.length > 0 ? racksArray.join(', ') : 'Unknown';
         
         html += `
             <div class="flex items-center justify-between p-2 rounded-lg bg-surface-soft dark:bg-zinc-800 border border-slate-100 dark:border-zinc-700/50">
-                <div>
-                    <span class="text-[13px] font-bold text-on-surface dark:text-zinc-300 block">${displayDate}</span>
-                    <span class="text-[9px] font-semibold text-on-surface-variant dark:text-zinc-500">${entry.harvestCount} harvests</span>
+                <div class="min-w-0 pr-2">
+                    <span class="text-[13px] font-bold text-on-surface dark:text-zinc-300 block truncate">${displayDate}</span>
+                    <span class="text-[9px] font-semibold text-on-surface-variant dark:text-zinc-500 truncate block">${entry.harvestCount} harvest${entry.harvestCount !== 1 ? 's' : ''} &nbsp;&nbsp;•&nbsp;&nbsp; ${racksDisplay}</span>
                 </div>
-                <div class="text-right">
+                <div class="text-right shrink-0">
                     <span class="text-[13px] font-extrabold text-secondary dark:text-emerald-400 block leading-tight">${kg} kg</span>
                     <span class="text-[9px] font-bold text-on-surface-variant dark:text-zinc-500 uppercase tracking-wider">${grams}g</span>
                 </div>
@@ -792,7 +790,9 @@ function generateYieldExcelReport() {
     // 1. Daily Sheet
     const dailyRows = [buildHeaders("Date")];
     Object.keys(data.dailyMap).sort((a,b) => new Date(b)-new Date(a)).forEach(d => {
-        dailyRows.push(buildRow(d, data.dailyMap[d]));
+        const parts = d.split('-');
+        const formattedDate = `${parseInt(parts[1], 10)}-${parseInt(parts[2], 10)}-${parts[0]}`;
+        dailyRows.push(buildRow(formattedDate, data.dailyMap[d]));
     });
 
     // 2. Monthly Sheet

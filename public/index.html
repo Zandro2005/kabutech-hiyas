@@ -72,7 +72,7 @@
     <!-- Material Symbols -->
     <link href="./assets/material-symbols.css" rel="stylesheet">
     <!-- Tailwind CSS -->
-    <link href="./assets/tailwind-compiled.css" rel="stylesheet">
+    <link href="./assets/tailwind-compiled.css?v=2" rel="stylesheet">
 
     <link href="./css/base.css" rel="stylesheet">
     <link href="./css/layout.css" rel="stylesheet">
@@ -80,6 +80,7 @@
     <link href="./css/features.css?v=2" rel="stylesheet">
     <link href="./css/animations.css" rel="stylesheet">
     <link href="./css/responsive.css?v=2" rel="stylesheet">
+    <link href="./css/no-scrollbar-desktop.css" rel="stylesheet">
 
     <!-- Firebase SDK -->
     <script src="https://www.gstatic.com/firebasejs/10.0.0/firebase-app-compat.js"></script>
@@ -87,12 +88,12 @@
     <script src="https://www.gstatic.com/firebasejs/10.0.0/firebase-database-compat.js"></script>
     <style>
         /* Custom Dashboard Widget Backgrounds */
-        .bg-green-gradient {
-            background: linear-gradient(135deg, #f0fdf4 0%, #d1fae5 100%) !important;
+        .bg-green-gradient, .widget-panel, .sensor-card, .crop-card, .pd-card, .ob-card, .sched-dsk-card, .report-card-container, .bg-surface-container-lowest, #ctrl-system-mode-card, .ctrl-schedule-efficiency-card {
+            background: var(--md-sys-color-surface-container-lowest, #ffffff) !important;
         }
 
-        html.dark .bg-green-gradient {
-            background: linear-gradient(135deg, #18181b 0%, #064e3b 100%) !important;
+        html.dark .bg-green-gradient, html.dark .widget-panel, html.dark .sensor-card, html.dark .crop-card, html.dark .pd-card, html.dark .ob-card, html.dark .sched-dsk-card, html.dark .report-card-container, html.dark .bg-surface-container-lowest, html.dark #ctrl-system-mode-card, html.dark .ctrl-schedule-efficiency-card {
+            background: var(--md-sys-color-surface-container-lowest, #18181b) !important;
         }
         
         /* SVG Gauge Gradient Overrides */
@@ -107,7 +108,7 @@
 </head>
 
 <body
-    class="bg-app-bg dark:bg-zinc-950 text-on-surface antialiased min-h-screen select-none relative overflow-hidden transition-colors duration-300">
+    class="bg-app-bg dark:bg-zinc-950 text-on-surface antialiased h-screen w-screen relative overflow-hidden transition-colors duration-300">
 
     <!-- Global SVG Gradients for Gauges -->
     <svg class="w-0 h-0 absolute pointer-events-none">
@@ -2401,7 +2402,7 @@
                                         <!-- Actual Yield Card (full-width primary) -->
                                         <div id="actual-yield-wrap" class="col-span-3 relative">
                                             <div id="actual-yield-card" onclick="toggleActualYieldDetail()"
-                                                class="bg-surface-container-lowest dark:bg-zinc-900 rounded-2xl p-4 border border-muted dark:border-zinc-800 flex flex-col justify-between relative overflow-hidden shadow-sm cursor-pointer transition-all duration-200 active:scale-[0.97]">
+                                                class="bg-surface-container-lowest dark:bg-zinc-900 rounded-2xl p-4 border border-muted dark:border-zinc-800 flex flex-col justify-between relative overflow-clip shadow-sm cursor-pointer transition-all duration-200 active:scale-[0.97]">
                                                 <div class="flex justify-between items-start">
                                                     <div
                                                         class="flex items-center gap-1 text-secondary dark:text-emerald-400">
@@ -2576,7 +2577,7 @@
                                 <div class="space-y-4" id="yield-col-right">
                                     <!-- Yield Analytics Chart -->
                                     <div id="yield-analytics-section"
-                                        class="bg-surface-container-lowest dark:bg-zinc-900 rounded-2xl border border-muted dark:border-zinc-800 shadow-sm overflow-hidden">
+                                        class="bg-surface-container-lowest dark:bg-zinc-900 rounded-2xl border border-muted dark:border-zinc-800 shadow-sm overflow-clip h-full flex flex-col justify-between">
                                         <!-- Header -->
                                         <div
                                             class="flex justify-between items-center px-4 pt-4 pb-3 border-b border-muted dark:border-zinc-800">
@@ -2742,89 +2743,96 @@
                                                 </div>
                                             </div>
                                         </div>
-                                    </div>
 
-                                    <!-- Pinpoint Detail Panel -->
-                                    <div id="ya-pinpoint-panel"
-                                        class="overflow-hidden transition-all duration-300 ease-in-out max-h-0 opacity-0">
-                                        <div
-                                            class="bg-surface-soft dark:bg-zinc-800 rounded-2xl p-4 border border-border-muted dark:border-zinc-700 space-y-2.5">
-                                            <div class="flex items-center justify-between">
-                                                <h5
-                                                    class="text-body-sm font-bold text-brand-deep dark:text-primary-fixed flex items-center gap-1.5">
-                                                    <span
-                                                        class="material-symbols-outlined text-[15px]">event_note</span>
-                                                    <span id="ya-pin-title">Month Detail</span>
-                                                </h5>
-                                                <button onclick="closeYAPinpoint()"
-                                                    class="text-slate-400 dark:text-zinc-500 p-0.5 rounded-full active:scale-95">
-                                                    <span class="material-symbols-outlined text-[16px]">close</span>
-                                                </button>
-                                            </div>
-                                            <div class="grid grid-cols-2 gap-2">
-                                                <div
-                                                    class="flex flex-col gap-0.5 bg-surface-container-lowest dark:bg-zinc-900 rounded-xl p-3 border border-muted dark:border-zinc-700">
-                                                    <div class="flex items-center gap-1 mb-0.5">
+                                        <!-- Pinpoint Detail Panel -->
+                                        <div id="ya-pinpoint-panel"
+                                            class="overflow-hidden transition-all duration-300 ease-in-out max-h-0 opacity-0 px-4">
+                                            <div
+                                                class="bg-surface-soft dark:bg-zinc-800 rounded-2xl p-4 border border-border-muted dark:border-zinc-700 space-y-2.5 mt-2 mb-4">
+                                                <div class="flex items-center justify-between">
+                                                    <h5
+                                                        class="text-body-sm font-bold text-brand-deep dark:text-primary-fixed flex items-center gap-1.5">
                                                         <span
-                                                            class="w-1.5 h-1.5 rounded-full bg-secondary dark:bg-emerald-400 shrink-0"></span>
-                                                        <span
-                                                            class="text-[9px] font-bold text-secondary dark:text-emerald-400 uppercase tracking-wide">Actual</span>
+                                                            class="material-symbols-outlined text-[15px]">event_note</span>
+                                                        <span id="ya-pin-title">Month Detail</span>
+                                                    </h5>
+                                                    <button onclick="closeYAPinpoint()"
+                                                        class="text-slate-400 dark:text-zinc-500 p-0.5 rounded-full active:scale-95">
+                                                        <span class="material-symbols-outlined text-[16px]">close</span>
+                                                    </button>
+                                                </div>
+                                                <div class="grid grid-cols-2 gap-2">
+                                                    <div
+                                                        class="flex flex-col gap-0.5 bg-surface-container-lowest dark:bg-zinc-900 rounded-xl p-3 border border-muted dark:border-zinc-700">
+                                                        <div class="flex items-center gap-1 mb-0.5">
+                                                            <span
+                                                                class="w-1.5 h-1.5 rounded-full bg-secondary dark:bg-emerald-400 shrink-0"></span>
+                                                            <span
+                                                                class="text-[9px] font-bold text-secondary dark:text-emerald-400 uppercase tracking-wide">Actual</span>
+                                                        </div>
+                                                        <span id="ya-pin-actual"
+                                                            class="text-[20px] font-extrabold text-on-surface dark:text-white leading-none">—</span>
                                                     </div>
-                                                    <span id="ya-pin-actual"
-                                                        class="text-[20px] font-extrabold text-on-surface dark:text-white leading-none">—</span>
-                                                </div>
-                                                <div
-                                                    class="flex flex-col gap-0.5 bg-surface-container-lowest dark:bg-zinc-900 rounded-xl p-3 border border-muted dark:border-zinc-700">
-                                                    <div class="flex items-center gap-1 mb-0.5">
-                                                        <span
-                                                            class="w-1.5 h-1.5 rounded-full bg-primary-fixed-dim dark:bg-zinc-500 shrink-0"></span>
-                                                        <span
-                                                            class="text-[9px] font-bold text-primary dark:text-primary-fixed uppercase tracking-wide">Target</span>
+                                                    <div
+                                                        class="flex flex-col gap-0.5 bg-surface-container-lowest dark:bg-zinc-900 rounded-xl p-3 border border-muted dark:border-zinc-700">
+                                                        <div class="flex items-center gap-1 mb-0.5">
+                                                            <span
+                                                                class="w-1.5 h-1.5 rounded-full bg-primary-fixed-dim dark:bg-zinc-500 shrink-0"></span>
+                                                            <span
+                                                                class="text-[9px] font-bold text-primary dark:text-primary-fixed uppercase tracking-wide">Target</span>
+                                                        </div>
+                                                        <span id="ya-pin-predicted"
+                                                            class="text-[20px] font-extrabold text-on-surface dark:text-white leading-none">—</span>
                                                     </div>
-                                                    <span id="ya-pin-predicted"
-                                                        class="text-[20px] font-extrabold text-on-surface dark:text-white leading-none">—</span>
                                                 </div>
-                                            </div>
-                                            <div class="grid grid-cols-3 gap-2">
-                                                <div class="flex flex-col gap-0.5">
-                                                    <span
-                                                        class="text-[9px] font-bold text-on-surface-variant dark:text-zinc-500 uppercase tracking-wide">vs
-                                                        Avg</span>
-                                                    <span id="ya-pin-var" class="text-[14px] font-extrabold">—</span>
+                                                <div class="grid grid-cols-3 gap-2">
+                                                    <div class="flex flex-col gap-0.5">
+                                                        <span
+                                                            class="text-[9px] font-bold text-on-surface-variant dark:text-zinc-500 uppercase tracking-wide">vs
+                                                            Avg</span>
+                                                        <span id="ya-pin-var" class="text-[14px] font-extrabold">—</span>
+                                                    </div>
+                                                    <div class="flex flex-col gap-0.5">
+                                                        <span
+                                                            class="text-[9px] font-bold text-on-surface-variant dark:text-zinc-500 uppercase tracking-wide">Δ
+                                                            Pred</span>
+                                                        <span id="ya-pin-delta" class="text-[14px] font-extrabold">—</span>
+                                                    </div>
+                                                    <div class="flex flex-col gap-0.5">
+                                                        <span
+                                                            class="text-[9px] font-bold text-on-surface-variant dark:text-zinc-500 uppercase tracking-wide">Rank</span>
+                                                        <span id="ya-pin-vsavg" class="text-[14px] font-extrabold">—</span>
+                                                    </div>
                                                 </div>
-                                                <div class="flex flex-col gap-0.5">
-                                                    <span
-                                                        class="text-[9px] font-bold text-on-surface-variant dark:text-zinc-500 uppercase tracking-wide">Δ
-                                                        Pred</span>
-                                                    <span id="ya-pin-delta" class="text-[14px] font-extrabold">—</span>
+                                                <div class="pt-1.5 border-t border-muted dark:border-zinc-700">
+                                                    <p id="ya-pin-insight"
+                                                        class="text-[11px] text-on-surface-variant dark:text-zinc-400 leading-relaxed">
+                                                    </p>
                                                 </div>
-                                                <div class="flex flex-col gap-0.5">
-                                                    <span
-                                                        class="text-[9px] font-bold text-on-surface-variant dark:text-zinc-500 uppercase tracking-wide">Rank</span>
-                                                    <span id="ya-pin-vsavg" class="text-[14px] font-extrabold">—</span>
-                                                </div>
-                                            </div>
-                                            <div class="pt-1.5 border-t border-muted dark:border-zinc-700">
-                                                <p id="ya-pin-insight"
-                                                    class="text-[11px] text-on-surface-variant dark:text-zinc-400 leading-relaxed">
-                                                </p>
                                             </div>
                                         </div>
                                     </div>
 
                                     <!-- Daily Harvest Breakdown -->
-                                    <div class="bg-surface-container-lowest dark:bg-zinc-900 rounded-2xl p-4 border border-muted dark:border-zinc-800 shadow-sm">
-                                        <div class="flex items-center justify-between mb-3">
+                                    <div id="yield-drivers-card" class="bg-surface-container-lowest dark:bg-zinc-900 rounded-2xl p-4 border border-muted dark:border-zinc-800 shadow-sm flex flex-col h-full justify-between">
+                                        <div class="flex items-center justify-between mb-3 flex-wrap gap-2">
                                             <div class="flex items-center gap-1.5 text-brand-deep dark:text-primary-fixed">
                                                 <span class="material-symbols-outlined text-[18px]">calendar_today</span>
                                                 <h3 class="text-[13px] font-bold uppercase tracking-wider">Daily Harvests</h3>
+                                                <select id="daily-harvest-limit" onchange="renderDailyHarvests()" class="text-[10px] p-1 rounded-md bg-surface-container dark:bg-zinc-800 border border-muted dark:border-zinc-700 ml-1 text-on-surface dark:text-zinc-200 focus:outline-none cursor-pointer">
+                                                    <option value="5">Last 5 Days</option>
+                                                    <option value="10">Last 10 Days</option>
+                                                    <option value="15">Last 15 Days</option>
+                                                    <option value="30">Last 30 Days</option>
+                                                    <option value="all">All</option>
+                                                </select>
                                             </div>
                                             <button onclick="generateYieldExcelReport()" class="flex items-center gap-1 px-2.5 py-1.5 bg-secondary/10 dark:bg-emerald-950/40 text-secondary dark:text-emerald-400 border border-secondary/20 dark:border-emerald-800 rounded-lg text-[10px] font-bold active:scale-95 transition-all whitespace-nowrap">
                                                 <span class="material-symbols-outlined text-[14px]">download</span>
-                                                <span>Export Data</span>
+                                                <span class="hidden md:inline">Export Data</span>
                                             </button>
                                         </div>
-                                        <div id="yield-daily-list" class="space-y-2 max-h-[300px] overflow-y-auto pr-1 -mr-1 custom-scrollbar">
+                                        <div id="yield-daily-list" class="space-y-2 flex-1 overflow-y-auto pr-1 min-h-0" style="max-height: 350px;">
                                             <p class="text-[12px] text-on-surface-variant dark:text-zinc-500 italic text-center py-4">Loading harvest data...</p>
                                         </div>
                                     </div>
@@ -2879,7 +2887,7 @@
                                         <div class="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center text-primary dark:text-primary-fixed">
                                             <span class="material-symbols-outlined text-[22px]">grass</span>
                                         </div>
-                                        <h3 class="text-base font-extrabold text-on-background dark:text-white">Harvest Yield</h3>
+                                        <h3 class="text-lg md:text-xl font-extrabold text-on-background dark:text-white">Harvest Yield</h3>
                                     </div>
                                     <div id="crop-widget-harvest-content">
                                         <div class="animate-pulse flex space-x-4">
@@ -2899,7 +2907,7 @@
                                         <div class="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center text-primary dark:text-primary-fixed">
                                             <span class="material-symbols-outlined text-[22px]" style="font-variation-settings: 'FILL' 1;">inventory_2</span>
                                         </div>
-                                        <h3 class="text-base font-extrabold text-on-background dark:text-white">Rack Utilization</h3>
+                                        <h3 class="text-lg md:text-xl font-extrabold text-on-background dark:text-white">Rack Utilization</h3>
                                     </div>
                                     <div id="crop-widget-util-content">
                                         <div class="animate-pulse flex space-x-4">
@@ -2919,7 +2927,7 @@
                                         <div class="w-10 h-10 rounded-full bg-red-500/10 flex items-center justify-center text-red-500">
                                             <span class="material-symbols-outlined text-[22px]">biotech</span>
                                         </div>
-                                        <h3 class="text-base font-extrabold text-on-background dark:text-white">Crop Health Monitor</h3>
+                                        <h3 class="text-lg md:text-xl font-extrabold text-on-background dark:text-white">Crop Health Monitor</h3>
                                     </div>
                                     <div id="crop-widget-health-content">
                                         <div class="animate-pulse flex space-x-4">
@@ -2939,7 +2947,7 @@
                                         <div class="w-10 h-10 rounded-full bg-emerald-500/10 flex items-center justify-center text-emerald-500">
                                             <span class="material-symbols-outlined text-[22px]">model_training</span>
                                         </div>
-                                        <h3 class="text-base font-extrabold text-on-background dark:text-white">Growth Cycles</h3>
+                                        <h3 class="text-lg md:text-xl font-extrabold text-on-background dark:text-white">Growth Cycles</h3>
                                     </div>
                                     <div id="crop-widget-cycles-content">
                                         <div class="animate-pulse flex space-x-4">
@@ -5079,6 +5087,12 @@
                     <input type="number" id="harvest-grams" placeholder="e.g. 500" min="1"
                         class="bg-surface-soft dark:bg-zinc-800 border border-outline-variant dark:border-zinc-700 rounded-xl py-2 px-3 text-body-sm focus:border-primary text-on-surface dark:text-white">
                 </div>
+
+                <div class="flex flex-col gap-1">
+                    <label class="text-[10px] font-bold text-on-surface-variant dark:text-zinc-400 uppercase tracking-wide">Harvest Date</label>
+                    <input type="date" id="harvest-date" required
+                        class="bg-surface-soft dark:bg-zinc-800 border border-outline-variant dark:border-zinc-700 rounded-xl py-2 px-3 text-body-sm focus:border-primary text-on-surface dark:text-white">
+                </div>
                 
                 <p id="harvest-error" class="hidden text-[11px] font-bold text-red-500"></p>
                 
@@ -5124,6 +5138,11 @@
                         <input type="number" id="capacity-empty" min="0"
                             class="bg-surface-soft dark:bg-zinc-800 border border-outline-variant dark:border-zinc-700 rounded-xl py-2.5 px-3 text-body-sm focus:border-primary text-on-surface dark:text-white">
                     </div>
+                </div>
+                
+                <div class="flex items-center justify-between px-1 mt-1">
+                    <span class="text-[11px] font-bold text-on-surface-variant dark:text-zinc-400 uppercase tracking-wide">Total Slot Capacity:</span>
+                    <span id="capacity-total-display" class="text-[14px] font-extrabold text-brand-deep dark:text-primary-fixed">0</span>
                 </div>
                 
                 <p id="capacity-error" class="hidden text-[11px] font-bold text-red-500"></p>
@@ -5707,7 +5726,7 @@
     <script src="./js/features/controls.js"></script>
     <script src="./js/features/schedule.js"></script>
     <script src="./js/features/batches.js?v=2"></script>
-    <script src="./js/features/yield.js?v=5"></script>
+    <script src="./js/features/yield.js?v=7"></script>
     <script src="./js/features/tasks.js"></script>
     <script src="./js/features/alerts.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/xlsx/dist/xlsx.full.min.js"></script>
@@ -5716,7 +5735,7 @@
     <script src="./js/features/logs.js"></script>
     <script src="./js/features/dashboard.js"></script>
     <script src="./js/features/live-view.js"></script>
-    <script src="./js/features/crop-analytics.js?v=3"></script>
+    <script src="./js/features/crop-analytics.js?v=4"></script>
     <!-- Desktop enhancements -->
     <script src="./js/desktop/zoom.js"></script>
     <script src="./js/desktop/sidebar.js"></script>

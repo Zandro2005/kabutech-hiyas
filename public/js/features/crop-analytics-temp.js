@@ -20,12 +20,10 @@ function computeHarvestSummary(racks) {
     let totalGrams = 0;
     let totalHarvests = 0;
     let rackData = [];
-    let totalBagsInFarm = 0;
     let totalBagsWithHarvest = 0;
-    
+
     racks.forEach(rack => {
         const bags = Object.values(rack.bags || {}).filter(b => b != null);
-        totalBagsInFarm += bags.length;
         let rackGrams = 0;
         
         if (rack.historicalHarvests) {
@@ -51,29 +49,22 @@ function computeHarvestSummary(racks) {
     
     // Convert to kg if large enough, else keep g
     const formatWeight = (g) => g >= 1000 ? (g / 1000).toFixed(2) + 'kg' : g + 'g';
-    
-    // Calculate average per bag (fallback to total bags in farm if no bag-level data exists)
-    let avgPerBag = 0;
-    if (totalBagsWithHarvest > 0) {
-        avgPerBag = Math.round(totalGrams / totalBagsWithHarvest);
-    } else if (totalBagsInFarm > 0 && totalGrams > 0) {
-        avgPerBag = Math.round(totalGrams / totalBagsInFarm);
-    }
+    const avgPerBag = totalBagsWithHarvest > 0 ? Math.round(totalGrams / totalBagsWithHarvest) : 0;
 
     let html = `
-        <div class="flex flex-wrap items-end justify-between mb-8 gap-y-4">
+        <div class="flex items-end justify-between mb-8">
             <div>
-                <p class="text-[12px] md:text-[14px] text-on-surface-variant dark:text-zinc-400 uppercase tracking-widest font-bold mb-3">Total Yield</p>
+                <p class="text-[11px] text-on-surface-variant dark:text-zinc-400 uppercase tracking-widest font-bold mb-2">Total Yield</p>
                 <div class="flex items-baseline gap-1">
-                    <span class="text-[36px] md:text-[44px] font-extrabold text-brand-deep dark:text-white leading-none tracking-tighter">${formatWeight(totalGrams)}</span>
+                    <span class="text-[36px] font-extrabold text-brand-deep dark:text-white leading-none tracking-tighter">${formatWeight(totalGrams)}</span>
                 </div>
             </div>
-            <div class="text-right pb-3">
-                <p class="text-[14px] md:text-[16px] text-on-surface-variant dark:text-zinc-400 font-medium">Avg: ${avgPerBag}g / bag</p>
-                <p class="text-[14px] md:text-[16px] text-on-surface-variant dark:text-zinc-400 font-medium">${totalHarvests} total harvests</p>
+            <div class="text-right pb-2">
+                <p class="text-[13px] text-on-surface-variant dark:text-zinc-400 font-medium">Avg: ${avgPerBag}g / bag</p>
+                <p class="text-[13px] text-on-surface-variant dark:text-zinc-400 font-medium">${totalHarvests} total harvests</p>
             </div>
         </div>
-        <div class="space-y-6 mb-8">
+        <div class="space-y-4 mb-8">
     `;
 
     if (totalGrams === 0) {
@@ -82,12 +73,12 @@ function computeHarvestSummary(racks) {
         rackData.forEach(r => { // Show all
             const pct = Math.round((r.grams / totalGrams) * 100);
             html += `
-                <div class="flex items-center gap-4 md:gap-5 group">
-                    <span class="text-[13px] md:text-[15px] font-bold text-on-surface dark:text-zinc-300 flex-1 min-w-[60px] truncate">${r.name}</span>
-                    <div class="flex-1 bg-surface-variant dark:bg-zinc-800 rounded-full h-3 relative overflow-hidden">
+                <div class="flex items-center gap-4 group">
+                    <span class="text-[13px] font-bold text-on-surface dark:text-zinc-300 w-16 truncate">${r.name}</span>
+                    <div class="flex-1 bg-surface-variant dark:bg-zinc-800 rounded-full h-4 relative overflow-hidden">
                         <div class="absolute top-0 left-0 bottom-0 bg-primary dark:bg-primary-fixed rounded-full transition-all duration-1000 ease-out" style="width: 0%;" data-target-width="${pct}%"></div>
                     </div>
-                    <span class="text-[13px] md:text-[15px] font-semibold text-on-surface-variant dark:text-zinc-400 w-auto text-right whitespace-nowrap ml-3">${formatWeight(r.grams)} <span class="hidden md:inline">(${pct}%)</span></span>
+                    <span class="text-[13px] font-semibold text-on-surface-variant dark:text-zinc-400 w-24 text-right">${formatWeight(r.grams)} (${pct}%)</span>
                 </div>
             `;
         });
@@ -96,8 +87,8 @@ function computeHarvestSummary(racks) {
     html += `</div>`;
     
     html += `
-        <button onclick="openWidgetModal('modal-log-harvest')" class="w-full mt-auto py-4 rounded-xl bg-primary/10 text-primary dark:text-primary-fixed font-bold text-[15px] hover:bg-primary/20 transition-colors flex items-center justify-center gap-2">
-            <span class="material-symbols-outlined text-[20px]">add</span>
+        <button onclick="openWidgetModal('modal-log-harvest')" class="w-full mt-2 py-3 rounded-xl bg-primary/10 text-primary dark:text-primary-fixed font-bold text-[13px] hover:bg-primary/20 transition-colors flex items-center justify-center gap-2">
+            <span class="material-symbols-outlined text-[18px]">add</span>
             Log Harvest
         </button>
     `;
@@ -146,38 +137,38 @@ function computeRackUtilization(racks) {
 
     let html = `
         <div class="mb-8">
-            <div class="flex flex-wrap justify-between items-end mb-4 gap-y-2">
-                <span class="text-[14px] md:text-[16px] font-bold text-on-surface dark:text-zinc-300">Overall Capacity</span>
-                <span class="text-[14px] md:text-[16px] font-extrabold text-brand-deep dark:text-primary-fixed">${active + replaced} / ${totalSlots} <span class="text-on-surface-variant dark:text-zinc-500 font-medium ml-1">(${overallPct}%)</span></span>
+            <div class="flex justify-between items-end mb-3">
+                <span class="text-[14px] font-bold text-on-surface dark:text-zinc-300">Overall Capacity</span>
+                <span class="text-[14px] font-extrabold text-brand-deep dark:text-primary-fixed">${active + replaced} / ${totalSlots} <span class="text-on-surface-variant dark:text-zinc-500 font-medium ml-1">(${overallPct}%)</span></span>
             </div>
-            <div class="w-full bg-surface-variant dark:bg-zinc-800 rounded-full h-4 flex overflow-hidden">
+            <div class="w-full bg-surface-variant dark:bg-zinc-800 rounded-full h-5 flex overflow-hidden">
                 <div class="bg-emerald-500 h-full transition-all duration-1000" style="width: 0%" data-target-width="${totalSlots ? (active/totalSlots)*100 : 0}%" title="Active"></div>
                 <div class="bg-slate-400 h-full transition-all duration-1000" style="width: 0%" data-target-width="${totalSlots ? (replaced/totalSlots)*100 : 0}%" title="Replaced"></div>
                 <div class="bg-red-500 h-full transition-all duration-1000" style="width: 0%" data-target-width="${totalSlots ? (contam/totalSlots)*100 : 0}%" title="Contaminated"></div>
             </div>
         </div>
         
-        <div class="flex flex-wrap gap-4 md:gap-5 mb-8 text-[12px] md:text-[14px] font-bold uppercase tracking-wider text-on-surface-variant dark:text-zinc-400">
-            <span class="flex items-center gap-2"><span class="w-3 h-3 rounded-full bg-emerald-500"></span> ${active} Active</span>
-            <span class="flex items-center gap-2"><span class="w-3 h-3 rounded-full bg-surface-variant dark:bg-zinc-700"></span> ${empty} Empty</span>
-            <span class="flex items-center gap-2"><span class="w-3 h-3 rounded-full bg-red-500"></span> ${contam} Flagged</span>
+        <div class="flex flex-wrap gap-4 mb-8 text-[12px] font-bold uppercase tracking-wider text-on-surface-variant dark:text-zinc-400">
+            <span class="flex items-center gap-1.5"><span class="w-3.5 h-3.5 rounded-full bg-emerald-500"></span> ${active} Active</span>
+            <span class="flex items-center gap-1.5"><span class="w-3.5 h-3.5 rounded-full bg-surface-variant dark:bg-zinc-700"></span> ${empty} Empty</span>
+            <span class="flex items-center gap-1.5"><span class="w-3.5 h-3.5 rounded-full bg-red-500"></span> ${contam} Flagged</span>
         </div>
         
-        <div class="space-y-6 mb-8">
+        <div class="space-y-4 mb-8">
     `;
 
     rackStats.forEach(r => {
         const color = r.pct > 80 ? 'bg-emerald-500' : r.pct > 40 ? 'bg-amber-500' : 'bg-red-500';
         html += `
-            <div class="flex items-center gap-4 md:gap-5 group">
-                <span class="text-[13px] md:text-[15px] font-bold text-on-surface dark:text-zinc-300 flex-1 min-w-[60px] truncate">${r.name}</span>
-                <div class="flex-1 bg-surface-variant dark:bg-zinc-800 rounded-full h-3 relative overflow-hidden">
+            <div class="flex items-center gap-4 group">
+                <span class="text-[13px] font-bold text-on-surface dark:text-zinc-300 w-16 truncate">${r.name}</span>
+                <div class="flex-1 bg-surface-variant dark:bg-zinc-800 rounded-full h-3.5 relative overflow-hidden">
                     <div class="absolute top-0 left-0 bottom-0 ${color} rounded-full transition-all duration-1000 ease-out" style="width: 0%;" data-target-width="${r.pct}%"></div>
                 </div>
-                <div class="flex items-center gap-2 md:gap-3 w-auto justify-end ml-3">
-                    <span class="text-[13px] md:text-[15px] font-semibold text-on-surface-variant dark:text-zinc-400 text-right whitespace-nowrap">${r.active}/${r.total}</span>
-                    <button onclick="removeRack(${r.id})" class="text-slate-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/30 rounded p-1.5 transition-colors flex items-center justify-center" title="Delete Rack">
-                        <span class="material-symbols-outlined text-[16px] md:text-[18px]">delete</span>
+                <div class="flex items-center gap-2 w-20 justify-end">
+                    <span class="text-[13px] font-semibold text-on-surface-variant dark:text-zinc-400 text-right">${r.active}/${r.total}</span>
+                    <button onclick="removeRack(${r.id})" class="text-slate-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/30 rounded p-1 transition-colors flex items-center justify-center" title="Delete Rack">
+                        <span class="material-symbols-outlined text-[16px]">delete</span>
                     </button>
                 </div>
             </div>
@@ -187,8 +178,8 @@ function computeRackUtilization(racks) {
     html += `</div>`;
     
     html += `
-        <button onclick="openWidgetModal('modal-update-capacity')" class="w-full mt-auto py-4 rounded-xl bg-slate-100 dark:bg-zinc-800 text-on-surface-variant dark:text-zinc-300 font-bold text-[15px] hover:bg-slate-200 dark:hover:bg-zinc-700 transition-colors flex items-center justify-center gap-2">
-            <span class="material-symbols-outlined text-[20px]">edit</span>
+        <button onclick="openWidgetModal('modal-update-capacity')" class="w-full mt-2 py-3 rounded-xl bg-slate-100 dark:bg-zinc-800 text-on-surface-variant dark:text-zinc-300 font-bold text-[13px] hover:bg-slate-200 dark:hover:bg-zinc-700 transition-colors flex items-center justify-center gap-2">
+            <span class="material-symbols-outlined text-[18px]">edit</span>
             Update Capacity
         </button>
     `;
@@ -232,22 +223,22 @@ function computeCropHealth(racks) {
     const rateColor = totalContam === 0 ? 'text-emerald-500' : 'text-red-500';
 
     let html = `
-        <div class="flex flex-col md:flex-row gap-4 md:gap-5 mb-8">
-            <div class="flex-1 bg-surface-soft dark:bg-zinc-800/50 rounded-2xl p-4 border border-slate-100 dark:border-zinc-800">
-                <p class="text-[10px] md:text-[12px] text-on-surface-variant dark:text-zinc-400 font-bold uppercase tracking-wider mb-2 md:mb-3">Health Score</p>
+        <div class="flex gap-4 mb-8">
+            <div class="flex-1 bg-surface-soft dark:bg-zinc-800/50 rounded-2xl p-5 border border-slate-100 dark:border-zinc-800">
+                <p class="text-[12px] text-on-surface-variant dark:text-zinc-400 font-bold uppercase tracking-wider mb-3">Health Score</p>
                 <div class="flex items-baseline gap-1">
-                    <span class="text-[28px] md:text-[36px] font-extrabold ${scoreColor} leading-none tracking-tight">${healthScore}</span>
-                    <span class="text-[12px] md:text-[14px] text-on-surface-variant dark:text-zinc-500 font-bold">/100</span>
+                    <span class="text-[36px] font-extrabold ${scoreColor} leading-none tracking-tight">${healthScore}</span>
+                    <span class="text-[14px] text-on-surface-variant dark:text-zinc-500 font-bold">/100</span>
                 </div>
             </div>
-            <div class="flex-1 bg-surface-soft dark:bg-zinc-800/50 rounded-2xl p-4 border border-slate-100 dark:border-zinc-800">
-                <p class="text-[10px] md:text-[12px] text-on-surface-variant dark:text-zinc-400 font-bold uppercase tracking-wider mb-2 md:mb-3">Contam. Rate</p>
+            <div class="flex-1 bg-surface-soft dark:bg-zinc-800/50 rounded-2xl p-5 border border-slate-100 dark:border-zinc-800">
+                <p class="text-[12px] text-on-surface-variant dark:text-zinc-400 font-bold uppercase tracking-wider mb-3">Contam. Rate</p>
                 <div class="flex items-baseline gap-1">
-                    <span class="text-[28px] md:text-[36px] font-extrabold ${rateColor} leading-none tracking-tight">${contamRate}%</span>
+                    <span class="text-[36px] font-extrabold ${rateColor} leading-none tracking-tight">${contamRate}%</span>
                 </div>
             </div>
         </div>
-        <div class="space-y-6 mb-8">
+        <div class="space-y-4 mb-8">
     `;
 
     rackHealth.sort((a, b) => (a.name || "").localeCompare(b.name || "", undefined, { numeric: true, sensitivity: 'base' }));
@@ -258,14 +249,14 @@ function computeCropHealth(racks) {
         let bg = r.status === 'Healthy' ? 'bg-emerald-50 dark:bg-emerald-950/30' : r.status === 'Monitor' ? 'bg-amber-50 dark:bg-amber-950/30' : 'bg-red-50 dark:bg-red-950/30';
         
         html += `
-            <div class="flex flex-wrap items-center justify-between gap-y-2 px-3 py-2 md:px-4 md:py-3 rounded-xl ${bg}">
-                <div class="flex items-center gap-2 md:gap-3 flex-1 min-w-[50%]">
-                    <span class="material-symbols-outlined text-[16px] md:text-[18px] ${color}" style="font-variation-settings: 'FILL' 1;">${icon}</span>
-                    <span class="text-[11px] md:text-[13px] font-bold text-on-surface dark:text-zinc-200 truncate pr-2">${r.name}</span>
+            <div class="flex items-center justify-between px-4 py-3 rounded-xl ${bg}">
+                <div class="flex items-center gap-3">
+                    <span class="material-symbols-outlined text-[18px] ${color}" style="font-variation-settings: 'FILL' 1;">${icon}</span>
+                    <span class="text-[13px] font-bold text-on-surface dark:text-zinc-200">${r.name}</span>
                 </div>
-                <div class="flex flex-wrap md:flex-nowrap items-center gap-2 md:gap-3 w-full md:w-auto justify-end">
-                    <span class="text-[11px] md:text-[13px] ${color} font-semibold whitespace-nowrap">${r.contam} flagged</span>
-                    <span class="text-[9px] md:text-[11px] uppercase tracking-wider font-extrabold ${color} px-2 py-1 rounded border border-current opacity-70 whitespace-nowrap ml-auto md:ml-0">${r.status}</span>
+                <div class="flex items-center gap-3">
+                    <span class="text-[13px] ${color} font-semibold">${r.contam} flagged</span>
+                    <span class="text-[11px] uppercase tracking-wider font-extrabold ${color} px-2 py-1 rounded border border-current opacity-70">${r.status}</span>
                 </div>
             </div>
         `;
@@ -274,7 +265,7 @@ function computeCropHealth(racks) {
     html += `</div>`;
     
     html += `
-        <button onclick="openWidgetModal('modal-flag-contamination')" class="w-full mt-auto py-3 rounded-xl bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-500 font-bold text-[13px] hover:bg-red-100 dark:hover:bg-red-900/40 transition-colors flex items-center justify-center gap-2">
+        <button onclick="openWidgetModal('modal-flag-contamination')" class="w-full mt-2 py-3 rounded-xl bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-500 font-bold text-[13px] hover:bg-red-100 dark:hover:bg-red-900/40 transition-colors flex items-center justify-center gap-2">
             <span class="material-symbols-outlined text-[18px]">flag</span>
             Flag Contamination
         </button>
@@ -325,17 +316,17 @@ function computeGrowthCycles(racks) {
     }
 
     let html = `
-        <div class="flex flex-wrap justify-between items-end mb-8 gap-y-4">
+        <div class="flex justify-between items-end mb-8">
             <div>
-                <p class="text-[10px] md:text-[11px] text-on-surface-variant dark:text-zinc-400 uppercase tracking-widest font-bold mb-2">Avg Cycle Age</p>
+                <p class="text-[11px] text-on-surface-variant dark:text-zinc-400 uppercase tracking-widest font-bold mb-2">Avg Cycle Age</p>
                 <div class="flex items-baseline gap-1">
-                    <span class="text-[28px] md:text-[36px] font-extrabold text-brand-deep dark:text-white leading-none tracking-tighter">${avgAge}</span>
-                    <span class="text-[13px] md:text-[15px] font-bold text-on-surface-variant dark:text-zinc-500 ml-1">days</span>
+                    <span class="text-[36px] font-extrabold text-brand-deep dark:text-white leading-none tracking-tighter">${avgAge}</span>
+                    <span class="text-[15px] font-bold text-on-surface-variant dark:text-zinc-500 ml-1">days</span>
                 </div>
             </div>
-            <div class="text-left md:text-right pb-2">
-                <p class="text-[11px] md:text-[13px] text-on-surface-variant dark:text-zinc-400 font-medium">Next Est. Harvest</p>
-                <p class="text-[13px] md:text-[16px] font-extrabold text-emerald-600 dark:text-emerald-400 mt-1 whitespace-nowrap">${nextHarvest}</p>
+            <div class="text-right pb-2">
+                <p class="text-[13px] text-on-surface-variant dark:text-zinc-400 font-medium">Next Est. Harvest</p>
+                <p class="text-[16px] font-extrabold text-emerald-600 dark:text-emerald-400 mt-1">${nextHarvest}</p>
             </div>
         </div>
         <div class="space-y-6 mb-8">
@@ -346,15 +337,15 @@ function computeGrowthCycles(racks) {
         
         html += `
             <div class="group">
-                <div class="flex items-center gap-3 mb-2">
-                    <span class="text-[12px] md:text-[14px] font-bold text-on-surface dark:text-zinc-200 flex-1 truncate">${c.name}</span>
-                    <span class="text-[10px] md:text-[12px] text-on-surface-variant dark:text-zinc-500 font-semibold whitespace-nowrap mr-1 md:mr-2">• Day ${c.days}</span>
+                <div class="flex justify-between items-end mb-3">
+                    <div class="flex items-center gap-2">
+                        <span class="text-[14px] font-bold text-on-surface dark:text-zinc-200">${c.name}</span>
+                        <span class="text-[12px] text-on-surface-variant dark:text-zinc-500 font-semibold">• Day ${c.days}</span>
+                    </div>
+                    <span class="text-[11px] font-extrabold uppercase tracking-wider ${barColor.replace('bg-', 'text-')}">${c.stage}</span>
                 </div>
-                <div class="w-full bg-surface-variant dark:bg-zinc-800 rounded-full h-3 relative overflow-hidden">
+                <div class="w-full bg-surface-variant dark:bg-zinc-800 rounded-full h-3.5 relative overflow-hidden">
                     <div class="absolute top-0 left-0 bottom-0 ${barColor} rounded-full transition-all duration-1000 ease-out" style="width: 0%;" data-target-width="${c.pct}%"></div>
-                </div>
-                <div class="flex justify-end mt-1.5">
-                    <span class="text-[10px] md:text-[11px] font-extrabold uppercase tracking-wider ${barColor.replace('bg-', 'text-')} whitespace-nowrap">${c.stage}</span>
                 </div>
             </div>
         `;
@@ -363,7 +354,7 @@ function computeGrowthCycles(racks) {
     html += `</div>`;
     
     html += `
-        <button onclick="openAddBatchModal()" class="w-full mt-auto py-3 rounded-xl bg-slate-100 dark:bg-zinc-800 text-on-surface-variant dark:text-zinc-300 font-bold text-[13px] hover:bg-slate-200 dark:hover:bg-zinc-700 transition-colors flex items-center justify-center gap-2">
+        <button onclick="openAddBatchModal()" class="w-full mt-2 py-3 rounded-xl bg-slate-100 dark:bg-zinc-800 text-on-surface-variant dark:text-zinc-300 font-bold text-[13px] hover:bg-slate-200 dark:hover:bg-zinc-700 transition-colors flex items-center justify-center gap-2">
             <span class="material-symbols-outlined text-[18px]">add_box</span>
             Initialize New Batch
         </button>
@@ -396,11 +387,6 @@ function openWidgetModal(modalId) {
     if (modalId === "modal-log-harvest") {
         populateRackDropdown("harvest-rack-select");
         document.getElementById("harvest-grams").value = "";
-        
-        // Set default date to today
-        const today = new Date().toLocaleDateString("en-CA"); // YYYY-MM-DD
-        document.getElementById("harvest-date").value = today;
-        
         document.getElementById("harvest-error").classList.add("hidden");
     } else if (modalId === "modal-update-capacity") {
         populateRackDropdown("capacity-rack-select");
@@ -491,7 +477,6 @@ function populateRackDropdown(selectId) {
 function submitLogHarvest() {
     const rackId = parseInt(document.getElementById("harvest-rack-select").value);
     const grams = parseFloat(document.getElementById("harvest-grams").value);
-    const harvestDate = document.getElementById("harvest-date").value || new Date().toLocaleDateString("en-CA");
     const errEl = document.getElementById("harvest-error");
     
     if (isNaN(grams) || grams <= 0) {
@@ -505,7 +490,7 @@ function submitLogHarvest() {
     
     if (!rack.historicalHarvests) rack.historicalHarvests = [];
     rack.historicalHarvests.push({
-        date: harvestDate,
+        date: new Date().toLocaleDateString("en-CA"),
         grams: grams
     });
     

@@ -462,7 +462,7 @@ html.dark #scene-register .dark\:bg-zinc-950 {
                the app shell so Login/Register/Onboarding are unaffected. */
     html:not(.dark) #scene-app [class~="bg-white"],
     html:not(.dark) #scene-app [class~="bg-surface-container-lowest"] {
-        background-color: #f9faf9 !important;
+        background-color: #ffffff !important;
     }
 
     /* Controls tab main content: shrink everything (setpoint
@@ -523,15 +523,29 @@ html.dark #scene-register .dark\:bg-zinc-950 {
 
 
     html:not(.dark) #tab-home .bg-white.rounded-3xl {
-        background-color: #f6faf7 !important;
+        background-color: #ffffff !important;
     }
 
     html:not(.dark) #tab-home .bg-white.rounded-2xl {
-        background-color: #f6faf7 !important;
+        background-color: #ffffff !important;
     }
 
     #rotate-lock {
         display: none !important;
+    }
+
+    /* Force-hide the main scroll area scrollbar on desktop —
+               the hide-scrollbar utility may lose to Windows "classic
+               scrollbar" settings without these !important overrides. */
+    #app-scroll-area {
+        scrollbar-width: none !important;
+        -ms-overflow-style: none !important;
+    }
+
+    #app-scroll-area::-webkit-scrollbar {
+        display: none !important;
+        width: 0 !important;
+        height: 0 !important;
     }
 
     /* Desktop-only: dissolve the top header bar entirely instead of
@@ -2180,7 +2194,7 @@ html.dark #scene-register .dark\:bg-zinc-950 {
     /* --- Light mode: card backgrounds --- */
     html:not(.dark) #tab-controls #ctrl-system-mode-card,
     html:not(.dark) #tab-controls .ctrl-schedule-efficiency-card {
-        background: #f9faf9 !important;
+        background: #ffffff !important;
         border: 1px solid #edf1ee !important;
     }
 
@@ -3960,6 +3974,7 @@ html.dark #scene-register .dark\:bg-zinc-950 {
     #tab-yield #yield-analytics-section {
         grid-column: 1 !important;
         grid-row: 3 !important;
+        align-self: stretch !important;
     }
 
     #tab-yield #yield-drivers-card {
@@ -4014,7 +4029,7 @@ html.dark #scene-register .dark\:bg-zinc-950 {
 #tab-yield #yield-col-right,
 #tab-yield #yield-analytics-section {
     max-width: 100%;
-    overflow-x: hidden;
+    overflow-x: clip;
     min-width: 0;
 }
 

@@ -46,3 +46,9 @@
     z-index: 100;
 }
 
+
+@media (min-width: 1024px) {
+  .yield-custom-grid {
+    grid-template-columns: 3fr 2fr !important;
+  }
+}

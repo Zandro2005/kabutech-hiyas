@@ -1,0 +1,34 @@
+/* ================================================================
+   DESKTOP-ONLY: completely hide all scrollbars.
+   Scroll still works via mousewheel / trackpad / keyboard.
+   This file is loaded AFTER responsive.css so it wins any conflicts.
+   ================================================================ */
+@media (min-width: 768px) {
+    html,
+    body,
+    #scene-app,
+    #scene-app div,
+    #scene-app section,
+    #scene-app nav,
+    #scene-app ul,
+    #scene-app ol,
+    #app-scroll-area {
+        scrollbar-width: none !important;
+        -ms-overflow-style: none !important;
+    }
+
+    html::-webkit-scrollbar,
+    body::-webkit-scrollbar,
+    #scene-app div::-webkit-scrollbar,
+    #scene-app section::-webkit-scrollbar,
+    #scene-app nav::-webkit-scrollbar,
+    #scene-app ul::-webkit-scrollbar,
+    #scene-app ol::-webkit-scrollbar,
+    #app-scroll-area::-webkit-scrollbar,
+    #yield-daily-list::-webkit-scrollbar,
+    #yield-drivers-card::-webkit-scrollbar {
+        display: none !important;
+        width: 0 !important;
+        height: 0 !important;
+    }
+}

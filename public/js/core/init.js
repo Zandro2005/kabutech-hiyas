@@ -183,6 +183,16 @@ if ('serviceWorker' in navigator) {
                 });
             });
         }
+
+        // --- EXTRACT MODALS ---
+        // Move all modals out of #scene-app to the root body so they can 
+        // successfully cover and blur the desktop sidebar, bypassing the 
+        // local stacking context created by the absolute-positioned app shell.
+        document.querySelectorAll('[id^="modal-"]').forEach(modal => {
+            if (modal.closest('#scene-app')) {
+                document.body.appendChild(modal);
+            }
+        });
     }
 
     if (document.readyState === 'loading') {

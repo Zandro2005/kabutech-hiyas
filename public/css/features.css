@@ -183,3 +183,37 @@ input.ctrl-slider::-moz-range-progress {
     opacity: 1;
 }
 
+/* Crop Analytics Widgets */
+.crop-analytics-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 2rem;
+    margin-bottom: 2rem;
+}
+
+.crop-card {
+    background-color: var(--md-sys-color-surface-container-lowest, #ffffff);
+    border: 1px solid var(--md-sys-color-outline-variant, #e2e8f0);
+    border-radius: 1.5rem;
+    padding: 2rem;
+    box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.1);
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
+    display: flex;
+    flex-direction: column;
+}
+
+.crop-card > div[id^="crop-widget-"] {
+    flex-grow: 1;
+    display: flex;
+    flex-direction: column;
+}
+
+.dark .crop-card {
+    background-color: var(--md-sys-color-surface-container-lowest, #18181b);
+    border-color: var(--md-sys-color-outline-variant, #27272a);
+}
+
+.crop-card:hover {
+    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+    transform: translateY(-2px);
+}
