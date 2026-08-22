@@ -4197,13 +4197,11 @@ html.dark #scene-register .dark\:bg-zinc-950 {
 
     /* Card backgrounds: soft green tint (light) / mostly black with a
                faint green corner wash (dark) — green is an accent, not a fill */
-    #home-desktop-view #quick-controls-card,
     #home-desktop-view #farm-activity-feed-card {
         background: linear-gradient(160deg, #ffffff 0%, #f2fdf6 100%) !important;
         border: 1px solid #dcf5e5 !important;
     }
 
-    html.dark #home-desktop-view #quick-controls-card,
     html.dark #home-desktop-view #farm-activity-feed-card {
         background:
             radial-gradient(55% 45% at 100% 0%, rgba(16, 185, 129, 0.06) 0%, rgba(16, 185, 129, 0) 40%),
@@ -4212,7 +4210,6 @@ html.dark #scene-register .dark\:bg-zinc-950 {
     }
 
     /* Card titles */
-    #home-desktop-view #quick-controls-card h3,
     #home-desktop-view #farm-activity-feed-card h3 {
         color: #1e293b !important;
     }
@@ -4235,33 +4232,31 @@ html.dark #scene-register .dark\:bg-zinc-950 {
     }
 
     /* Quick control rows — OFF/default state only (leave the ON/active
-               mint-green highlight, which already uses pre-existing classes,
-               untouched by excluding [class*="7ef4a2"]). Rows stay near-black,
-               just barely lighter than the card so they read as distinct. */
-    #home-desktop-view [id^="btn-quick-"]:not([class*="7ef4a2"]) {
-        background: #ffffff !important;
-        border: 1px solid #e3f6ea !important;
+               state untouched by excluding .quick-active). */
+    #home-desktop-view [id^="btn-quick-"]:not(.quick-active) {
+        background: #f1f5f9 !important;
+        border: 1px solid #cbd5e1 !important;
         transition: background .2s ease, border-color .2s ease;
     }
 
-    html.dark #home-desktop-view [id^="btn-quick-"]:not([class*="7ef4a2"]) {
-        background: #202024 !important;
-        border: 1px solid #303035 !important;
+    html.dark #home-desktop-view [id^="btn-quick-"]:not(.quick-active) {
+        background: #27272a !important;
+        border: 1px solid #3f3f46 !important;
     }
 
-    html.dark #home-desktop-view [id^="btn-quick-"]:not([class*="7ef4a2"]):hover {
-        background: #26262b !important;
-        border-color: rgba(52, 211, 153, 0.3) !important;
+    html.dark #home-desktop-view [id^="btn-quick-"]:not(.quick-active):hover {
+        background: #3f3f46 !important;
+        border-color: rgba(52, 211, 153, 0.4) !important;
     }
 
-    /* Icon chips inside each row */
-    #home-desktop-view [id^="icon-container-quick-"]:not([class*="7ef4a2"]) {
-        background: #f1faf4 !important;
+    /* Icon chips inside each row — OFF state */
+    #home-desktop-view [id^="icon-container-quick-"]:not(.quick-active-icon) {
+        background: #e2e8f0 !important;
         color: #64748b !important;
-        border: 1px solid #e3f6ea !important;
+        border: none !important;
     }
 
-    html.dark #home-desktop-view [id^="icon-container-quick-"]:not([class*="7ef4a2"]) {
+    html.dark #home-desktop-view [id^="icon-container-quick-"]:not(.quick-active-icon) {
         background: #27272a !important;
         color: #e4e4e7 !important;
         border: 1px solid #3f3f46 !important;
@@ -4272,14 +4267,44 @@ html.dark #scene-register .dark\:bg-zinc-950 {
         color: #ffffff !important;
     }
 
-    /* OFF status text (exclude the green "ACTIVE" state) */
-    html.dark #home-desktop-view [id^="status-quick-"]:not([class*="7ef4a2"]) {
+    /* OFF status text */
+    html.dark #home-desktop-view [id^="status-quick-"]:not(.quick-active-status) {
         color: #a1a1aa !important;
     }
 
     /* Toggle pill — OFF state */
-    html.dark #home-desktop-view [id^="toggle-bg-quick-"]:not([class*="7ef4a2"]) {
+    html.dark #home-desktop-view [id^="toggle-bg-quick-"]:not(.quick-active-toggle) {
         background: #52525b !important;
+    }
+
+    /* ── Quick Controls: ACTIVE / ON state ── */
+    #home-desktop-view [id^="btn-quick-"].quick-active,
+    [id^="btn-quick-"].quick-active {
+        background: linear-gradient(135deg, #047857, #14532d) !important;
+        border: 2px solid #059669 !important;
+    }
+
+    [id^="btn-quick-"].quick-active [id^="icon-container-quick-"] {
+        background: rgba(255,255,255,0.25) !important;
+        color: #fff !important;
+        border: none !important;
+    }
+
+    [id^="btn-quick-"].quick-active [id^="label-quick-"],
+    [id^="btn-quick-"].quick-active span.font-extrabold {
+        color: #fff !important;
+    }
+
+    [id^="btn-quick-"].quick-active [id^="status-quick-"] {
+        color: rgba(255,255,255,0.9) !important;
+    }
+
+    [id^="btn-quick-"].quick-active [id^="uptime-quick-"] {
+        color: rgba(255,255,255,0.8) !important;
+    }
+
+    [id^="btn-quick-"].quick-active [id^="icon-quick-"] {
+        color: #fff !important;
     }
 
     /* Activity feed rows: dividers + default (non-colored) text */
@@ -5465,6 +5490,69 @@ html.dark #scene-register .dark\:bg-zinc-950 {
 @media (max-width: 767px) {
     .crop-analytics-grid {
         grid-template-columns: 1fr;
-        gap: 0.75rem;
+        gap: 1rem; /* Moderate spacing between widgets */
+    }
+    
+    .crop-card {
+        zoom: 0.75; /* Proportionally shrink everything inside by 25% */
+        padding: 1rem !important;
+        min-height: auto;
+    }
+}
+
+/* ══════════════════════════════════════════════════════════════════
+   Quick Device Controls — ACTIVE state (global, works on mobile + desktop)
+   ══════════════════════════════════════════════════════════════════ */
+[id^="btn-quick-"].quick-active {
+    background: linear-gradient(135deg, #047857, #14532d) !important;
+    border: 2px solid #059669 !important;
+    transition: all 0.3s ease !important;
+}
+
+html.dark [id^="btn-quick-"].quick-active {
+    box-shadow: 0 0 20px rgba(16, 185, 129, 0.35) !important;
+}
+
+[id^="btn-quick-"].quick-active [id^="icon-container-quick-"] {
+    background: rgba(255,255,255,0.25) !important;
+    color: #fff !important;
+    border: none !important;
+}
+
+[id^="btn-quick-"].quick-active [id^="label-quick-"],
+[id^="btn-quick-"].quick-active span.font-extrabold {
+    color: #fff !important;
+    text-shadow: 0 1px 2px rgba(0,0,0,0.12);
+}
+
+[id^="btn-quick-"].quick-active [id^="status-quick-"] {
+    color: rgba(255,255,255,0.9) !important;
+}
+
+[id^="btn-quick-"].quick-active [id^="uptime-quick-"] {
+    color: rgba(255,255,255,0.8) !important;
+}
+
+[id^="btn-quick-"].quick-active [id^="icon-quick-"] {
+    color: #fff !important;
+}
+/* Global Body Background Gradient (Overrides everything) */
+body {
+    background: linear-gradient(135deg, #ecfdf5 0%, #d1fae5 100%) !important;
+}
+
+html.dark body {
+    background: radial-gradient(circle at top left, rgba(6, 78, 59, 0.35) 0%, #09090b 60%, #09090b 100%) !important;
+}
+
+/* Make wrappers transparent so the body gradient is visible */
+#app-scroll-area,
+#app-wrapper {
+    background: transparent !important;
+}
+
+@media (max-width: 767px) {
+    #daily-harvest-limit {
+        font-size: 12px !important;
     }
 }

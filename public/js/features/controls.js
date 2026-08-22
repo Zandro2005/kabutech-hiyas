@@ -92,51 +92,73 @@ function syncControlsUI() {
     // Quick toggles UI sync
     const devices = ['fans', 'misters', 'lights'];
     devices.forEach(d => {
-        const btn = document.getElementById(`btn-quick-${d}`);
-        const status = document.getElementById(`status-quick-${d}`);
-        const icon = document.getElementById(`icon-quick-${d}`);
-        const iconContainer = document.getElementById(`icon-container-quick-${d}`);
-        const toggleBg = document.getElementById(`toggle-bg-quick-${d}`);
-        const toggleDot = document.getElementById(`toggle-dot-quick-${d}`);
-        const dot = document.getElementById(`sim-${d}-dot`);
-        const uptime = document.getElementById(`uptime-quick-${d}`);
+        ['', '-mobile'].forEach(suffix => {
+            const btn = document.getElementById(`btn-quick-${d}${suffix}`);
+            const status = document.getElementById(`status-quick-${d}${suffix}`);
+            const icon = document.getElementById(`icon-quick-${d}${suffix}`);
+            const iconContainer = document.getElementById(`icon-container-quick-${d}${suffix}`);
+            const label = document.getElementById(`label-quick-${d}${suffix}`);
+            const uptime = document.getElementById(`uptime-quick-${d}${suffix}`);
+            
+            const isMobile = suffix === '-mobile';
+            const iconSize = isMobile ? 'w-9 h-9' : 'w-9 h-9 md:w-8 md:h-8';
+            const textSizeLabel = isMobile ? 'text-[11px]' : 'text-[11px] md:text-[10px]';
+            const textSizeStatus = isMobile ? 'text-[9px]' : 'text-[9px] md:text-[8px]';
 
+            if (state.deviceStates[d]) {
+                // Active (ON) state — add .quick-active, CSS handles the green styling
+                if (btn) {
+                    btn.classList.add('quick-active');
+                    btn.style.cssText = '';
+                }
+                if (iconContainer) iconContainer.classList.add('quick-active-icon');
+                if (label) {
+                    label.className = `font-extrabold`;
+                }
+                if (status) {
+                    status.classList.add('quick-active-status');
+                    status.innerText = "ACTIVE";
+                }
+                if (uptime && state.deviceUptimeStart && state.deviceUptimeStart[d]) {
+                    const mins = Math.floor((Date.now() - state.deviceUptimeStart[d]) / 60000);
+                    uptime.classList.remove('hidden');
+                    uptime.innerText = mins < 1 ? 'just now' : `${mins}m`;
+                }
+                if (icon) {
+                    if (d === 'fans') icon.className = `material-symbols-outlined text-[20px] animate-spin-slow`;
+                    else icon.className = `material-symbols-outlined text-[20px] animate-pulse`;
+                }
+            } else {
+                // Inactive (OFF) state — remove .quick-active, CSS handles the default styling
+                if (btn) {
+                    btn.classList.remove('quick-active');
+                    btn.style.cssText = '';
+                }
+                if (iconContainer) iconContainer.classList.remove('quick-active-icon');
+                if (label) {
+                    label.className = `text-[11px] font-bold text-slate-800 dark:text-zinc-100`;
+                }
+                if (status) {
+                    status.classList.remove('quick-active-status');
+                    status.innerText = "OFF";
+                }
+                if (uptime) {
+                    uptime.innerText = '';
+                    uptime.classList.add('hidden');
+                }
+                if (icon) icon.className = `material-symbols-outlined text-[20px]`;
+            }
+        });
+        
+        // Sim dot updates are outside the suffix loop
+        const dot = document.getElementById(`sim-${d}-dot`);
+        const dotMobile = document.getElementById(`sim-${d}-dot-mobile`);
         if (state.deviceStates[d]) {
-            // Active (ON) state classes
-            if (btn) btn.className = "flex items-center justify-between w-full p-4 rounded-2xl border bg-[#7ef4a2]/5 dark:bg-emerald-950/20 border-[#7ef4a2] hover:bg-[#7ef4a2]/10 transition-all select-none";
-            if (iconContainer) iconContainer.className = "w-10 h-10 rounded-xl bg-[#7ef4a2] dark:bg-emerald-800 flex items-center justify-center text-[#032514] dark:text-[#7ef4a2] border-transparent";
-            if (toggleBg) toggleBg.className = "relative w-9 h-5 bg-[#7ef4a2] rounded-full transition-colors duration-200 flex items-center p-0.5";
-            if (toggleDot) toggleDot.className = "w-4 h-4 bg-white rounded-full shadow-md transform transition-transform duration-200 translate-x-4";
-            if (status) {
-                status.className = "text-[10px] text-[#15803d] dark:text-[#7ef4a2] font-bold uppercase tracking-wide";
-                status.innerText = "ACTIVE";
-            }
             if (dot) dot.className = "w-1.5 h-1.5 rounded-full bg-success-green animate-ping";
-            if (uptime && state.deviceUptimeStart && state.deviceUptimeStart[d]) {
-                const mins = Math.floor((Date.now() - state.deviceUptimeStart[d]) / 60000);
-                uptime.classList.remove('hidden');
-                uptime.innerText = mins < 1 ? 'just now' : `${mins}m`;
-            }
-            if (icon) {
-                if (d === 'fans') icon.className = "material-symbols-outlined text-[20px] animate-spin-slow";
-                else icon.className = "material-symbols-outlined text-[20px] animate-pulse";
-            }
+            if (dotMobile) dotMobile.className = "w-1.5 h-1.5 rounded-full bg-success-green animate-ping";
         } else {
-            // Inactive (OFF) state classes
-            if (btn) btn.className = "flex items-center justify-between w-full p-4 rounded-2xl border bg-white dark:bg-zinc-900 border-slate-100 dark:border-zinc-800 hover:bg-slate-50 dark:hover:bg-zinc-800/50 transition-all select-none";
-            if (iconContainer) iconContainer.className = "w-10 h-10 rounded-xl bg-slate-50 dark:bg-zinc-800 flex items-center justify-center text-slate-400 dark:text-zinc-500 border border-slate-100 dark:border-zinc-700";
-            if (toggleBg) toggleBg.className = "relative w-9 h-5 bg-slate-200 dark:bg-zinc-700 rounded-full transition-colors duration-200 flex items-center p-0.5";
-            if (toggleDot) toggleDot.className = "w-4 h-4 bg-white rounded-full shadow-md transform transition-transform duration-200 translate-x-0";
-            if (status) {
-                status.className = "text-[10px] text-slate-400 dark:text-zinc-500 uppercase tracking-wide";
-                status.innerText = "OFF";
-            }
-            if (icon) icon.className = "material-symbols-outlined text-[20px]";
             if (dot) dot.className = "w-1.5 h-1.5 rounded-full bg-slate-300";
-            if (uptime) {
-                uptime.innerText = '';
-                uptime.classList.add('hidden');
-            }
+            if (dotMobile) dotMobile.className = "w-1.5 h-1.5 rounded-full bg-slate-300";
             if (state.deviceUptimeStart) state.deviceUptimeStart[d] = null;
         }
     });
