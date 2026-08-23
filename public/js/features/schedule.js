@@ -473,6 +473,7 @@ function applySchedulePreset(key) {
 }
 
 function exportProtocolSummary() {
+    alert("1. Export button clicked!");
     const sc = scheduleConfig;
     const fmt = t => _schedMinToLabel(_schedTimeToMin(t));
     const lines = [
@@ -496,8 +497,14 @@ function exportProtocolSummary() {
     
     // Check if we are running inside the Flutter app with the bridge
     if (window.ExportChannel) {
-        window.ExportChannel.postMessage(summaryText);
+        alert("2. Found ExportChannel! Triggering Android Share menu...");
+        try {
+            window.ExportChannel.postMessage(summaryText);
+        } catch(e) {
+            alert("Error in Flutter bridge: " + e.message);
+        }
     } else {
+        alert("2. ExportChannel NOT found. Falling back to web download.");
         // Fallback to standard web download
         const blob = new Blob([summaryText], { type: 'text/plain' });
         const url = URL.createObjectURL(blob);
