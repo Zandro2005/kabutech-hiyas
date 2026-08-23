@@ -6,17 +6,7 @@
     <meta name="viewport"
         content="width=device-width, initial-scale=1, minimum-scale=0.5, maximum-scale=5, user-scalable=yes">
 
-    <script>
-        // Restore the user's saved zoom level as early as possible (before
-        // first paint) so there's no flash of the page at the wrong size.
-        (function () {
-            var MIN_ZOOM = 0.8, MAX_ZOOM = 1.4;
-            var saved = parseFloat(localStorage.getItem('kb_zoom_level'));
-            if (isNaN(saved)) saved = 1;
-            saved = Math.min(MAX_ZOOM, Math.max(MIN_ZOOM, saved));
-            document.documentElement.style.setProperty('--user-zoom', saved);
-        })();
-    </script>
+
     <script>
         // App boot gate: the whole app stays hidden behind #app-boot-loader
         // until EVERYTHING it needs is ready — the Material Symbols font,
@@ -299,15 +289,7 @@
         <div id="notch" class="phone-notch hidden"></div>
         <div id="home-indicator" class="phone-indicator hidden"></div>
 
-        <!-- Floating Zoom Control: lets the user scale the whole app UI
-             up or down (clamped so it never gets unreadably small or
-             so large it breaks the layout), without altering any
-             individual element's spacing or formatting. -->
-        <div id="zoom-control" role="group" aria-label="App zoom controls">
-            <button id="zoom-in-btn" type="button" onclick="appZoomIn()" aria-label="Zoom in">+</button>
-            <span id="zoom-level-label">100%</span>
-            <button id="zoom-out-btn" type="button" onclick="appZoomOut()" aria-label="Zoom out">&minus;</button>
-        </div>
+
 
         <!-- Toast Notifications Layer -->
         <div id="toast-container" class="absolute left-4 right-4 z-[99] flex flex-col gap-2 pointer-events-none"
@@ -6240,7 +6222,7 @@
     <script src="./js/features/live-view.js"></script>
     <script src="./js/features/crop-analytics.js?v=4"></script>
     <!-- Desktop enhancements -->
-    <script src="./js/desktop/zoom.js"></script>
+
     <script src="./js/desktop/sidebar.js"></script>
 
     <!-- Post-init -->

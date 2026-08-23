@@ -1,0 +1,7 @@
+- generic [active] [ref=e1]:
+  - generic:
+    - paragraph: KabuTech Hiyas
+  - group "App zoom controls" [ref=e3]:
+    - button "Zoom in" [ref=e4] [cursor=pointer]: +
+    - generic [ref=e5]: 100%
+    - button "Zoom out" [ref=e6] [cursor=pointer]: −

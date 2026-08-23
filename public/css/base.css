@@ -508,7 +508,7 @@ html:has(#scene-register:not(.hidden)) {
                instead of staying a fixed px size that causes more wrapping
                on narrower screens. */
     html {
-        font-size: calc(clamp(11px, 3.55vw, 14px) * var(--user-zoom, 1));
+        font-size: calc(clamp(7.5px, 2.6vw, 14px) * var(--user-zoom, 1));
     }
 
     /* Login/Register screens are designed with the standard 16px
@@ -602,11 +602,11 @@ html:has(#scene-register:not(.hidden)) {
     /* Bottom nav: admin has 6 tabs vs staff's 5 — shrink icons/labels
                slightly so all items fit without crowding or overflow. */
     #app-wrapper nav button .material-symbols-outlined {
-        font-size: 1.35rem !important;
+        font-size: 1.6rem !important;
     }
 
     #app-wrapper nav button [class*="text-[10px]"] {
-        font-size: 0.65rem !important;
+        font-size: 0.85rem !important;
     }
 
     #app-wrapper nav:not(.ob-nav) {

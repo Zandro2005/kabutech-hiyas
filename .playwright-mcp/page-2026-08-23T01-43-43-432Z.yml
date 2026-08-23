@@ -1,0 +1,9 @@
+- generic [active] [ref=f2e1]:
+  - generic:
+    - paragraph: KabuTech Hiyas
+  - generic [ref=f2e3]:
+    - generic [ref=f2e5]:
+      - generic [ref=f2e6]: energy_savings_leaf
+      - heading "KabuTech Hiyas" [level=1] [ref=f2e8]
+      - paragraph [ref=f2e9]: Initializing Farm Intelligence...
+    - text: · SETPOINT TARGETS
