@@ -38,6 +38,16 @@ jobs:
           # Copy main.dart from the repo
           cp $GITHUB_WORKSPACE/android_main.dart lib/main.dart
 
+          # Change App Name to KabuTech
+          sed -i 's/android:label=".*"/android:label="KabuTech"/g' android/app/src/main/AndroidManifest.xml
+
+          # Set App Icon using flutter_launcher_icons
+          flutter pub add --dev flutter_launcher_icons
+          echo "flutter_launcher_icons:" > flutter_launcher_icons.yaml
+          echo "  android: true" >> flutter_launcher_icons.yaml
+          echo "  image_path: \"$GITHUB_WORKSPACE/public/assets/logo.png\"" >> flutter_launcher_icons.yaml
+          dart run flutter_launcher_icons
+
           # Add internet permission for Android
           sed -i 's/<application/<uses-permission android:name="android.permission.INTERNET" \/>\n    <application/' android/app/src/main/AndroidManifest.xml
 
