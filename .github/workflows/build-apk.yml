@@ -32,8 +32,9 @@ jobs:
           flutter create mobile_app --platforms android
           cd mobile_app
           
-          # Add webview package
+          # Add webview and share packages
           flutter pub add webview_flutter
+          flutter pub add share_plus
 
           # Copy main.dart from the repo
           cp $GITHUB_WORKSPACE/android_main.dart lib/main.dart

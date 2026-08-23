@@ -743,3 +743,15 @@ html:has(#scene-register:not(.hidden)) {
     }
 }
 
+
+ / *   M a k e   a p p   f e e l   m o r e   n a t i v e   i n s i d e   W e b V i e w s   * / 
+ b o d y   { 
+         - w e b k i t - t a p - h i g h l i g h t - c o l o r :   t r a n s p a r e n t ; 
+         - w e b k i t - t o u c h - c a l l o u t :   n o n e ; 
+         u s e r - s e l e c t :   n o n e ; 
+         o v e r s c r o l l - b e h a v i o r - y :   n o n e ; 
+ } 
+ i n p u t ,   t e x t a r e a   { 
+         u s e r - s e l e c t :   a u t o ; 
+ }  
+ 

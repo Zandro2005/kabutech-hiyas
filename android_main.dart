@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:webview_flutter/webview_flutter.dart';
+import 'package:share_plus/share_plus.dart';
 
 void main() {
   runApp(const MyApp());
@@ -38,6 +39,12 @@ class _WebViewAppState extends State<WebViewApp> {
     controller = WebViewController()
       ..setJavaScriptMode(JavaScriptMode.unrestricted)
       ..setBackgroundColor(const Color(0xFFFFFFFF))
+      ..addJavaScriptChannel(
+        'ExportChannel',
+        onMessageReceived: (JavaScriptMessage message) {
+          Share.share(message.message, subject: 'KabuTech Protocol Summary');
+        },
+      )
       ..loadRequest(Uri.parse('https://kabutech-hiyas.web.app'));
   }
 

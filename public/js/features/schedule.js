@@ -492,15 +492,23 @@ function exportProtocolSummary() {
         '',
         `Estimated daily energy: ${document.getElementById('sched-dsk-energy-kwh')?.textContent || '0.0'} kWh (${document.getElementById('sched-dsk-energy-cost')?.textContent || '$0.00'}/day)`
     ];
-    const blob = new Blob([lines.join('\n')], { type: 'text/plain' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `kabutech-protocol-summary-${new Date().toISOString().slice(0, 10)}.txt`;
-    document.body.appendChild(a);
-    a.click();
-    a.remove();
-    URL.revokeObjectURL(url);
+    const summaryText = lines.join('\n');
+    
+    // Check if we are running inside the Flutter app with the bridge
+    if (window.ExportChannel) {
+        window.ExportChannel.postMessage(summaryText);
+    } else {
+        // Fallback to standard web download
+        const blob = new Blob([summaryText], { type: 'text/plain' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `kabutech-protocol-summary-${new Date().toISOString().slice(0, 10)}.txt`;
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+        URL.revokeObjectURL(url);
+    }
     pushSchedNotification('Protocol summary <strong>exported</strong>', 'saved');
 }
 
