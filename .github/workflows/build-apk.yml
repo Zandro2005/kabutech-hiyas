@@ -1,0 +1,103 @@
+name: Build Flutter APK
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Setup Java
+        uses: actions/setup-java@v3
+        with:
+          distribution: 'zulu'
+          java-version: '17'
+
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: 'stable'
+
+      - name: Create Flutter App
+        run: |
+          # Create a new flutter app outside the current directory so it doesn't conflict
+          cd ..
+          flutter create mobile_app --platforms android
+          cd mobile_app
+          
+          # Add webview package
+          flutter pub add webview_flutter
+
+          # Replace main.dart with our custom webview code
+          cat << 'EOF' > lib/main.dart
+          import 'package:flutter/material.dart';
+          import 'package:webview_flutter/webview_flutter.dart';
+
+          void main() {
+            runApp(const MyApp());
+          }
+
+          class MyApp extends StatelessWidget {
+            const MyApp({super.key});
+
+            @override
+            Widget build(BuildContext context) {
+              return MaterialApp(
+                title: 'Kabutech Hiyas',
+                theme: ThemeData(
+                  colorScheme: ColorScheme.fromSeed(seedColor: Colors.blue),
+                  useMaterial3: true,
+                ),
+                home: const WebViewApp(),
+                debugShowCheckedModeBanner: false,
+              );
+            }
+          }
+
+          class WebViewApp extends StatefulWidget {
+            const WebViewApp({super.key});
+
+            @override
+            State<WebViewApp> createState() => _WebViewAppState();
+          }
+
+          class _WebViewAppState extends State<WebViewApp> {
+            late final WebViewController controller;
+
+            @override
+            void initState() {
+              super.initState();
+              controller = WebViewController()
+                ..setJavaScriptMode(JavaScriptMode.unrestricted)
+                ..setBackgroundColor(const Color(0xFFFFFFFF))
+                ..loadRequest(Uri.parse('https://kabutech-hiyas.web.app'));
+            }
+
+            @override
+            Widget build(BuildContext context) {
+              return Scaffold(
+                body: SafeArea(
+                  child: WebViewWidget(controller: controller),
+                ),
+              );
+            }
+          }
+          EOF
+
+          # Add internet permission for Android
+          sed -i 's/<application/<uses-permission android:name="android.permission.INTERNET" \/>\n    <application/' android/app/src/main/AndroidManifest.xml
+
+          # Build APK
+          flutter build apk --release
+
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: kabutech-hiyas-apk
+          path: ../mobile_app/build/app/outputs/flutter-apk/app-release.apk
