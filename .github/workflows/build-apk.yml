@@ -36,7 +36,7 @@ jobs:
           flutter pub add webview_flutter
 
           # Copy main.dart from the repo
-          cp ../android_main.dart lib/main.dart
+          cp $GITHUB_WORKSPACE/android_main.dart lib/main.dart
 
           # Add internet permission for Android
           sed -i 's/<application/<uses-permission android:name="android.permission.INTERNET" \/>\n    <application/' android/app/src/main/AndroidManifest.xml
