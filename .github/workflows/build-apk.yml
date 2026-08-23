@@ -28,6 +28,7 @@ jobs:
         run: |
           # Create a new flutter app outside the current directory so it doesn't conflict
           cd ..
+          flutter config --no-analytics
           flutter create mobile_app --platforms android
           cd mobile_app
           
@@ -88,7 +89,7 @@ jobs:
               );
             }
           }
-          EOF
+EOF
 
           # Add internet permission for Android
           sed -i 's/<application/<uses-permission android:name="android.permission.INTERNET" \/>\n    <application/' android/app/src/main/AndroidManifest.xml
