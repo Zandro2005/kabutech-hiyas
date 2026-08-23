@@ -45,7 +45,7 @@ class _WebViewAppState extends State<WebViewApp> {
           Share.share(message.message, subject: 'KabuTech Protocol Summary');
         },
       )
-      ..loadRequest(Uri.parse('https://kabutech-hiyas.web.app'));
+      ..loadRequest(Uri.parse('https://kabutech-hiyas.web.app/?v=${DateTime.now().millisecondsSinceEpoch}'));
   }
 
   @override
