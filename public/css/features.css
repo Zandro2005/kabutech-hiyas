@@ -202,7 +202,7 @@ input.ctrl-slider::-moz-range-progress {
     flex-direction: column;
 }
 
-.crop-card > div[id^="crop-widget-"] {
+.crop-card>div[id^="crop-widget-"] {
     flex-grow: 1;
     display: flex;
     flex-direction: column;
@@ -216,4 +216,8 @@ input.ctrl-slider::-moz-range-progress {
 .crop-card:hover {
     box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
     transform: translateY(-2px);
+}
+
+.quick-device-card {
+    height: 115px !important;
 }
