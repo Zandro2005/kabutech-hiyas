@@ -26,8 +26,8 @@ jobs:
 
       - name: Create Flutter App
         run: |
-          # Create a new flutter app outside the current directory so it doesn't conflict
-          cd ..
+          # Create a new flutter app inside the current directory
+          flutter config --no-analytics
           flutter config --no-analytics
           flutter create mobile_app --platforms android
           cd mobile_app
@@ -48,4 +48,4 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: kabutech-hiyas-apk
-          path: ../mobile_app/build/app/outputs/flutter-apk/app-release.apk
+          path: mobile_app/build/app/outputs/flutter-apk/app-release.apk
