@@ -27,15 +27,26 @@ export interface SettingsData {
   yieldTarget?: number;
 }
 
+export interface HarvestLogData {
+  date: string;
+  grams: number;
+}
+
+export interface BagData {
+  id: number | string;
+  status: 'Active' | 'Empty' | 'Contaminated';
+  harvestLog?: HarvestLogData[] | Record<string, HarvestLogData>;
+}
+
 export interface BatchData {
   firebaseKey: string | number;
   id?: string | number;
   rack?: string;
   substrate?: string;
   archived?: boolean;
-  bags?: any;
-  historicalHarvests?: any;
-  [key: string]: any;
+  setupDate?: string;
+  bags?: BagData[] | Record<string, BagData>;
+  historicalHarvests?: HarvestLogData[] | Record<string, HarvestLogData>;
 }
 
 export interface AlertData {

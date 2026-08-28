@@ -6,6 +6,7 @@ import ScreenHeader from '../components/ScreenHeader';
 import { useFirebaseData } from '../hooks/useFirebaseData';
 import YieldChart from '../components/yield/YieldChart';
 import DailyHarvestList from '../components/yield/DailyHarvestList';
+import { getRackStats } from '../utils/dataHelpers';
 
 export default function YieldScreen() {
   const [filterDays, setFilterDays] = useState<number | 'All'>(5);
@@ -22,44 +23,21 @@ export default function YieldScreen() {
     batches.forEach(rack => {
       const rackName = rack.rack || 'Unknown Rack';
       allRackNames.add(rackName);
-      if (rack.bags) {
-        Object.values(rack.bags).filter((b: any) => b != null).forEach((bag: any) => {
-          if (bag.harvestLog) {
-            Object.values(bag.harvestLog).filter((l: any) => l != null).forEach((log: any) => {
-              if (log.grams) {
-                totalHarvestGrams += log.grams;
-                
-                // Track daily
-                if (log.date) {
-                  if (!dailyMap[log.date]) {
-                    dailyMap[log.date] = { count: 0, grams: 0, racks: new Set(), rackYields: {} };
-                  }
-                  dailyMap[log.date].count += 1;
-                  dailyMap[log.date].grams += log.grams;
-                  dailyMap[log.date].racks.add(rackName);
-                  dailyMap[log.date].rackYields[rackName] = (dailyMap[log.date].rackYields[rackName] || 0) + log.grams;
-                }
-              }
-            });
+      
+      const { allHarvestLogs } = getRackStats(rack);
+      
+      allHarvestLogs.forEach(log => {
+        totalHarvestGrams += log.grams;
+        if (log.date) {
+          if (!dailyMap[log.date]) {
+            dailyMap[log.date] = { count: 0, grams: 0, racks: new Set(), rackYields: {} };
           }
-        });
-      }
-      if (rack.historicalHarvests) {
-        Object.values(rack.historicalHarvests).filter((l: any) => l != null).forEach((log: any) => {
-          if (log.grams) {
-            totalHarvestGrams += log.grams;
-            if (log.date) {
-              if (!dailyMap[log.date]) {
-                dailyMap[log.date] = { count: 0, grams: 0, racks: new Set(), rackYields: {} };
-              }
-              dailyMap[log.date].count += 1;
-              dailyMap[log.date].grams += log.grams;
-              dailyMap[log.date].racks.add(rackName);
-              dailyMap[log.date].rackYields[rackName] = (dailyMap[log.date].rackYields[rackName] || 0) + log.grams;
-            }
-          }
-        });
-      }
+          dailyMap[log.date].count += 1;
+          dailyMap[log.date].grams += log.grams;
+          dailyMap[log.date].racks.add(rackName);
+          dailyMap[log.date].rackYields[rackName] = (dailyMap[log.date].rackYields[rackName] || 0) + log.grams;
+        }
+      });
     });
   }
 

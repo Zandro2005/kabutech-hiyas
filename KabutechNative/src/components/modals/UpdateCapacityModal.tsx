@@ -7,51 +7,38 @@ import { playSuccessSound } from '../../utils/SoundManager';
 import ActionModal from '../ActionModal';
 import tw from '../../tailwind';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
+import { BatchData } from '../../types/firebase';
+import { getRackStats } from '../../utils/dataHelpers';
 
 interface UpdateCapacityModalProps {
   visible: boolean;
   onClose: () => void;
-  racks: any[];
-  preselectedRackId?: string | number | null;
+  selectedRack: BatchData | null;
 }
 
-export default function UpdateCapacityModal({ visible, onClose, racks, preselectedRackId }: UpdateCapacityModalProps) {
-  const [selectedRackId, setSelectedRackId] = useState<string | number | null>(preselectedRackId || null);
+export default function UpdateCapacityModal({ visible, onClose, selectedRack }: UpdateCapacityModalProps) {
   const [activeBags, setActiveBags] = useState('0');
   const [emptyBags, setEmptyBags] = useState('0');
   const [loading, setLoading] = useState(false);
-  const [showDropdown, setShowDropdown] = useState(false);
 
   useEffect(() => {
-    if (visible && preselectedRackId !== undefined) {
-      setSelectedRackId(preselectedRackId);
-    }
-  }, [visible, preselectedRackId]);
-
-  const selectedRack = racks.find(r => r.id === selectedRackId);
-
-  useEffect(() => {
-    if (selectedRack && selectedRack.bags) {
-      const bags = Array.isArray(selectedRack.bags) ? selectedRack.bags : Object.values(selectedRack.bags);
-      const activeCount = bags.filter((b: any) => b && b.status !== 'Empty').length;
-      const emptyCount = bags.filter((b: any) => b && b.status === 'Empty').length;
-      setActiveBags(activeCount.toString());
-      setEmptyBags(emptyCount.toString());
+    if (visible && selectedRack) {
+      const stats = getRackStats(selectedRack);
+      setActiveBags(stats.activeBags.length.toString());
+      setEmptyBags(stats.emptyBags.length.toString());
     } else {
       setActiveBags('0');
       setEmptyBags('0');
     }
-  }, [selectedRackId, selectedRack]);
+  }, [visible, selectedRack]);
 
   const totalCapacity = parseInt(activeBags || '0', 10) + parseInt(emptyBags || '0', 10);
 
   const handleSave = async () => {
-    if (!selectedRackId) {
+    if (!selectedRack) {
       showToast({ type: 'error', text1: 'Missing Info', text2: 'Please select a rack.' });
       return;
     }
-
-    if (!selectedRack) return;
 
     const emptyTarget = parseInt(emptyBags || '0', 10);
     const activeTarget = parseInt(activeBags || '0', 10);
@@ -63,25 +50,20 @@ export default function UpdateCapacityModal({ visible, onClose, racks, preselect
     
     setLoading(true);
     try {
-      const currentBags = selectedRack.bags ? (Array.isArray(selectedRack.bags) ? [...selectedRack.bags] : Object.values(selectedRack.bags)) : [];
-      let updatedBags = [...currentBags];
-      const emptyTarget = parseInt(emptyBags || '0', 10);
-      const activeTarget = parseInt(activeBags || '0', 10);
-      const currentEmptyCount = updatedBags.filter((b: any) => b && b.status === 'Empty').length;
-      const currentActiveCount = updatedBags.filter((b: any) => b && b.status !== 'Empty').length;
-      
+      const stats = getRackStats(selectedRack);
+      let updatedBags = [...stats.bags];
       let highestId = updatedBags.reduce((max, b: any) => (b && b.id > max ? b.id : max), 0);
       let updatedHistorical = selectedRack.historicalHarvests ? (Array.isArray(selectedRack.historicalHarvests) ? [...selectedRack.historicalHarvests] : Object.values(selectedRack.historicalHarvests)) : [];
 
       // Handle Empty Bags
-      if (emptyTarget > currentEmptyCount) {
-        const diff = emptyTarget - currentEmptyCount;
+      if (emptyTarget > stats.emptyBags.length) {
+        const diff = emptyTarget - stats.emptyBags.length;
         for (let i = 0; i < diff; i++) {
           highestId++;
           updatedBags.push({ id: highestId, status: 'Empty', harvestLog: [] });
         }
-      } else if (emptyTarget < currentEmptyCount) {
-        let diff = currentEmptyCount - emptyTarget;
+      } else if (emptyTarget < stats.emptyBags.length) {
+        let diff = stats.emptyBags.length - emptyTarget;
         for (let i = updatedBags.length - 1; i >= 0 && diff > 0; i--) {
           if (updatedBags[i] && updatedBags[i].status === 'Empty') {
             updatedBags.splice(i, 1);
@@ -91,14 +73,14 @@ export default function UpdateCapacityModal({ visible, onClose, racks, preselect
       }
 
       // Handle Active Bags
-      if (activeTarget > currentActiveCount) {
-        const diff = activeTarget - currentActiveCount;
+      if (activeTarget > stats.activeBags.length) {
+        const diff = activeTarget - stats.activeBags.length;
         for (let i = 0; i < diff; i++) {
           highestId++;
           updatedBags.push({ id: highestId, status: 'Active', harvestLog: [] });
         }
-      } else if (activeTarget < currentActiveCount) {
-        let diff = currentActiveCount - activeTarget;
+      } else if (activeTarget < stats.activeBags.length) {
+        let diff = stats.activeBags.length - activeTarget;
         for (let i = updatedBags.length - 1; i >= 0 && diff > 0; i--) {
           if (updatedBags[i] && updatedBags[i].status !== 'Empty') {
             const removed = updatedBags.splice(i, 1)[0];
@@ -113,21 +95,20 @@ export default function UpdateCapacityModal({ visible, onClose, racks, preselect
         }
       }
 
-      if (!selectedRack || selectedRack.firebaseKey === undefined) throw new Error("Rack not found");
+      if (selectedRack.firebaseKey === undefined) throw new Error("Rack not found");
 
       update(ref(db, `kabutech/batches/${selectedRack.firebaseKey}`), {
         bags: updatedBags,
         historicalHarvests: updatedHistorical
+      }).then(() => {
+        playSuccessSound();
+        showToast({ type: 'success', text1: 'Success', text2: `Capacity updated. Total: ${updatedBags.length}` });
       }).catch(error => {
         showToast({ type: 'error', text1: 'Error', text2: 'Failed to update capacity.' });
         console.error(error);
       });
 
       onClose();
-      setTimeout(() => {
-        playSuccessSound();
-        showToast({ type: 'success', text1: 'Success', text2: `Capacity updated. Total slots: ${updatedBags.length}` });
-      }, 600);
     } catch (error) {
       showToast({ type: 'error', text1: 'Error', text2: 'An unexpected error occurred.' });
       console.error(error);
@@ -137,43 +118,8 @@ export default function UpdateCapacityModal({ visible, onClose, racks, preselect
   };
 
   return (
-    <ActionModal visible={visible} onClose={onClose} title="Update Capacity" iconName="archive">
+    <ActionModal visible={visible} onClose={onClose} title="Update Capacity" iconName="plus-minus-variant">
       <View style={tw`gap-4`}>
-        {/* Rack Dropdown */}
-        {!preselectedRackId && (
-          <View style={tw`z-50`}>
-            <Text style={tw`text-[10px] font-bold text-gray-500 uppercase tracking-wider mb-1.5`}>SELECT RACK</Text>
-            <TouchableOpacity 
-              onPress={() => setShowDropdown(!showDropdown)}
-              style={tw`bg-[#f4fbf7] border border-green-100 rounded-xl px-4 py-3.5 flex-row justify-between items-center`}
-            >
-              <Text style={tw`text-gray-800 ${selectedRack ? 'font-bold' : ''}`}>
-                {selectedRack ? selectedRack.rack : 'Select a Rack'}
-              </Text>
-              <MaterialCommunityIcons name={showDropdown ? "chevron-up" : "chevron-down"} size={20} color="#166534" />
-            </TouchableOpacity>
-            
-            {showDropdown && (
-              <View style={tw`absolute top-16 left-0 right-0 bg-white border border-gray-100 rounded-xl shadow-lg max-h-48 overflow-hidden z-50`}>
-                <ScrollView nestedScrollEnabled>
-                  {racks.filter(r => !r.archived).map((r, idx) => (
-                    <TouchableOpacity
-                      key={r.id || idx}
-                      style={tw`px-4 py-3 border-b border-gray-50 flex-row justify-between`}
-                      onPress={() => {
-                        setSelectedRackId(r.id);
-                        setShowDropdown(false);
-                      }}
-                    >
-                      <Text style={tw`text-gray-800 font-semibold`}>{r.rack}</Text>
-                    </TouchableOpacity>
-                  ))}
-                </ScrollView>
-              </View>
-            )}
-          </View>
-        )}
-
         {/* Capacity Inputs */}
         <View style={tw`flex-row gap-3 mt-4 z-10`}>
           <View style={tw`flex-1`}>
