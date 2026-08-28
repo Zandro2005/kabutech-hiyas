@@ -12,11 +12,11 @@ interface UpdateCapacityModalProps {
   visible: boolean;
   onClose: () => void;
   racks: any[];
-  preselectedRackId?: number | null;
+  preselectedRackId?: string | number | null;
 }
 
 export default function UpdateCapacityModal({ visible, onClose, racks, preselectedRackId }: UpdateCapacityModalProps) {
-  const [selectedRackId, setSelectedRackId] = useState<number | null>(preselectedRackId || null);
+  const [selectedRackId, setSelectedRackId] = useState<string | number | null>(preselectedRackId || null);
   const [activeBags, setActiveBags] = useState('0');
   const [emptyBags, setEmptyBags] = useState('0');
   const [loading, setLoading] = useState(false);

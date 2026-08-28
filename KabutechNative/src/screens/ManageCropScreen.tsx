@@ -26,7 +26,7 @@ export default function ManageCropScreen() {
   const [showUpdateCapacity, setShowUpdateCapacity] = useState(false);
   const [showFlagContamination, setShowFlagContamination] = useState(false);
   const [showAddRack, setShowAddRack] = useState(false);
-  const [activeModalRackId, setActiveModalRackId] = useState<number | null>(null);
+  const [activeModalRackId, setActiveModalRackId] = useState<number | string | null>(null);
   // Archive confirm modal state
   const [archiveTarget, setArchiveTarget] = useState<{ firebaseKey: string | number; rackName: string } | null>(null);
 
@@ -101,7 +101,6 @@ export default function ManageCropScreen() {
     }
 
     return {
-      firebaseKey: rack.firebaseKey,
       ...rack,
       _activeBags: activeBags.length,
       _emptyBags: emptyBags.length,
@@ -137,7 +136,7 @@ export default function ManageCropScreen() {
     }, 600);
   };
 
-  const openActionModal = (type: 'harvest' | 'capacity' | 'flag', rackId: number) => {
+  const openActionModal = (type: 'harvest' | 'capacity' | 'flag', rackId: string | number) => {
     setActiveModalRackId(rackId);
     if (type === 'harvest') setShowLogHarvest(true);
     if (type === 'capacity') setShowUpdateCapacity(true);
@@ -246,7 +245,7 @@ export default function ManageCropScreen() {
               {/* Action Buttons */}
               <View style={tw`flex-row justify-between gap-2`}>
                 <TouchableOpacity 
-                  onPress={() => openActionModal('harvest', rack.id)}
+                  onPress={() => openActionModal('harvest', rack.id ?? rack.firebaseKey)}
                   style={tw`flex-1 bg-[#166534] dark:bg-emerald-700 py-2.5 rounded-xl items-center flex-row justify-center gap-1.5`}
                 >
                   <MaterialCommunityIcons name="leaf" size={14} color="white" />
@@ -254,7 +253,7 @@ export default function ManageCropScreen() {
                 </TouchableOpacity>
 
                 <TouchableOpacity 
-                  onPress={() => openActionModal('capacity', rack.id)}
+                  onPress={() => openActionModal('capacity', rack.id ?? rack.firebaseKey)}
                   style={tw`flex-1 bg-white dark:bg-slate-700 border border-gray-200 dark:border-slate-600 py-2.5 rounded-xl items-center flex-row justify-center gap-1.5`}
                 >
                   <MaterialCommunityIcons name="archive-edit" size={14} color={isDarkMode ? '#cbd5e1' : '#475569'} />
@@ -262,7 +261,7 @@ export default function ManageCropScreen() {
                 </TouchableOpacity>
 
                 <TouchableOpacity 
-                  onPress={() => openActionModal('flag', rack.id)}
+                  onPress={() => openActionModal('flag', rack.id ?? rack.firebaseKey)}
                   style={tw`bg-red-50 dark:bg-red-900/30 border border-red-100 dark:border-red-900/50 w-10 py-2.5 rounded-xl items-center justify-center`}
                 >
                   <MaterialCommunityIcons name="flag" size={14} color="#ef4444" />

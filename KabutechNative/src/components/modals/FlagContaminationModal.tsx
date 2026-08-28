@@ -11,11 +11,11 @@ interface FlagContaminationModalProps {
   visible: boolean;
   onClose: () => void;
   racks: any[];
-  preselectedRackId?: number | null;
+  preselectedRackId?: string | number | null;
 }
 
 export default function FlagContaminationModal({ visible, onClose, racks, preselectedRackId }: FlagContaminationModalProps) {
-  const [selectedRackId, setSelectedRackId] = useState<number | null>(preselectedRackId || null);
+  const [selectedRackId, setSelectedRackId] = useState<string | number | null>(preselectedRackId || null);
   const [bagsToFlag, setBagsToFlag] = useState('');
   const [loading, setLoading] = useState(false);
   const [showDropdown, setShowDropdown] = useState(false);
