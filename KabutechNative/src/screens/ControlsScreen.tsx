@@ -69,6 +69,11 @@ export default function ControlsScreen() {
 
   const [activeTab, setActiveTab] = useState<TabId>('temp');
   const activeTabData = tabs.find(t => t.id === activeTab)!;
+  const activeTabDataRef = useRef(activeTabData);
+
+  useEffect(() => {
+    activeTabDataRef.current = activeTabData;
+  }, [activeTabData]);
 
   const [localTarget, setLocalTarget] = useState<number>(activeTabData.target);
 
@@ -86,15 +91,17 @@ export default function ControlsScreen() {
 
   const increment = () => {
     setLocalTarget(prev => {
-      const next = prev + activeTabData.step;
-      return next > activeTabData.max ? activeTabData.max : Number(next.toFixed(1));
+      const data = activeTabDataRef.current;
+      const next = prev + data.step;
+      return next > data.max ? data.max : Number(next.toFixed(1));
     });
   };
 
   const decrement = () => {
     setLocalTarget(prev => {
-      const next = prev - activeTabData.step;
-      return next < activeTabData.min ? activeTabData.min : Number(next.toFixed(1));
+      const data = activeTabDataRef.current;
+      const next = prev - data.step;
+      return next < data.min ? data.min : Number(next.toFixed(1));
     });
   };
 
@@ -116,6 +123,12 @@ export default function ControlsScreen() {
       timerRef.current = null;
     }
   };
+
+  useEffect(() => {
+    return () => {
+      stopTimer();
+    };
+  }, []);
 
   // Dial calculations
   const size = 260;

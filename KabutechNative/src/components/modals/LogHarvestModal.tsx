@@ -70,19 +70,15 @@ export default function LogHarvestModal({ visible, onClose, selectedRack }: LogH
 
       if (selectedRack.firebaseKey === undefined) throw new Error("Rack not found");
 
-      update(ref(db, `kabutech/batches/${selectedRack.firebaseKey}`), {
+      await update(ref(db, `kabutech/batches/${selectedRack.firebaseKey}`), {
         bags: updatedBags
-      }).catch(error => {
-        showToast({ type: 'error', text1: 'Error', text2: 'Failed to log harvest.' });
-        console.error(error);
       });
 
+      playSuccessSound();
+      showToast({ type: 'success', text1: 'Success', text2: `Logged ${totalYield}g harvest across ${activeBags.length} bags.` });
+      
       setYieldGrams('');
       onClose();
-      setTimeout(() => {
-        playSuccessSound();
-        showToast({ type: 'success', text1: 'Success', text2: `Logged ${totalYield}g harvest across ${activeBags.length} bags.` });
-      }, 600);
     } catch (error) {
       showToast({ type: 'error', text1: 'Error', text2: 'An unexpected error occurred.' });
       console.error(error);

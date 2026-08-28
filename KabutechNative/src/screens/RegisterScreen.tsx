@@ -45,10 +45,11 @@ export default function RegisterScreen() {
       });
 
       // Insert minimal user record into database
-      await set(ref(db, `users/${userCredential.user.uid}`), {
+      await set(ref(db, `kabutech/users/${userCredential.user.uid}`), {
         email: email.trim(),
         name: fullName.trim(),
         role: 'operator',
+        approved: true,
         createdAt: new Date().toISOString()
       });
       

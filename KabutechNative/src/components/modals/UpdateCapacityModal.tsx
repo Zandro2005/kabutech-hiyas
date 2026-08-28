@@ -97,17 +97,12 @@ export default function UpdateCapacityModal({ visible, onClose, selectedRack }: 
 
       if (selectedRack.firebaseKey === undefined) throw new Error("Rack not found");
 
-      update(ref(db, `kabutech/batches/${selectedRack.firebaseKey}`), {
+      await update(ref(db, `kabutech/batches/${selectedRack.firebaseKey}`), {
         bags: updatedBags,
         historicalHarvests: updatedHistorical
-      }).then(() => {
-        playSuccessSound();
-        showToast({ type: 'success', text1: 'Success', text2: `Capacity updated. Total: ${updatedBags.length}` });
-      }).catch(error => {
-        showToast({ type: 'error', text1: 'Error', text2: 'Failed to update capacity.' });
-        console.error(error);
       });
-
+      playSuccessSound();
+      showToast({ type: 'success', text1: 'Success', text2: `Capacity updated. Total: ${updatedBags.length}` });
       onClose();
     } catch (error) {
       showToast({ type: 'error', text1: 'Error', text2: 'An unexpected error occurred.' });

@@ -60,18 +60,14 @@ export default function FlagContaminationModal({ visible, onClose, selectedRack 
 
       if (selectedRack.firebaseKey === undefined) throw new Error("Rack not found");
 
-      update(ref(db, `kabutech/batches/${selectedRack.firebaseKey}`), {
+      await update(ref(db, `kabutech/batches/${selectedRack.firebaseKey}`), {
         bags: updatedBags
-      }).catch(error => {
-        showToast({ type: 'error', text1: 'Error', text2: 'Failed to flag bags.' });
-        console.error(error);
       });
 
+      showToast({ type: 'success', text1: 'Success', text2: `Flagged ${flagCount} bags for contamination.` });
+      
       setBagsToFlag('');
       onClose();
-      setTimeout(() => {
-        showToast({ type: 'success', text1: 'Success', text2: `Flagged ${flagCount} bags for contamination.` });
-      }, 600);
     } catch (error) {
       showToast({ type: 'error', text1: 'Error', text2: 'An unexpected error occurred.' });
       console.error(error);
