@@ -1,6 +1,8 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { View, Text, ScrollView, TouchableOpacity, StatusBar, DeviceEventEmitter, Alert, Dimensions } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
+import { NativeStackNavigationProp } from '@react-navigation/native-stack';
+import { GlobalNavigationParamList } from '../types/navigation';
 import tw from '../tailwind';
 import { useFirebaseData } from '../hooks/useFirebaseData';
 import { ref, update } from 'firebase/database';
@@ -16,7 +18,7 @@ const { width } = Dimensions.get('window');
 type TabId = 'temp' | 'hum' | 'light' | 'co2';
 
 export default function ControlsScreen() {
-  const navigation = useNavigation<any>();
+  const navigation = useNavigation<NativeStackNavigationProp<GlobalNavigationParamList>>();
   const { isDarkMode } = useTheme();
   const { sensors, settings } = useFirebaseData();
   

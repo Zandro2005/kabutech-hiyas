@@ -3,13 +3,15 @@ import { View, Text, ScrollView, TouchableOpacity } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
+import { NativeStackNavigationProp } from '@react-navigation/native-stack';
+import { GlobalNavigationParamList } from '../types/navigation';
 import { showToast } from '../components/CustomToast';
 import { ref, update } from 'firebase/database';
 import { db } from '../services/firebase';
 import tw from 'twrnc';
 
 export default function ReportScreen() {
-  const navigation = useNavigation();
+  const navigation = useNavigation<NativeStackNavigationProp<GlobalNavigationParamList>>();
 
   // Overrides the system to manual mode and turns on the requested device
   const overrideDevice = (deviceKey: string, actionName: string) => {

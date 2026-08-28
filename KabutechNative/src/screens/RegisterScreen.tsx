@@ -6,6 +6,8 @@ import { ref, set } from 'firebase/database';
 import { auth, db } from '../services/firebase';
 import tw from '../tailwind';
 import { useNavigation } from '@react-navigation/native';
+import { NativeStackNavigationProp } from '@react-navigation/native-stack';
+import { GlobalNavigationParamList } from '../types/navigation';
 
 export default function RegisterScreen() {
   const [fullName, setFullName] = useState('');
@@ -21,7 +23,7 @@ export default function RegisterScreen() {
   const passwordRef = useRef<TextInput>(null);
   const confirmRef = useRef<TextInput>(null);
 
-  const navigation = useNavigation<any>();
+  const navigation = useNavigation<NativeStackNavigationProp<GlobalNavigationParamList>>();
 
   const handleRegister = async () => {
     if (!fullName || !email || !password || !confirmPassword) {

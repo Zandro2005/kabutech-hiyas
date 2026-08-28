@@ -2,6 +2,8 @@ import React, { useState, useEffect } from 'react';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { useNavigation } from '@react-navigation/native';
+import { NativeStackNavigationProp } from '@react-navigation/native-stack';
+import { GlobalNavigationParamList } from '../types/navigation';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { View, Platform, TouchableOpacity, Text, DeviceEventEmitter } from 'react-native';
 import { BlurView } from 'expo-blur';
@@ -34,7 +36,7 @@ function HomeStackNavigator() {
 }
 
 export default function MainTabNavigator() {
-  const navigation = useNavigation();
+  const navigation = useNavigation<NativeStackNavigationProp<GlobalNavigationParamList>>();
   const [addBatchVisible, setAddBatchVisible] = useState(false);
   const [overrideModalVisible, setOverrideModalVisible] = useState(false);
   const { isDarkMode } = useTheme();

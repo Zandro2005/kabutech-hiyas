@@ -5,6 +5,8 @@ import tw from '../tailwind';
 import { useTheme } from '../context/ThemeContext';
 import { useFirebaseData } from '../hooks/useFirebaseData';
 import { useNavigation } from '@react-navigation/native';
+import { NativeStackNavigationProp } from '@react-navigation/native-stack';
+import { GlobalNavigationParamList } from '../types/navigation';
 import { update, ref } from 'firebase/database';
 import { db } from '../services/firebase';
 import { showToast } from './CustomToast';
@@ -19,7 +21,7 @@ export default function AiInsightModal({ visible, onClose }: AiInsightModalProps
   const { sensors, settings } = useFirebaseData();
   const isAuto = String(settings?.setpoints?.mode).toLowerCase() === 'auto';
 
-  const navigation = useNavigation();
+  const navigation = useNavigation<NativeStackNavigationProp<GlobalNavigationParamList>>();
   
   const handleActivateMisters = () => {
     update(ref(db, `kabutech/settings/setpoints/devices`), {

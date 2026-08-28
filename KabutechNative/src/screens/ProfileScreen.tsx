@@ -5,6 +5,8 @@ import { useAuth } from '../context/AuthContext';
 import { signOut } from 'firebase/auth';
 import { auth } from '../services/firebase';
 import { useNavigation } from '@react-navigation/native';
+import { NativeStackNavigationProp } from '@react-navigation/native-stack';
+import { GlobalNavigationParamList } from '../types/navigation';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import tw from '../tailwind';
 import EditProfileModal from '../components/modals/EditProfileModal';
@@ -14,7 +16,7 @@ import { useTheme } from '../context/ThemeContext';
 export default function ProfileScreen() {
   const [editProfileVisible, setEditProfileVisible] = useState(false);
   const { isDarkMode } = useTheme();
-  const navigation = useNavigation<any>();
+  const navigation = useNavigation<NativeStackNavigationProp<GlobalNavigationParamList>>();
   const insets = useSafeAreaInsets();
   const { user, profile } = useAuth();
   

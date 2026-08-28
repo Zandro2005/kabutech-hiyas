@@ -3,6 +3,8 @@ import { View, Text, TouchableOpacity, Image } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
+import { NativeStackNavigationProp } from '@react-navigation/native-stack';
+import { GlobalNavigationParamList } from '../types/navigation';
 import tw from '../tailwind';
 import { useTheme } from '../context/ThemeContext';
 import { showToast } from './CustomToast';
@@ -18,7 +20,7 @@ interface ScreenHeaderProps {
 export default function ScreenHeader({ title, subtitle, rightComponent }: ScreenHeaderProps) {
   const insets = useSafeAreaInsets();
   const { isDarkMode, toggleTheme } = useTheme();
-  const navigation = useNavigation<any>();
+  const navigation = useNavigation<NativeStackNavigationProp<GlobalNavigationParamList>>();
   const [helpVisible, setHelpVisible] = useState(false);
   const [infoId, setInfoId] = useState<string | null>(null);
   

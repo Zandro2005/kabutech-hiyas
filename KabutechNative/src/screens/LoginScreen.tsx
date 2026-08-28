@@ -6,6 +6,8 @@ import { auth } from '../services/firebase';
 import Svg, { Path } from 'react-native-svg';
 import tw from '../tailwind';
 import { useNavigation } from '@react-navigation/native';
+import { NativeStackNavigationProp } from '@react-navigation/native-stack';
+import { GlobalNavigationParamList } from '../types/navigation';
 
 export default function LoginScreen() {
   const [email, setEmail] = useState('');
@@ -16,7 +18,7 @@ export default function LoginScreen() {
   const [errorMsg, setErrorMsg] = useState('');
 
   const passwordRef = useRef<TextInput>(null);
-  const navigation = useNavigation<any>();
+  const navigation = useNavigation<NativeStackNavigationProp<GlobalNavigationParamList>>();
 
   const handleLogin = async () => {
     if (!email || !password) {
