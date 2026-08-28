@@ -9,7 +9,7 @@ import { MaterialCommunityIcons } from '@expo/vector-icons';
 import ScreenHeader from '../components/ScreenHeader';
 import { useTheme } from '../context/ThemeContext';
 import { showToast } from '../components/CustomToast';
-import Svg, { Circle, Defs, DropShadow, Shadow } from 'react-native-svg';
+import Svg, { Circle, Defs } from 'react-native-svg';
 
 const { width } = Dimensions.get('window');
 
@@ -68,7 +68,7 @@ export default function ControlsScreen() {
   const [activeTab, setActiveTab] = useState<TabId>('temp');
   const activeTabData = tabs.find(t => t.id === activeTab)!;
 
-  const [localTarget, setLocalTarget] = useState(activeTabData.target);
+  const [localTarget, setLocalTarget] = useState<number>(activeTabData.target);
 
   useEffect(() => {
     setLocalTarget(activeTabData.target);
