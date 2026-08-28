@@ -1,0 +1,120 @@
+import React, { useEffect, useRef, useState, useCallback } from 'react';
+import { View, Text, Animated, StyleSheet } from 'react-native';
+import { MaterialCommunityIcons } from '@expo/vector-icons';
+
+interface ToastMessage {
+  type: 'success' | 'error';
+  text1: string;
+  text2?: string;
+}
+
+let globalShowToast: ((msg: ToastMessage) => void) | null = null;
+
+export const showToast = (msg: ToastMessage) => {
+  if (globalShowToast) {
+    globalShowToast(msg);
+  }
+};
+
+export default function CustomToast() {
+  const [message, setMessage] = useState<ToastMessage | null>(null);
+  const translateY = useRef(new Animated.Value(-120)).current;
+  const opacity = useRef(new Animated.Value(0)).current;
+  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const hide = useCallback(() => {
+    Animated.parallel([
+      Animated.timing(translateY, { toValue: -120, duration: 300, useNativeDriver: true }),
+      Animated.timing(opacity, { toValue: 0, duration: 300, useNativeDriver: true }),
+    ]).start(() => setMessage(null));
+  }, [translateY, opacity]);
+
+  const show = useCallback((msg: ToastMessage) => {
+    if (timerRef.current) clearTimeout(timerRef.current);
+    setMessage(msg);
+    translateY.setValue(-120);
+    opacity.setValue(0);
+    Animated.parallel([
+      Animated.spring(translateY, { toValue: 0, friction: 8, tension: 60, useNativeDriver: true }),
+      Animated.timing(opacity, { toValue: 1, duration: 250, useNativeDriver: true }),
+    ]).start();
+    timerRef.current = setTimeout(hide, 2500);
+  }, [translateY, opacity, hide]);
+
+  useEffect(() => {
+    globalShowToast = show;
+    return () => { globalShowToast = null; };
+  }, [show]);
+
+  if (!message) return null;
+
+  const isSuccess = message.type === 'success';
+  const bgColor = isSuccess ? '#f0fdf4' : '#fef2f2';
+  const borderColor = isSuccess ? '#10b981' : '#ef4444';
+  const iconName = isSuccess ? 'check-circle' : 'alert-circle';
+  const iconColor = isSuccess ? '#10b981' : '#ef4444';
+  const titleColor = isSuccess ? '#064e3b' : '#7f1d1d';
+  const bodyColor = isSuccess ? '#166534' : '#991b1b';
+
+  return (
+    <Animated.View
+      style={[
+        styles.container,
+        {
+          backgroundColor: bgColor,
+          borderLeftColor: borderColor,
+          transform: [{ translateY }],
+          opacity,
+        },
+      ]}
+    >
+      <View style={styles.iconWrap}>
+        <MaterialCommunityIcons name={iconName as any} size={24} color={iconColor} />
+      </View>
+      <View style={styles.textWrap}>
+        <Text style={[styles.title, { color: titleColor }]}>{message.text1}</Text>
+        {message.text2 ? (
+          <Text style={[styles.body, { color: bodyColor }]} numberOfLines={2}>{message.text2}</Text>
+        ) : null}
+      </View>
+    </Animated.View>
+  );
+}
+
+const styles = StyleSheet.create({
+  container: {
+    position: 'absolute',
+    top: 50,
+    left: 16,
+    right: 16,
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderRadius: 16,
+    borderLeftWidth: 6,
+    paddingVertical: 14,
+    paddingHorizontal: 16,
+    zIndex: 99999,
+    elevation: 20,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.15,
+    shadowRadius: 16,
+  },
+  iconWrap: {
+    marginRight: 12,
+  },
+  textWrap: {
+    flex: 1,
+  },
+  title: {
+    fontSize: 14,
+    fontWeight: '800',
+    fontFamily: 'PlusJakartaSans_800ExtraBold',
+  },
+  body: {
+    fontSize: 12,
+    fontWeight: '600',
+    fontFamily: 'PlusJakartaSans_700Bold',
+    marginTop: 2,
+  },
+});
