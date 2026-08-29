@@ -6,6 +6,7 @@ interface ToastMessage {
   type: 'success' | 'error';
   text1: string;
   text2?: string;
+  duration?: number;
 }
 
 let globalShowToast: ((msg: ToastMessage) => void) | null = null;
@@ -38,7 +39,7 @@ export default function CustomToast() {
       Animated.spring(translateY, { toValue: 0, friction: 8, tension: 60, useNativeDriver: true }),
       Animated.timing(opacity, { toValue: 1, duration: 250, useNativeDriver: true }),
     ]).start();
-    timerRef.current = setTimeout(hide, 2500);
+    timerRef.current = setTimeout(hide, msg.duration || 2500);
   }, [translateY, opacity, hide]);
 
   useEffect(() => {

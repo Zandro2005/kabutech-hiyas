@@ -1,18 +1,22 @@
 import React, { useState, useRef } from 'react';
 import { View, Text, TextInput, TouchableOpacity, KeyboardAvoidingView, Platform, ScrollView, Image, StatusBar } from 'react-native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
-import { signInWithEmailAndPassword, sendPasswordResetEmail } from 'firebase/auth';
+// @ts-ignore
+import { signInWithEmailAndPassword, sendPasswordResetEmail, setPersistence, inMemoryPersistence, getReactNativePersistence } from 'firebase/auth';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { auth } from '../services/firebase';
 import Svg, { Path } from 'react-native-svg';
 import tw from '../tailwind';
 import { useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { GlobalNavigationParamList } from '../types/navigation';
+import { showToast } from '../components/CustomToast';
 
 export default function LoginScreen() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
+  const [rememberMe, setRememberMe] = useState(true);
 
   const [loading, setLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
@@ -28,6 +32,11 @@ export default function LoginScreen() {
     setLoading(true);
     setErrorMsg('');
     try {
+      if (rememberMe) {
+        await setPersistence(auth, getReactNativePersistence(AsyncStorage));
+      } else {
+        await setPersistence(auth, inMemoryPersistence);
+      }
       await signInWithEmailAndPassword(auth, email.trim(), password);
     } catch (error: any) {
       setLoading(false);
@@ -42,7 +51,13 @@ export default function LoginScreen() {
     }
     try {
       await sendPasswordResetEmail(auth, email.trim());
-      setErrorMsg('Password reset email sent. Check your inbox.');
+      showToast({ 
+        type: 'success', 
+        text1: 'Email Sent', 
+        text2: 'If an account exists, a password reset link has been sent to your inbox.',
+        duration: 5000
+      });
+      setErrorMsg('');
     } catch (error: any) {
       setErrorMsg('Failed to send reset email. Ensure your email is correct.');
     }
@@ -142,7 +157,22 @@ export default function LoginScreen() {
             </View>
 
             {/* Options */}
-            <View style={tw`flex-row items-center justify-end mb-8 px-1`}>
+            <View style={tw`flex-row items-center justify-between mb-8 px-1`}>
+              <TouchableOpacity
+                style={tw`flex-row items-center`}
+                onPress={() => setRememberMe(!rememberMe)}
+                hitSlop={{ top: 15, bottom: 15, left: 15, right: 15 }}
+              >
+                <MaterialCommunityIcons
+                  name={rememberMe ? "checkbox-marked" : "checkbox-blank-outline"}
+                  size={20}
+                  color={rememberMe ? "#3d8c63" : "#9ca3af"}
+                />
+                <Text style={[tw`text-[12px] text-slate-500 ml-2`, { fontFamily: 'PlusJakartaSans_700Bold' }]}>
+                  Remember me
+                </Text>
+              </TouchableOpacity>
+              
               <TouchableOpacity
                 onPress={handleForgotPassword}
                 hitSlop={{ top: 15, bottom: 15, left: 15, right: 15 }}
