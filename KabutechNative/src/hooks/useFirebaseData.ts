@@ -30,3 +30,18 @@ export function useTasks() {
   const context = useContext(FirebaseDataContext);
   return context.tasks;
 }
+
+export function useActivityLogs() {
+  const context = useContext(FirebaseDataContext);
+  return context.activityLogs;
+}
+
+export function useStaffTasks() {
+  const context = useContext(FirebaseDataContext);
+  return context.staffTasks;
+}
+
+export function useAllUsers() {
+  const context = useContext(FirebaseDataContext);
+  return context.allUsers;
+}

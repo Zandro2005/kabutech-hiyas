@@ -92,5 +92,38 @@ export interface UserProfile {
   email: string;
   role: 'admin' | 'operator' | 'staff';
   approved: boolean;
+  declined?: boolean;
   createdAt: string;
+}
+
+export interface ActivityLogEntry {
+  id: string;
+  staffId: string;
+  staffName: string;
+  action: 'harvest' | 'watering' | 'inspection' | 'cleaning' | 'maintenance' | 'contamination_report' | 'other';
+  description: string;
+  timestamp: string;        // ISO string — when the action was performed
+  rackId?: string;
+  rackName?: string;
+  status: 'pending' | 'reviewed';
+  reviewedBy?: string;
+  reviewedAt?: string;
+  adminNotes?: string;
+}
+
+export interface StaffTask {
+  id: string;
+  title: string;
+  description?: string;
+  assignedTo: string;       // Staff user UID
+  assignedToName: string;   // Staff display name
+  assignedBy: string;       // Admin UID
+  assignedByName: string;   // Admin display name
+  createdAt: string;        // ISO string
+  dueDate: string;          // ISO date string (YYYY-MM-DD)
+  dueTime?: string;         // Optional time deadline (HH:mm)
+  status: 'assigned' | 'completed' | 'overdue';
+  completedAt?: string;     // ISO string — when staff marked it done
+  completionNotes?: string; // Staff can add notes on completion
+  isOnTime?: boolean;       // Computed: completedAt <= dueDate+dueTime
 }

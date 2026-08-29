@@ -1,7 +1,8 @@
 import React, { createContext, useState, useEffect, useContext } from 'react';
 import { ref, onValue } from 'firebase/database';
 import { db } from '../services/firebase';
-import { SensorData, SettingsData, BatchData, AlertData, TaskData } from '../types/firebase';
+import { useAuth } from './AuthContext';
+import { SensorData, SettingsData, BatchData, AlertData, TaskData, ActivityLogEntry, StaffTask, UserProfile } from '../types/firebase';
 import { showToast } from '../components/CustomToast';
 
 interface FirebaseDataContextType {
@@ -11,6 +12,9 @@ interface FirebaseDataContextType {
   batches: BatchData[];
   alerts: AlertData[];
   tasks: TaskData[];
+  activityLogs: ActivityLogEntry[];
+  staffTasks: StaffTask[];
+  allUsers: Record<string, UserProfile>;
 }
 
 const defaultContext: FirebaseDataContextType = {
@@ -34,20 +38,34 @@ const defaultContext: FirebaseDataContextType = {
   },
   batches: [],
   alerts: [],
-  tasks: []
+  tasks: [],
+  activityLogs: [],
+  staffTasks: [],
+  allUsers: {}
 };
 
 export const FirebaseDataContext = createContext<FirebaseDataContextType>(defaultContext);
 
 export const FirebaseDataProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [data, setData] = useState<FirebaseDataContextType>(defaultContext);
+  const { user } = useAuth();
 
   useEffect(() => {
+    // We re-attach listeners whenever the auth state changes (user?.uid) 
+    // to prevent permission_denied errors from permanently killing listeners on startup.
     // 1. Connection Status
     const connectedRef = ref(db, '.info/connected');
     const unsubscribeConnected = onValue(connectedRef, (snap) => {
       setData(prev => ({ ...prev, isConnected: snap.val() === true }));
     });
+
+    if (!user) {
+      // Do not attempt to attach restricted listeners if not authenticated
+      // to avoid triggering permission_denied errors.
+      return () => {
+        unsubscribeConnected();
+      };
+    }
 
     // 2. Sensors
     const sensorsRef = ref(db, 'kabutech/sensors/live');
@@ -120,6 +138,34 @@ export const FirebaseDataProvider: React.FC<{ children: React.ReactNode }> = ({ 
       console.error('Tasks listener error:', error);
     });
 
+    // 7. Activity Logs
+    const activityLogsRef = ref(db, 'kabutech/logs');
+    const unsubscribeActivityLogs = onValue(activityLogsRef, (snapshot) => {
+      const val = snapshot.val();
+      let logsArray: ActivityLogEntry[] = [];
+      if (val) {
+        logsArray = Object.entries(val).map(([key, v]: any) => ({ ...v, id: key }));
+      }
+      setData(prev => ({ ...prev, activityLogs: logsArray }));
+    });
+
+    // 8. Staff Tasks
+    const staffTasksRef = ref(db, 'kabutech/tasks');
+    const unsubscribeStaffTasks = onValue(staffTasksRef, (snapshot) => {
+      const val = snapshot.val();
+      let tasksArray: StaffTask[] = [];
+      if (val) {
+        tasksArray = Object.entries(val).map(([key, v]: any) => ({ ...v, id: key }));
+      }
+      setData(prev => ({ ...prev, staffTasks: tasksArray }));
+    });
+
+    // 9. All Users
+    const usersRef = ref(db, 'kabutech/users');
+    const unsubscribeUsers = onValue(usersRef, (snapshot) => {
+      setData(prev => ({ ...prev, allUsers: snapshot.val() || {} }));
+    });
+
     return () => {
       unsubscribeConnected();
       unsubscribeSensors();
@@ -127,8 +173,11 @@ export const FirebaseDataProvider: React.FC<{ children: React.ReactNode }> = ({ 
       unsubscribeBatches();
       unsubscribeAlerts();
       unsubscribeTasks();
+      unsubscribeActivityLogs();
+      unsubscribeStaffTasks();
+      unsubscribeUsers();
     };
-  }, []);
+  }, [user?.uid]);
 
   return (
     <FirebaseDataContext.Provider value={data}>

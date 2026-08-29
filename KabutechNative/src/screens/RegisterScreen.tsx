@@ -61,8 +61,8 @@ export default function RegisterScreen() {
       await set(ref(db, `kabutech/users/${userCredential.user.uid}`), {
         email: email.trim(),
         name: fullName.trim(),
-        role: 'operator',
-        approved: true,
+        role: 'staff',
+        approved: false,
         createdAt: new Date().toISOString()
       });
       

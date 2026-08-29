@@ -12,6 +12,7 @@ import tw from '../tailwind';
 import EditProfileModal from '../components/modals/EditProfileModal';
 import ScreenHeader from '../components/ScreenHeader';
 import { useTheme } from '../context/ThemeContext';
+import { useAllUsers, useActivityLogs } from '../hooks/useFirebaseData';
 
 export default function ProfileScreen() {
   const [editProfileVisible, setEditProfileVisible] = useState(false);
@@ -19,6 +20,11 @@ export default function ProfileScreen() {
   const navigation = useNavigation<NativeStackNavigationProp<GlobalNavigationParamList>>();
   const insets = useSafeAreaInsets();
   const { user, profile } = useAuth();
+  const allUsers = useAllUsers();
+  const activityLogs = useActivityLogs();
+
+  const pendingStaffCount = Object.values(allUsers).filter(u => u.role === 'staff' && !u.approved && !u.declined).length;
+  const pendingLogsCount = activityLogs.filter(log => log.status === 'pending').length;
   
   const handleLogout = async () => {
     try {
@@ -114,35 +120,68 @@ export default function ProfileScreen() {
         </View>
 
         {/* Settings Links */}
-        <TouchableOpacity style={tw`bg-white dark:bg-slate-800 rounded-2xl p-4 border border-gray-100 dark:border-slate-700 shadow-sm flex-row items-center justify-between mb-3 active:scale-95`}>
+        <TouchableOpacity 
+          onPress={() => navigation.navigate('StaffReportsInbox' as never)}
+          style={tw`bg-white dark:bg-slate-800 rounded-2xl p-4 border border-gray-100 dark:border-slate-700 shadow-sm flex-row items-center justify-between mb-3 active:scale-95`}
+        >
           <View style={tw`flex-row items-center gap-3`}>
             <View style={tw`w-10 h-10 rounded-xl bg-gray-50 dark:bg-slate-700/50 items-center justify-center border border-gray-100 dark:border-slate-600/50`}>
-              <MaterialCommunityIcons name="alert-circle" size={20} color="#f59e0b" />
+              <MaterialCommunityIcons name="inbox-multiple" size={20} color="#3b82f6" />
             </View>
-            <Text style={tw`text-sm font-bold text-gray-800 dark:text-slate-200`}>Alerts</Text>
-          </View>
-          <MaterialCommunityIcons name="chevron-right" size={24} color={tw.color('dark:text-slate-500') || "#94a3b8"} />
-        </TouchableOpacity>
-
-        <TouchableOpacity style={tw`bg-white dark:bg-slate-800 rounded-2xl p-4 border border-gray-100 dark:border-slate-700 shadow-sm flex-row items-center justify-between mb-3 active:scale-95`}>
-          <View style={tw`flex-row items-center gap-3`}>
-            <View style={tw`w-10 h-10 rounded-xl bg-gray-50 dark:bg-slate-700/50 items-center justify-center border border-gray-100 dark:border-slate-600/50`}>
-              <MaterialCommunityIcons name="inbox" size={20} color="#3b82f6" />
+            <View style={tw`flex-row items-center`}>
+              <Text style={tw`text-sm font-bold text-gray-800 dark:text-slate-200`}>Staff Reports Inbox</Text>
+              {pendingLogsCount > 0 && (
+                <View style={tw`ml-2 bg-red-500 rounded-full px-2 py-0.5 justify-center`}>
+                  <Text style={[tw`text-[10px] text-white font-bold`]}>{pendingLogsCount}</Text>
+                </View>
+              )}
             </View>
-            <Text style={tw`text-sm font-bold text-gray-800 dark:text-slate-200`}>Staff Reports Inbox</Text>
           </View>
           <MaterialCommunityIcons name="chevron-right" size={24} color={tw.color('dark:text-slate-500') || "#94a3b8"} />
         </TouchableOpacity>
 
         <TouchableOpacity 
-          onPress={() => setEditProfileVisible(true)}
+          onPress={() => navigation.navigate('StaffApprovals' as never)}
           style={tw`bg-white dark:bg-slate-800 rounded-2xl p-4 border border-gray-100 dark:border-slate-700 shadow-sm flex-row items-center justify-between mb-3 active:scale-95`}
         >
           <View style={tw`flex-row items-center gap-3`}>
             <View style={tw`w-10 h-10 rounded-xl bg-gray-50 dark:bg-slate-700/50 items-center justify-center border border-gray-100 dark:border-slate-600/50`}>
-              <MaterialCommunityIcons name="account-edit" size={20} color={tw.color('dark:text-slate-300') || "#374151"} />
+              <MaterialCommunityIcons name="account-check" size={20} color="#10b981" />
             </View>
-            <Text style={tw`text-sm font-bold text-gray-800 dark:text-slate-200`}>Edit Profile</Text>
+            <View style={tw`flex-row items-center`}>
+              <Text style={tw`text-sm font-bold text-gray-800 dark:text-slate-200`}>Staff Approvals</Text>
+              {pendingStaffCount > 0 && (
+                <View style={tw`ml-2 bg-red-500 rounded-full px-2 py-0.5 justify-center`}>
+                  <Text style={[tw`text-[10px] text-white font-bold`]}>{pendingStaffCount}</Text>
+                </View>
+              )}
+            </View>
+          </View>
+          <MaterialCommunityIcons name="chevron-right" size={24} color={tw.color('dark:text-slate-500') || "#94a3b8"} />
+        </TouchableOpacity>
+
+        <TouchableOpacity 
+          onPress={() => navigation.navigate('AssignTask' as never)}
+          style={tw`bg-white dark:bg-slate-800 rounded-2xl p-4 border border-gray-100 dark:border-slate-700 shadow-sm flex-row items-center justify-between mb-3 active:scale-95`}
+        >
+          <View style={tw`flex-row items-center gap-3`}>
+            <View style={tw`w-10 h-10 rounded-xl bg-gray-50 dark:bg-slate-700/50 items-center justify-center border border-gray-100 dark:border-slate-600/50`}>
+              <MaterialCommunityIcons name="clipboard-check" size={20} color="#8b5cf6" />
+            </View>
+            <Text style={tw`text-sm font-bold text-gray-800 dark:text-slate-200`}>Assign Task</Text>
+          </View>
+          <MaterialCommunityIcons name="chevron-right" size={24} color={tw.color('dark:text-slate-500') || "#94a3b8"} />
+        </TouchableOpacity>
+
+        <TouchableOpacity 
+          onPress={() => navigation.navigate('StaffTaskHistory' as never)}
+          style={tw`bg-white dark:bg-slate-800 rounded-2xl p-4 border border-gray-100 dark:border-slate-700 shadow-sm flex-row items-center justify-between mb-3 active:scale-95`}
+        >
+          <View style={tw`flex-row items-center gap-3`}>
+            <View style={tw`w-10 h-10 rounded-xl bg-gray-50 dark:bg-slate-700/50 items-center justify-center border border-gray-100 dark:border-slate-600/50`}>
+              <MaterialCommunityIcons name="clipboard-text-clock" size={20} color="#8b5cf6" />
+            </View>
+            <Text style={tw`text-sm font-bold text-gray-800 dark:text-slate-200`}>Staff Task History</Text>
           </View>
           <MaterialCommunityIcons name="chevron-right" size={24} color={tw.color('dark:text-slate-500') || "#94a3b8"} />
         </TouchableOpacity>

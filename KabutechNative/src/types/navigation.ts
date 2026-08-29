@@ -7,8 +7,15 @@ export type AuthStackParamList = {
 
 export type RootStackParamList = {
   Main: undefined;
+  StaffMain: undefined;
   DeviceSchedules: undefined;
   Report: undefined;
+  PendingApproval: undefined;
+  StaffReportsInbox: undefined;
+  StaffApprovals: undefined;
+  AssignTask: undefined;
+  MyActivityHistory: undefined;
+  MyTasks: undefined;
 };
 
 export type MainTabParamList = {
@@ -25,5 +32,13 @@ export type HomeStackParamList = {
   LiveFarm: undefined;
 };
 
+export type StaffTabParamList = {
+  Home: undefined;
+  Crop: undefined;
+  ActivityLog: undefined;
+  Yield: undefined;
+  Profile: undefined;
+};
+
 // A combined type for `useNavigation` that includes Root and Tab param lists
-export type GlobalNavigationParamList = RootStackParamList & MainTabParamList & AuthStackParamList & HomeStackParamList;
+export type GlobalNavigationParamList = RootStackParamList & MainTabParamList & StaffTabParamList & AuthStackParamList & HomeStackParamList;

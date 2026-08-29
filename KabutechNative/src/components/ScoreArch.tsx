@@ -37,6 +37,7 @@ interface Props {
   lightActive: boolean;
   toggleDevice: (device: 'fans' | 'misters' | 'lights' | 'co2', currentState: boolean) => void;
   navigation: any;
+  readOnly?: boolean;
 }
 
 export default function ScoreArch({
@@ -48,7 +49,8 @@ export default function ScoreArch({
   misterActive,
   lightActive,
   toggleDevice,
-  navigation
+  navigation,
+  readOnly = false
 }: Props) {
   const { profile } = useAuth();
   
@@ -118,32 +120,34 @@ export default function ScoreArch({
       </View>
 
       {/* 3 Circular Control Icons Overlapping the Arch Bottom */}
-      <View style={tw`flex-row justify-center gap-5 w-full z-20 relative -mt-6`}>
-        {[
-          { icon: 'fan', active: fansActive, key: 'fans' },
-          { icon: 'water', active: misterActive, key: 'misters' },
-          { icon: 'lightbulb-on', active: lightActive, key: 'lights' }
-        ].map((item, index) => {
-          const showActive = item.active;
-          return (
-          <TouchableOpacity 
-            key={index} 
-            disabled={isAuto || isScheduled}
-            onPress={() => toggleDevice(item.key as 'fans' | 'misters' | 'lights' | 'co2', item.active)}
-            style={tw`w-14 h-14 rounded-full items-center justify-center shadow-sm border ${
-              showActive 
-                ? 'bg-emerald-50 dark:bg-emerald-900/30 border-emerald-500' 
-                : 'bg-white dark:bg-slate-800 border-gray-100 dark:border-slate-700'
-            } ${(isAuto || isScheduled) ? 'opacity-50' : ''}`}
-          >
-            <MaterialCommunityIcons 
-              name={item.icon as any} 
-              size={24} 
-              color={showActive ? '#10b981' : (isDarkMode ? '#94a3b8' : '#64748b')} 
-            />
-          </TouchableOpacity>
-        )})}
-      </View>
+      {!readOnly && (
+        <View style={tw`flex-row justify-center gap-5 w-full z-20 relative -mt-6`}>
+          {[
+            { icon: 'fan', active: fansActive, key: 'fans' },
+            { icon: 'water', active: misterActive, key: 'misters' },
+            { icon: 'lightbulb-on', active: lightActive, key: 'lights' }
+          ].map((item, index) => {
+            const showActive = item.active;
+            return (
+            <TouchableOpacity 
+              key={index} 
+              disabled={isAuto || isScheduled}
+              onPress={() => toggleDevice(item.key as 'fans' | 'misters' | 'lights' | 'co2', item.active)}
+              style={tw`w-14 h-14 rounded-full items-center justify-center shadow-sm border ${
+                showActive 
+                  ? 'bg-emerald-50 dark:bg-emerald-900/30 border-emerald-500' 
+                  : 'bg-white dark:bg-slate-800 border-gray-100 dark:border-slate-700'
+              } ${(isAuto || isScheduled) ? 'opacity-50' : ''}`}
+            >
+              <MaterialCommunityIcons 
+                name={item.icon as any} 
+                size={24} 
+                color={showActive ? '#10b981' : (isDarkMode ? '#94a3b8' : '#64748b')} 
+              />
+            </TouchableOpacity>
+          )})}
+        </View>
+      )}
     </View>
   );
 }
