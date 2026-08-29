@@ -1,15 +1,17 @@
-import React from 'react';
-import { View, Text, ScrollView, TouchableOpacity } from 'react-native';
+import React, { useState, useMemo } from 'react';
+import { View, Text, TouchableOpacity, ScrollView, Platform } from 'react-native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
+import { Calendar } from 'react-native-calendars';
 import tw from '../../tailwind';
 import { handleExport } from '../../utils/yieldExport';
+import { useTheme } from '../../context/ThemeContext';
 
 interface DailyHarvestListProps {
   filterDays: number | 'All';
   setFilterDays: (days: number | 'All') => void;
   showFilterDropdown: boolean;
   setShowFilterDropdown: (show: boolean) => void;
-  dailyHarvestsList: { date: string; desc: string; kg: string; g: string }[];
+  dailyHarvestsList: { date: string; month: string; day: string; year: string; desc: string; kg: string; g: string }[];
   sortedDates: string[];
   dailyMap: any;
   allRackNames: Set<string>;
@@ -27,76 +29,142 @@ export default function DailyHarvestList({
   allRackNames,
   isExporting
 }: DailyHarvestListProps) {
+  
+  const { isDarkMode } = useTheme();
+
+  // Default selected date to today, formatted as YYYY-MM-DD
+  const today = new Date().toISOString().split('T')[0];
+  const [selectedDate, setSelectedDate] = useState<string>(today);
 
   const onExport = () => {
     handleExport(sortedDates, dailyMap, allRackNames, isExporting);
   };
 
+  const markedDates = useMemo(() => {
+    const marked: any = {};
+    
+    // Mark dates that have harvests
+    sortedDates.forEach(dateStr => {
+      marked[dateStr] = {
+        marked: true,
+        dotColor: tw.color('emerald-500') || '#10b981',
+      };
+    });
+    
+    // Mark selected date
+    if (selectedDate) {
+      marked[selectedDate] = {
+        ...marked[selectedDate],
+        selected: true,
+        selectedColor: tw.color('emerald-600') || '#059669',
+        selectedTextColor: '#ffffff'
+      };
+    }
+    
+    return marked;
+  }, [sortedDates, selectedDate]);
+
+  // Find the harvest details for the selected date
+  const selectedHarvests = useMemo(() => {
+    if (!selectedDate || !dailyMap[selectedDate]) return [];
+    
+    const parts = selectedDate.split('-');
+    if (parts.length !== 3) return [];
+    
+    const d = new Date(parseInt(parts[0]), parseInt(parts[1]) - 1, parseInt(parts[2]));
+    const month = d.toLocaleDateString('en-US', { month: 'short' }).toUpperCase();
+    const day = d.toLocaleDateString('en-US', { day: '2-digit' });
+    const year = d.toLocaleDateString('en-US', { year: 'numeric' });
+    
+    const data = dailyMap[selectedDate];
+    const rackYields = data.rackYields;
+    
+    return Object.entries(rackYields).map(([rackName, grams]) => {
+      const totalGrams = Math.round(grams as number);
+      const weightDisplay = totalGrams >= 1000 ? `${Math.round(totalGrams / 1000)} kg` : `${totalGrams} g`;
+
+      return {
+        id: rackName,
+        month,
+        day,
+        year,
+        desc: rackName,
+        weight: weightDisplay
+      };
+    });
+  }, [selectedDate, dailyMap]);
+
   return (
-    <View style={tw`bg-white dark:bg-slate-800 rounded-[24px] p-5 shadow-sm border border-gray-100 dark:border-slate-700`}>
-      <View style={tw`flex-row items-center justify-between mb-5`}>
-        <View style={tw`flex-row items-center gap-1.5`}>
-          <MaterialCommunityIcons name="calendar-blank" size={16} color={tw.color('dark:text-slate-100') || "#032514"} />
-          <Text style={[tw`text-[11px] text-[#032514] dark:text-slate-100 tracking-wide`, {fontFamily: 'PlusJakartaSans_800ExtraBold'}]}>DAILY HARVESTS</Text>
+    <View style={tw`bg-white dark:bg-slate-800 rounded-[24px] p-4 shadow-sm border border-gray-100 dark:border-slate-700`}>
+      {/* Header Row */}
+      <View style={tw`flex-row items-center justify-between mb-4`}>
+        <View style={tw`flex-row items-center gap-2`}>
+          <MaterialCommunityIcons name="calendar-blank" size={18} color={tw.color('dark:text-slate-100') || "#032514"} />
+          <Text style={[tw`text-[13px] text-[#032514] dark:text-slate-100 tracking-wide`, {fontFamily: 'PlusJakartaSans_800ExtraBold'}]}>HARVEST CALENDAR</Text>
         </View>
-        
-        <View style={tw`flex-row items-center gap-2 z-50 relative shrink-0`}>
-          <View style={tw`relative`}>
-            <TouchableOpacity 
-              onPress={() => setShowFilterDropdown(!showFilterDropdown)}
-              style={tw`bg-[#f0fdf4] dark:bg-slate-700 px-2 py-1.5 rounded-lg flex-row items-center gap-1 border border-[#dcfce7] dark:border-slate-600`}
-            >
-              <Text style={[tw`text-[10px] text-gray-800 dark:text-slate-300`, {fontFamily: 'PlusJakartaSans_700Bold'}]}>
-                {filterDays === 'All' ? 'All Time' : `Last ${filterDays} Days`}
-              </Text>
-              <MaterialCommunityIcons name={showFilterDropdown ? "chevron-up" : "chevron-down"} size={14} color={tw.color('dark:text-slate-400') || "#334155"} />
-            </TouchableOpacity>
-            
-            {showFilterDropdown && (
-              <View style={tw`absolute top-8 right-0 bg-white dark:bg-slate-800 border border-gray-100 dark:border-slate-700 rounded-lg shadow-xl w-32 z-50 overflow-hidden`}>
-                {[5, 10, 15, 30, 'All'].map((val) => (
-                  <TouchableOpacity
-                    key={val}
-                    style={tw`px-3 py-2 border-b border-gray-50 dark:border-slate-700/50 ${filterDays === val ? 'bg-[#f0fdf4] dark:bg-slate-700' : ''}`}
-                    onPress={() => {
-                      setFilterDays(val as number | 'All');
-                      setShowFilterDropdown(false);
-                    }}
-                  >
-                    <Text style={[tw`text-xs text-gray-700 dark:text-slate-200`, {fontFamily: filterDays === val ? 'PlusJakartaSans_800ExtraBold' : 'PlusJakartaSans_400Regular'}]}>
-                      {val === 'All' ? 'All Time' : `Last ${val} Days`}
-                    </Text>
-                  </TouchableOpacity>
-                ))}
-              </View>
-            )}
-          </View>
-          
-          <TouchableOpacity onPress={onExport} style={tw`bg-gray-50 dark:bg-slate-700 border border-gray-200 dark:border-slate-600 px-2 py-1.5 rounded-lg flex-row items-center gap-1`}>
-            <MaterialCommunityIcons name="download" size={12} color={tw.color('dark:text-emerald-400') || "#166534"} />
-            <Text style={[tw`text-[10px] text-[#166534] dark:text-emerald-400`, {fontFamily: 'PlusJakartaSans_800ExtraBold'}]}>Export</Text>
-          </TouchableOpacity>
-        </View>
+        <TouchableOpacity onPress={onExport} style={tw`bg-gray-50 dark:bg-slate-700 border border-gray-200 dark:border-slate-600 px-2 py-1.5 rounded-lg flex-row items-center gap-1`}>
+          <MaterialCommunityIcons name="download" size={12} color={tw.color('dark:text-emerald-400') || "#166534"} />
+          <Text style={[tw`text-[10px] text-[#166534] dark:text-emerald-400`, {fontFamily: 'PlusJakartaSans_800ExtraBold'}]}>Export</Text>
+        </TouchableOpacity>
       </View>
 
-      {dailyHarvestsList.length === 0 ? (
-        <Text style={tw`text-center text-xs text-gray-400 italic py-4`}>No harvests recorded yet.</Text>
-      ) : (
-        <ScrollView style={tw`max-h-80 pr-1`} nestedScrollEnabled showsVerticalScrollIndicator={true}>
-          {dailyHarvestsList.map((item, idx) => (
-            <View key={idx} style={tw`flex-row justify-between items-center bg-[#f8fafc] dark:bg-slate-700/50 border border-gray-100 dark:border-slate-600/50 rounded-[14px] p-4 mb-2`}>
-              <View style={tw`flex-1 pr-2`}>
-                <Text style={[tw`text-sm text-[#032514] dark:text-slate-200 mb-0.5`, {fontFamily: 'PlusJakartaSans_800ExtraBold'}]}>{item.date}</Text>
-                <Text style={[tw`text-[11px] text-gray-500 dark:text-slate-400`, {fontFamily: 'PlusJakartaSans_700Bold'}]} numberOfLines={1}>{item.desc}</Text>
-              </View>
-              <View style={tw`items-end shrink-0`}>
-                <Text style={[tw`text-sm text-[#166534] dark:text-emerald-400 mb-0.5`, {fontFamily: 'PlusJakartaSans_800ExtraBold'}]}>{item.kg}</Text>
-                <Text style={[tw`text-[10px] text-gray-500 dark:text-slate-400 uppercase tracking-wider`, {fontFamily: 'PlusJakartaSans_700Bold'}]}>{item.g}</Text>
-              </View>
+      <View style={tw`border border-gray-100 dark:border-slate-700 rounded-3xl overflow-hidden mb-4`}>
+        <Calendar
+          key={isDarkMode ? 'dark' : 'light'}
+          current={today}
+          onDayPress={(day: any) => setSelectedDate(day.dateString)}
+          markedDates={markedDates}
+          theme={{
+            backgroundColor: isDarkMode ? tw.color('slate-800') : tw.color('white'),
+            calendarBackground: isDarkMode ? tw.color('slate-800') : tw.color('white'),
+            textSectionTitleColor: isDarkMode ? tw.color('slate-400') : tw.color('slate-500'),
+            selectedDayBackgroundColor: tw.color('emerald-600'),
+            selectedDayTextColor: '#ffffff',
+            todayTextColor: tw.color('emerald-600'),
+            dayTextColor: isDarkMode ? tw.color('slate-200') : tw.color('slate-700'),
+            textDisabledColor: isDarkMode ? tw.color('slate-600') : tw.color('slate-300'),
+            dotColor: tw.color('emerald-500'),
+            selectedDotColor: '#ffffff',
+            arrowColor: tw.color('emerald-600'),
+            monthTextColor: isDarkMode ? tw.color('slate-100') : tw.color('slate-800'),
+            textDayFontFamily: 'PlusJakartaSans_700Bold',
+            textMonthFontFamily: 'PlusJakartaSans_800ExtraBold',
+            textDayHeaderFontFamily: 'PlusJakartaSans_800ExtraBold',
+            textDayFontSize: 13,
+            textMonthFontSize: 14,
+            textDayHeaderFontSize: 11
+          }}
+        />
+      </View>
+
+      <Text style={[tw`text-[11px] text-[#032514] dark:text-slate-400 tracking-wide mb-3 px-1`, {fontFamily: 'PlusJakartaSans_800ExtraBold'}]}>HARVEST DETAILS</Text>
+
+      {selectedHarvests.length > 0 ? (
+        selectedHarvests.map((harvest, index) => (
+          <View key={harvest.id} style={tw`flex-row justify-between items-center bg-[#f0fdf4] dark:bg-emerald-900/20 border border-emerald-100 dark:border-emerald-800/50 rounded-[16px] p-4 shadow-sm mb-3`}>
+            
+            <View style={tw`w-14 bg-white dark:bg-slate-800 rounded-[12px] border border-emerald-100 dark:border-emerald-800/50 items-center justify-center py-1.5 shadow-sm`}>
+              <Text style={[tw`text-[9px] text-[#166534] dark:text-emerald-400 uppercase tracking-widest`, {fontFamily: 'PlusJakartaSans_800ExtraBold'}]}>{harvest.month}</Text>
+              <Text style={[tw`text-lg text-slate-800 dark:text-slate-100 leading-tight`, {fontFamily: 'PlusJakartaSans_800ExtraBold'}]}>{harvest.day}</Text>
             </View>
-          ))}
-        </ScrollView>
+
+            <View style={tw`flex-1 px-3`}>
+              <Text style={[tw`text-sm text-[#032514] dark:text-slate-200 mb-0.5`, {fontFamily: 'PlusJakartaSans_800ExtraBold'}]}>{harvest.year}</Text>
+              <Text style={[tw`text-[11px] text-emerald-700 dark:text-emerald-400/80`, {fontFamily: 'PlusJakartaSans_700Bold'}]} numberOfLines={1}>{harvest.desc}</Text>
+            </View>
+            
+            <View style={tw`items-end shrink-0 justify-center`}>
+              <Text style={[tw`text-[18px] text-[#166534] dark:text-emerald-400`, {fontFamily: 'PlusJakartaSans_800ExtraBold'}]}>{harvest.weight}</Text>
+            </View>
+          </View>
+        ))
+      ) : (
+        <View style={tw`bg-[#f8fafc] dark:bg-slate-800/50 border border-gray-100 dark:border-slate-700 rounded-[16px] p-6 items-center justify-center`}>
+          <MaterialCommunityIcons name="leaf-off" size={24} color={tw.color('slate-300')} style={tw`mb-2`} />
+          <Text style={[tw`text-xs text-gray-400 dark:text-slate-500`, {fontFamily: 'PlusJakartaSans_700Bold'}]}>No harvests recorded for this date.</Text>
+        </View>
       )}
+
     </View>
   );
 }

@@ -35,20 +35,26 @@ export default function HomeScreen() {
   const light = typeof sensors.light === 'number' ? sensors.light : 490;
 
   const isAuto = String(settings?.setpoints?.mode).toLowerCase() === 'auto';
+  const isScheduled = String(settings?.setpoints?.mode).toLowerCase() === 'scheduled';
+  const isLocked = isAuto || isScheduled;
   const devices = settings?.setpoints?.devices || { fans: false, misters: false, lights: false };
   
   const fansActive = devices.fans;
   const misterActive = devices.misters;
   const lightActive = devices.lights;
 
-  const toggleDevice = (key: string, currentState: boolean) => {
-    if (isAuto) return; // User cannot toggle while in auto mode
+  const toggleDevice = async (key: string, currentState: boolean) => {
+    if (isLocked) return; // User cannot toggle while in auto or scheduled mode
     const newState = !currentState;
-    update(ref(db, `kabutech/settings/setpoints/devices`), {
-      [key]: newState
-    }).then(() => {
+    try {
+      await update(ref(db, `kabutech/settings/setpoints/devices`), {
+        [key]: newState
+      });
       showToast({ type: 'success', text1: `${key.charAt(0).toUpperCase() + key.slice(1)} turned ${newState ? 'ON' : 'OFF'}` });
-    });
+    } catch (error) {
+      console.error(error);
+      showToast({ type: 'error', text1: 'Error', text2: `Failed to turn ${newState ? 'ON' : 'OFF'} ${key}.` });
+    }
   };
 
   // Calculate Environment Score (0 to 10)
@@ -67,6 +73,7 @@ export default function HomeScreen() {
         <ScoreArch 
           envScore={envScore} 
           isAuto={isAuto} 
+          isScheduled={isScheduled}
           isDarkMode={isDarkMode} 
           fansActive={fansActive} 
           misterActive={misterActive} 

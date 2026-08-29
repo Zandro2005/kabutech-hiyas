@@ -62,32 +62,27 @@ export default function LoginScreen() {
               <Svg height="100%" width="100%" viewBox="0 0 1440 320" preserveAspectRatio="none">
                 <Path 
                   fill="#ffffff" 
-                  d="M0,160 C320,350 800,350 1440,0 L1440,320 L0,320 Z" 
+                  d="M0,160 C480,420 960,-100 1440,160 L1440,320 L0,320 Z" 
                 />
               </Svg>
             </View>
-            
-            {/* Back Button */}
-            <TouchableOpacity 
-              onPress={() => navigation.goBack()}
-              style={tw`absolute top-12 left-6 w-10 h-10 bg-white/30 rounded-full items-center justify-center`}
-            >
-              <MaterialCommunityIcons name="chevron-left" size={24} color="white" />
-            </TouchableOpacity>
           </View>
 
           {/* Form Area */}
           <View style={tw`flex-1 px-8 pt-8 pb-6 relative`}>
-            
-            {/* Floating Mushroom Icon instead of Leaf */}
-            <View style={tw`absolute right-8 top-4 opacity-80`}>
-              <MaterialCommunityIcons name="mushroom-outline" size={42} color="#3d8c63" style={{ transform: [{ rotate: '15deg' }] }} />
-            </View>
 
             <View style={tw`mb-8`}>
-              <Text style={[tw`text-3xl text-slate-800 text-center`, { fontFamily: 'PlusJakartaSans_800ExtraBold' }]}>
-                Welcome back
-              </Text>
+              <View style={tw`flex-row items-center justify-center`}>
+                <Text style={[tw`text-3xl text-slate-800 text-center`, { fontFamily: 'PlusJakartaSans_800ExtraBold' }]}>
+                  Welcome back
+                </Text>
+                <MaterialCommunityIcons 
+                  name="mushroom" 
+                  size={32} 
+                  color="#3d8c63" 
+                  style={[tw`ml-2 mt-1`, { transform: [{ rotate: '15deg' }] }]} 
+                />
+              </View>
               <Text style={[tw`text-sm text-slate-400 text-center mt-2`, { fontFamily: 'PlusJakartaSans_700Bold' }]}>
                 Login to your account
               </Text>

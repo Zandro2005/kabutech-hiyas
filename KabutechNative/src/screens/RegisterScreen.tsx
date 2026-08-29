@@ -1,6 +1,7 @@
 import React, { useState, useRef } from 'react';
-import { View, Text, TextInput, TouchableOpacity, KeyboardAvoidingView, Platform, ScrollView, StatusBar } from 'react-native';
+import { View, Text, TextInput, TouchableOpacity, KeyboardAvoidingView, Platform, ScrollView, StatusBar, Image } from 'react-native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
+import Svg, { Path } from 'react-native-svg';
 import { createUserWithEmailAndPassword, updateProfile } from 'firebase/auth';
 import { ref, set } from 'firebase/database';
 import { auth, db } from '../services/firebase';
@@ -95,28 +96,45 @@ export default function RegisterScreen() {
         keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 20}
       >
         <ScrollView 
-          contentContainerStyle={tw`flex-grow px-8 pt-20 pb-6 relative`} 
+          contentContainerStyle={tw`flex-grow`} 
           bounces={false}
           keyboardShouldPersistTaps="handled"
         >
           
-          {/* Back Button */}
-          <TouchableOpacity 
-            onPress={() => navigation.goBack()}
-            style={tw`w-10 h-10 bg-[#f3f4f6] rounded-full items-center justify-center mb-8`}
-          >
-            <MaterialCommunityIcons name="chevron-left" size={24} color="#64748b" />
-          </TouchableOpacity>
-
-          {/* Floating Mushroom Icon instead of Leaf */}
-          <View style={tw`absolute right-8 top-28 opacity-80 z-10`}>
-            <MaterialCommunityIcons name="mushroom-outline" size={48} color="#3d8c63" style={{ transform: [{ rotate: '-15deg' }] }} />
+          {/* Header Image with SVG Wave (Compact Design) */}
+          <View style={tw`w-full h-[200px] relative overflow-hidden bg-white`}>
+            <Image 
+              source={require('../../assets/realistic_mushrooms_bg.png')} 
+              style={tw`w-full h-full absolute`}
+              resizeMode="cover"
+            />
+            
+            {/* SVG White Wave overlayed at the bottom of the image */}
+            <View style={tw`absolute bottom-0 w-full h-[80px]`}>
+              <Svg height="100%" width="100%" viewBox="0 0 1440 320" preserveAspectRatio="none">
+                <Path 
+                  fill="#ffffff" 
+                  d="M0,160 C480,420 960,-100 1440,160 L1440,320 L0,320 Z" 
+                />
+              </Svg>
+            </View>
           </View>
 
-          <View style={tw`mb-10 mt-4`}>
-            <Text style={[tw`text-3xl text-slate-800 text-center`, { fontFamily: 'PlusJakartaSans_800ExtraBold' }]}>
-              Register
-            </Text>
+          {/* Form Area */}
+          <View style={tw`flex-1 px-8 pt-4 pb-6 relative`}>
+
+            <View style={tw`mb-6`}>
+            <View style={tw`flex-row items-center justify-center`}>
+              <Text style={[tw`text-3xl text-slate-800 text-center`, { fontFamily: 'PlusJakartaSans_800ExtraBold' }]}>
+                Register
+              </Text>
+              <MaterialCommunityIcons 
+                name="mushroom" 
+                size={32} 
+                color="#3d8c63" 
+                style={[tw`ml-2 mt-1`, { transform: [{ rotate: '15deg' }] }]} 
+              />
+            </View>
             <Text style={[tw`text-sm text-slate-400 text-center mt-2`, { fontFamily: 'PlusJakartaSans_700Bold' }]}>
               Create your new account
             </Text>
@@ -240,6 +258,7 @@ export default function RegisterScreen() {
             </TouchableOpacity>
           </View>
           
+          </View>
         </ScrollView>
       </KeyboardAvoidingView>
     </View>

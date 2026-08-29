@@ -96,15 +96,18 @@ export default function ManageCropScreen() {
     setArchiveTarget({ firebaseKey, rackName });
   };
 
-  const confirmArchive = () => {
+  const confirmArchive = async () => {
     if (!archiveTarget) return;
-    remove(ref(db, `kabutech/batches/${archiveTarget.firebaseKey}`))
-    const rackName = archiveTarget.rackName;
-    setArchiveTarget(null);
-    setTimeout(() => {
+    try {
+      await remove(ref(db, `kabutech/batches/${archiveTarget.firebaseKey}`));
+      const rackName = archiveTarget.rackName;
+      setArchiveTarget(null);
       playSuccessSound();
       showToast({ type: 'success', text1: 'Removed', text2: `"${rackName}" has been removed.` });
-    }, 600);
+    } catch (error) {
+      console.error(error);
+      showToast({ type: 'error', text1: 'Error', text2: 'Failed to archive rack.' });
+    }
   };
 
   const openActionModal = (type: 'harvest' | 'capacity' | 'flag', rack: BatchData) => {
@@ -135,8 +138,8 @@ export default function ManageCropScreen() {
               <MaterialCommunityIcons name="leaf" size={16} color="#166534" />
             </View>
             <View>
-              <Text style={[tw`text-[9px] text-gray-500 dark:text-slate-400 uppercase tracking-widest`, {fontFamily: 'PlusJakartaSans_800ExtraBold'}]}>Total Yield</Text>
-              <Text style={[tw`text-lg text-[#032514] dark:text-emerald-400 tracking-tighter`, {fontFamily: 'PlusJakartaSans_800ExtraBold'}]}>{(totalYieldGrams / 1000).toFixed(2)}kg</Text>
+              <Text style={[tw`text-[11px] text-gray-500 dark:text-slate-400 mb-0.5`, {fontFamily: 'PlusJakartaSans_700Bold'}]}>Total Output</Text>
+              <Text style={[tw`text-lg text-[#032514] dark:text-emerald-400 tracking-tighter`, {fontFamily: 'PlusJakartaSans_800ExtraBold'}]}>{Math.round(totalYieldGrams / 1000)}kg</Text>
             </View>
           </View>
           
@@ -240,7 +243,7 @@ export default function ManageCropScreen() {
               <View style={tw`flex-row items-center gap-1.5 mt-3 mb-2`}>
                   <MaterialCommunityIcons name="scale" size={12} color={tw.color('dark:text-slate-400') || "#64748b"} />
                   <Text style={[tw`text-[10px] text-gray-600 dark:text-slate-300`, {fontFamily: 'PlusJakartaSans_700Bold'}]}>
-                    Total Yield: {(rack.stats.totalYieldGrams / 1000).toFixed(2)} kg
+                    Total Yield: {Math.round(rack.stats.totalYieldGrams / 1000)} kg
                   </Text>
               </View>
 

@@ -35,6 +35,8 @@ export default function ControlsScreen() {
 
   const devices = settings?.setpoints?.devices || { fans: false, misters: false, lights: false, co2: false };
   const isAuto = String(settings?.setpoints?.mode).toLowerCase() === 'auto';
+  const isScheduled = String(settings?.setpoints?.mode).toLowerCase() === 'scheduled';
+  const isLocked = isAuto || isScheduled;
 
   const updateSetpoint = (key: string, value: number, label?: string, unit?: string) => {
     update(ref(db, 'kabutech/settings/setpoints'), {
@@ -45,7 +47,7 @@ export default function ControlsScreen() {
   };
 
   const toggleDevice = (key: string, state: boolean) => {
-    if (isAuto) return;
+    if (isLocked) return;
     update(ref(db, `kabutech/settings/setpoints/devices`), {
       [key]: state
     }).then(() => {
@@ -53,7 +55,7 @@ export default function ControlsScreen() {
     }).catch(err => Alert.alert("Error Saving", err.message));
   };
 
-  const setMode = (mode: 'auto' | 'manual') => {
+  const setMode = (mode: 'auto' | 'manual' | 'scheduled') => {
     update(ref(db, 'kabutech/settings/setpoints'), {
       mode
     }).then(() => {
@@ -148,7 +150,14 @@ export default function ControlsScreen() {
         
         {/* Horizontal Tabs */}
         <View style={tw`mb-10 pl-4`}>
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={tw`pr-4`}>
+          <ScrollView 
+            horizontal 
+            showsHorizontalScrollIndicator={false} 
+            contentContainerStyle={tw`pr-4`}
+            snapToInterval={92}
+            decelerationRate="fast"
+            snapToAlignment="start"
+          >
             {tabs.map((tab) => {
               const isActive = activeTab === tab.id;
               return (
@@ -156,6 +165,7 @@ export default function ControlsScreen() {
                   key={tab.id}
                   onPress={() => setActiveTab(tab.id)}
                   style={tw`items-center justify-center mr-7 w-16`}
+                  hitSlop={{ top: 15, bottom: 15, left: 10, right: 10 }}
                 >
                   <MaterialCommunityIcons 
                     name={tab.icon as any} 
@@ -195,30 +205,37 @@ export default function ControlsScreen() {
         />
 
         {/* Controls Row (-, Mode, +) */}
-        <View style={tw`flex-row items-center justify-center px-4 mb-12 gap-3`}>
+        <View style={tw`flex-row items-center justify-center px-4 mb-12 gap-2`}>
           <TouchableOpacity 
             activeOpacity={0.7}
             onPressIn={startDecrement}
             onPressOut={stopTimer}
-            style={tw`w-11 h-11 rounded-full border border-slate-200 dark:border-slate-700 items-center justify-center bg-white dark:bg-slate-800 shadow-sm`}
+            hitSlop={{ top: 15, bottom: 15, left: 15, right: 15 }}
+            style={tw`w-9 h-9 rounded-full border border-slate-200 dark:border-slate-700 items-center justify-center bg-white dark:bg-slate-800 shadow-sm`}
           >
-            <MaterialCommunityIcons name="minus" size={24} color={isDarkMode ? '#94a3b8' : '#64748b'} />
+            <MaterialCommunityIcons name="minus" size={20} color={isDarkMode ? '#94a3b8' : '#64748b'} />
           </TouchableOpacity>
 
           <View style={tw`flex-row bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-full p-1`}>
             <TouchableOpacity 
               onPress={() => setMode('auto')}
-              style={[tw`px-6 py-2.5 rounded-full`, isAuto ? tw`bg-[#10b981] shadow-sm` : tw`bg-transparent`]}
+              style={[tw`px-4 py-2.5 rounded-full`, isAuto ? tw`bg-[#10b981] shadow-sm` : tw`bg-transparent`]}
             >
-              <Text style={[tw`text-[11px]`, isAuto ? tw`text-white` : tw`text-slate-500 dark:text-slate-400`, {fontFamily: 'PlusJakartaSans_800ExtraBold', letterSpacing: 0.5}]}>AUTO</Text>
+              <Text style={[tw`text-[10px]`, isAuto ? tw`text-white` : tw`text-slate-500 dark:text-slate-400`, {fontFamily: 'PlusJakartaSans_800ExtraBold', letterSpacing: 0.5}]}>AUTO</Text>
+            </TouchableOpacity>
+            <TouchableOpacity 
+              onPress={() => setMode('scheduled')}
+              style={[tw`px-4 py-2.5 rounded-full`, isScheduled ? tw`bg-[#8b5cf6] shadow-sm` : tw`bg-transparent`]}
+            >
+              <Text style={[tw`text-[10px]`, isScheduled ? tw`text-white` : tw`text-slate-500 dark:text-slate-400`, {fontFamily: 'PlusJakartaSans_800ExtraBold', letterSpacing: 0.5}]}>SCHEDULED</Text>
             </TouchableOpacity>
             <TouchableOpacity 
               onPress={() => {
-                if (isAuto) DeviceEventEmitter.emit('showManualOverrideModal');
+                if (isLocked) DeviceEventEmitter.emit('showManualOverrideModal');
               }}
-              style={[tw`px-6 py-2.5 rounded-full`, !isAuto ? tw`bg-[#f59e0b] shadow-sm` : tw`bg-transparent`]}
+              style={[tw`px-4 py-2.5 rounded-full`, (!isAuto && !isScheduled) ? tw`bg-[#f59e0b] shadow-sm` : tw`bg-transparent`]}
             >
-              <Text style={[tw`text-[11px]`, !isAuto ? tw`text-white` : tw`text-slate-500 dark:text-slate-400`, {fontFamily: 'PlusJakartaSans_800ExtraBold', letterSpacing: 0.5}]}>MANUAL</Text>
+              <Text style={[tw`text-[10px]`, (!isAuto && !isScheduled) ? tw`text-white` : tw`text-slate-500 dark:text-slate-400`, {fontFamily: 'PlusJakartaSans_800ExtraBold', letterSpacing: 0.5}]}>MANUAL</Text>
             </TouchableOpacity>
           </View>
 
@@ -226,19 +243,20 @@ export default function ControlsScreen() {
             activeOpacity={0.7}
             onPressIn={startIncrement}
             onPressOut={stopTimer}
-            style={tw`w-11 h-11 rounded-full border border-slate-200 dark:border-slate-700 items-center justify-center bg-white dark:bg-slate-800 shadow-sm`}
+            hitSlop={{ top: 15, bottom: 15, left: 15, right: 15 }}
+            style={tw`w-9 h-9 rounded-full border border-slate-200 dark:border-slate-700 items-center justify-center bg-white dark:bg-slate-800 shadow-sm`}
           >
-            <MaterialCommunityIcons name="plus" size={24} color={isDarkMode ? '#94a3b8' : '#64748b'} />
+            <MaterialCommunityIcons name="plus" size={20} color={isDarkMode ? '#94a3b8' : '#64748b'} />
           </TouchableOpacity>
         </View>
 
         {/* Bottom Device Toggles */}
         <View style={tw`px-6`}>
-          {isAuto && (
+          {isLocked && (
             <View style={tw`bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-200 dark:border-emerald-800/50 rounded-xl p-3 flex-row items-center gap-2 mb-4 mx-2`}>
               <MaterialCommunityIcons name="lock" size={16} color={isDarkMode ? '#34d399' : '#059669'} />
               <Text style={[tw`text-[10px] text-emerald-800 dark:text-emerald-300`, {fontFamily: 'PlusJakartaSans_700Bold'}]}>
-                Manual controls are locked in Auto Mode.
+                Manual controls are locked.
               </Text>
             </View>
           )}
@@ -249,11 +267,13 @@ export default function ControlsScreen() {
               return (
                 <TouchableOpacity
                   key={device.key}
-                  disabled={isAuto}
+                  disabled={isLocked}
                   onPress={() => toggleDevice(device.key, !device.active)}
                   style={[
-                    tw`w-[22%] aspect-square rounded-2xl items-center justify-center border bg-[#eaeff5] dark:bg-[#1e293b] border-transparent`,
-                    isAuto ? tw`opacity-50` : null
+                    tw`w-[22%] aspect-square rounded-2xl items-center justify-center border`,
+                    isLocked 
+                      ? tw`bg-slate-200 dark:bg-slate-900 border-transparent opacity-40` 
+                      : tw`bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 shadow-sm`
                   ]}
                 >
                   <View style={tw`mb-2 p-1.5 rounded-full bg-transparent`}>

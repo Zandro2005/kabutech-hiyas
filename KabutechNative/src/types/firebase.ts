@@ -18,12 +18,32 @@ export interface Setpoints {
   humidity: number;
   light: number;
   co2: number;
-  mode: 'auto' | 'manual';
+  mode: 'auto' | 'manual' | 'scheduled';
   devices: DeviceStates;
+}
+
+export interface TimeWindow {
+  id: string;
+  startTime: string;
+  endTime: string;
+}
+
+export interface ScheduleConfig {
+  enabled: boolean;
+  durationMins?: number;
+  intervalHours?: number;
+  windows?: TimeWindow[];
+}
+
+export interface ScheduleSettings {
+  misters: ScheduleConfig;
+  fans: ScheduleConfig;
+  lights: ScheduleConfig;
 }
 
 export interface SettingsData {
   setpoints: Setpoints;
+  schedules?: ScheduleSettings;
   yieldTarget?: number;
 }
 

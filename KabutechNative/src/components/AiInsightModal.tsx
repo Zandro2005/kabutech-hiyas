@@ -24,16 +24,17 @@ export default function AiInsightModal({ visible, onClose }: AiInsightModalProps
 
   const navigation = useNavigation<NativeStackNavigationProp<GlobalNavigationParamList>>();
   
-  const handleActivateMisters = () => {
-    update(ref(db, `kabutech/settings/setpoints/devices`), {
-      misters: true
-    }).then(() => {
+  const handleActivateMisters = async () => {
+    try {
+      await update(ref(db, `kabutech/settings/setpoints/devices`), {
+        misters: true
+      });
       showToast({ type: 'success', text1: 'AI Override: Misters activated!' });
       onClose();
       navigation.navigate('Controls' as never);
-    }).catch(err => {
+    } catch (err) {
       showToast({ type: 'error', text1: 'Error activating misters.' });
-    });
+    }
   };
 
   return (

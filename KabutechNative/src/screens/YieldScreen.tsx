@@ -1,5 +1,5 @@
 import React, { useState, useRef, useMemo } from 'react';
-import { View, Text, ScrollView, TouchableOpacity, StatusBar } from 'react-native';
+import { View, Text, ScrollView, TouchableOpacity, StatusBar, Modal, TextInput, Alert, ActivityIndicator } from 'react-native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import tw from '../tailwind';
 import ScreenHeader from '../components/ScreenHeader';
@@ -7,11 +7,19 @@ import { useBatches, useSettings } from '../hooks/useFirebaseData';
 import YieldChart from '../components/yield/YieldChart';
 import DailyHarvestList from '../components/yield/DailyHarvestList';
 import { getRackStats } from '../utils/dataHelpers';
+import { db } from '../services/firebase';
+import { ref, update } from 'firebase/database';
+import { showToast } from '../components/CustomToast';
+import { useTheme } from '../context/ThemeContext';
 
 export default function YieldScreen() {
-  const [filterDays, setFilterDays] = useState<number | 'All'>(5);
+  const { isDarkMode } = useTheme();
+  const [filterDays, setFilterDays] = useState<number | 'All'>('All');
   const [showFilterDropdown, setShowFilterDropdown] = useState(false);
   const [chartPeriod, setChartPeriod] = useState<'Monthly' | 'Semi-Annually' | 'Annually'>('Monthly');
+  const [targetModalVisible, setTargetModalVisible] = useState(false);
+  const [newTargetYield, setNewTargetYield] = useState('');
+  const [isUpdatingTarget, setIsUpdatingTarget] = useState(false);
   const batches = useBatches();
   const settings = useSettings();
 
@@ -44,7 +52,7 @@ export default function YieldScreen() {
     }
 
     const aYieldKg = (tGrams / 1000).toFixed(2);
-    const tYieldKg = (settings?.yieldTarget || 5.00).toFixed(2);
+    const tYieldKg = (settings?.yieldTarget || 5).toFixed(2);
     const eff = Math.min(100, Math.round((parseFloat(aYieldKg) / parseFloat(tYieldKg)) * 100)) || 0;
 
     // Format daily harvests for list
@@ -54,17 +62,26 @@ export default function YieldScreen() {
       .map(dateStr => {
         const parts = dateStr.split('-');
         let formattedDate = dateStr;
+        let month = '';
+        let day = '';
+        let year = '';
         if (parts.length === 3) {
           const d = new Date(parseInt(parts[0]), parseInt(parts[1]) - 1, parseInt(parts[2]));
           formattedDate = d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+          month = d.toLocaleDateString('en-US', { month: 'short' }).toUpperCase();
+          day = d.toLocaleDateString('en-US', { day: '2-digit' });
+          year = d.toLocaleDateString('en-US', { year: 'numeric' });
         }
         const data = dMap[dateStr];
         const racksArr = Array.from(data.racks);
         return {
           date: formattedDate,
+          month,
+          day,
+          year,
           desc: `${data.count} harvest${data.count > 1 ? 's' : ''} • ${racksArr.join(', ')}`,
-          kg: `${(data.grams / 1000).toFixed(2)} kg`,
-          g: `${data.grams}G`
+          kg: `${Math.round(data.grams / 1000)} kg`,
+          g: `${Math.round(data.grams)} g`
         };
       });
 
@@ -81,6 +98,26 @@ export default function YieldScreen() {
   }, [batches, settings?.yieldTarget, filterDays]);
 
   const isExporting = useRef(false);
+
+  const handleSaveTarget = async () => {
+    const val = parseFloat(newTargetYield);
+    if (isNaN(val) || val <= 0) {
+      Alert.alert('Invalid Input', 'Please enter a valid target yield in kg.');
+      return;
+    }
+    
+    setIsUpdatingTarget(true);
+    try {
+      await update(ref(db, 'kabutech/settings'), { yieldTarget: val });
+      setTargetModalVisible(false);
+      showToast({ type: 'success', text1: 'Target Yield Updated', text2: `Target yield successfully set to ${val} kg.` });
+    } catch (error) {
+      Alert.alert('Error', 'Failed to update target yield.');
+      console.error(error);
+    } finally {
+      setIsUpdatingTarget(false);
+    }
+  };
 
   return (
     <View style={tw`flex-1 bg-[#f4f8f4] dark:bg-[#020617]`}>
@@ -133,7 +170,13 @@ export default function YieldScreen() {
                 <MaterialCommunityIcons name="flag-outline" size={14} color="#166534" />
                 <Text style={[tw`text-[10px] text-gray-800 dark:text-slate-200 tracking-wide uppercase`, {fontFamily: 'PlusJakartaSans_800ExtraBold'}]}>TARGET</Text>
               </View>
-              <TouchableOpacity style={tw`bg-gray-100 dark:bg-slate-700 px-2 py-0.5 rounded-full flex-row items-center gap-1`}>
+              <TouchableOpacity 
+                style={tw`bg-gray-100 dark:bg-slate-700 px-2 py-0.5 rounded-full flex-row items-center gap-1`}
+                onPress={() => {
+                  setNewTargetYield(targetYieldKg);
+                  setTargetModalVisible(true);
+                }}
+              >
                 <MaterialCommunityIcons name="pencil" size={10} color={tw.color('dark:text-slate-300') || "#334155"} />
                 <Text style={[tw`text-[8px] text-gray-600 dark:text-slate-300`, {fontFamily: 'PlusJakartaSans_800ExtraBold'}]}>Edit</Text>
               </TouchableOpacity>
@@ -173,6 +216,46 @@ export default function YieldScreen() {
         />
 
       </ScrollView>
+
+      {/* Edit Target Modal */}
+      <Modal visible={targetModalVisible} transparent animationType="fade">
+        <View style={tw`flex-1 bg-black/50 justify-center items-center px-6`}>
+          <View style={tw`bg-white dark:bg-slate-800 w-full rounded-[24px] p-6 shadow-xl`}>
+            <View style={tw`flex-row justify-between items-center mb-4`}>
+              <Text style={[tw`text-lg text-gray-900 dark:text-white`, {fontFamily: 'PlusJakartaSans_800ExtraBold'}]}>Edit Target Yield</Text>
+              <TouchableOpacity onPress={() => setTargetModalVisible(false)} disabled={isUpdatingTarget}>
+                <MaterialCommunityIcons name="close" size={24} color={tw.color('gray-400')} />
+              </TouchableOpacity>
+            </View>
+            
+            <Text style={[tw`text-sm text-gray-500 dark:text-slate-400 mb-2`, {fontFamily: 'PlusJakartaSans_500Medium'}]}>Enter new target yield (kg):</Text>
+            
+            <TextInput
+              style={[tw`bg-gray-50 dark:bg-slate-900 border border-gray-200 dark:border-slate-700 rounded-xl px-4 py-3 text-base text-gray-900 dark:text-white mb-6`, {fontFamily: 'PlusJakartaSans_700Bold'}]}
+              keyboardType="decimal-pad"
+              value={newTargetYield}
+              onChangeText={setNewTargetYield}
+              placeholder="e.g. 5.5"
+              placeholderTextColor={tw.color('gray-400')}
+              editable={!isUpdatingTarget}
+            />
+            
+            <TouchableOpacity 
+              style={tw`bg-emerald-600 dark:bg-emerald-500 rounded-xl py-3.5 items-center justify-center flex-row shadow-sm ${isUpdatingTarget ? 'opacity-70' : ''}`}
+              onPress={handleSaveTarget}
+              disabled={isUpdatingTarget}
+            >
+              {isUpdatingTarget ? (
+                <ActivityIndicator color="white" size="small" style={tw`mr-2`} />
+              ) : null}
+              <Text style={[tw`text-white text-base`, {fontFamily: 'PlusJakartaSans_700Bold'}]}>
+                {isUpdatingTarget ? 'Saving...' : 'Save Target'}
+              </Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
+
     </View>
   );
 }

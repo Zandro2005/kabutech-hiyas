@@ -11,6 +11,7 @@ import {
 } from '@expo-google-fonts/plus-jakarta-sans';
 import { ThemeProvider } from './src/context/ThemeContext';
 import { AuthProvider } from './src/context/AuthContext';
+import { FirebaseDataProvider } from './src/context/FirebaseDataContext';
 import { useDeviceContext } from 'twrnc';
 import tw from './src/tailwind';
 import CustomToast from './src/components/CustomToast';
@@ -44,11 +45,13 @@ export default function App() {
   return (
     <ThemeProvider>
       <AuthProvider>
-        <SafeAreaProvider>
-          <StatusBar style="auto" />
-          <AppNavigator />
-          <CustomToast />
-        </SafeAreaProvider>
+        <FirebaseDataProvider>
+          <SafeAreaProvider>
+            <StatusBar style="auto" />
+            <AppNavigator />
+            <CustomToast />
+          </SafeAreaProvider>
+        </FirebaseDataProvider>
       </AuthProvider>
     </ThemeProvider>
   );

@@ -7,9 +7,30 @@ import { useAuth } from '../context/AuthContext';
 
 const { width } = Dimensions.get('window');
 
+const getAvatarColor = (name: string) => {
+  const colors = [
+    '#ef4444', // red
+    '#f97316', // orange
+    '#eab308', // yellow
+    '#22c55e', // green
+    '#06b6d4', // cyan
+    '#3b82f6', // blue
+    '#8b5cf6', // violet
+    '#d946ef', // fuchsia
+    '#f43f5e'  // rose
+  ];
+  if (!name) return colors[0];
+  let hash = 0;
+  for (let i = 0; i < name.length; i++) {
+    hash = name.charCodeAt(i) + ((hash << 5) - hash);
+  }
+  return colors[Math.abs(hash) % colors.length];
+};
+
 interface Props {
   envScore: string;
   isAuto: boolean;
+  isScheduled?: boolean;
   isDarkMode: boolean;
   fansActive: boolean;
   misterActive: boolean;
@@ -21,6 +42,7 @@ interface Props {
 export default function ScoreArch({
   envScore,
   isAuto,
+  isScheduled = false,
   isDarkMode,
   fansActive,
   misterActive,
@@ -46,8 +68,10 @@ export default function ScoreArch({
             style={tw`flex-row items-center gap-3`} 
             onPress={() => navigation.navigate('Profile' as never)}
           >
-            <View style={tw`w-12 h-12 bg-slate-200 rounded-full overflow-hidden items-center justify-center border-2 border-white shadow-sm`}>
-              <MaterialCommunityIcons name="account" size={32} color="#64748b" />
+            <View style={tw`w-12 h-12 bg-slate-200 dark:bg-slate-700 rounded-full overflow-hidden items-center justify-center border-2 border-white shadow-sm`}>
+              <Text style={[tw`text-2xl`, {color: getAvatarColor(profile?.name || 'User'), fontFamily: 'PlusJakartaSans_800ExtraBold'}]}>
+                {profile?.name ? profile.name.charAt(0).toUpperCase() : '?'}
+              </Text>
             </View>
             <View>
               <Text style={[tw`text-lg text-slate-800 dark:text-white tracking-wide`, {fontFamily: 'PlusJakartaSans_800ExtraBold'}]}>
@@ -83,10 +107,10 @@ export default function ScoreArch({
           <View style={tw`flex-row items-center gap-2 mt-1.5`}>
             <Text style={[tw`text-[10px] text-emerald-600 dark:text-emerald-400`, { fontFamily: 'PlusJakartaSans_800ExtraBold' }]}>▲ +6% VS last Week</Text>
             
-            {/* Auto/Manual Mode Indicator */}
-            <View style={tw`px-2 py-0.5 rounded-md ${isAuto ? 'bg-emerald-100 dark:bg-emerald-900/40' : 'bg-amber-100 dark:bg-amber-900/40'} border ${isAuto ? 'border-emerald-200 dark:border-emerald-800' : 'border-amber-200 dark:border-amber-800'}`}>
-              <Text style={[tw`text-[9px] uppercase ${isAuto ? 'text-emerald-700 dark:text-emerald-400' : 'text-amber-700 dark:text-amber-400'}`, { fontFamily: 'PlusJakartaSans_800ExtraBold', letterSpacing: 1 }]}>
-                {isAuto ? 'AUTO' : 'MANUAL'}
+            {/* Auto/Manual/Scheduled Mode Indicator */}
+            <View style={tw`px-2 py-0.5 rounded-md ${isAuto ? 'bg-emerald-100 dark:bg-emerald-900/40' : isScheduled ? 'bg-purple-100 dark:bg-purple-900/40' : 'bg-amber-100 dark:bg-amber-900/40'} border ${isAuto ? 'border-emerald-200 dark:border-emerald-800' : isScheduled ? 'border-purple-200 dark:border-purple-800' : 'border-amber-200 dark:border-amber-800'}`}>
+              <Text style={[tw`text-[9px] uppercase ${isAuto ? 'text-emerald-700 dark:text-emerald-400' : isScheduled ? 'text-purple-700 dark:text-purple-400' : 'text-amber-700 dark:text-amber-400'}`, { fontFamily: 'PlusJakartaSans_800ExtraBold', letterSpacing: 1 }]}>
+                {isAuto ? 'AUTO' : isScheduled ? 'SCHEDULED' : 'MANUAL'}
               </Text>
             </View>
           </View>
@@ -104,13 +128,13 @@ export default function ScoreArch({
           return (
           <TouchableOpacity 
             key={index} 
-            disabled={isAuto}
+            disabled={isAuto || isScheduled}
             onPress={() => toggleDevice(item.key as 'fans' | 'misters' | 'lights' | 'co2', item.active)}
             style={tw`w-14 h-14 rounded-full items-center justify-center shadow-sm border ${
               showActive 
                 ? 'bg-emerald-50 dark:bg-emerald-900/30 border-emerald-500' 
                 : 'bg-white dark:bg-slate-800 border-gray-100 dark:border-slate-700'
-            } ${isAuto ? 'opacity-50' : ''}`}
+            } ${(isAuto || isScheduled) ? 'opacity-50' : ''}`}
           >
             <MaterialCommunityIcons 
               name={item.icon as any} 
