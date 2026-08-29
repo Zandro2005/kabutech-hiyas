@@ -1,6 +1,6 @@
 import React, { createContext, useState, useEffect, useContext } from 'react';
 import { onAuthStateChanged, User } from 'firebase/auth';
-import { ref, get } from 'firebase/database';
+import { ref, onValue } from 'firebase/database';
 import { auth, db } from '../services/firebase';
 import { UserProfile } from '../types/firebase';
 
@@ -22,40 +22,43 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
+    let unsubscribeProfile: (() => void) | undefined;
+
+    const unsubscribeAuth = onAuthStateChanged(auth, (firebaseUser) => {
       if (firebaseUser) {
-        // Fetch user profile from database
+        // Use onValue instead of get to react immediately when RegisterScreen creates the profile
         const profileRef = ref(db, `kabutech/users/${firebaseUser.uid}`);
-        try {
-          const snapshot = await get(profileRef);
+        unsubscribeProfile = onValue(profileRef, (snapshot) => {
           const userProfile = snapshot.val();
           
-          if (userProfile && !userProfile.approved) {
-            // Unapproved users cannot log in. They should be handled at the LoginScreen level,
-            // but we ensure the profile is available for checking.
-            setUser(firebaseUser);
-            setProfile(userProfile);
-          } else if (userProfile) {
-            setUser(firebaseUser);
+          setUser(firebaseUser);
+          if (userProfile) {
             setProfile(userProfile);
           } else {
-            // Profile missing, handle dynamically or reject
-            setUser(firebaseUser);
             setProfile(null);
           }
-        } catch (error) {
+          setIsLoading(false);
+        }, (error) => {
           console.error("Error fetching user profile:", error);
           setUser(null);
           setProfile(null);
-        }
+          setIsLoading(false);
+        });
       } else {
+        if (unsubscribeProfile) {
+          unsubscribeProfile();
+          unsubscribeProfile = undefined;
+        }
         setUser(null);
         setProfile(null);
+        setIsLoading(false);
       }
-      setIsLoading(false);
     });
 
-    return unsubscribe;
+    return () => {
+      if (unsubscribeProfile) unsubscribeProfile();
+      unsubscribeAuth();
+    };
   }, []);
 
   return (

@@ -132,6 +132,7 @@ export default function ControlsScreen() {
   }, []);
 
   // Device toggles list
+  const deviceToggles = [
     { key: 'fans', label: 'FANS', icon: 'fan', active: devices.fans, color: '#3b82f6' },
     { key: 'misters', label: 'MISTERS', icon: 'water', active: devices.misters, color: '#0ea5e9' },
     { key: 'lights', label: 'LIGHTS', icon: 'lightbulb-on', active: devices.lights, color: '#eab308' },

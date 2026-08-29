@@ -35,9 +35,11 @@ export default function BootScreen() {
       toValue: 100,
       duration: 2000,
       useNativeDriver: false,
-    }).start(() => {
-      // Navigate straight to Welcome after "loading"
-      navigation.replace('Welcome');
+    }).start(({ finished }) => {
+      if (finished && navigation.isFocused()) {
+        // Navigate straight to Welcome after "loading"
+        navigation.replace('Welcome');
+      }
     });
   }, []);
 

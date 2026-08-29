@@ -11,7 +11,7 @@ interface Props {
     max: number;
     color: string;
     unit: string;
-    optimal: number;
+    optimal: string;
   };
   isDarkMode: boolean;
 }

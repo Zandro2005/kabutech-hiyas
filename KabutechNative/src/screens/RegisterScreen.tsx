@@ -34,6 +34,18 @@ export default function RegisterScreen() {
       setErrorMsg('Passwords do not match.');
       return;
     }
+    if (password.length < 8) {
+      setErrorMsg('Password must be at least 8 characters long.');
+      return;
+    }
+    if (!/[A-Z]/.test(password)) {
+      setErrorMsg('Password must contain at least one uppercase letter.');
+      return;
+    }
+    if (!/[0-9]/.test(password) || !/[a-zA-Z]/.test(password)) {
+      setErrorMsg('Password must be alphanumeric (contain both letters and numbers).');
+      return;
+    }
     setLoading(true);
     setErrorMsg('');
     try {
@@ -56,7 +68,21 @@ export default function RegisterScreen() {
       // Navigation handled via AuthContext
     } catch (error: any) {
       setLoading(false);
-      setErrorMsg(error.message);
+      let friendlyMessage = 'Registration failed. Please try again.';
+      if (error.code === 'auth/email-already-in-use') {
+        friendlyMessage = 'This email is already registered.';
+      } else if (error.code === 'auth/invalid-email') {
+        friendlyMessage = 'Invalid email address format.';
+      } else if (error.code === 'auth/weak-password') {
+        // Firebase Identity Platform returns detailed policy errors in error.message
+        friendlyMessage = error.message ? error.message.replace(/^Firebase:\s*/, '').replace(/\(auth\/weak-password\)\.?/, '').trim() : 'Password does not meet the security requirements.';
+      } else if (error.code === 'auth/network-request-failed') {
+        friendlyMessage = 'Network error. Please check your connection.';
+      } else if (error.message) {
+        // Fallback to error message but remove the "Firebase: " prefix if present
+        friendlyMessage = error.message.replace(/^Firebase:\s*/, '').replace(/\(auth\/.*?\)\.?/, '').trim();
+      }
+      setErrorMsg(friendlyMessage);
     }
   };
 

@@ -3,7 +3,7 @@ import { View, Text, Modal, TouchableOpacity, Animated } from 'react-native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import tw from '../tailwind';
 import { useTheme } from '../context/ThemeContext';
-import { useFirebaseData } from '../hooks/useFirebaseData';
+import { useSensors, useSettings } from '../hooks/useFirebaseData';
 import { useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { GlobalNavigationParamList } from '../types/navigation';
@@ -18,7 +18,8 @@ interface AiInsightModalProps {
 
 export default function AiInsightModal({ visible, onClose }: AiInsightModalProps) {
   const { isDarkMode } = useTheme();
-  const { sensors, settings } = useFirebaseData();
+  const sensors = useSensors();
+  const settings = useSettings();
   const isAuto = String(settings?.setpoints?.mode).toLowerCase() === 'auto';
 
   const navigation = useNavigation<NativeStackNavigationProp<GlobalNavigationParamList>>();

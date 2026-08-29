@@ -3,6 +3,7 @@ import { View, Text, TouchableOpacity, Dimensions } from 'react-native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import tw from '../tailwind';
+import { useAuth } from '../context/AuthContext';
 
 const { width } = Dimensions.get('window');
 
@@ -27,6 +28,8 @@ export default function ScoreArch({
   toggleDevice,
   navigation
 }: Props) {
+  const { profile } = useAuth();
+  
   return (
     <View style={tw`w-full items-center mt-2 relative z-0`}>
       <View style={{ width: width * 1.5, height: width * 0.95, overflow: 'hidden', alignItems: 'center' }}>
@@ -48,7 +51,7 @@ export default function ScoreArch({
             </View>
             <View>
               <Text style={[tw`text-lg text-slate-800 dark:text-white tracking-wide`, {fontFamily: 'PlusJakartaSans_800ExtraBold'}]}>
-                Hi, Admin
+                Hi, {profile?.name ? profile.name.split(' ')[0] : 'User'}
               </Text>
               <Text style={[tw`text-xs text-slate-500 dark:text-slate-400 mt-0.5 tracking-wide`, {fontFamily: 'PlusJakartaSans_400Regular'}]}>
                 Welcome Back!!
