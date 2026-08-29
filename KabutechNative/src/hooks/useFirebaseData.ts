@@ -26,11 +26,6 @@ export function useAlerts() {
   return context.alerts;
 }
 
-export function useTasks() {
-  const context = useContext(FirebaseDataContext);
-  return context.tasks;
-}
-
 export function useActivityLogs() {
   const context = useContext(FirebaseDataContext);
   return context.activityLogs;

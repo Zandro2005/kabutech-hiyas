@@ -11,7 +11,6 @@ interface FirebaseDataContextType {
   settings: SettingsData;
   batches: BatchData[];
   alerts: AlertData[];
-  tasks: TaskData[];
   activityLogs: ActivityLogEntry[];
   staffTasks: StaffTask[];
   allUsers: Record<string, UserProfile>;
@@ -38,7 +37,6 @@ const defaultContext: FirebaseDataContextType = {
   },
   batches: [],
   alerts: [],
-  tasks: [],
   activityLogs: [],
   staffTasks: [],
   allUsers: {}
@@ -125,19 +123,6 @@ export const FirebaseDataProvider: React.FC<{ children: React.ReactNode }> = ({ 
       console.error('Alerts listener error:', error);
     });
 
-    // 6. Tasks
-    const tasksRef = ref(db, 'kabutech/tasks');
-    const unsubscribeTasks = onValue(tasksRef, (snapshot) => {
-      const val = snapshot.val();
-      let taskArray = val || [];
-      if (!Array.isArray(taskArray) && typeof taskArray === 'object') {
-        taskArray = Object.values(taskArray);
-      }
-      setData(prev => ({ ...prev, tasks: taskArray.filter((t: any) => t != null) }));
-    }, (error) => {
-      console.error('Tasks listener error:', error);
-    });
-
     // 7. Activity Logs
     const activityLogsRef = ref(db, 'kabutech/logs');
     const unsubscribeActivityLogs = onValue(activityLogsRef, (snapshot) => {
@@ -172,7 +157,6 @@ export const FirebaseDataProvider: React.FC<{ children: React.ReactNode }> = ({ 
       unsubscribeSettings();
       unsubscribeBatches();
       unsubscribeAlerts();
-      unsubscribeTasks();
       unsubscribeActivityLogs();
       unsubscribeStaffTasks();
       unsubscribeUsers();

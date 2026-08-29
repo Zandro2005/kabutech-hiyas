@@ -12,7 +12,16 @@ import tw from '../tailwind';
 import EditProfileModal from '../components/modals/EditProfileModal';
 import ScreenHeader from '../components/ScreenHeader';
 import { useTheme } from '../context/ThemeContext';
-import { useAllUsers, useActivityLogs } from '../hooks/useFirebaseData';
+import { useAllUsers, useActivityLogs, useBatches, useAlerts, useStaffTasks } from '../hooks/useFirebaseData';
+
+const isToday = (dateString?: string) => {
+  if (!dateString) return false;
+  const today = new Date();
+  const date = new Date(dateString);
+  return date.getDate() === today.getDate() &&
+    date.getMonth() === today.getMonth() &&
+    date.getFullYear() === today.getFullYear();
+};
 
 export default function ProfileScreen() {
   const [editProfileVisible, setEditProfileVisible] = useState(false);
@@ -22,9 +31,27 @@ export default function ProfileScreen() {
   const { user, profile } = useAuth();
   const allUsers = useAllUsers();
   const activityLogs = useActivityLogs();
+  const batches = useBatches();
+  const alerts = useAlerts();
+  const tasks = useStaffTasks();
 
   const pendingStaffCount = Object.values(allUsers).filter(u => u.role === 'staff' && !u.approved && !u.declined).length;
   const pendingLogsCount = activityLogs.filter(log => log.status === 'pending').length;
+  
+  const activeRacksCount = batches.filter(b => !b.archived).length;
+  const tasksDoneToday = tasks.filter(t => t.status === 'completed' && isToday(t.completedAt)).length;
+  const alertsFiredToday = alerts.filter(a => isToday(a.timestamp)).length;
+
+  let totalSlots = 0;
+  let totalFlagged = 0;
+  batches.filter(b => !b.archived).forEach(rack => {
+    const activeBags = rack.bags?.filter((b: any) => b && b.status === 'Active') || [];
+    const flaggedBags = rack.bags?.filter((b: any) => b && b.status === 'Flagged') || [];
+    totalSlots += rack.bags?.length || 0;
+    totalFlagged += flaggedBags.length;
+  });
+  const healthScore = Math.max(0, 100 - (totalSlots > 0 && totalFlagged > 0 ? (totalFlagged / totalSlots) * 500 : 0));
+  
   
   const handleLogout = async () => {
     try {
@@ -88,7 +115,7 @@ export default function ProfileScreen() {
             </View>
           </View>
           <View style={tw`flex-row items-baseline gap-0.5`}>
-            <Text style={tw`text-3xl font-extrabold text-[#10b981]`}>100</Text>
+            <Text style={tw`text-3xl font-extrabold ${healthScore < 80 ? 'text-amber-500' : 'text-[#10b981]'}`}>{Math.round(healthScore)}</Text>
             <Text style={tw`text-xs text-gray-400 dark:text-slate-500 font-bold`}>/100</Text>
           </View>
         </View>
@@ -103,17 +130,17 @@ export default function ProfileScreen() {
           <View style={tw`flex-row justify-between`}>
             <View style={tw`flex-1 bg-gray-50 dark:bg-slate-700/50 rounded-xl p-3 items-center mr-2 border border-transparent dark:border-slate-600/50`}>
               <MaterialCommunityIcons name="check-circle" size={20} color="#10b981" />
-              <Text style={tw`text-xl font-extrabold text-gray-800 dark:text-slate-200 my-1`}>0</Text>
+              <Text style={tw`text-xl font-extrabold text-gray-800 dark:text-slate-200 my-1`}>{tasksDoneToday}</Text>
               <Text style={tw`text-[9px] text-gray-500 dark:text-slate-400 uppercase font-bold`}>Tasks Done</Text>
             </View>
             <View style={tw`flex-1 bg-gray-50 dark:bg-slate-700/50 rounded-xl p-3 items-center mx-1 border border-transparent dark:border-slate-600/50`}>
               <MaterialCommunityIcons name="alert" size={20} color="#ef4444" />
-              <Text style={tw`text-xl font-extrabold text-gray-800 dark:text-slate-200 my-1`}>0</Text>
+              <Text style={tw`text-xl font-extrabold text-gray-800 dark:text-slate-200 my-1`}>{alertsFiredToday}</Text>
               <Text style={tw`text-[9px] text-gray-500 dark:text-slate-400 uppercase font-bold`}>Alerts Fired</Text>
             </View>
             <View style={tw`flex-1 bg-gray-50 dark:bg-slate-700/50 rounded-xl p-3 items-center ml-2 border border-transparent dark:border-slate-600/50`}>
               <MaterialCommunityIcons name="leaf" size={20} color="#10b981" />
-              <Text style={tw`text-xl font-extrabold text-gray-800 dark:text-slate-200 my-1`}>0</Text>
+              <Text style={tw`text-xl font-extrabold text-gray-800 dark:text-slate-200 my-1`}>{activeRacksCount}</Text>
               <Text style={tw`text-[9px] text-gray-500 dark:text-slate-400 uppercase font-bold`}>Active Racks</Text>
             </View>
           </View>

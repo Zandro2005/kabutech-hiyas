@@ -1,8 +1,11 @@
-import React, { useState } from 'react';
-import { View, Text, TextInput, TouchableOpacity } from 'react-native';
+import React, { useState, useEffect } from 'react';
+import { View, Text, TextInput, TouchableOpacity, ActivityIndicator } from 'react-native';
 import { showToast } from '../CustomToast';
 import tw from '../../tailwind';
 import ActionModal from '../ActionModal';
+import { useAuth } from '../../context/AuthContext';
+import { db } from '../../services/firebase';
+import { ref, update } from 'firebase/database';
 
 interface EditProfileModalProps {
   visible: boolean;
@@ -10,13 +13,31 @@ interface EditProfileModalProps {
 }
 
 export default function EditProfileModal({ visible, onClose }: EditProfileModalProps) {
-  const [name, setName] = useState('Admin Renz');
-  const [role, setRole] = useState('Farm Manager');
+  const { user, profile } = useAuth();
+  const [name, setName] = useState('');
+  const [isSaving, setIsSaving] = useState(false);
 
-  const handleSave = () => {
-    // Implement save logic here
-    showToast({ type: 'success', text1: 'Profile Updated', text2: 'Your profile details have been saved.' });
-    setTimeout(() => onClose(), 1500);
+  useEffect(() => {
+    if (visible) {
+      setName(profile?.name || user?.displayName || '');
+    }
+  }, [visible, profile, user]);
+
+  const handleSave = async () => {
+    if (!user) return;
+    setIsSaving(true);
+    try {
+      await update(ref(db, `kabutech/users/${user.uid}`), {
+        name: name.trim()
+      });
+      showToast({ type: 'success', text1: 'Profile Updated', text2: 'Your profile details have been saved.' });
+      onClose();
+    } catch (error) {
+      console.error(error);
+      showToast({ type: 'error', text1: 'Update Failed', text2: 'Could not save profile details.' });
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   return (
@@ -31,30 +52,24 @@ export default function EditProfileModal({ visible, onClose }: EditProfileModalP
           />
         </View>
 
-        <View style={tw`mt-4`}>
-          <Text style={tw`text-xs font-bold text-gray-500 uppercase tracking-wider mb-2`}>Role</Text>
-          <TextInput
-            style={tw`bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 text-gray-900 font-semibold`}
-            value={role}
-            onChangeText={setRole}
-          />
-        </View>
-
-        <View style={tw`flex-row gap-3 mt-6`}>
-          <TouchableOpacity 
-            onPress={onClose}
-            style={tw`flex-1 bg-gray-100 rounded-xl py-3.5 items-center`}
-          >
-            <Text style={tw`text-gray-600 font-bold`}>Cancel</Text>
-          </TouchableOpacity>
-          <TouchableOpacity 
-            onPress={handleSave}
-            style={tw`flex-1 bg-green-600 rounded-xl py-3.5 items-center`}
-          >
-            <Text style={tw`text-white font-bold`}>Save Changes</Text>
-          </TouchableOpacity>
-        </View>
       </View>
-    </ActionModal>
+
+      <View style={tw`flex-row gap-3 mt-6`}>
+        <TouchableOpacity
+          onPress={onClose}
+          style={tw`flex-1 bg-gray-100 rounded-xl py-3.5 items-center`}
+        >
+          <Text style={tw`text-gray-600 font-bold`}>Cancel</Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          onPress={handleSave}
+          style={tw`flex-1 bg-green-600 rounded-xl py-3.5 items-center flex-row justify-center ${isSaving ? 'opacity-70' : ''}`}
+          disabled={isSaving}
+        >
+          {isSaving ? <ActivityIndicator color="white" size="small" style={tw`mr-2`} /> : null}
+          <Text style={tw`text-white font-bold`}>{isSaving ? 'Saving...' : 'Save Changes'}</Text>
+        </TouchableOpacity>
+      </View>
+    </ActionModal >
   );
 }

@@ -16,6 +16,8 @@ import { useDeviceContext } from 'twrnc';
 import tw from './src/tailwind';
 import CustomToast from './src/components/CustomToast';
 
+import ErrorBoundary from './src/components/ErrorBoundary';
+
 export default function App() {
   const [fontsLoaded, setFontsLoaded] = useState(false);
   
@@ -48,7 +50,9 @@ export default function App() {
         <FirebaseDataProvider>
           <SafeAreaProvider>
             <StatusBar style="auto" />
-            <AppNavigator />
+            <ErrorBoundary>
+              <AppNavigator />
+            </ErrorBoundary>
             <CustomToast />
           </SafeAreaProvider>
         </FirebaseDataProvider>

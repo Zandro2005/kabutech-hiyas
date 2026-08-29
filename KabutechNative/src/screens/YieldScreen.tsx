@@ -144,10 +144,6 @@ export default function YieldScreen() {
                 <MaterialCommunityIcons name="bottle-tonic-outline" size={16} color="#166534" />
                 <Text style={[tw`text-[10px] text-gray-800 dark:text-slate-200 tracking-wide`, {fontFamily: 'PlusJakartaSans_800ExtraBold'}]}>Actual Yield</Text>
               </View>
-              <View style={tw`bg-[#f0fdf4] dark:bg-emerald-900/40 px-1.5 py-0.5 rounded-full flex-row items-center gap-0.5 border border-[#dcfce7] dark:border-emerald-800`}>
-                <MaterialCommunityIcons name="trending-up" size={10} color="#166534" />
-                <Text style={[tw`text-[8px] text-[#166534] dark:text-emerald-400`, {fontFamily: 'PlusJakartaSans_800ExtraBold'}]}>+5% vs Avg</Text>
-              </View>
             </View>
             
             <View style={tw`flex-row items-baseline mb-3`}>

@@ -7,7 +7,7 @@ import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import tw from '../tailwind';
-import { useSensors, useSettings, useFirebaseConnection } from '../hooks/useFirebaseData';
+import { useSensors, useSettings, useFirebaseConnection, useAlerts } from '../hooks/useFirebaseData';
 import { useTheme } from '../context/ThemeContext';
 import ScreenHeader from '../components/ScreenHeader';
 import AiInsightModal from '../components/AiInsightModal';
@@ -26,7 +26,10 @@ export default function HomeScreen() {
   const sensors = useSensors();
   const settings = useSettings();
   const isConnected = useFirebaseConnection();
+  const alerts = useAlerts();
   const [isInsightModalVisible, setIsInsightModalVisible] = useState(false);
+  
+  const unresolvedAlerts = alerts.filter(a => !a.resolved);
 
   // Safe extraction of sensor values
   const temp = typeof sensors.temperature === 'number' ? sensors.temperature : 30.0;
@@ -92,17 +95,35 @@ export default function HomeScreen() {
               <Text style={[tw`text-sm text-slate-800 dark:text-white tracking-wide`, { fontFamily: 'PlusJakartaSans_800ExtraBold' }]}>
                 Critical System Alerts
               </Text>
-              <View style={tw`bg-emerald-100 dark:bg-emerald-900/30 px-2 py-1 rounded-full`}>
-                <Text style={[tw`text-[9px] text-emerald-700 dark:text-emerald-400 uppercase tracking-widest`, { fontFamily: 'PlusJakartaSans_800ExtraBold' }]}>All Clear</Text>
+              <View style={unresolvedAlerts.length === 0 ? tw`bg-emerald-100 dark:bg-emerald-900/30 px-2 py-1 rounded-full` : tw`bg-red-100 dark:bg-red-900/30 px-2 py-1 rounded-full`}>
+                <Text style={[tw`text-[9px] ${unresolvedAlerts.length === 0 ? 'text-emerald-700 dark:text-emerald-400' : 'text-red-700 dark:text-red-400'} uppercase tracking-widest`, { fontFamily: 'PlusJakartaSans_800ExtraBold' }]}>
+                  {unresolvedAlerts.length === 0 ? 'All Clear' : `${unresolvedAlerts.length} Active`}
+                </Text>
               </View>
             </View>
 
-            <View style={tw`bg-white/60 dark:bg-slate-900/50 rounded-2xl p-6 items-center justify-center border border-emerald-100/50 dark:border-slate-800 border-dashed`}>
-              <MaterialCommunityIcons name="check-decagram" size={32} color="#10b981" style={tw`mb-2 opacity-80`} />
-              <Text style={[tw`text-xs text-slate-500 dark:text-slate-400 text-center leading-tight`, { fontFamily: 'PlusJakartaSans_400Regular' }]}>
-                No critical emergencies detected.{"\n"}Open the Analytics Hub for routine AI predictions.
-              </Text>
-            </View>
+            {unresolvedAlerts.length === 0 ? (
+              <View style={tw`bg-white/60 dark:bg-slate-900/50 rounded-2xl p-6 items-center justify-center border border-emerald-100/50 dark:border-slate-800 border-dashed`}>
+                <MaterialCommunityIcons name="check-decagram" size={32} color="#10b981" style={tw`mb-2 opacity-80`} />
+                <Text style={[tw`text-xs text-slate-500 dark:text-slate-400 text-center leading-tight`, { fontFamily: 'PlusJakartaSans_400Regular' }]}>
+                  No critical emergencies detected.{"\n"}Open the Analytics Hub for routine AI predictions.
+                </Text>
+              </View>
+            ) : (
+              <View style={tw`gap-2`}>
+                {unresolvedAlerts.slice(0, 3).map((alert, idx) => (
+                  <View key={idx} style={tw`bg-white dark:bg-slate-900/80 rounded-xl p-3 border border-red-100 dark:border-red-900/30 flex-row items-center gap-3 shadow-sm`}>
+                    <View style={tw`w-8 h-8 rounded-full bg-red-50 dark:bg-red-900/20 items-center justify-center`}>
+                      <MaterialCommunityIcons name="alert-circle-outline" size={18} color="#ef4444" />
+                    </View>
+                    <View style={tw`flex-1`}>
+                      <Text style={[tw`text-sm text-gray-800 dark:text-slate-200 font-bold`]}>{alert.title || 'System Alert'}</Text>
+                      <Text style={tw`text-[10px] text-gray-500 dark:text-slate-400`} numberOfLines={1}>{alert.message || 'Action required.'}</Text>
+                    </View>
+                  </View>
+                ))}
+              </View>
+            )}
           </View>
         </View>
 

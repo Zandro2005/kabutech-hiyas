@@ -108,7 +108,6 @@ export default function ActivityLogScreen() {
               <TouchableOpacity
                 key={type.id}
                 onPress={() => setSelectedAction(type.id)}
-                style={tw`px-3 py-1.5 rounded-full border ${selectedAction === type.id ? 'border-transparent' : 'border-gray-200 dark:border-slate-600 flex-row items-center gap-1.5'}`}
                 style={[
                   tw`px-3 py-1.5 rounded-full border flex-row items-center gap-1.5`,
                   selectedAction === type.id 

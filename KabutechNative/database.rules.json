@@ -1,0 +1,64 @@
+{
+  "rules": {
+    "kabutech": {
+      "sensors": {
+        "live": {
+          ".read": "auth != null",
+          ".write": "auth != null"
+        }
+      },
+      "settings": {
+        ".read": "auth != null",
+        ".write": "auth != null && root.child('kabutech/users/' + auth.uid + '/role').val() === 'admin'"
+      },
+      "batches": {
+        ".read": "auth != null",
+        ".write": "auth != null && root.child('kabutech/users/' + auth.uid + '/role').val() === 'admin'"
+      },
+      "users": {
+        ".read": "auth != null",
+        "$uid": {
+          ".write": "auth != null && (auth.uid === $uid || root.child('kabutech/users/' + auth.uid + '/role').val() === 'admin')",
+          ".validate": "newData.hasChildren(['email', 'name', 'role', 'approved'])",
+          "role": {
+            ".validate": "root.child('kabutech/users/' + auth.uid + '/role').val() === 'admin' || (auth.uid === $uid && !data.exists() && newData.val() === 'staff')"
+          },
+          "approved": {
+            ".validate": "root.child('kabutech/users/' + auth.uid + '/role').val() === 'admin' || (auth.uid === $uid && !data.exists() && newData.val() === false)"
+          }
+        }
+      },
+      "tasks": {
+        ".read": "auth != null",
+        "$taskId": {
+          ".write": "auth != null && (root.child('kabutech/users/' + auth.uid + '/role').val() === 'admin' || (data.child('assignedTo').val() === auth.uid && newData.child('status').val() === 'completed'))",
+          "status": {
+            ".validate": "newData.isString()"
+          },
+          "completedAt": {
+            ".validate": "newData.isString()"
+          },
+          "completionNotes": {
+            ".validate": "newData.isString()"
+          },
+          "isOnTime": {
+            ".validate": "newData.isBoolean()"
+          }
+        }
+      },
+      "logs": {
+        ".read": "auth != null",
+        "$logId": {
+          ".write": "auth != null && (root.child('kabutech/users/' + auth.uid + '/role').val() === 'admin' || (newData.child('staffId').val() === auth.uid))",
+          "status": {
+            ".validate": "root.child('kabutech/users/' + auth.uid + '/role').val() === 'admin' || newData.val() === 'pending'"
+          }
+        }
+      },
+      "alerts": {
+        ".read": "auth != null",
+        ".write": "auth != null && root.child('kabutech/users/' + auth.uid + '/role').val() === 'admin'"
+      }
+    }
+  }
+}

@@ -10,13 +10,13 @@ import { GlobalNavigationParamList } from '../../types/navigation';
 import tw from '../../tailwind';
 import ScreenHeader from '../../components/ScreenHeader';
 import { useTheme } from '../../context/ThemeContext';
-import { useTasks } from '../../hooks/useFirebaseData';
+import { useStaffTasks } from '../../hooks/useFirebaseData';
 
 export default function StaffProfileScreen() {
   const { isDarkMode } = useTheme();
   const navigation = useNavigation<NativeStackNavigationProp<GlobalNavigationParamList>>();
   const { user, profile } = useAuth();
-  const tasks = useTasks();
+  const tasks = useStaffTasks();
   
   const pendingTasksCount = tasks.filter(t => t.assignedTo === user?.uid && t.status === 'assigned').length;
 
