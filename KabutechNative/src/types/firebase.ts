@@ -50,9 +50,27 @@ export interface BatchData {
 }
 
 export interface AlertData {
-  [key: string]: any;
+  id: string;
+  type: 'critical' | 'warning' | 'info';
+  message: string;
+  timestamp: string;
+  resolved: boolean;
+  metadata?: Record<string, unknown>;
 }
 
 export interface TaskData {
-  [key: string]: any;
+  id: string;
+  title: string;
+  description?: string;
+  status: 'pending' | 'in_progress' | 'completed';
+  assignedTo?: string;
+  dueDate?: string;
+}
+
+export interface UserProfile {
+  name: string;
+  email: string;
+  role: 'admin' | 'operator' | 'staff';
+  approved: boolean;
+  createdAt: string;
 }

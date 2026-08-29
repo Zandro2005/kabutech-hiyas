@@ -6,12 +6,12 @@ import { GlobalNavigationParamList } from '../types/navigation';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import tw from '../tailwind';
-import { useFirebaseData } from '../hooks/useFirebaseData';
+import { useSensors } from '../hooks/useFirebaseData';
 
 export default function LiveFarmScreen() {
   const navigation = useNavigation<NativeStackNavigationProp<GlobalNavigationParamList>>();
   const insets = useSafeAreaInsets();
-  const { sensors } = useFirebaseData();
+  const sensors = useSensors();
   
   const [currentTime, setCurrentTime] = useState('');
   

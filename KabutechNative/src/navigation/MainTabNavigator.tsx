@@ -16,7 +16,7 @@ import ManageCropScreen from '../screens/ManageCropScreen';
 import AddBatchModal from '../components/modals/AddBatchModal';
 import tw from '../tailwind';
 import { useTheme } from '../context/ThemeContext';
-import { useFirebaseData } from '../hooks/useFirebaseData';
+// useFirebaseData removed as it is not used in this file
 import { db } from '../services/firebase';
 import { showToast } from '../components/CustomToast';
 import { ref, update } from 'firebase/database';

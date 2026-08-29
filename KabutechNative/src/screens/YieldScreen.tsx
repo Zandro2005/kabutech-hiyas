@@ -1,9 +1,9 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useMemo } from 'react';
 import { View, Text, ScrollView, TouchableOpacity, StatusBar } from 'react-native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import tw from '../tailwind';
 import ScreenHeader from '../components/ScreenHeader';
-import { useFirebaseData } from '../hooks/useFirebaseData';
+import { useBatches, useSettings } from '../hooks/useFirebaseData';
 import YieldChart from '../components/yield/YieldChart';
 import DailyHarvestList from '../components/yield/DailyHarvestList';
 import { getRackStats } from '../utils/dataHelpers';
@@ -12,59 +12,73 @@ export default function YieldScreen() {
   const [filterDays, setFilterDays] = useState<number | 'All'>(5);
   const [showFilterDropdown, setShowFilterDropdown] = useState(false);
   const [chartPeriod, setChartPeriod] = useState<'Monthly' | 'Semi-Annually' | 'Annually'>('Monthly');
-  const { batches, settings } = useFirebaseData();
+  const batches = useBatches();
+  const settings = useSettings();
 
   // Aggregate harvest data
-  let totalHarvestGrams = 0;
-  let dailyMap: Record<string, { count: number; grams: number; racks: Set<string>; rackYields: Record<string, number> }> = {};
-  const allRackNames = new Set<string>();
+  const { totalHarvestGrams, dailyMap, allRackNames, actualYieldKg, targetYieldKg, efficiency, sortedDates, dailyHarvestsList } = useMemo(() => {
+    let tGrams = 0;
+    const dMap: Record<string, { count: number; grams: number; racks: Set<string>; rackYields: Record<string, number> }> = {};
+    const aRackNames = new Set<string>();
 
-  if (batches) {
-    batches.forEach(rack => {
-      const rackName = rack.rack || 'Unknown Rack';
-      allRackNames.add(rackName);
-      
-      const { allHarvestLogs } = getRackStats(rack);
-      
-      allHarvestLogs.forEach(log => {
-        totalHarvestGrams += log.grams;
-        if (log.date) {
-          if (!dailyMap[log.date]) {
-            dailyMap[log.date] = { count: 0, grams: 0, racks: new Set(), rackYields: {} };
+    if (batches) {
+      batches.forEach(rack => {
+        const rackName = rack.rack || 'Unknown Rack';
+        aRackNames.add(rackName);
+        
+        const { allHarvestLogs } = getRackStats(rack);
+        
+        allHarvestLogs.forEach(log => {
+          tGrams += log.grams;
+          if (log.date) {
+            if (!dMap[log.date]) {
+              dMap[log.date] = { count: 0, grams: 0, racks: new Set(), rackYields: {} };
+            }
+            dMap[log.date].count += 1;
+            dMap[log.date].grams += log.grams;
+            dMap[log.date].racks.add(rackName);
+            dMap[log.date].rackYields[rackName] = (dMap[log.date].rackYields[rackName] || 0) + log.grams;
           }
-          dailyMap[log.date].count += 1;
-          dailyMap[log.date].grams += log.grams;
-          dailyMap[log.date].racks.add(rackName);
-          dailyMap[log.date].rackYields[rackName] = (dailyMap[log.date].rackYields[rackName] || 0) + log.grams;
-        }
+        });
       });
-    });
-  }
+    }
 
-  const actualYieldKg = (totalHarvestGrams / 1000).toFixed(2);
-  const targetYieldKg = (settings?.yieldTarget || 5.00).toFixed(2);
-  const efficiency = Math.min(100, Math.round((parseFloat(actualYieldKg) / parseFloat(targetYieldKg)) * 100)) || 0;
+    const aYieldKg = (tGrams / 1000).toFixed(2);
+    const tYieldKg = (settings?.yieldTarget || 5.00).toFixed(2);
+    const eff = Math.min(100, Math.round((parseFloat(aYieldKg) / parseFloat(tYieldKg)) * 100)) || 0;
 
-  // Format daily harvests for list
-  const sortedDates = Object.keys(dailyMap).sort((a, b) => new Date(b).getTime() - new Date(a).getTime());
-  
-  const dailyHarvestsList = (filterDays === 'All' ? sortedDates : sortedDates.slice(0, filterDays))
-    .map(dateStr => {
-      const parts = dateStr.split('-');
-      let formattedDate = dateStr;
-      if (parts.length === 3) {
-        const d = new Date(parseInt(parts[0]), parseInt(parts[1]) - 1, parseInt(parts[2]));
-        formattedDate = d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
-      }
-      const data = dailyMap[dateStr];
-      const racksArr = Array.from(data.racks);
-      return {
-        date: formattedDate,
-        desc: `${data.count} harvest${data.count > 1 ? 's' : ''} • ${racksArr.join(', ')}`,
-        kg: `${(data.grams / 1000).toFixed(2)} kg`,
-        g: `${data.grams}G`
-      };
-    });
+    // Format daily harvests for list
+    const sDates = Object.keys(dMap).sort((a, b) => new Date(b).getTime() - new Date(a).getTime());
+    
+    const dHarvestsList = (filterDays === 'All' ? sDates : sDates.slice(0, filterDays))
+      .map(dateStr => {
+        const parts = dateStr.split('-');
+        let formattedDate = dateStr;
+        if (parts.length === 3) {
+          const d = new Date(parseInt(parts[0]), parseInt(parts[1]) - 1, parseInt(parts[2]));
+          formattedDate = d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+        }
+        const data = dMap[dateStr];
+        const racksArr = Array.from(data.racks);
+        return {
+          date: formattedDate,
+          desc: `${data.count} harvest${data.count > 1 ? 's' : ''} • ${racksArr.join(', ')}`,
+          kg: `${(data.grams / 1000).toFixed(2)} kg`,
+          g: `${data.grams}G`
+        };
+      });
+
+    return {
+      totalHarvestGrams: tGrams,
+      dailyMap: dMap,
+      allRackNames: aRackNames,
+      actualYieldKg: aYieldKg,
+      targetYieldKg: tYieldKg,
+      efficiency: eff,
+      sortedDates: sDates,
+      dailyHarvestsList: dHarvestsList
+    };
+  }, [batches, settings?.yieldTarget, filterDays]);
 
   const isExporting = useRef(false);
 

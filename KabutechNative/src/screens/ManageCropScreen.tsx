@@ -1,11 +1,11 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { View, Text, ScrollView, TouchableOpacity, StatusBar } from 'react-native';
 import { MaterialCommunityIcons, Feather } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import tw from '../tailwind';
 import ScreenHeader from '../components/ScreenHeader';
 import { useTheme } from '../context/ThemeContext';
-import { useFirebaseData } from '../hooks/useFirebaseData';
+import { useBatches } from '../hooks/useFirebaseData';
 import { getRackStats } from '../utils/dataHelpers';
 import { BatchData } from '../types/firebase';
 import { remove, ref } from 'firebase/database';
@@ -21,7 +21,7 @@ import { playSuccessSound } from '../utils/SoundManager';
 export default function ManageCropScreen() {
   const insets = useSafeAreaInsets();
   const { isDarkMode } = useTheme();
-  const { batches } = useFirebaseData();
+  const batches = useBatches();
 
   // Modals state
   const [showLogHarvest, setShowLogHarvest] = useState(false);
@@ -34,42 +34,62 @@ export default function ManageCropScreen() {
   const [archiveTarget, setArchiveTarget] = useState<{ firebaseKey: string | number; rackName: string } | null>(null);
 
   // --- Compute Stats from Firebase Data ---
-  let totalYieldGrams = 0;
-  let totalSlots = 0;
-  let totalActive = 0;
-  let totalFlagged = 0;
-  
-  let cycleDaysSum = 0;
-  let activeBagsForCycle = 0;
+  const {
+    enrichedBatches,
+    activeRacks,
+    totalYieldGrams,
+    totalSlots,
+    totalActive,
+    totalFlagged,
+    overallCapacityPercent,
+    healthScore
+  } = useMemo(() => {
+    let tYield = 0;
+    let tSlots = 0;
+    let tActive = 0;
+    let tFlagged = 0;
+    let cycleDaysSum = 0;
+    let activeBagsForCycle = 0;
 
-  // Enhance batches with computed data
-  const enrichedBatches = batches.map((rack) => {
-    const stats = getRackStats(rack);
-    
-    // Add to global totals
-    totalYieldGrams += stats.totalYieldGrams;
+    // Enhance batches with computed data
+    const enhanced = batches.map((rack) => {
+      const stats = getRackStats(rack);
+      
+      // Add to global totals
+      tYield += stats.totalYieldGrams;
 
-    if (!rack.archived) {
-      totalSlots += stats.bags.length;
-      totalActive += stats.activeBags.length;
-      totalFlagged += stats.flaggedBags.length;
+      if (!rack.archived) {
+        tSlots += stats.bags.length;
+        tActive += stats.activeBags.length;
+        tFlagged += stats.flaggedBags.length;
 
-      if (stats.activeBags.length > 0) {
-        cycleDaysSum += stats.rackDay * stats.activeBags.length;
-        activeBagsForCycle += stats.activeBags.length;
+        if (stats.activeBags.length > 0) {
+          cycleDaysSum += stats.rackDay * stats.activeBags.length;
+          activeBagsForCycle += stats.activeBags.length;
+        }
       }
-    }
+
+      return {
+        ...rack,
+        stats
+      };
+    });
+
+    const activeR = enhanced.filter(r => !r.archived);
+    const capacityPercent = tSlots > 0 ? Math.round((tActive / tSlots) * 100) : 0;
+    const score = Math.max(0, 100 - (tSlots > 0 && tFlagged > 0 ? (tFlagged / tSlots) * 500 : 0));
 
     return {
-      ...rack,
-      stats
+      enrichedBatches: enhanced,
+      activeRacks: activeR,
+      totalYieldGrams: tYield,
+      totalSlots: tSlots,
+      totalActive: tActive,
+      totalFlagged: tFlagged,
+      overallCapacityPercent: capacityPercent,
+      healthScore: score
     };
-  });
-
-  const activeRacks = enrichedBatches.filter(r => !r.archived);
-  
-  const overallCapacityPercent = totalSlots > 0 ? Math.round((totalActive / totalSlots) * 100) : 0;
-  const healthScore = Math.max(0, 100 - (totalSlots > 0 && totalFlagged > 0 ? (totalFlagged / totalSlots) * 500 : 0));
+  }, [batches]);
 
   // --- Handlers ---
   const handleArchiveRack = (firebaseKey: string | number, rackName: string) => {

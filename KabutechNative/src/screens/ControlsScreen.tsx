@@ -4,14 +4,14 @@ import { useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { GlobalNavigationParamList } from '../types/navigation';
 import tw from '../tailwind';
-import { useFirebaseData } from '../hooks/useFirebaseData';
+import { useSensors, useSettings } from '../hooks/useFirebaseData';
 import { ref, update } from 'firebase/database';
 import { db } from '../services/firebase';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
+import CircularSlider from '../components/CircularSlider';
 import ScreenHeader from '../components/ScreenHeader';
 import { useTheme } from '../context/ThemeContext';
 import { showToast } from '../components/CustomToast';
-import Svg, { Circle, Defs } from 'react-native-svg';
 
 const { width } = Dimensions.get('window');
 
@@ -20,7 +20,8 @@ type TabId = 'temp' | 'hum' | 'light' | 'co2';
 export default function ControlsScreen() {
   const navigation = useNavigation<NativeStackNavigationProp<GlobalNavigationParamList>>();
   const { isDarkMode } = useTheme();
-  const { sensors, settings } = useFirebaseData();
+  const sensors = useSensors();
+  const settings = useSettings();
   
   const temp = typeof sensors.temperature === 'number' ? sensors.temperature : 32.8;
   const hum = typeof sensors.humidity === 'number' ? sensors.humidity : 51;
@@ -130,16 +131,7 @@ export default function ControlsScreen() {
     };
   }, []);
 
-  // Dial calculations
-  const size = 260;
-  const radius = 110;
-  const strokeWidth = 14;
-  const circumference = 2 * Math.PI * radius;
-  // Progress ratio limited between 0 and 1
-  const progress = Math.max(0, Math.min(1, (localTarget - activeTabData.min) / (activeTabData.max - activeTabData.min)));
-  const strokeDashoffset = circumference - (progress * circumference);
-
-  const deviceToggles = [
+  // Device toggles list
     { key: 'fans', label: 'FANS', icon: 'fan', active: devices.fans, color: '#3b82f6' },
     { key: 'misters', label: 'MISTERS', icon: 'water', active: devices.misters, color: '#0ea5e9' },
     { key: 'lights', label: 'LIGHTS', icon: 'lightbulb-on', active: devices.lights, color: '#eab308' },
@@ -195,46 +187,11 @@ export default function ControlsScreen() {
         </View>
 
         {/* Central Dial Area */}
-        <View style={tw`items-center justify-center relative mb-12`}>
-          <Svg width={size} height={size} viewBox={`0 0 ${size} ${size}`}>
-            {/* Background Track */}
-            <Circle 
-              cx={size/2} cy={size/2} r={radius} 
-              stroke={isDarkMode ? '#334155' : '#e2e8f0'} 
-              strokeWidth={strokeWidth} 
-              fill="none" 
-            />
-            {/* Progress Track */}
-            <Circle 
-              cx={size/2} cy={size/2} r={radius} 
-              stroke={activeTabData.color} 
-              strokeWidth={strokeWidth} 
-              strokeDasharray={circumference} 
-              strokeDashoffset={strokeDashoffset} 
-              strokeLinecap="round"
-              fill="none" 
-              transform={`rotate(-90 ${size/2} ${size/2})`} 
-            />
-          </Svg>
-
-          {/* Central Values */}
-          <View style={[tw`absolute items-center justify-center`, {width: size, height: size}]}>
-            <View style={tw`flex-row items-start`}>
-              <Text style={[tw`text-5xl text-slate-800 dark:text-white tracking-tighter`, {fontFamily: 'PlusJakartaSans_800ExtraBold'}]}>
-                {localTarget}
-              </Text>
-              <Text style={[tw`text-lg text-slate-500 dark:text-slate-400 mt-2 ml-1`, {fontFamily: 'PlusJakartaSans_700Bold'}]}>
-                {activeTabData.unit}
-              </Text>
-            </View>
-            <View style={tw`bg-slate-100 dark:bg-slate-800/60 px-3 py-1 rounded-full mt-2 flex-row items-center gap-1.5`}>
-              <MaterialCommunityIcons name="lightbulb-on-outline" size={12} color={activeTabData.color} />
-              <Text style={[tw`text-xs text-slate-600 dark:text-slate-400`, {fontFamily: 'PlusJakartaSans_700Bold'}]}>
-                Optimal: {activeTabData.optimal} {activeTabData.unit}
-              </Text>
-            </View>
-          </View>
-        </View>
+        <CircularSlider 
+          localTarget={localTarget} 
+          activeTabData={activeTabData} 
+          isDarkMode={isDarkMode} 
+        />
 
         {/* Controls Row (-, Mode, +) */}
         <View style={tw`flex-row items-center justify-center px-4 mb-12 gap-3`}>
