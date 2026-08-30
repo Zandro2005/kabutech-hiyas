@@ -11,15 +11,29 @@ import { useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { GlobalNavigationParamList } from '../types/navigation';
 import { showToast } from '../components/CustomToast';
+import { SoundManager } from '../utils/SoundManager';
+import * as Speech from 'expo-speech';
+import { db } from '../services/firebase';
+import { ref, get } from 'firebase/database';
+import { VolumeManager } from 'react-native-volume-manager';
 
 export default function LoginScreen() {
+  // Warm up TTS engine on mount to eliminate initial delay
+  React.useEffect(() => {
+    Speech.speak('', { rate: 0, volume: 0 });
+  }, []);
+
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [rememberMe, setRememberMe] = useState(true);
 
   const [loading, setLoading] = useState(false);
-  const [errorMsg, setErrorMsg] = useState('');
+  const [errorMsg, _setErrorMsg] = useState('');
+  const setErrorMsg = (msg: string) => {
+    if (msg) SoundManager.playError();
+    _setErrorMsg(msg);
+  };
 
   const passwordRef = useRef<TextInput>(null);
   const navigation = useNavigation<NativeStackNavigationProp<GlobalNavigationParamList>>();
@@ -37,7 +51,32 @@ export default function LoginScreen() {
       } else {
         await setPersistence(auth, inMemoryPersistence);
       }
-      await signInWithEmailAndPassword(auth, email.trim(), password);
+      const userCredential = await signInWithEmailAndPassword(auth, email.trim(), password);
+      
+      // Fetch user data for personalized greeting
+      const userRef = ref(db, `kabutech/users/${userCredential.user.uid}`);
+      const snapshot = await get(userRef);
+      if (snapshot.exists()) {
+        const data = snapshot.val();
+        const fullName = data.name || 'User';
+        const firstName = fullName.split(' ')[0];
+
+        setTimeout(async () => {
+          await VolumeManager.setVolume(1, { showUI: false });
+          
+          const hour = new Date().getHours();
+          let greeting = 'Good evening';
+          if (hour < 12) greeting = 'Good morning';
+          else if (hour < 18) greeting = 'Good afternoon';
+          
+          // Jarvis-like advanced British AI voice (Lady tone)
+          Speech.speak(`${greeting} ${firstName}. All Kabutech systems are online and fully operational. Welcome back.`, {
+            language: 'en-GB', 
+            rate: 0.9,
+            pitch: 1.1,
+          });
+        }, 600); // 600ms wait ensures the dashboard has transitioned and rendered before speaking
+      }
     } catch (error: any) {
       setLoading(false);
       setErrorMsg('Invalid email or password.');
@@ -67,9 +106,9 @@ export default function LoginScreen() {
     <View style={tw`flex-1 bg-white`}>
       <StatusBar translucent backgroundColor="transparent" barStyle="light-content" />
       <KeyboardAvoidingView
-        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+        behavior="padding"
         style={tw`flex-1`}
-        keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 20}
+        keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 25}
       >
         <ScrollView
           contentContainerStyle={tw`flex-grow`}

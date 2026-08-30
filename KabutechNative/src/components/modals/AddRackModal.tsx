@@ -4,7 +4,7 @@ import { showToast } from '../CustomToast';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { ref, set, push } from 'firebase/database';
 import { db } from '../../services/firebase';
-import { playSuccessSound } from '../../utils/SoundManager';
+import { SoundManager } from '../../utils/SoundManager';
 import ActionModal from '../ActionModal';
 import tw from '../../tailwind';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
@@ -18,6 +18,7 @@ interface AddRackModalProps {
 export default function AddRackModal({ visible, onClose, racks }: AddRackModalProps) {
   const [rackName, setRackName] = useState('');
   const [slotsCount, setSlotsCount] = useState('');
+  const slotsRef = React.useRef<TextInput>(null);
   const [substrate, setSubstrate] = useState('Sawdust + Bran');
   const [setupDate, setSetupDate] = useState(new Date());
   const [showDatePicker, setShowDatePicker] = useState(false);
@@ -68,7 +69,7 @@ export default function AddRackModal({ visible, onClose, racks }: AddRackModalPr
       setSlotsCount('');
       onClose();
       setTimeout(() => {
-        playSuccessSound();
+        SoundManager.playSuccess();
         showToast({ type: 'success', text1: 'Success', text2: `Rack "${rackName}" added with ${slots} empty slots.` });
       }, 600);
     } catch (error) {
@@ -91,6 +92,9 @@ export default function AddRackModal({ visible, onClose, racks }: AddRackModalPr
             placeholderTextColor="#9ca3af"
             value={rackName}
             onChangeText={setRackName}
+            returnKeyType="next"
+            onSubmitEditing={() => slotsRef.current?.focus()}
+            blurOnSubmit={false}
           />
         </View>
 
@@ -99,12 +103,15 @@ export default function AddRackModal({ visible, onClose, racks }: AddRackModalPr
           <View style={tw`flex-1 z-10`}>
             <Text style={tw`text-[10px] font-bold text-gray-500 uppercase tracking-wider mb-1.5`}>NO. OF SLOTS</Text>
             <TextInput
+              ref={slotsRef}
               style={tw`bg-[#f4fbf7] border border-green-100 rounded-xl px-4 py-3.5 text-gray-900 font-semibold`}
               placeholder="20"
               placeholderTextColor="#9ca3af"
               keyboardType="numeric"
               value={slotsCount}
               onChangeText={setSlotsCount}
+              returnKeyType="done"
+              onSubmitEditing={handleSave}
             />
           </View>
           <View style={tw`flex-1 z-50`}>

@@ -14,6 +14,7 @@ interface AddBatchModalProps {
 export default function AddBatchModal({ visible, onClose }: AddBatchModalProps) {
   const [strain, setStrain] = useState('');
   const [expectedYield, setExpectedYield] = useState('');
+  const yieldRef = React.useRef<TextInput>(null);
   const [loading, setLoading] = useState(false);
 
   const handleSave = async () => {
@@ -55,18 +56,24 @@ export default function AddBatchModal({ visible, onClose }: AddBatchModalProps) 
             placeholderTextColor="#9ca3af"
             value={strain}
             onChangeText={setStrain}
+            returnKeyType="next"
+            onSubmitEditing={() => yieldRef.current?.focus()}
+            blurOnSubmit={false}
           />
         </View>
 
         <View style={tw`mt-4`}>
           <Text style={tw`text-xs font-bold text-gray-500 uppercase tracking-wider mb-2`}>Expected Yield (kg)</Text>
           <TextInput
+            ref={yieldRef}
             style={tw`bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 text-gray-900 font-semibold`}
             placeholder="e.g. 50"
             placeholderTextColor="#9ca3af"
             keyboardType="numeric"
             value={expectedYield}
             onChangeText={setExpectedYield}
+            returnKeyType="done"
+            onSubmitEditing={handleSave}
           />
         </View>
 

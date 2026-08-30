@@ -12,6 +12,7 @@ import { db } from '../services/firebase';
 import { showToast } from '../components/CustomToast';
 import { useAuth } from '../context/AuthContext';
 import { StaffTask } from '../types/firebase';
+import { sendPushNotification } from '../utils/PushNotifications';
 
 export default function AssignTaskScreen() {
   const navigation = useNavigation();
@@ -21,6 +22,7 @@ export default function AssignTaskScreen() {
 
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
+  const descriptionRef = React.useRef<TextInput>(null);
   const [selectedStaffId, setSelectedStaffId] = useState<string>('');
   
   const [dueDate, setDueDate] = useState<Date>(new Date());
@@ -66,6 +68,19 @@ export default function AssignTaskScreen() {
 
       await set(newTaskRef, task);
       
+      // Trigger Push Notification to assigned staff
+      if (staffUser.pushToken) {
+        try {
+          sendPushNotification(
+            staffUser.pushToken,
+            'New Task Assigned 📋',
+            `${profile?.name || user?.displayName || 'Admin'} assigned you a new task: ${title.trim()}`
+          );
+        } catch (e) {
+          console.log('Push error', e);
+        }
+      }
+
       showToast({ type: 'success', text1: 'Task Assigned', text2: 'Task has been assigned successfully.' });
       navigation.goBack();
     } catch (error) {
@@ -91,7 +106,7 @@ export default function AssignTaskScreen() {
   };
 
   return (
-    <SafeAreaView style={tw`flex-1 bg-[#f0f9f4] dark:bg-[#020617]`}>
+    <View style={tw`flex-1 bg-[#f0f9f4] dark:bg-[#020617]`}>
       <StatusBar barStyle="light-content" />
       
       {/* Header */}
@@ -102,7 +117,7 @@ export default function AssignTaskScreen() {
         <Text style={[tw`text-lg text-slate-900 dark:text-white`, {fontFamily: 'PlusJakartaSans_800ExtraBold'}]}>Assign Task</Text>
       </View>
       
-      <ScrollView contentContainerStyle={tw`p-5 pb-32`} showsVerticalScrollIndicator={false}>
+      <ScrollView contentContainerStyle={tw`p-5 pb-36`} showsVerticalScrollIndicator={false}>
         
         <View style={tw`bg-white dark:bg-slate-800 rounded-3xl p-5 shadow-sm border border-gray-100 dark:border-slate-700`}>
           
@@ -113,10 +128,14 @@ export default function AssignTaskScreen() {
             placeholderTextColor={tw.color('gray-400')}
             value={title}
             onChangeText={setTitle}
+            returnKeyType="next"
+            onSubmitEditing={() => descriptionRef.current?.focus()}
+            blurOnSubmit={false}
           />
 
           <Text style={[tw`text-[11px] text-gray-500 dark:text-slate-400 uppercase tracking-widest mb-2`, {fontFamily: 'PlusJakartaSans_800ExtraBold'}]}>Description (Optional)</Text>
           <TextInput
+            ref={descriptionRef}
             style={[tw`bg-gray-50 dark:bg-slate-900 border border-gray-200 dark:border-slate-700 rounded-xl px-4 py-3 text-sm text-gray-900 dark:text-white mb-5`, {fontFamily: 'PlusJakartaSans_500Medium', minHeight: 80}]}
             placeholder="Additional instructions..."
             placeholderTextColor={tw.color('gray-400')}
@@ -224,6 +243,6 @@ export default function AssignTaskScreen() {
           </TouchableOpacity>
         </View>
       </ScrollView>
-    </SafeAreaView>
+    </View>
   );
 }

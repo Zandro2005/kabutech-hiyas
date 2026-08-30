@@ -45,7 +45,7 @@ export default function MyActivityHistoryScreen() {
     .sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
 
   return (
-    <SafeAreaView style={tw`flex-1 bg-[#f0f9f4] dark:bg-[#020617]`}>
+    <View style={tw`flex-1 bg-[#f0f9f4] dark:bg-[#020617]`}>
       <StatusBar barStyle="light-content" />
       
       {/* Header */}
@@ -97,7 +97,7 @@ export default function MyActivityHistoryScreen() {
         </View>
       </View>
 
-      <ScrollView contentContainerStyle={tw`p-4 pb-12`} showsVerticalScrollIndicator={false}>
+      <ScrollView contentContainerStyle={tw`p-4 pb-36`} showsVerticalScrollIndicator={false}>
         {myLogs.length === 0 ? (
           <View style={tw`py-10 items-center justify-center`}>
             <MaterialCommunityIcons name="clipboard-text-off" size={48} color={isDarkMode ? '#334155' : '#d1d5db'} />
@@ -152,6 +152,6 @@ export default function MyActivityHistoryScreen() {
           })
         )}
       </ScrollView>
-    </SafeAreaView>
+    </View>
   );
 }

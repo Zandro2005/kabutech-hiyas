@@ -6,6 +6,7 @@ import { db } from '../../services/firebase';
 import ActionModal from '../ActionModal';
 import tw from '../../tailwind';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
+import { SoundManager } from '../../utils/SoundManager';
 
 import { BatchData } from '../../types/firebase';
 import { getRackStats } from '../../utils/dataHelpers';
@@ -20,22 +21,28 @@ export default function FlagContaminationModal({ visible, onClose, selectedRack 
   const [bagsToFlag, setBagsToFlag] = useState('');
   const [loading, setLoading] = useState(false);
   const [showDropdown, setShowDropdown] = useState(false);
+  const [errorMsg, _setErrorMsg] = useState('');
+  const setErrorMsg = (msg: string) => {
+    if (msg) SoundManager.playError();
+    _setErrorMsg(msg);
+  };
 
   useEffect(() => {
     if (!visible) {
       setBagsToFlag('');
+      setErrorMsg('');
     }
   }, [visible]);
 
   const handleSave = async () => {
     if (!selectedRack || !bagsToFlag) {
-      showToast({ type: 'error', text1: 'Missing Info', text2: 'Please fill out all fields.' });
+      setErrorMsg('Please fill out all fields.');
       return;
     }
 
     const flagCount = parseInt(bagsToFlag, 10);
     if (isNaN(flagCount) || flagCount <= 0) {
-      showToast({ type: 'error', text1: 'Error', text2: 'Please enter a valid number of bags.' });
+      setErrorMsg('Please enter a valid number of bags.');
       return;
     }
 
@@ -44,11 +51,12 @@ export default function FlagContaminationModal({ visible, onClose, selectedRack 
     const activeBagIndices = currentBags.map((b, index) => ({ bag: b, index })).filter(item => item.bag.status === 'Active');
     
     if (activeBagIndices.length < flagCount) {
-      showToast({ type: 'error', text1: 'Error', text2: `Cannot flag ${flagCount} bags. Only ${activeBagIndices.length} active bags available.` });
+      setErrorMsg(`Cannot flag ${flagCount} bags. Only ${activeBagIndices.length} active bags available.`);
       return;
     }
 
     setLoading(true);
+    setErrorMsg('');
     try {
       let updatedBags = [...currentBags];
       
@@ -69,7 +77,7 @@ export default function FlagContaminationModal({ visible, onClose, selectedRack 
       setBagsToFlag('');
       onClose();
     } catch (error) {
-      showToast({ type: 'error', text1: 'Error', text2: 'An unexpected error occurred.' });
+      setErrorMsg('An unexpected error occurred.');
       console.error(error);
     } finally {
       setLoading(false);
@@ -89,11 +97,17 @@ export default function FlagContaminationModal({ visible, onClose, selectedRack 
             keyboardType="numeric"
             value={bagsToFlag}
             onChangeText={setBagsToFlag}
+            returnKeyType="done"
+            onSubmitEditing={handleSave}
           />
         </View>
 
+        {errorMsg ? (
+          <Text style={tw`text-red-500 text-center mt-2 text-xs font-bold z-10`}>{errorMsg}</Text>
+        ) : null}
+
         {/* Actions */}
-        <View style={tw`mt-6 z-10`}>
+        <View style={tw`mt-4 z-10`} pointerEvents="box-none">
           <TouchableOpacity 
             onPress={handleSave}
             disabled={loading}

@@ -1,5 +1,6 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { NavigationContainer } from '@react-navigation/native';
+import * as SplashScreen from 'expo-splash-screen';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import BootScreen from '../screens/BootScreen';
 import WelcomeScreen from '../screens/WelcomeScreen';
@@ -26,12 +27,16 @@ const Stack = createNativeStackNavigator();
 export default function AppNavigator() {
   const { user, profile, isLoading } = useAuth();
 
+  // Inside the component...
+  useEffect(() => {
+    if (!isLoading) {
+      // Hide the native splash screen smoothly once auth is resolved and the tree is ready
+      SplashScreen.hideAsync().catch(() => {});
+    }
+  }, [isLoading]);
+
   if (isLoading) {
-    return (
-      <View style={{ flex: 1, backgroundColor: '#004521', justifyContent: 'center', alignItems: 'center' }}>
-        <ActivityIndicator size="large" color="#adf2bc" />
-      </View>
-    );
+    return null; // Native splash screen remains visible
   }
 
   // Check if user exists and is approved

@@ -3,7 +3,7 @@ import { View, Text, TextInput, TouchableOpacity, ScrollView } from 'react-nativ
 import { showToast } from '../CustomToast';
 import { ref, update } from 'firebase/database';
 import { db } from '../../services/firebase';
-import { playSuccessSound } from '../../utils/SoundManager';
+import { SoundManager } from '../../utils/SoundManager';
 import ActionModal from '../ActionModal';
 import tw from '../../tailwind';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
@@ -19,7 +19,13 @@ interface UpdateCapacityModalProps {
 export default function UpdateCapacityModal({ visible, onClose, selectedRack }: UpdateCapacityModalProps) {
   const [activeBags, setActiveBags] = useState('0');
   const [emptyBags, setEmptyBags] = useState('0');
+  const emptyBagsRef = React.useRef<TextInput>(null);
   const [loading, setLoading] = useState(false);
+  const [errorMsg, _setErrorMsg] = useState('');
+  const setErrorMsg = (msg: string) => {
+    if (msg) SoundManager.playError();
+    _setErrorMsg(msg);
+  };
 
   useEffect(() => {
     if (visible && selectedRack) {
@@ -29,6 +35,7 @@ export default function UpdateCapacityModal({ visible, onClose, selectedRack }: 
     } else {
       setActiveBags('0');
       setEmptyBags('0');
+      setErrorMsg('');
     }
   }, [visible, selectedRack]);
 
@@ -36,7 +43,7 @@ export default function UpdateCapacityModal({ visible, onClose, selectedRack }: 
 
   const handleSave = async () => {
     if (!selectedRack) {
-      showToast({ type: 'error', text1: 'Missing Info', text2: 'Please select a rack.' });
+      setErrorMsg('Please select a rack.');
       return;
     }
 
@@ -44,11 +51,12 @@ export default function UpdateCapacityModal({ visible, onClose, selectedRack }: 
     const activeTarget = parseInt(activeBags || '0', 10);
     
     if (isNaN(emptyTarget) || emptyTarget < 0 || isNaN(activeTarget) || activeTarget < 0) {
-      showToast({ type: 'error', text1: 'Error', text2: 'Please enter valid numbers for capacity.' });
+      setErrorMsg('Please enter valid positive numbers for capacity.');
       return;
     }
     
     setLoading(true);
+    setErrorMsg('');
     try {
       const stats = getRackStats(selectedRack);
       let updatedBags = [...stats.bags];
@@ -101,11 +109,11 @@ export default function UpdateCapacityModal({ visible, onClose, selectedRack }: 
         bags: updatedBags,
         historicalHarvests: updatedHistorical
       });
-      playSuccessSound();
+      SoundManager.playSuccess();
       showToast({ type: 'success', text1: 'Success', text2: `Capacity updated. Total: ${updatedBags.length}` });
       onClose();
     } catch (error) {
-      showToast({ type: 'error', text1: 'Error', text2: 'An unexpected error occurred.' });
+      setErrorMsg('An unexpected error occurred.');
       console.error(error);
     } finally {
       setLoading(false);
@@ -124,15 +132,21 @@ export default function UpdateCapacityModal({ visible, onClose, selectedRack }: 
               keyboardType="numeric"
               value={activeBags}
               onChangeText={setActiveBags}
+              returnKeyType="next"
+              onSubmitEditing={() => emptyBagsRef.current?.focus()}
+              blurOnSubmit={false}
             />
           </View>
           <View style={tw`flex-1`}>
             <Text style={tw`text-[10px] font-bold text-gray-500 uppercase tracking-wider mb-1.5`}>EMPTY BAGS</Text>
             <TextInput
+              ref={emptyBagsRef}
               style={tw`bg-[#f4fbf7] border border-green-100 rounded-xl px-4 py-3.5 text-gray-900 font-semibold`}
               keyboardType="numeric"
               value={emptyBags}
               onChangeText={setEmptyBags}
+              returnKeyType="done"
+              onSubmitEditing={handleSave}
             />
           </View>
         </View>
@@ -142,8 +156,12 @@ export default function UpdateCapacityModal({ visible, onClose, selectedRack }: 
           <Text style={[tw`text-[15px] text-[#032514]`, {fontFamily: 'PlusJakartaSans_800ExtraBold'}]}>{totalCapacity}</Text>
         </View>
 
+        {errorMsg ? (
+          <Text style={tw`text-red-500 text-center mt-2 text-xs font-bold z-10`}>{errorMsg}</Text>
+        ) : null}
+
         {/* Actions */}
-        <View style={tw`mt-6 z-10`}>
+        <View style={tw`mt-4 z-10`} pointerEvents="box-none">
           <TouchableOpacity 
             onPress={handleSave}
             disabled={loading}

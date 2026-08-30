@@ -3,6 +3,8 @@ import { onAuthStateChanged, User } from 'firebase/auth';
 import { ref, onValue } from 'firebase/database';
 import { auth, db } from '../services/firebase';
 import { UserProfile } from '../types/firebase';
+import { registerForPushNotificationsAsync } from '../utils/PushNotifications';
+import { useTheme } from './ThemeContext';
 
 interface AuthContextType {
   user: User | null;
@@ -16,26 +18,51 @@ const AuthContext = createContext<AuthContextType>({
   isLoading: true,
 });
 
+import AsyncStorage from '@react-native-async-storage/async-storage';
+
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [user, setUser] = useState<User | null>(null);
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const { setTheme } = useTheme();
 
   useEffect(() => {
     let unsubscribeProfile: (() => void) | undefined;
 
-    const unsubscribeAuth = onAuthStateChanged(auth, (firebaseUser) => {
+    const unsubscribeAuth = onAuthStateChanged(auth, async (firebaseUser) => {
       if (firebaseUser) {
-        // Use onValue instead of get to react immediately when RegisterScreen creates the profile
+        // Register for push notifications once upon login
+        registerForPushNotificationsAsync(firebaseUser.uid).catch(console.error);
+
+        // Optimistically load profile from cache to speed up app launch
+        try {
+          const cachedStr = await AsyncStorage.getItem(`cached_profile_${firebaseUser.uid}`);
+          if (cachedStr) {
+            const cachedProfile = JSON.parse(cachedStr);
+            setUser(firebaseUser);
+            setProfile(cachedProfile);
+            setTheme(cachedProfile.theme === 'dark' ? 'dark' : 'light');
+            setIsLoading(false); // Instant login from cache
+          }
+        } catch (e) {
+          // Ignore cache errors
+        }
+
+        // Use onValue to fetch latest and keep updated
         const profileRef = ref(db, `kabutech/users/${firebaseUser.uid}`);
         unsubscribeProfile = onValue(profileRef, (snapshot) => {
           const userProfile = snapshot.val();
           
           setUser(firebaseUser);
+          
           if (userProfile) {
             setProfile(userProfile);
+            setTheme(userProfile.theme === 'dark' ? 'dark' : 'light');
+            AsyncStorage.setItem(`cached_profile_${firebaseUser.uid}`, JSON.stringify(userProfile)).catch(() => {});
           } else {
             setProfile(null);
+            setTheme('light');
+            AsyncStorage.removeItem(`cached_profile_${firebaseUser.uid}`).catch(() => {});
           }
           setIsLoading(false);
         }, (error) => {
@@ -51,6 +78,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         }
         setUser(null);
         setProfile(null);
+        setTheme('light');
         setIsLoading(false);
       }
     });

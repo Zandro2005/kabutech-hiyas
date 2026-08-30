@@ -18,7 +18,7 @@ export default function WelcomeScreen() {
         resizeMode="cover"
       >
         {/* Dark Overlay for Text Readability */}
-        <View style={tw`flex-1 bg-black/40 justify-between px-6 pb-12 pt-24`}>
+        <View style={tw`flex-1 bg-black/40 justify-between px-6 pb-36 pt-24`}>
           
           {/* Title Area */}
           <View style={tw`mt-12`}>

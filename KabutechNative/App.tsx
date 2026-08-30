@@ -4,6 +4,11 @@ import { SafeAreaProvider } from 'react-native-safe-area-context';
 import AppNavigator from './src/navigation/AppNavigator';
 import { StatusBar } from 'expo-status-bar';
 import * as Font from 'expo-font';
+import * as SplashScreen from 'expo-splash-screen';
+import { Asset } from 'expo-asset';
+
+// Keep the splash screen visible while we fetch resources
+SplashScreen.preventAutoHideAsync();
 import {
   PlusJakartaSans_400Regular,
   PlusJakartaSans_700Bold,
@@ -15,33 +20,53 @@ import { FirebaseDataProvider } from './src/context/FirebaseDataContext';
 import { useDeviceContext } from 'twrnc';
 import tw from './src/tailwind';
 import CustomToast from './src/components/CustomToast';
+import { SoundManager } from './src/utils/SoundManager';
+import * as NavigationBar from 'expo-navigation-bar';
+import { Platform, Alert as RNAlert } from 'react-native';
+
+const originalAlert = RNAlert.alert;
+RNAlert.alert = (title, message, buttons, options) => {
+  if (title && (title.toLowerCase().includes('error') || title.toLowerCase().includes('invalid') || title.toLowerCase().includes('fail'))) {
+    SoundManager.playError();
+  }
+  originalAlert(title, message, buttons, options);
+};
 
 import ErrorBoundary from './src/components/ErrorBoundary';
 
 export default function App() {
   const [fontsLoaded, setFontsLoaded] = useState(false);
   
-  // Initialize Tailwind device context to listen for color scheme changes
-  useDeviceContext(tw);
+  // Initialize Tailwind device context to listen for color scheme changes, but ignore system scheme
+  useDeviceContext(tw, { observeDeviceColorSchemeChanges: false });
 
   useEffect(() => {
-    async function loadFonts() {
-      await Font.loadAsync({
-        PlusJakartaSans_400Regular,
-        PlusJakartaSans_700Bold,
-        PlusJakartaSans_800ExtraBold,
-      });
-      setFontsLoaded(true);
+    async function loadResources() {
+      try {
+        await Promise.all([
+          Font.loadAsync({
+            PlusJakartaSans_400Regular,
+            PlusJakartaSans_700Bold,
+            PlusJakartaSans_800ExtraBold,
+          }),
+          Asset.loadAsync([
+            require('./assets/mushroom_bg.png'),
+            require('./assets/mushroom_feed.png'),
+            require('./assets/icon.png'),
+          ]),
+          SoundManager.init(),
+        ]);
+      } catch (e) {
+        console.warn(e);
+      } finally {
+        setFontsLoaded(true);
+      }
     }
-    loadFonts();
+    loadResources();
   }, []);
 
   if (!fontsLoaded) {
-    return (
-      <View style={{ flex: 1, backgroundColor: '#072211', justifyContent: 'center', alignItems: 'center' }}>
-        <ActivityIndicator size="large" color="#adf2bc" />
-      </View>
-    );
+    return null; // Native splash screen remains visible
   }
 
   return (

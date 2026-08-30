@@ -1,5 +1,5 @@
-import React from 'react';
-import { View, Text, ScrollView, TouchableOpacity, Image, StatusBar } from 'react-native';
+import React, { useState, useEffect } from 'react';
+import { View, Text, ScrollView, TouchableOpacity, Image, StatusBar, ActivityIndicator } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { GlobalNavigationParamList } from '../../types/navigation';
@@ -20,6 +20,14 @@ export default function StaffHomeScreen() {
   const settings = useSettings();
   const alerts = useAlerts();
 
+  const [isReady, setIsReady] = useState(false);
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setIsReady(true);
+    }, 200);
+    return () => clearTimeout(timer);
+  }, []);
+
   const unresolvedAlerts = alerts.filter(a => !a.resolved);
 
   // Safe extraction of sensor values
@@ -37,10 +45,19 @@ export default function StaffHomeScreen() {
   const envScore = ((tempScore + humScore) / 2 * 10).toFixed(1);
 
   return (
-    <SafeAreaView style={tw`flex-1 bg-[#f0f9f4] dark:bg-[#020617]`}>
+    <View style={tw`flex-1 bg-[#dcfce7] dark:bg-[#0f172a]`}>
       <StatusBar barStyle="light-content" />
       <ScreenHeader />
-      <ScrollView contentContainerStyle={tw`pb-32`} showsVerticalScrollIndicator={false}>
+      
+      {!isReady ? (
+        <View style={tw`flex-1 items-center justify-center bg-[#f0f9f4] dark:bg-[#020617]`}>
+          <ActivityIndicator size="large" color="#10b981" />
+        </View>
+      ) : (
+      <ScrollView style={tw`bg-[#f0f9f4] dark:bg-[#020617]`} contentContainerStyle={tw`pb-36`} showsVerticalScrollIndicator={false}>
+        {/* Overscroll Filler to prevent white gap when bouncing */}
+        <View style={[tw`absolute left-0 right-0 bg-[#dcfce7] dark:bg-[#0f172a]`, { top: -500, height: 500 }]} />
+
 
         {/* Arch Gradient Score Section - Read Only for Staff */}
         <ScoreArch
@@ -142,8 +159,8 @@ export default function StaffHomeScreen() {
             </View>
           </TouchableOpacity>
         </View>
-
       </ScrollView>
-    </SafeAreaView>
+      )}
+    </View>
   );
 }

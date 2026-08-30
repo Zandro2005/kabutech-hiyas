@@ -1,6 +1,7 @@
 import React, { useState, useRef } from 'react';
 import { View, Text, TextInput, TouchableOpacity, KeyboardAvoidingView, Platform, ScrollView, StatusBar, Image } from 'react-native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
+import { SoundManager } from '../utils/SoundManager';
 import Svg, { Path } from 'react-native-svg';
 import { createUserWithEmailAndPassword, updateProfile } from 'firebase/auth';
 import { ref, set } from 'firebase/database';
@@ -18,7 +19,11 @@ export default function RegisterScreen() {
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [loading, setLoading] = useState(false);
-  const [errorMsg, setErrorMsg] = useState('');
+  const [errorMsg, _setErrorMsg] = useState('');
+  const setErrorMsg = (msg: string) => {
+    if (msg) SoundManager.playError();
+    _setErrorMsg(msg);
+  };
 
   const emailRef = useRef<TextInput>(null);
   const passwordRef = useRef<TextInput>(null);
@@ -91,9 +96,9 @@ export default function RegisterScreen() {
     <View style={tw`flex-1 bg-white`}>
       <StatusBar translucent backgroundColor="transparent" barStyle="dark-content" />
       <KeyboardAvoidingView 
-        behavior={Platform.OS === 'ios' ? 'padding' : undefined} 
+        behavior="padding"
         style={tw`flex-1`}
-        keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 20}
+        keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 25}
       >
         <ScrollView 
           contentContainerStyle={tw`flex-grow`} 

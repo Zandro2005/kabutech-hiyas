@@ -1,42 +1,38 @@
 import { useContext } from 'react';
-import { FirebaseDataContext } from '../context/FirebaseDataContext';
+import { 
+  ConnectionContext, SensorsContext, SettingsContext, 
+  BatchesContext, AlertsContext, ActivityLogsContext, 
+  StaffTasksContext, AllUsersContext 
+} from '../context/FirebaseDataContext';
 
 export function useFirebaseConnection() {
-  const context = useContext(FirebaseDataContext);
-  return context.isConnected;
+  return useContext(ConnectionContext);
 }
 
 export function useSensors() {
-  const context = useContext(FirebaseDataContext);
-  return context.sensors;
+  return useContext(SensorsContext);
 }
 
 export function useSettings() {
-  const context = useContext(FirebaseDataContext);
-  return context.settings;
+  return useContext(SettingsContext);
 }
 
 export function useBatches() {
-  const context = useContext(FirebaseDataContext);
-  return context.batches;
+  return useContext(BatchesContext);
 }
 
 export function useAlerts() {
-  const context = useContext(FirebaseDataContext);
-  return context.alerts;
+  return useContext(AlertsContext);
 }
 
 export function useActivityLogs() {
-  const context = useContext(FirebaseDataContext);
-  return context.activityLogs;
+  return useContext(ActivityLogsContext);
 }
 
 export function useStaffTasks() {
-  const context = useContext(FirebaseDataContext);
-  return context.staffTasks;
+  return useContext(StaffTasksContext);
 }
 
 export function useAllUsers() {
-  const context = useContext(FirebaseDataContext);
-  return context.allUsers;
+  return useContext(AllUsersContext);
 }

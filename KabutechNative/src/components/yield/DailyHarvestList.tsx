@@ -18,7 +18,7 @@ interface DailyHarvestListProps {
   isExporting: React.MutableRefObject<boolean>;
 }
 
-export default function DailyHarvestList({
+export default React.memo(function DailyHarvestList({
   filterDays,
   setFilterDays,
   showFilterDropdown,
@@ -167,4 +167,4 @@ export default function DailyHarvestList({
 
     </View>
   );
-}
+});

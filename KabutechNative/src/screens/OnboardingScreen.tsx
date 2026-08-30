@@ -58,7 +58,7 @@ export default function OnboardingScreen() {
   };
 
   return (
-    <SafeAreaView style={tw`flex-1 bg-[#d8f0de]`}>
+    <View style={tw`flex-1 bg-[#d8f0de]`}>
       <View style={tw`flex-row justify-between items-center px-6 pt-4 z-10`}>
         <View style={tw`flex-row items-center gap-2`}>
           <MaterialCommunityIcons name="flower" size={20} color="#004521" />
@@ -132,6 +132,6 @@ export default function OnboardingScreen() {
           </View>
         ))}
       </ScrollView>
-    </SafeAreaView>
+    </View>
   );
 }

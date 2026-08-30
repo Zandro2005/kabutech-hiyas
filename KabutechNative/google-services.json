@@ -1,0 +1,30 @@
+{
+  "project_info": {
+    "project_number": "528459633948",
+    "firebase_url": "https://kabutech-hiyas-default-rtdb.asia-southeast1.firebasedatabase.app",
+    "project_id": "kabutech-hiyas",
+    "storage_bucket": "kabutech-hiyas.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:528459633948:android:7c2c0f5e8eecc5fc7cd6d9",
+        "android_client_info": {
+          "package_name": "com.kabutech.kabutech"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyB7a9FHK-qmqdZv9VUkFjYnN6losoD750w"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

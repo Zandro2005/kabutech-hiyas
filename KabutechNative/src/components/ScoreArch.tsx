@@ -4,6 +4,7 @@ import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import tw from '../tailwind';
 import { useAuth } from '../context/AuthContext';
+import { hapticMedium } from '../utils/haptics';
 
 const { width } = Dimensions.get('window');
 
@@ -40,7 +41,7 @@ interface Props {
   readOnly?: boolean;
 }
 
-export default function ScoreArch({
+export default React.memo(function ScoreArch({
   envScore,
   isAuto,
   isScheduled = false,
@@ -55,7 +56,10 @@ export default function ScoreArch({
   const { profile } = useAuth();
   
   return (
-    <View style={tw`w-full items-center mt-2 relative z-0`}>
+    <View style={tw`w-full items-center relative z-0`}>
+      {/* Background block to seamlessly blend with the dashboard nav bar */}
+      <View style={tw`absolute top-0 left-0 right-0 h-1/2 bg-[#dcfce7] dark:bg-[#0f172a]`} />
+      
       <View style={{ width: width * 1.5, height: width * 0.95, overflow: 'hidden', alignItems: 'center' }}>
         <LinearGradient
           colors={isDarkMode ? ['#0f172a', '#020617'] : ['#dcfce7', '#f0f9f4']}
@@ -132,7 +136,10 @@ export default function ScoreArch({
             <TouchableOpacity 
               key={index} 
               disabled={isAuto || isScheduled}
-              onPress={() => toggleDevice(item.key as 'fans' | 'misters' | 'lights' | 'co2', item.active)}
+              onPress={() => {
+                hapticMedium();
+                toggleDevice(item.key as 'fans' | 'misters' | 'lights' | 'co2', item.active);
+              }}
               style={tw`w-14 h-14 rounded-full items-center justify-center shadow-sm border ${
                 showActive 
                   ? 'bg-emerald-50 dark:bg-emerald-900/30 border-emerald-500' 
@@ -150,4 +157,4 @@ export default function ScoreArch({
       )}
     </View>
   );
-}
+});

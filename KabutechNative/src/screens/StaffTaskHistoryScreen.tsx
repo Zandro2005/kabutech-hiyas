@@ -24,7 +24,7 @@ export default function StaffTaskHistoryScreen() {
     .sort((a: any, b: any) => new Date(b.completedAt || 0).getTime() - new Date(a.completedAt || 0).getTime());
 
   return (
-    <SafeAreaView style={tw`flex-1 bg-[#f0f9f4] dark:bg-[#020617]`}>
+    <View style={tw`flex-1 bg-[#f0f9f4] dark:bg-[#020617]`}>
       <StatusBar barStyle="light-content" />
       
       {/* Header */}
@@ -60,7 +60,7 @@ export default function StaffTaskHistoryScreen() {
         </ScrollView>
       </View>
 
-      <ScrollView contentContainerStyle={tw`p-4 pb-12`} showsVerticalScrollIndicator={false}>
+      <ScrollView contentContainerStyle={tw`p-4 pb-36`} showsVerticalScrollIndicator={false}>
         {completedTasks.length === 0 ? (
           <View style={tw`py-10 items-center justify-center`}>
             <MaterialCommunityIcons name="clipboard-check-outline" size={48} color={isDarkMode ? '#334155' : '#d1d5db'} />
@@ -112,6 +112,6 @@ export default function StaffTaskHistoryScreen() {
           ))
         )}
       </ScrollView>
-    </SafeAreaView>
+    </View>
   );
 }

@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { View, Text, TouchableOpacity, Image } from 'react-native';
+import { View, Text, TouchableOpacity, Image, ActivityIndicator } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
@@ -7,12 +7,14 @@ import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { GlobalNavigationParamList } from '../types/navigation';
 import tw from '../tailwind';
 import { useTheme } from '../context/ThemeContext';
+import { hapticMedium, hapticSelection } from '../utils/haptics';
 import { showToast } from './CustomToast';
 import HelpModal from './modals/HelpModal';
 import InfoModal from './modals/InfoModal';
 import { useAuth } from '../context/AuthContext';
-import { FirebaseDataContext } from '../context/FirebaseDataContext';
-import { useContext } from 'react';
+import { useActivityLogs, useAllUsers } from '../hooks/useFirebaseData';
+import { ref, update } from 'firebase/database';
+import { db } from '../services/firebase';
 
 interface ScreenHeaderProps {
   title?: string;
@@ -20,13 +22,30 @@ interface ScreenHeaderProps {
   rightComponent?: React.ReactNode;
 }
 
-export default function ScreenHeader({ title, subtitle, rightComponent }: ScreenHeaderProps) {
+export default React.memo(function ScreenHeader({ title, subtitle, rightComponent }: ScreenHeaderProps) {
   const insets = useSafeAreaInsets();
   const { isDarkMode, toggleTheme } = useTheme();
   const navigation = useNavigation<NativeStackNavigationProp<GlobalNavigationParamList>>();
   const [helpVisible, setHelpVisible] = useState(false);
   const [infoId, setInfoId] = useState<string | null>(null);
+  const [isToggling, setIsToggling] = useState(false);
   const { profile, user } = useAuth();
+  
+  const handleToggleTheme = () => {
+    if (isToggling) return;
+    hapticMedium();
+    setIsToggling(true);
+    
+    // Defer the heavy theme switch to allow the spinner to render
+    setTimeout(() => {
+      const newTheme = isDarkMode ? 'light' : 'dark';
+      toggleTheme();
+      if (user) {
+        update(ref(db, `kabutech/users/${user.uid}`), { theme: newTheme }).catch((err) => console.error("Theme update error:", err));
+      }
+      setIsToggling(false);
+    }, 50);
+  };
   
   const handleItemPress = (id: string) => {
     setHelpVisible(false); // Hide the slider immediately
@@ -35,7 +54,8 @@ export default function ScreenHeader({ title, subtitle, rightComponent }: Screen
     }, 150);
   };
 
-  const { activityLogs, tasks, allUsers } = useContext(FirebaseDataContext);
+  const activityLogs = useActivityLogs();
+  const allUsers = useAllUsers();
   const isAdmin = profile?.role === 'admin' || profile?.role === 'operator';
   const isStaff = profile?.role === 'staff';
 
@@ -47,7 +67,7 @@ export default function ScreenHeader({ title, subtitle, rightComponent }: Screen
   }
 
   return (
-    <View style={[tw`bg-transparent pb-3 px-5 z-10 relative`, { paddingTop: insets.top > 0 ? insets.top + 2 : 20 }]}>
+    <View style={[tw`bg-transparent pb-3 px-5 z-10 relative`, { paddingTop: insets.top + 20 }]}>
       
       <View style={tw`flex-row justify-between items-center`}>
         
@@ -65,33 +85,41 @@ export default function ScreenHeader({ title, subtitle, rightComponent }: Screen
           {/* Help Icon */}
           <TouchableOpacity 
             onPress={() => setHelpVisible(true)}
-            style={tw`w-7 h-7 rounded-full bg-white dark:bg-slate-800 items-center justify-center border border-gray-200 dark:border-slate-700 shadow-sm`}
+            hitSlop={{ top: 15, bottom: 15, left: 10, right: 10 }}
+            style={tw`w-8 h-8 rounded-full bg-white dark:bg-slate-800 items-center justify-center border border-gray-200 dark:border-slate-700 shadow-sm`}
           >
             <MaterialCommunityIcons name="help-circle-outline" size={16} color={isDarkMode ? "#cbd5e1" : "#334155"} />
           </TouchableOpacity>
 
           {/* Theme Toggle */}
           <TouchableOpacity 
-            onPress={toggleTheme}
-            style={tw`w-7 h-7 rounded-full bg-white dark:bg-slate-800 items-center justify-center border border-gray-200 dark:border-slate-700 shadow-sm`}
+            onPress={handleToggleTheme}
+            disabled={isToggling}
+            hitSlop={{ top: 15, bottom: 15, left: 10, right: 10 }}
+            style={tw`w-8 h-8 rounded-full bg-white dark:bg-slate-800 items-center justify-center border border-gray-200 dark:border-slate-700 shadow-sm`}
           >
-            <MaterialCommunityIcons 
-              name={isDarkMode ? "weather-sunny" : "weather-night"} 
-              size={14} 
-              color={isDarkMode ? "#fbbf24" : "#334155"} 
-            />
+            {isToggling ? (
+              <ActivityIndicator size="small" color={isDarkMode ? "#fbbf24" : "#334155"} />
+            ) : (
+              <MaterialCommunityIcons 
+                name={isDarkMode ? "weather-sunny" : "weather-night"} 
+                size={14} 
+                color={isDarkMode ? "#fbbf24" : "#334155"} 
+              />
+            )}
           </TouchableOpacity>
 
           {/* More Button */}
           <TouchableOpacity 
             onPress={() => {
               if (profile?.role === 'staff') {
-                navigation.navigate('StaffMain' as never, { screen: 'Profile' } as never);
+                navigation.navigate('StaffMain' as any, { screen: 'Profile' } as any);
               } else {
-                navigation.navigate('Main' as never, { screen: 'Profile' } as never);
+                navigation.navigate('Main' as any, { screen: 'Profile' } as any);
               }
             }}
-            style={tw`w-7 h-7 rounded-full bg-white dark:bg-slate-800 items-center justify-center border border-gray-200 dark:border-slate-700 shadow-sm`}
+            hitSlop={{ top: 15, bottom: 15, left: 10, right: 15 }}
+            style={tw`w-8 h-8 rounded-full bg-white dark:bg-slate-800 items-center justify-center border border-gray-200 dark:border-slate-700 shadow-sm`}
           >
             <MaterialCommunityIcons name="dots-vertical" size={16} color={isDarkMode ? "#cbd5e1" : "#334155"} />
             {notificationCount > 0 && (
@@ -114,4 +142,4 @@ export default function ScreenHeader({ title, subtitle, rightComponent }: Screen
       />
     </View>
   );
-}
+});

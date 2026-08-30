@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { View, Text, ScrollView, TouchableOpacity, StatusBar, Modal, TextInput } from 'react-native';
+import React, { useState, useEffect } from 'react';
+import { View, Text, TouchableOpacity, StatusBar, Modal, TextInput, ActivityIndicator, FlatList, ScrollView } from 'react-native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
@@ -7,9 +7,10 @@ import tw from '../../tailwind';
 import { useAuth } from '../../context/AuthContext';
 import { useStaffTasks } from '../../hooks/useFirebaseData';
 import { useTheme } from '../../context/ThemeContext';
-import { ref, update, push } from 'firebase/database';
+import { ref, update, push, get, child } from 'firebase/database';
 import { db } from '../../services/firebase';
 import { showToast } from '../../components/CustomToast';
+import { sendPushNotification } from '../../utils/PushNotifications';
 
 export default function MyTasksScreen() {
   const navigation = useNavigation();
@@ -22,6 +23,14 @@ export default function MyTasksScreen() {
   const [selectedTaskId, setSelectedTaskId] = useState<string | null>(null);
   const [completionNotes, setCompletionNotes] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  const [isReady, setIsReady] = useState(false);
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setIsReady(true);
+    }, 200);
+    return () => clearTimeout(timer);
+  }, []);
 
   const myTasks = allTasks.filter(t => t.assignedTo === user?.uid);
   
@@ -64,6 +73,23 @@ export default function MyTasksScreen() {
       updates[`kabutech/tasks/${selectedTaskId}/isOnTime`] = isOnTime;
 
       await update(ref(db), updates);
+
+      // Trigger Push Notification to Admin
+      if (task.assignedBy) {
+        try {
+          const adminProfileSnapshot = await get(child(ref(db), `kabutech/users/${task.assignedBy}`));
+          const adminProfile = adminProfileSnapshot.val();
+          if (adminProfile && adminProfile.pushToken) {
+            sendPushNotification(
+              adminProfile.pushToken,
+              'Task Completed! ✅',
+              `${profile?.name || 'Staff'} has completed: ${task.title}`
+            );
+          }
+        } catch(e) {
+          console.log('Failed to send push notification', e);
+        }
+      }
 
       showToast({ type: 'success', text1: 'Task Completed', text2: 'Great job!' });
       setCompleteModalVisible(false);
@@ -157,7 +183,7 @@ export default function MyTasksScreen() {
   };
 
   return (
-    <SafeAreaView style={tw`flex-1 bg-[#f0f9f4] dark:bg-[#020617]`}>
+    <View style={tw`flex-1 bg-[#f0f9f4] dark:bg-[#020617]`}>
       <StatusBar barStyle="light-content" />
       
       {/* Header */}
@@ -168,6 +194,12 @@ export default function MyTasksScreen() {
         <Text style={[tw`text-lg text-slate-900 dark:text-white`, {fontFamily: 'PlusJakartaSans_800ExtraBold'}]}>My Tasks</Text>
       </View>
 
+      {!isReady ? (
+        <View style={tw`flex-1 items-center justify-center`}>
+          <ActivityIndicator size="large" color="#10b981" />
+        </View>
+      ) : (
+      <>
       {/* Tabs */}
       <View style={tw`flex-row bg-white dark:bg-slate-900 border-b border-gray-200 dark:border-slate-800`}>
         <TouchableOpacity 
@@ -188,18 +220,23 @@ export default function MyTasksScreen() {
         </TouchableOpacity>
       </View>
 
-      <ScrollView contentContainerStyle={tw`p-4 pb-12`} showsVerticalScrollIndicator={false}>
-        {displayedTasks.length === 0 ? (
+      <FlatList
+        data={displayedTasks}
+        keyExtractor={(item) => item.id}
+        contentContainerStyle={tw`p-4 pb-36`}
+        showsVerticalScrollIndicator={false}
+        ListEmptyComponent={
           <View style={tw`py-10 items-center justify-center`}>
             <MaterialCommunityIcons name={filter === 'active' ? 'check-all' : 'clipboard-text-off'} size={48} color={isDarkMode ? '#334155' : '#d1d5db'} />
             <Text style={[tw`text-sm text-gray-500 mt-3`, {fontFamily: 'PlusJakartaSans_500Medium'}]}>
               {filter === 'active' ? 'You have no active tasks!' : 'No completed tasks yet.'}
             </Text>
           </View>
-        ) : (
-          displayedTasks.map(renderTaskCard)
-        )}
-      </ScrollView>
+        }
+        renderItem={({ item }) => renderTaskCard(item)}
+      />
+      </>
+      )}
 
       {/* Complete Task Modal */}
       <Modal visible={completeModalVisible} transparent animationType="fade">
@@ -240,6 +277,6 @@ export default function MyTasksScreen() {
         </View>
       </Modal>
 
-    </SafeAreaView>
+    </View>
   );
 }

@@ -16,7 +16,7 @@ export default function PendingApprovalScreen() {
   };
 
   return (
-    <SafeAreaView style={tw`flex-1 bg-white dark:bg-slate-900 justify-center items-center p-6`}>
+    <View style={tw`flex-1 bg-white dark:bg-slate-900 justify-center items-center p-6`}>
       <StatusBar barStyle="dark-content" />
       
       <View style={tw`w-24 h-24 bg-amber-50 dark:bg-amber-900/30 rounded-full items-center justify-center mb-6 border border-amber-100 dark:border-amber-800`}>
@@ -40,6 +40,6 @@ export default function PendingApprovalScreen() {
           Sign Out
         </Text>
       </TouchableOpacity>
-    </SafeAreaView>
+    </View>
   );
 }

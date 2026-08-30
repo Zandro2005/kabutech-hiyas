@@ -1,24 +1,46 @@
-// import { Audio } from 'expo-av';
+import { createAudioPlayer, AudioSource } from 'expo-audio';
+import { VolumeManager } from 'react-native-volume-manager';
 
-export const playSuccessSound = async () => {
-  // Sound temporarily disabled for testing in Expo Go
-  // Uncomment the import above and the code below before building the APK!
-  
-  /*
-  try {
-    const { sound } = await Audio.Sound.createAsync(
-      require('../../assets/success.wav')
-    );
-    await sound.playAsync();
-    
-    // Cleanup the sound object after it finishes playing
-    sound.setOnPlaybackStatusUpdate((status) => {
-      if (status.isLoaded && status.didJustFinish) {
-        sound.unloadAsync();
-      }
-    });
-  } catch (error) {
-    console.log('Error playing sound:', error);
+// Preload sound sources for instant playback
+const successSource: AudioSource = require('../../assets/sounds/success_fast.wav');
+const errorSource: AudioSource = require('../../assets/sounds/engk.wav');
+
+class SoundManagerClass {
+  private successPlayer: ReturnType<typeof createAudioPlayer> | null = null;
+  private errorPlayer: ReturnType<typeof createAudioPlayer> | null = null;
+
+  async init() {
+    try {
+      this.successPlayer = createAudioPlayer(successSource);
+      this.errorPlayer = createAudioPlayer(errorSource);
+    } catch (e) {
+      console.log('Audio init error:', e);
+    }
   }
-  */
-};
+
+  playSuccess() {
+    try {
+      if (this.successPlayer) {
+        VolumeManager.setVolume(1, { showUI: false }).catch(() => {});
+        this.successPlayer.seekTo(0);
+        this.successPlayer.play();
+      }
+    } catch (e) {
+      console.log('Audio play error:', e);
+    }
+  }
+
+  playError() {
+    try {
+      if (this.errorPlayer) {
+        VolumeManager.setVolume(1, { showUI: false }).catch(() => {});
+        this.errorPlayer.seekTo(0);
+        this.errorPlayer.play();
+      }
+    } catch (e) {
+      console.log('Audio play error:', e);
+    }
+  }
+}
+
+export const SoundManager = new SoundManagerClass();

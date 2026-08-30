@@ -1,6 +1,8 @@
 import React, { useEffect, useRef, useState, useCallback } from 'react';
 import { View, Text, Animated, StyleSheet } from 'react-native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
+import { SoundManager } from '../utils/SoundManager';
+import { hapticSuccess, hapticError } from '../utils/haptics';
 
 interface ToastMessage {
   type: 'success' | 'error';
@@ -33,6 +35,16 @@ export default function CustomToast() {
   const show = useCallback((msg: ToastMessage) => {
     if (timerRef.current) clearTimeout(timerRef.current);
     setMessage(msg);
+
+    // Trigger sounds and haptics
+    if (msg.type === 'success') {
+      SoundManager.playSuccess();
+      hapticSuccess();
+    } else if (msg.type === 'error') {
+      SoundManager.playError();
+      hapticError();
+    }
+
     translateY.setValue(-120);
     opacity.setValue(0);
     Animated.parallel([

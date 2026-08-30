@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { View, Text, ScrollView, TouchableOpacity, StatusBar, DeviceEventEmitter, Alert, Dimensions } from 'react-native';
+import { View, Text, ScrollView, TouchableOpacity, StatusBar, DeviceEventEmitter, Alert, Dimensions, ActivityIndicator } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { GlobalNavigationParamList } from '../types/navigation';
@@ -12,6 +12,7 @@ import CircularSlider from '../components/CircularSlider';
 import ScreenHeader from '../components/ScreenHeader';
 import { useTheme } from '../context/ThemeContext';
 import { showToast } from '../components/CustomToast';
+import { hapticLight, hapticMedium, hapticSelection } from '../utils/haptics';
 
 const { width } = Dimensions.get('window');
 
@@ -23,6 +24,14 @@ export default function ControlsScreen() {
   const sensors = useSensors();
   const settings = useSettings();
   
+  const [isReady, setIsReady] = useState(false);
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setIsReady(true);
+    }, 200);
+    return () => clearTimeout(timer);
+  }, []);
+
   const temp = typeof sensors.temperature === 'number' ? sensors.temperature : 32.8;
   const hum = typeof sensors.humidity === 'number' ? sensors.humidity : 51;
   const light = typeof sensors.light === 'number' ? sensors.light : 71;
@@ -48,6 +57,7 @@ export default function ControlsScreen() {
 
   const toggleDevice = (key: string, state: boolean) => {
     if (isLocked) return;
+    hapticMedium();
     update(ref(db, `kabutech/settings/setpoints/devices`), {
       [key]: state
     }).then(() => {
@@ -56,6 +66,7 @@ export default function ControlsScreen() {
   };
 
   const setMode = (mode: 'auto' | 'manual' | 'scheduled') => {
+    hapticSelection();
     update(ref(db, 'kabutech/settings/setpoints'), {
       mode
     }).then(() => {
@@ -93,6 +104,7 @@ export default function ControlsScreen() {
   }, [localTarget]);
 
   const increment = () => {
+    hapticLight();
     setLocalTarget(prev => {
       const data = activeTabDataRef.current;
       const next = prev + data.step;
@@ -101,6 +113,7 @@ export default function ControlsScreen() {
   };
 
   const decrement = () => {
+    hapticLight();
     setLocalTarget(prev => {
       const data = activeTabDataRef.current;
       const next = prev - data.step;
@@ -146,6 +159,11 @@ export default function ControlsScreen() {
       <StatusBar barStyle="light-content" />
       <ScreenHeader />
       
+      {!isReady ? (
+        <View style={tw`flex-1 items-center justify-center`}>
+          <ActivityIndicator size="large" color="#10b981" />
+        </View>
+      ) : (
       <ScrollView contentContainerStyle={tw`pb-32 pt-2`} showsVerticalScrollIndicator={false}>
         
         {/* Horizontal Tabs */}
@@ -293,6 +311,7 @@ export default function ControlsScreen() {
         </View>
 
       </ScrollView>
+      )}
     </View>
   );
 }

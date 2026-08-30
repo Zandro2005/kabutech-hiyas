@@ -7,7 +7,7 @@ import { auth } from '../services/firebase';
 import { useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { GlobalNavigationParamList } from '../types/navigation';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useSafeAreaInsets, SafeAreaView } from 'react-native-safe-area-context';
 import tw from '../tailwind';
 import EditProfileModal from '../components/modals/EditProfileModal';
 import ScreenHeader from '../components/ScreenHeader';
@@ -45,9 +45,10 @@ export default function ProfileScreen() {
   let totalSlots = 0;
   let totalFlagged = 0;
   batches.filter(b => !b.archived).forEach(rack => {
-    const activeBags = rack.bags?.filter((b: any) => b && b.status === 'Active') || [];
-    const flaggedBags = rack.bags?.filter((b: any) => b && b.status === 'Flagged') || [];
-    totalSlots += rack.bags?.length || 0;
+    const bagsArray = Array.isArray(rack.bags) ? rack.bags : (rack.bags ? Object.values(rack.bags) : []);
+    const activeBags = bagsArray.filter((b: any) => b && b.status === 'Active');
+    const flaggedBags = bagsArray.filter((b: any) => b && b.status === 'Flagged');
+    totalSlots += bagsArray.length;
     totalFlagged += flaggedBags.length;
   });
   const healthScore = Math.max(0, 100 - (totalSlots > 0 && totalFlagged > 0 ? (totalFlagged / totalSlots) * 500 : 0));
@@ -69,7 +70,7 @@ export default function ProfileScreen() {
     <View style={tw`flex-1 bg-[#f8fafc] dark:bg-[#020617]`}>
       <StatusBar barStyle="light-content" />
       <ScreenHeader />
-      <ScrollView contentContainerStyle={tw`p-6 pt-5 pb-24`} showsVerticalScrollIndicator={false}>
+      <ScrollView contentContainerStyle={tw`p-6 pt-5 pb-36`} showsVerticalScrollIndicator={false}>
         
         {/* Page Title & Subtitle */}
         <View style={tw`mb-2`}>

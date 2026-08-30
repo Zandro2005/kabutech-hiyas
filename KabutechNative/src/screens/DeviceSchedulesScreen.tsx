@@ -231,7 +231,7 @@ export default function DeviceSchedulesScreen() {
         </View>
       </View>
 
-      <ScrollView contentContainerStyle={tw`p-4 pb-12`} showsVerticalScrollIndicator={false}>
+      <ScrollView contentContainerStyle={tw`p-4 pb-36`} showsVerticalScrollIndicator={false}>
         
         {/* ================= MISTERS ================= */}
         <Text style={[tw`mx-2 mt-2 mb-2 text-[10px] text-gray-500 tracking-widest uppercase`, {fontFamily: 'PlusJakartaSans_800ExtraBold'}]}>Humidity Control</Text>

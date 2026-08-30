@@ -1,3 +1,4 @@
+import { SafeAreaView } from 'react-native-safe-area-context';
 import React from 'react';
 import { View, Text, ScrollView, TouchableOpacity, StatusBar } from 'react-native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
@@ -36,7 +37,7 @@ export default function StaffProfileScreen() {
     <View style={tw`flex-1 bg-[#f8fafc] dark:bg-[#020617]`}>
       <StatusBar barStyle="light-content" />
       <ScreenHeader />
-      <ScrollView contentContainerStyle={tw`p-6 pt-5 pb-24`} showsVerticalScrollIndicator={false}>
+      <ScrollView contentContainerStyle={tw`p-6 pt-5 pb-36`} showsVerticalScrollIndicator={false}>
         
         {/* Page Title & Subtitle */}
         <View style={tw`mb-2`}>

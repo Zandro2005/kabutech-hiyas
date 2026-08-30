@@ -11,7 +11,7 @@ interface YieldChartProps {
   isExporting: React.MutableRefObject<boolean>;
 }
 
-export default function YieldChart({ dailyMap, chartPeriod, setChartPeriod, isExporting }: YieldChartProps) {
+export default React.memo(function YieldChart({ dailyMap, chartPeriod, setChartPeriod, isExporting }: YieldChartProps) {
   const chartScrollRef = useRef<ScrollView>(null);
 
   const buildChartData = () => {
@@ -187,4 +187,4 @@ export default function YieldChart({ dailyMap, chartPeriod, setChartPeriod, isEx
       </View>
     </View>
   );
-}
+});

@@ -11,7 +11,7 @@ interface Props {
   navigation: any;
 }
 
-export default function EnvironmentMetricsGrid({ temp, hum, light, co2, navigation }: Props) {
+export default React.memo(function EnvironmentMetricsGrid({ temp, hum, light, co2, navigation }: Props) {
   return (
     <View style={tw`px-6 pt-8`}>
       <View style={tw`flex-row justify-between items-end mb-4`}>
@@ -77,4 +77,4 @@ export default function EnvironmentMetricsGrid({ temp, hum, light, co2, navigati
       </View>
     </View>
   );
-}
+});

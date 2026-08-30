@@ -1,7 +1,7 @@
-import React, { useState, useMemo } from 'react';
-import { View, Text, ScrollView, TouchableOpacity, StatusBar } from 'react-native';
+import React, { useState, useMemo, useEffect } from 'react';
+import { View, Text, ScrollView, TouchableOpacity, StatusBar, ActivityIndicator, FlatList } from 'react-native';
 import { MaterialCommunityIcons, Feather } from '@expo/vector-icons';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useSafeAreaInsets, SafeAreaView } from 'react-native-safe-area-context';
 import tw from '../tailwind';
 import ScreenHeader from '../components/ScreenHeader';
 import { useTheme } from '../context/ThemeContext';
@@ -16,7 +16,7 @@ import FlagContaminationModal from '../components/modals/FlagContaminationModal'
 import AddRackModal from '../components/modals/AddRackModal';
 import ConfirmModal from '../components/ConfirmModal';
 import CustomToast, { showToast } from '../components/CustomToast';
-import { playSuccessSound } from '../utils/SoundManager';
+import { SoundManager } from '../utils/SoundManager';
 
 export default function ManageCropScreen() {
   const insets = useSafeAreaInsets();
@@ -33,6 +33,15 @@ export default function ManageCropScreen() {
   // Archive confirm modal state
   const [archiveTarget, setArchiveTarget] = useState<{ firebaseKey: string | number; rackName: string } | null>(null);
 
+  // Deferred rendering state for smooth tab transitions
+  const [isReady, setIsReady] = useState(false);
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setIsReady(true);
+    }, 200);
+    return () => clearTimeout(timer);
+  }, []);
+
   // --- Compute Stats from Firebase Data ---
   const {
     enrichedBatches,
@@ -44,6 +53,13 @@ export default function ManageCropScreen() {
     overallCapacityPercent,
     healthScore
   } = useMemo(() => {
+    if (!isReady) {
+      return {
+        enrichedBatches: [], activeRacks: [], totalYieldGrams: 0,
+        totalSlots: 0, totalActive: 0, totalFlagged: 0, overallCapacityPercent: 0, healthScore: 100
+      };
+    }
+
     let tYield = 0;
     let tSlots = 0;
     let tActive = 0;
@@ -89,7 +105,7 @@ export default function ManageCropScreen() {
       overallCapacityPercent: capacityPercent,
       healthScore: score
     };
-  }, [batches]);
+  }, [batches, isReady]);
 
   // --- Handlers ---
   const handleArchiveRack = (firebaseKey: string | number, rackName: string) => {
@@ -102,7 +118,7 @@ export default function ManageCropScreen() {
       await remove(ref(db, `kabutech/batches/${archiveTarget.firebaseKey}`));
       const rackName = archiveTarget.rackName;
       setArchiveTarget(null);
-      playSuccessSound();
+      SoundManager.playSuccess();
       showToast({ type: 'success', text1: 'Removed', text2: `"${rackName}" has been removed.` });
     } catch (error) {
       console.error(error);
@@ -122,72 +138,82 @@ export default function ManageCropScreen() {
       <StatusBar barStyle="light-content" />
       <ScreenHeader />
 
-      <ScrollView contentContainerStyle={tw`p-4 pb-32`} showsVerticalScrollIndicator={false}>
-        
-        {/* Page Title */}
-        <View style={tw`mb-4 mt-2`}>
-          <Text style={[tw`text-[17px] text-[#032514] dark:text-slate-100 tracking-tight`, {fontFamily: 'PlusJakartaSans_800ExtraBold'}]}>Crops Dashboard</Text>
-          <Text style={[tw`text-xs text-gray-500 dark:text-slate-400 mt-1`, {fontFamily: 'PlusJakartaSans_400Regular'}]}>Manage racks, monitor health, and log harvests.</Text>
+      {!isReady ? (
+        <View style={tw`flex-1 items-center justify-center`}>
+          <ActivityIndicator size="large" color="#10b981" />
         </View>
-
-        {/* Global Analytics Overview (Small Pills) */}
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={tw`mb-5`} contentContainerStyle={tw`gap-3`}>
-          {/* Total Yield */}
-          <View style={tw`bg-white dark:bg-slate-800 rounded-[20px] px-4 py-3 flex-row items-center gap-3 border border-gray-100 dark:border-slate-700 shadow-sm`}>
-            <View style={tw`w-8 h-8 rounded-full bg-[#f0fdf4] dark:bg-emerald-900/40 items-center justify-center`}>
-              <MaterialCommunityIcons name="leaf" size={16} color="#166534" />
-            </View>
+      ) : (
+        <FlatList
+          data={activeRacks}
+          keyExtractor={(item) => String(item.id || item.firebaseKey)}
+          contentContainerStyle={tw`px-5 pt-2 pb-36`}
+          showsVerticalScrollIndicator={false}
+          ListHeaderComponent={
             <View>
-              <Text style={[tw`text-[11px] text-gray-500 dark:text-slate-400 mb-0.5`, {fontFamily: 'PlusJakartaSans_700Bold'}]}>Total Output</Text>
-              <Text style={[tw`text-lg text-[#032514] dark:text-emerald-400 tracking-tighter`, {fontFamily: 'PlusJakartaSans_800ExtraBold'}]}>{Math.round(totalYieldGrams / 1000)}kg</Text>
-            </View>
-          </View>
-          
-          {/* Health Score */}
-          <View style={tw`bg-white dark:bg-slate-800 rounded-[20px] px-4 py-3 flex-row items-center gap-3 border border-gray-100 dark:border-slate-700 shadow-sm`}>
-            <View style={tw`w-8 h-8 rounded-full ${healthScore < 80 ? 'bg-amber-50 dark:bg-amber-900/30' : 'bg-[#f0fdf4] dark:bg-emerald-900/40'} items-center justify-center`}>
-              <MaterialCommunityIcons name="heart-pulse" size={16} color={healthScore < 80 ? "#d97706" : "#10b981"} />
-            </View>
-            <View>
-              <Text style={[tw`text-[9px] text-gray-500 dark:text-slate-400 uppercase tracking-widest`, {fontFamily: 'PlusJakartaSans_800ExtraBold'}]}>Health Score</Text>
-              <Text style={[tw`text-lg ${healthScore < 80 ? 'text-amber-600' : 'text-[#059669]'} dark:text-emerald-400 tracking-tighter`, {fontFamily: 'PlusJakartaSans_800ExtraBold'}]}>{Math.round(healthScore)}/100</Text>
-            </View>
-          </View>
+              {/* Page Title */}
+              <View style={tw`mb-6`}>
+                <Text style={[tw`text-[17px] text-[#032514] dark:text-slate-100 tracking-tight`, {fontFamily: 'PlusJakartaSans_800ExtraBold'}]}>Crops Dashboard</Text>
+                <Text style={[tw`text-xs text-gray-500 dark:text-slate-400 mt-1`, {fontFamily: 'PlusJakartaSans_400Regular'}]}>Manage racks, monitor health, and log harvests.</Text>
+              </View>
 
-          {/* Capacity */}
-          <View style={tw`bg-white dark:bg-slate-800 rounded-[20px] px-4 py-3 flex-row items-center gap-3 border border-gray-100 dark:border-slate-700 shadow-sm`}>
-            <View style={tw`w-8 h-8 rounded-full bg-[#f0fdf4] dark:bg-emerald-900/40 items-center justify-center`}>
-              <MaterialCommunityIcons name="archive-outline" size={16} color="#166534" />
+              {/* Global Analytics Overview (Small Pills) */}
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} style={tw`mb-5`} contentContainerStyle={tw`gap-3`}>
+                {/* Total Yield */}
+                <View style={tw`bg-white dark:bg-slate-800 rounded-[20px] px-4 py-3 flex-row items-center gap-3 border border-gray-100 dark:border-slate-700 shadow-sm`}>
+                  <View style={tw`w-8 h-8 rounded-full bg-[#f0fdf4] dark:bg-emerald-900/40 items-center justify-center`}>
+                    <MaterialCommunityIcons name="leaf" size={16} color="#166534" />
+                  </View>
+                  <View>
+                    <Text style={[tw`text-[11px] text-gray-500 dark:text-slate-400 mb-0.5`, {fontFamily: 'PlusJakartaSans_700Bold'}]}>Total Output</Text>
+                    <Text style={[tw`text-lg text-[#032514] dark:text-emerald-400 tracking-tighter`, {fontFamily: 'PlusJakartaSans_800ExtraBold'}]}>{Math.round(totalYieldGrams / 1000)}kg</Text>
+                  </View>
+                </View>
+                
+                {/* Health Score */}
+                <View style={tw`bg-white dark:bg-slate-800 rounded-[20px] px-4 py-3 flex-row items-center gap-3 border border-gray-100 dark:border-slate-700 shadow-sm`}>
+                  <View style={tw`w-8 h-8 rounded-full ${healthScore < 80 ? 'bg-amber-50 dark:bg-amber-900/30' : 'bg-[#f0fdf4] dark:bg-emerald-900/40'} items-center justify-center`}>
+                    <MaterialCommunityIcons name="heart-pulse" size={16} color={healthScore < 80 ? "#d97706" : "#10b981"} />
+                  </View>
+                  <View>
+                    <Text style={[tw`text-[9px] text-gray-500 dark:text-slate-400 uppercase tracking-widest`, {fontFamily: 'PlusJakartaSans_800ExtraBold'}]}>Health Score</Text>
+                    <Text style={[tw`text-lg ${healthScore < 80 ? 'text-amber-600' : 'text-[#059669]'} dark:text-emerald-400 tracking-tighter`, {fontFamily: 'PlusJakartaSans_800ExtraBold'}]}>{Math.round(healthScore)}/100</Text>
+                  </View>
+                </View>
+
+                {/* Capacity */}
+                <View style={tw`bg-white dark:bg-slate-800 rounded-[20px] px-4 py-3 flex-row items-center gap-3 border border-gray-100 dark:border-slate-700 shadow-sm`}>
+                  <View style={tw`w-8 h-8 rounded-full bg-[#f0fdf4] dark:bg-emerald-900/40 items-center justify-center`}>
+                    <MaterialCommunityIcons name="archive-outline" size={16} color="#166534" />
+                  </View>
+                  <View>
+                    <Text style={[tw`text-[9px] text-gray-500 dark:text-slate-400 uppercase tracking-widest`, {fontFamily: 'PlusJakartaSans_800ExtraBold'}]}>Capacity</Text>
+                    <Text style={[tw`text-lg text-[#032514] dark:text-emerald-400 tracking-tighter`, {fontFamily: 'PlusJakartaSans_800ExtraBold'}]}>{overallCapacityPercent}%</Text>
+                  </View>
+                </View>
+              </ScrollView>
+
+              {/* ACTIVE RACKS SECTION */}
+              <View style={tw`flex-row justify-between items-center mb-4 mt-2`}>
+                <Text style={[tw`text-[15px] text-[#032514] dark:text-slate-200 tracking-tight`, {fontFamily: 'PlusJakartaSans_800ExtraBold'}]}>Active Racks</Text>
+                <TouchableOpacity 
+                  onPress={() => setShowAddRack(true)}
+                  style={tw`bg-[#10b981] dark:bg-emerald-600 px-3 py-1.5 rounded-full flex-row items-center gap-1 shadow-sm`}
+                >
+                  <Feather name="plus" size={14} color="white" />
+                  <Text style={[tw`text-white text-[11px]`, {fontFamily: 'PlusJakartaSans_800ExtraBold'}]}>Add Rack</Text>
+                </TouchableOpacity>
+              </View>
             </View>
-            <View>
-              <Text style={[tw`text-[9px] text-gray-500 dark:text-slate-400 uppercase tracking-widest`, {fontFamily: 'PlusJakartaSans_800ExtraBold'}]}>Capacity</Text>
-              <Text style={[tw`text-lg text-[#032514] dark:text-emerald-400 tracking-tighter`, {fontFamily: 'PlusJakartaSans_800ExtraBold'}]}>{overallCapacityPercent}%</Text>
+          }
+          ListEmptyComponent={
+            <View style={tw`bg-white dark:bg-slate-800 rounded-[24px] p-8 items-center justify-center border border-dashed border-gray-300 dark:border-slate-600`}>
+              <MaterialCommunityIcons name="bookshelf" size={48} color={isDarkMode ? '#334155' : '#d1d5db'} />
+              <Text style={[tw`text-gray-500 dark:text-slate-400 text-sm mt-3 text-center`, {fontFamily: 'PlusJakartaSans_700Bold'}]}>No active racks.</Text>
+              <Text style={[tw`text-gray-400 dark:text-slate-500 text-xs mt-1 text-center`, {fontFamily: 'PlusJakartaSans_400Regular'}]}>Initialize a new batch to start growing.</Text>
             </View>
-          </View>
-        </ScrollView>
-
-
-        {/* ACTIVE RACKS SECTION */}
-        <View style={tw`flex-row justify-between items-center mb-4 mt-2`}>
-          <Text style={[tw`text-[15px] text-[#032514] dark:text-slate-200 tracking-tight`, {fontFamily: 'PlusJakartaSans_800ExtraBold'}]}>Active Racks</Text>
-          <TouchableOpacity 
-            onPress={() => setShowAddRack(true)}
-            style={tw`bg-[#10b981] dark:bg-emerald-600 px-3 py-1.5 rounded-full flex-row items-center gap-1 shadow-sm`}
-          >
-            <Feather name="plus" size={14} color="white" />
-            <Text style={[tw`text-white text-[11px]`, {fontFamily: 'PlusJakartaSans_800ExtraBold'}]}>Add Rack</Text>
-          </TouchableOpacity>
-        </View>
-
-        {activeRacks.length === 0 ? (
-          <View style={tw`bg-white dark:bg-slate-800 rounded-[24px] p-8 items-center justify-center border border-dashed border-gray-300 dark:border-slate-600`}>
-            <MaterialCommunityIcons name="bookshelf" size={48} color={isDarkMode ? '#334155' : '#d1d5db'} />
-            <Text style={[tw`text-gray-500 dark:text-slate-400 text-sm mt-3 text-center`, {fontFamily: 'PlusJakartaSans_700Bold'}]}>No active racks.</Text>
-            <Text style={[tw`text-gray-400 dark:text-slate-500 text-xs mt-1 text-center`, {fontFamily: 'PlusJakartaSans_400Regular'}]}>Initialize a new batch to start growing.</Text>
-          </View>
-        ) : (
-          activeRacks.map((rack) => (
-            <View key={rack.id} style={tw`bg-white dark:bg-slate-800 rounded-[24px] p-5 shadow-sm border border-gray-100 dark:border-slate-700 mb-4 overflow-hidden`}>
+          }
+          renderItem={({ item: rack }) => (
+            <View style={tw`bg-white dark:bg-slate-800 rounded-[24px] p-5 shadow-sm border border-gray-100 dark:border-slate-700 mb-4 overflow-hidden`}>
               
               {/* Rack Header */}
               <View style={tw`flex-row justify-between items-start mb-2`}>
@@ -271,9 +297,9 @@ export default function ManageCropScreen() {
                 </TouchableOpacity>
               </View>
             </View>
-          ))
-        )}
-      </ScrollView>
+          )}
+        />
+      )}
 
       {/* Modals */}
       <AddRackModal visible={showAddRack} onClose={() => setShowAddRack(false)} racks={batches} />

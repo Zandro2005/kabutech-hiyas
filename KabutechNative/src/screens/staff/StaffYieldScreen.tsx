@@ -1,5 +1,6 @@
-import React, { useState, useRef, useMemo } from 'react';
-import { View, Text, ScrollView, StatusBar } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import React, { useState, useRef, useMemo, useEffect } from 'react';
+import { View, Text, ScrollView, StatusBar, ActivityIndicator } from 'react-native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import tw from '../../tailwind';
 import ScreenHeader from '../../components/ScreenHeader';
@@ -17,8 +18,19 @@ export default function StaffYieldScreen() {
   const batches = useBatches();
   const settings = useSettings();
 
+  const [isReady, setIsReady] = useState(false);
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setIsReady(true);
+    }, 200);
+    return () => clearTimeout(timer);
+  }, []);
+
   // Aggregate harvest data
   const { dailyMap, allRackNames, actualYieldKg, targetYieldKg, efficiency, sortedDates, dailyHarvestsList } = useMemo(() => {
+    if (!isReady) {
+      return { dailyMap: {}, allRackNames: new Set<string>(), actualYieldKg: '0.00', targetYieldKg: '0.00', efficiency: 0, sortedDates: [], dailyHarvestsList: [] };
+    }
     let tGrams = 0;
     const dMap: Record<string, { count: number; grams: number; racks: Set<string>; rackYields: Record<string, number> }> = {};
     const aRackNames = new Set<string>();
@@ -88,7 +100,7 @@ export default function StaffYieldScreen() {
       sortedDates: sDates,
       dailyHarvestsList: dHarvestsList
     };
-  }, [batches, settings?.yieldTarget, filterDays]);
+  }, [batches, settings?.yieldTarget, filterDays, isReady]);
 
   const isExporting = useRef(false);
 
@@ -96,7 +108,13 @@ export default function StaffYieldScreen() {
     <View style={tw`flex-1 bg-[#f4f8f4] dark:bg-[#020617]`}>
       <StatusBar barStyle="dark-content" />
       <ScreenHeader />
-      <ScrollView contentContainerStyle={tw`p-5 pb-24`} showsVerticalScrollIndicator={false}>
+
+      {!isReady ? (
+        <View style={tw`flex-1 items-center justify-center bg-[#f4f8f4] dark:bg-[#020617]`}>
+          <ActivityIndicator size="large" color="#10b981" />
+        </View>
+      ) : (
+      <ScrollView contentContainerStyle={tw`px-5 pt-2 pb-36`} showsVerticalScrollIndicator={false}>
 
         {/* Page Title & Subtitle */}
         <View style={tw`mb-6`}>
@@ -174,6 +192,7 @@ export default function StaffYieldScreen() {
         />
 
       </ScrollView>
+      )}
     </View>
   );
 }

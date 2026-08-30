@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { View, Text, ScrollView, TouchableOpacity, TextInput, StatusBar, ActivityIndicator } from 'react-native';
+import { View, Text, TouchableOpacity, TextInput, StatusBar, ActivityIndicator, FlatList, ScrollView } from 'react-native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
@@ -90,157 +90,161 @@ export default function ActivityLogScreen() {
       <StatusBar barStyle="light-content" />
       <ScreenHeader />
       
-      <ScrollView contentContainerStyle={tw`p-5 pb-32`} showsVerticalScrollIndicator={false}>
-        
-        {/* Title */}
-        <View style={tw`mb-4`}>
-          <Text style={[tw`text-[17px] text-[#032514] dark:text-slate-100 tracking-tight`, {fontFamily: 'PlusJakartaSans_800ExtraBold'}]}>Activity Log</Text>
-          <Text style={[tw`text-xs text-gray-500 dark:text-slate-400 mt-1`, {fontFamily: 'PlusJakartaSans_400Regular'}]}>Record your daily farm tasks and actions.</Text>
-        </View>
-
-        {/* Submit Form */}
-        <View style={tw`bg-white dark:bg-slate-800 rounded-3xl p-5 shadow-sm border border-gray-100 dark:border-slate-700 mb-6`}>
-          
-          <Text style={[tw`text-[11px] text-gray-500 dark:text-slate-400 uppercase tracking-widest mb-3`, {fontFamily: 'PlusJakartaSans_800ExtraBold'}]}>Action Type</Text>
-          
-          <View style={tw`flex-row flex-wrap gap-2 mb-5`}>
-            {ACTION_TYPES.map(type => (
-              <TouchableOpacity
-                key={type.id}
-                onPress={() => setSelectedAction(type.id)}
-                style={[
-                  tw`px-3 py-1.5 rounded-full border flex-row items-center gap-1.5`,
-                  selectedAction === type.id 
-                    ? { backgroundColor: type.color, borderColor: type.color } 
-                    : tw`bg-transparent border-gray-200 dark:border-slate-600`
-                ]}
-              >
-                <MaterialCommunityIcons name={type.icon as any} size={14} color={selectedAction === type.id ? 'white' : (isDarkMode ? '#94a3b8' : '#64748b')} />
-                <Text style={[tw`text-[11px]`, selectedAction === type.id ? tw`text-white font-bold` : tw`text-gray-500 dark:text-slate-400`]}>{type.label}</Text>
-              </TouchableOpacity>
-            ))}
-          </View>
-
-          <Text style={[tw`text-[11px] text-gray-500 dark:text-slate-400 uppercase tracking-widest mb-2`, {fontFamily: 'PlusJakartaSans_800ExtraBold'}]}>Description</Text>
-          <TextInput
-            style={[tw`bg-gray-50 dark:bg-slate-900 border border-gray-200 dark:border-slate-700 rounded-xl px-4 py-3 text-sm text-gray-900 dark:text-white mb-4`, {fontFamily: 'PlusJakartaSans_500Medium', minHeight: 80}]}
-            placeholder="What did you do?"
-            placeholderTextColor={tw.color('gray-400')}
-            multiline
-            value={description}
-            onChangeText={setDescription}
-            textAlignVertical="top"
-          />
-
-          <Text style={[tw`text-[11px] text-gray-500 dark:text-slate-400 uppercase tracking-widest mb-2`, {fontFamily: 'PlusJakartaSans_800ExtraBold'}]}>Related Rack</Text>
-          <TouchableOpacity 
-            onPress={() => setShowRackPicker(!showRackPicker)}
-            style={tw`bg-gray-50 dark:bg-slate-900 border border-gray-200 dark:border-slate-700 rounded-xl px-4 py-3 flex-row justify-between items-center mb-6`}
-          >
-            <Text style={[tw`text-sm`, selectedRackId ? tw`text-gray-900 dark:text-white` : tw`text-gray-400`, {fontFamily: 'PlusJakartaSans_500Medium'}]}>
-              {selectedRackName}
-            </Text>
-            <MaterialCommunityIcons name="chevron-down" size={20} color={tw.color('gray-400')} />
-          </TouchableOpacity>
-
-          {showRackPicker && (
-            <View style={tw`bg-gray-50 dark:bg-slate-900 border border-gray-200 dark:border-slate-700 rounded-xl mb-6 overflow-hidden mt-[-16px]`}>
-              <TouchableOpacity
-                style={tw`p-3 border-b border-gray-200 dark:border-slate-700`}
-                onPress={() => { setSelectedRackId(''); setShowRackPicker(false); }}
-              >
-                <Text style={tw`text-sm text-gray-500 dark:text-slate-400`}>None</Text>
-              </TouchableOpacity>
-              {activeRacks.map(rack => (
-                <TouchableOpacity
-                  key={String(rack.firebaseKey)}
-                  style={tw`p-3 border-b border-gray-200 dark:border-slate-700`}
-                  onPress={() => { setSelectedRackId(String(rack.firebaseKey)); setShowRackPicker(false); }}
-                >
-                  <Text style={tw`text-sm text-gray-900 dark:text-white`}>{rack.rack || 'Unnamed Rack'}</Text>
-                </TouchableOpacity>
-              ))}
+      <FlatList
+        data={myLogs}
+        keyExtractor={(item) => item.id}
+        contentContainerStyle={tw`p-5 pb-36`}
+        showsVerticalScrollIndicator={false}
+        ListHeaderComponent={
+          <>
+            {/* Title */}
+            <View style={tw`mb-4`}>
+              <Text style={[tw`text-[17px] text-[#032514] dark:text-slate-100 tracking-tight`, {fontFamily: 'PlusJakartaSans_800ExtraBold'}]}>Activity Log</Text>
+              <Text style={[tw`text-xs text-gray-500 dark:text-slate-400 mt-1`, {fontFamily: 'PlusJakartaSans_400Regular'}]}>Record your daily farm tasks and actions.</Text>
             </View>
-          )}
 
-          <TouchableOpacity 
-            style={tw`bg-[#166534] dark:bg-emerald-600 rounded-xl py-3.5 items-center justify-center flex-row shadow-sm ${isSubmitting ? 'opacity-70' : ''}`}
-            onPress={handleSubmit}
-            disabled={isSubmitting}
-          >
-            {isSubmitting ? (
-              <ActivityIndicator color="white" size="small" style={tw`mr-2`} />
-            ) : (
-              <MaterialCommunityIcons name="send-outline" size={18} color="white" style={tw`mr-2`} />
-            )}
-            <Text style={[tw`text-white text-[13px]`, {fontFamily: 'PlusJakartaSans_800ExtraBold'}]}>
-              {isSubmitting ? 'Submitting...' : 'Submit Log'}
-            </Text>
-          </TouchableOpacity>
-        </View>
+            {/* Submit Form */}
+            <View style={tw`bg-white dark:bg-slate-800 rounded-3xl p-5 shadow-sm border border-gray-100 dark:border-slate-700 mb-6`}>
+              
+              <Text style={[tw`text-[11px] text-gray-500 dark:text-slate-400 uppercase tracking-widest mb-3`, {fontFamily: 'PlusJakartaSans_800ExtraBold'}]}>Action Type</Text>
+              
+              <View style={tw`flex-row flex-wrap gap-2 mb-5`}>
+                {ACTION_TYPES.map(type => (
+                  <TouchableOpacity
+                    key={type.id}
+                    onPress={() => setSelectedAction(type.id)}
+                    style={[
+                      tw`px-3 py-1.5 rounded-full border flex-row items-center gap-1.5`,
+                      selectedAction === type.id 
+                        ? { backgroundColor: type.color, borderColor: type.color } 
+                        : tw`bg-transparent border-gray-200 dark:border-slate-600`
+                    ]}
+                  >
+                    <MaterialCommunityIcons name={type.icon as any} size={14} color={selectedAction === type.id ? 'white' : (isDarkMode ? '#94a3b8' : '#64748b')} />
+                    <Text style={[tw`text-[11px]`, selectedAction === type.id ? tw`text-white font-bold` : tw`text-gray-500 dark:text-slate-400`]}>{type.label}</Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
 
-        {/* Recent Activity */}
-        <View style={tw`flex-row justify-between items-center mb-4`}>
-          <Text style={[tw`text-[15px] text-[#032514] dark:text-slate-200 tracking-tight`, {fontFamily: 'PlusJakartaSans_800ExtraBold'}]}>Recent Logs</Text>
-          <TouchableOpacity onPress={() => navigation.navigate('MyActivityHistory' as never)}>
-            <Text style={[tw`text-[11px] text-emerald-600 dark:text-emerald-400`, {fontFamily: 'PlusJakartaSans_700Bold'}]}>View All</Text>
-          </TouchableOpacity>
-        </View>
+              <Text style={[tw`text-[11px] text-gray-500 dark:text-slate-400 uppercase tracking-widest mb-2`, {fontFamily: 'PlusJakartaSans_800ExtraBold'}]}>Description</Text>
+              <TextInput
+                style={[tw`bg-gray-50 dark:bg-slate-900 border border-gray-200 dark:border-slate-700 rounded-xl px-4 py-3 text-sm text-gray-900 dark:text-white mb-4`, {fontFamily: 'PlusJakartaSans_500Medium', minHeight: 80}]}
+                placeholder="What did you do?"
+                placeholderTextColor={tw.color('gray-400')}
+                multiline
+                value={description}
+                onChangeText={setDescription}
+                textAlignVertical="top"
+              />
 
-        {myLogs.length === 0 ? (
+              <Text style={[tw`text-[11px] text-gray-500 dark:text-slate-400 uppercase tracking-widest mb-2`, {fontFamily: 'PlusJakartaSans_800ExtraBold'}]}>Related Rack</Text>
+              <TouchableOpacity 
+                onPress={() => setShowRackPicker(!showRackPicker)}
+                style={tw`bg-gray-50 dark:bg-slate-900 border border-gray-200 dark:border-slate-700 rounded-xl px-4 py-3 flex-row justify-between items-center mb-6`}
+              >
+                <Text style={[tw`text-sm`, selectedRackId ? tw`text-gray-900 dark:text-white` : tw`text-gray-400`, {fontFamily: 'PlusJakartaSans_500Medium'}]}>
+                  {selectedRackName}
+                </Text>
+                <MaterialCommunityIcons name="chevron-down" size={20} color={tw.color('gray-400')} />
+              </TouchableOpacity>
+
+              {showRackPicker && (
+                <View style={tw`bg-gray-50 dark:bg-slate-900 border border-gray-200 dark:border-slate-700 rounded-xl mb-6 overflow-hidden mt-[-16px]`}>
+                  <TouchableOpacity
+                    style={tw`p-3 border-b border-gray-200 dark:border-slate-700`}
+                    onPress={() => { setSelectedRackId(''); setShowRackPicker(false); }}
+                  >
+                    <Text style={tw`text-sm text-gray-500 dark:text-slate-400`}>None</Text>
+                  </TouchableOpacity>
+                  {activeRacks.map(rack => (
+                    <TouchableOpacity
+                      key={String(rack.firebaseKey)}
+                      style={tw`p-3 border-b border-gray-200 dark:border-slate-700`}
+                      onPress={() => { setSelectedRackId(String(rack.firebaseKey)); setShowRackPicker(false); }}
+                    >
+                      <Text style={tw`text-sm text-gray-900 dark:text-white`}>{rack.rack || 'Unnamed Rack'}</Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+              )}
+
+              <TouchableOpacity 
+                style={tw`bg-[#166534] dark:bg-emerald-600 rounded-xl py-3.5 items-center justify-center flex-row shadow-sm ${isSubmitting ? 'opacity-70' : ''}`}
+                onPress={handleSubmit}
+                disabled={isSubmitting}
+              >
+                {isSubmitting ? (
+                  <ActivityIndicator color="white" size="small" style={tw`mr-2`} />
+                ) : (
+                  <MaterialCommunityIcons name="send-outline" size={18} color="white" style={tw`mr-2`} />
+                )}
+                <Text style={[tw`text-white text-[13px]`, {fontFamily: 'PlusJakartaSans_800ExtraBold'}]}>
+                  {isSubmitting ? 'Submitting...' : 'Submit Log'}
+                </Text>
+              </TouchableOpacity>
+            </View>
+
+            {/* Recent Activity */}
+            <View style={tw`flex-row justify-between items-center mb-4`}>
+              <Text style={[tw`text-[15px] text-[#032514] dark:text-slate-200 tracking-tight`, {fontFamily: 'PlusJakartaSans_800ExtraBold'}]}>Recent Logs</Text>
+              <TouchableOpacity onPress={() => navigation.navigate('MyActivityHistory' as never)}>
+                <Text style={[tw`text-[11px] text-emerald-600 dark:text-emerald-400`, {fontFamily: 'PlusJakartaSans_700Bold'}]}>View All</Text>
+              </TouchableOpacity>
+            </View>
+          </>
+        }
+        ListEmptyComponent={
           <View style={tw`bg-white dark:bg-slate-800 rounded-2xl p-6 items-center justify-center border border-gray-100 dark:border-slate-700 border-dashed`}>
             <MaterialCommunityIcons name="clipboard-text-outline" size={32} color={isDarkMode ? '#334155' : '#d1d5db'} />
             <Text style={[tw`text-sm text-gray-400 mt-2`, {fontFamily: 'PlusJakartaSans_500Medium'}]}>No recent activity logs.</Text>
           </View>
-        ) : (
-          myLogs.map(log => {
-            const actionType = ACTION_TYPES.find(t => t.id === log.action) || ACTION_TYPES[6];
-            const logDate = new Date(log.timestamp);
-            const timeString = logDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-            const dateString = logDate.toLocaleDateString();
+        }
+        renderItem={({ item: log }) => {
+          const actionType = ACTION_TYPES.find(t => t.id === log.action) || ACTION_TYPES[6];
+          const logDate = new Date(log.timestamp);
+          const timeString = logDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+          const dateString = logDate.toLocaleDateString();
 
-            return (
-              <View key={log.id} style={tw`bg-white dark:bg-slate-800 rounded-2xl p-4 shadow-sm border border-gray-100 dark:border-slate-700 mb-3`}>
-                <View style={tw`flex-row justify-between items-start mb-2`}>
-                  <View style={tw`flex-row items-center gap-2`}>
-                    <View style={[tw`w-8 h-8 rounded-full items-center justify-center`, { backgroundColor: `${actionType.color}20` }]}>
-                      <MaterialCommunityIcons name={actionType.icon as any} size={16} color={actionType.color} />
-                    </View>
-                    <View>
-                      <Text style={[tw`text-[13px] text-gray-800 dark:text-slate-200`, {fontFamily: 'PlusJakartaSans_800ExtraBold'}]}>{actionType.label}</Text>
-                      <Text style={[tw`text-[9px] text-gray-400`, {fontFamily: 'PlusJakartaSans_500Medium'}]}>{dateString} • {timeString}</Text>
-                    </View>
+          return (
+            <View style={tw`bg-white dark:bg-slate-800 rounded-2xl p-4 shadow-sm border border-gray-100 dark:border-slate-700 mb-3`}>
+              <View style={tw`flex-row justify-between items-start mb-2`}>
+                <View style={tw`flex-row items-center gap-2`}>
+                  <View style={[tw`w-8 h-8 rounded-full items-center justify-center`, { backgroundColor: `${actionType.color}20` }]}>
+                    <MaterialCommunityIcons name={actionType.icon as any} size={16} color={actionType.color} />
                   </View>
-                  <View style={tw`px-2 py-0.5 rounded border ${log.status === 'reviewed' ? 'bg-green-50 border-green-200 dark:bg-green-900/30 dark:border-green-800' : 'bg-amber-50 border-amber-200 dark:bg-amber-900/30 dark:border-amber-800'}`}>
-                    <Text style={[tw`text-[8px] uppercase tracking-widest font-bold`, log.status === 'reviewed' ? tw`text-green-600 dark:text-green-400` : tw`text-amber-600 dark:text-amber-400`]}>
-                      {log.status}
-                    </Text>
+                  <View>
+                    <Text style={[tw`text-[13px] text-gray-800 dark:text-slate-200`, {fontFamily: 'PlusJakartaSans_800ExtraBold'}]}>{actionType.label}</Text>
+                    <Text style={[tw`text-[9px] text-gray-400`, {fontFamily: 'PlusJakartaSans_500Medium'}]}>{dateString} • {timeString}</Text>
                   </View>
                 </View>
-
-                <Text style={[tw`text-[12px] text-gray-600 dark:text-slate-300 mb-2 leading-relaxed`, {fontFamily: 'PlusJakartaSans_400Regular'}]}>
-                  {log.description}
-                </Text>
-
-                {log.rackName && (
-                  <View style={tw`flex-row items-center gap-1 mb-2`}>
-                    <MaterialCommunityIcons name="bookshelf" size={12} color={tw.color('gray-400')} />
-                    <Text style={[tw`text-[10px] text-gray-500 dark:text-slate-400`, {fontFamily: 'PlusJakartaSans_700Bold'}]}>{log.rackName}</Text>
-                  </View>
-                )}
-
-                {log.status === 'reviewed' && log.adminNotes && (
-                  <View style={tw`mt-2 bg-gray-50 dark:bg-slate-900 p-3 rounded-xl border-l-2 border-emerald-500`}>
-                    <Text style={[tw`text-[9px] text-gray-400 uppercase tracking-widest mb-1 font-bold`]}>Admin Note</Text>
-                    <Text style={[tw`text-[11px] text-gray-700 dark:text-slate-300`, {fontFamily: 'PlusJakartaSans_500Medium'}]}>{log.adminNotes}</Text>
-                  </View>
-                )}
+                <View style={tw`px-2 py-0.5 rounded border ${log.status === 'reviewed' ? 'bg-green-50 border-green-200 dark:bg-green-900/30 dark:border-green-800' : 'bg-amber-50 border-amber-200 dark:bg-amber-900/30 dark:border-amber-800'}`}>
+                  <Text style={[tw`text-[8px] uppercase tracking-widest font-bold`, log.status === 'reviewed' ? tw`text-green-600 dark:text-green-400` : tw`text-amber-600 dark:text-amber-400`]}>
+                    {log.status}
+                  </Text>
+                </View>
               </View>
-            );
-          })
-        )}
 
-      </ScrollView>
+              <Text style={[tw`text-[12px] text-gray-600 dark:text-slate-300 mb-2 leading-relaxed`, {fontFamily: 'PlusJakartaSans_400Regular'}]}>
+                {log.description}
+              </Text>
+
+              {!!log.rackName && (
+                <View style={tw`flex-row items-center mt-1`}>
+                  <MaterialCommunityIcons name="server" size={10} color={isDarkMode ? '#94a3b8' : '#64748b'} />
+                  <Text style={[tw`text-[10px] text-slate-500 ml-1`, {fontFamily: 'PlusJakartaSans_600SemiBold'}]}>Rack: {log.rackName}</Text>
+                </View>
+              )}
+
+              {log.status === 'reviewed' && !!log.adminNotes && (
+                <View style={tw`mt-3 bg-emerald-50 dark:bg-emerald-900/20 p-2 rounded-lg border border-emerald-100 dark:border-emerald-800`}>
+                  <Text style={[tw`text-[10px] text-emerald-800 dark:text-emerald-400 mb-0.5`, {fontFamily: 'PlusJakartaSans_700Bold'}]}>Admin Note:</Text>
+                  <Text style={[tw`text-[11px] text-emerald-700 dark:text-emerald-300 leading-tight`, {fontFamily: 'PlusJakartaSans_400Regular'}]}>{log.adminNotes}</Text>
+                </View>
+              )}
+            </View>
+          );
+        }}
+      />
     </View>
   );
 }

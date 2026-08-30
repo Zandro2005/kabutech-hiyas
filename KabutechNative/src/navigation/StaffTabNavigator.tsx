@@ -6,10 +6,12 @@ import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { GlobalNavigationParamList } from '../types/navigation';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { View, Platform, TouchableOpacity } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import tw from '../tailwind';
 import { useTheme } from '../context/ThemeContext';
 import { useAuth } from '../context/AuthContext';
 import { useStaffTasks } from '../hooks/useFirebaseData';
+import { hapticLight } from '../utils/haptics';
 
 // Import staff screens (to be created next)
 import StaffHomeScreen from '../screens/staff/StaffHomeScreen';
@@ -39,10 +41,12 @@ export default function StaffTabNavigator() {
   const { isDarkMode } = useTheme();
   const { user } = useAuth();
   const allTasks = useStaffTasks();
+  const insets = useSafeAreaInsets();
   const pendingTasks = allTasks.filter(t => t.assignedTo === user?.uid && t.status === 'assigned').length;
 
   return (
     <Tab.Navigator
+      screenListeners={{ tabPress: () => hapticLight() }}
       screenOptions={{
         headerShown: false,
         tabBarActiveTintColor: isDarkMode ? '#6ee7b7' : (tw.color('brand-deep') || '#032514'),
@@ -51,14 +55,15 @@ export default function StaffTabNavigator() {
         tabBarLabelStyle: {
           fontSize: 10,
           fontWeight: '700',
-          marginTop: -4,
-          marginBottom: 4,
+          marginTop: 2,
+          marginBottom: 0,
           fontFamily: 'PlusJakartaSans_700Bold',
         },
         tabBarStyle: {
           backgroundColor: isDarkMode ? '#0f172a' : '#ffffff',
           borderTopWidth: 0,
-          height: Platform.OS === 'ios' ? 80 : 65,
+          height: (Platform.OS === 'ios' ? 85 : 90) + insets.bottom,
+          paddingBottom: insets.bottom > 0 ? insets.bottom : 24,
           paddingHorizontal: 8,
           paddingTop: 8,
           elevation: 0,
@@ -72,12 +77,12 @@ export default function StaffTabNavigator() {
       <Tab.Screen 
         name="Home" 
         component={StaffHomeStackNavigator} 
-        options={{ tabBarIcon: ({ color }) => <MaterialCommunityIcons name="home-outline" size={24} color={color} /> }}
+        options={{ tabBarIcon: ({ color }) => <MaterialCommunityIcons name="home-outline" size={28} color={color} /> }}
       />
       <Tab.Screen 
         name="Crop" 
         component={StaffCropScreen} 
-        options={{ tabBarLabel: 'Crop', tabBarIcon: ({ color }) => <MaterialCommunityIcons name="leaf" size={24} color={color} /> }}
+        options={{ tabBarLabel: 'Crop', tabBarIcon: ({ color }) => <MaterialCommunityIcons name="leaf" size={28} color={color} /> }}
       />
       <Tab.Screen 
         name="ActivityLog" 
@@ -101,7 +106,7 @@ export default function StaffTabNavigator() {
                     { borderWidth: 4, borderColor: isDarkMode ? '#0f172a' : '#ffffff' }
                   ]}
                 >
-                  <MaterialCommunityIcons name="clipboard-text-outline" size={30} color="white" />
+                  <MaterialCommunityIcons name="clipboard-text-outline" size={32} color="white" />
                 </TouchableOpacity>
               </View>
               {props.children}
@@ -113,7 +118,7 @@ export default function StaffTabNavigator() {
         name="Tasks" 
         component={MyTasksScreen} 
         options={{ 
-          tabBarIcon: ({ color }) => <MaterialCommunityIcons name="clipboard-check-outline" size={24} color={color} />,
+          tabBarIcon: ({ color }) => <MaterialCommunityIcons name="clipboard-check-outline" size={28} color={color} />,
           tabBarBadge: pendingTasks > 0 ? pendingTasks : undefined,
           tabBarBadgeStyle: { 
             backgroundColor: '#ef4444', 
@@ -132,7 +137,7 @@ export default function StaffTabNavigator() {
       <Tab.Screen 
         name="Yield" 
         component={StaffYieldScreen} 
-        options={{ tabBarIcon: ({ color }) => <MaterialCommunityIcons name="chart-bar" size={24} color={color} /> }}
+        options={{ tabBarIcon: ({ color }) => <MaterialCommunityIcons name="chart-bar" size={28} color={color} /> }}
       />
       <Tab.Screen 
         name="Profile" 

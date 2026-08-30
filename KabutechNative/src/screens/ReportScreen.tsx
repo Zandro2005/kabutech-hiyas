@@ -50,8 +50,8 @@ export default function ReportScreen() {
   };
 
 return (
-  <SafeAreaView style={tw`flex-1 bg-[#f0f9f4] dark:bg-[#020617]`}>
-    <ScrollView contentContainerStyle={tw`p-6 pt-2 pb-24`} showsVerticalScrollIndicator={false}>
+  <View style={tw`flex-1 bg-[#f0f9f4] dark:bg-[#020617]`}>
+    <ScrollView contentContainerStyle={tw`p-6 pt-2 pb-36`} showsVerticalScrollIndicator={false}>
 
       {/* Header */}
       <View style={tw`flex-row justify-between items-center mb-6 mt-4`}>
@@ -165,6 +165,6 @@ return (
       </View>
 
     </ScrollView>
-  </SafeAreaView>
+  </View>
 );
 }

@@ -4,7 +4,7 @@ import { showToast } from '../CustomToast';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { ref, update } from 'firebase/database';
 import { db } from '../../services/firebase';
-import { playSuccessSound } from '../../utils/SoundManager';
+import { SoundManager } from '../../utils/SoundManager';
 import ActionModal from '../ActionModal';
 import tw from '../../tailwind';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
@@ -24,33 +24,40 @@ export default function LogHarvestModal({ visible, onClose, selectedRack }: LogH
   const [showDatePicker, setShowDatePicker] = useState(false);
   const [loading, setLoading] = useState(false);
   const [showDropdown, setShowDropdown] = useState(false);
+  const [errorMsg, _setErrorMsg] = useState('');
+  const setErrorMsg = (msg: string) => {
+    if (msg) SoundManager.playError();
+    _setErrorMsg(msg);
+  };
 
   useEffect(() => {
     if (!visible) {
       setYieldGrams('');
+      setErrorMsg('');
     }
   }, [visible]);
 
   const handleSave = async () => {
     if (!selectedRack || !yieldGrams || !harvestDate) {
-      showToast({ type: 'error', text1: 'Missing Info', text2: 'Please fill out all fields.' });
+      setErrorMsg('Please fill out all fields.');
       return;
     }
 
     setLoading(true);
+    setErrorMsg('');
     try {
       const stats = getRackStats(selectedRack);
       const activeBags = stats.activeBags;
       
       if (activeBags.length === 0) {
-        showToast({ type: 'error', text1: 'Error', text2: 'No active bags in this rack to harvest.' });
+        setErrorMsg('No active bags in this rack to harvest.');
         setLoading(false);
         return;
       }
 
       const totalYield = parseFloat(yieldGrams);
       if (isNaN(totalYield) || totalYield <= 0) {
-        showToast({ type: 'error', text1: 'Error', text2: 'Please enter a valid yield amount.' });
+        setErrorMsg('Please enter a valid yield amount.');
         setLoading(false);
         return;
       }
@@ -74,13 +81,13 @@ export default function LogHarvestModal({ visible, onClose, selectedRack }: LogH
         bags: updatedBags
       });
 
-      playSuccessSound();
+      SoundManager.playSuccess();
       showToast({ type: 'success', text1: 'Success', text2: `Logged ${totalYield}g harvest across ${activeBags.length} bags.` });
       
       setYieldGrams('');
       onClose();
     } catch (error) {
-      showToast({ type: 'error', text1: 'Error', text2: 'An unexpected error occurred.' });
+      setErrorMsg('An unexpected error occurred.');
       console.error(error);
     } finally {
       setLoading(false);
@@ -100,6 +107,8 @@ export default function LogHarvestModal({ visible, onClose, selectedRack }: LogH
             keyboardType="numeric"
             value={yieldGrams}
             onChangeText={setYieldGrams}
+            returnKeyType="done"
+            onSubmitEditing={handleSave}
           />
         </View>
 
@@ -132,8 +141,12 @@ export default function LogHarvestModal({ visible, onClose, selectedRack }: LogH
           )}
         </View>
 
+        {errorMsg ? (
+          <Text style={tw`text-red-500 text-center mt-2 text-xs font-bold z-10`}>{errorMsg}</Text>
+        ) : null}
+
         {/* Actions */}
-        <View style={tw`mt-6 z-10`}>
+        <View style={tw`mt-4 z-10`} pointerEvents="box-none">
           <TouchableOpacity 
             onPress={handleSave}
             disabled={loading}
