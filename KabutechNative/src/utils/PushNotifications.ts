@@ -5,7 +5,8 @@ import { ref, update } from 'firebase/database';
 
 Notifications.setNotificationHandler({
   handleNotification: async () => ({
-    shouldShowAlert: true,
+    shouldShowBanner: true,
+    shouldShowList: true,
     shouldPlaySound: true,
     shouldSetBadge: false,
   }),
@@ -17,7 +18,7 @@ export async function registerForPushNotificationsAsync(userId: string) {
     await Notifications.setNotificationChannelAsync('default', {
       name: 'default',
       importance: Notifications.AndroidImportance.MAX,
-      vibrationPattern: [0, 250, 250, 250],
+      vibrationPattern: [0, 800, 300, 800, 300, 800], // 3 long, heavy pulses
       lightColor: '#FF231F7C',
     });
   }
@@ -61,15 +62,23 @@ export async function sendPushNotification(expoPushToken: string, title: string,
     title: title,
     body: body,
     data: data,
+    channelId: 'default',
+    priority: 'high',
   };
 
-  await fetch('https://exp.host/--/api/v2/push/send', {
-    method: 'POST',
-    headers: {
-      Accept: 'application/json',
-      'Accept-encoding': 'gzip, deflate',
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify(message),
-  });
+  try {
+    const response = await fetch('https://exp.host/--/api/v2/push/send', {
+      method: 'POST',
+      headers: {
+        Accept: 'application/json',
+        'Accept-encoding': 'gzip, deflate',
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(message),
+    });
+    const data = await response.json();
+    console.log('Push notification response:', JSON.stringify(data, null, 2));
+  } catch (error) {
+    console.error('Error sending push notification:', error);
+  }
 }

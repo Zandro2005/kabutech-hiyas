@@ -6,12 +6,13 @@ import { useNavigation } from '@react-navigation/native';
 import tw from '../../tailwind';
 import ScreenHeader from '../../components/ScreenHeader';
 import { useAuth } from '../../context/AuthContext';
-import { useBatches, useActivityLogs } from '../../hooks/useFirebaseData';
+import { useBatches, useActivityLogs, useAllUsers } from '../../hooks/useFirebaseData';
 import { ref, push, set } from 'firebase/database';
 import { db } from '../../services/firebase';
 import { showToast } from '../../components/CustomToast';
 import { ActivityLogEntry } from '../../types/firebase';
 import { useTheme } from '../../context/ThemeContext';
+import { sendPushNotification } from '../../utils/PushNotifications';
 
 const ACTION_TYPES = [
   { id: 'harvest', label: 'Harvest', icon: 'leaf', color: '#10b981' },
@@ -29,6 +30,7 @@ export default function ActivityLogScreen() {
   const { user, profile } = useAuth();
   const batches = useBatches();
   const allLogs = useActivityLogs();
+  const allUsers = useAllUsers();
 
   const [selectedAction, setSelectedAction] = useState<string>('harvest');
   const [description, setDescription] = useState('');
@@ -70,6 +72,22 @@ export default function ActivityLogScreen() {
       }
 
       await set(newLogRef, logEntry);
+      
+      // Notify admins
+      const admins = Object.values(allUsers).filter(u => u.role === 'admin' || !u.role);
+      for (const admin of admins) {
+        if (admin.pushToken) {
+          try {
+            sendPushNotification(
+              admin.pushToken,
+              'New Activity Log 📝',
+              `${profile?.name || user?.displayName || 'A staff member'} logged: ${description.trim()}`
+            );
+          } catch (e) {
+            console.log('Push error', e);
+          }
+        }
+      }
       
       showToast({ type: 'success', text1: 'Log Submitted', text2: 'Activity recorded successfully.' });
       setDescription('');

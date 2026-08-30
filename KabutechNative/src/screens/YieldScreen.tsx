@@ -158,31 +158,31 @@ export default function YieldScreen() {
           {/* Actual Yield */}
           <View style={tw`flex-1 bg-white dark:bg-slate-800 rounded-[24px] p-4 shadow-sm border border-gray-100 dark:border-slate-700`}>
             <View style={tw`flex-row justify-between items-center mb-3 flex-wrap gap-1`}>
-              <View style={tw`flex-row items-center gap-1`}>
-                <MaterialCommunityIcons name="bottle-tonic-outline" size={16} color="#166534" />
-                <Text style={[tw`text-[10px] text-gray-800 dark:text-slate-200 tracking-wide`, {fontFamily: 'PlusJakartaSans_800ExtraBold'}]}>Actual Yield</Text>
+              <View style={tw`flex-row items-center gap-1.5`}>
+                <MaterialCommunityIcons name="bottle-tonic-outline" size={18} color="#166534" />
+                <Text style={[tw`text-[11px] text-gray-800 dark:text-slate-200 tracking-wide`, {fontFamily: 'PlusJakartaSans_800ExtraBold'}]}>Actual Yield</Text>
               </View>
             </View>
             
-            <View style={tw`flex-row items-baseline mb-3`}>
-              <Text style={[tw`text-4xl text-[#032514] dark:text-emerald-400 tracking-tighter leading-none`, {fontFamily: 'PlusJakartaSans_800ExtraBold'}]}>{actualYieldKg}<Text style={tw`text-base`}>kg</Text></Text>
+            <View style={tw`flex-1 flex-row items-center justify-center mb-3`}>
+              <Text style={[tw`text-4xl text-[#032514] dark:text-emerald-400 tracking-tighter leading-none text-center`, {fontFamily: 'PlusJakartaSans_800ExtraBold'}]}>{actualYieldKg}<Text style={tw`text-base`}>kg</Text></Text>
             </View>
 
-            <View style={tw`w-full h-1.5 bg-[#e2e8f0] dark:bg-slate-700 rounded-full overflow-hidden mb-2`}>
-              <View style={[tw`h-full bg-[#166534] dark:bg-emerald-500 rounded-full`, { width: `${efficiency}%` }]} />
-            </View>
-            <View style={tw`flex-row justify-between mt-1 flex-wrap gap-1`}>
+            <View style={tw`flex-row justify-between mb-1.5 mt-auto flex-wrap gap-1`}>
               <Text style={[tw`text-[7.5px] text-gray-500 dark:text-slate-400 uppercase tracking-widest`, {fontFamily: 'PlusJakartaSans_800ExtraBold'}]}>TARGET: {targetYieldKg} KG</Text>
               <Text style={[tw`text-[7.5px] text-gray-500 dark:text-slate-400 uppercase tracking-widest`, {fontFamily: 'PlusJakartaSans_800ExtraBold'}]}>MAX: 3.0 KG</Text>
+            </View>
+            <View style={tw`w-full h-1.5 bg-[#e2e8f0] dark:bg-slate-700 rounded-full overflow-hidden`}>
+              <View style={[tw`h-full bg-[#166534] dark:bg-emerald-500 rounded-full`, { width: `${efficiency}%` }]} />
             </View>
           </View>
 
           {/* Target */}
           <View style={tw`flex-1 bg-white dark:bg-slate-800 rounded-[24px] p-4 shadow-sm border border-gray-100 dark:border-slate-700`}>
             <View style={tw`flex-row justify-between items-center mb-3 flex-wrap gap-1`}>
-              <View style={tw`flex-row items-center gap-1`}>
-                <MaterialCommunityIcons name="flag-outline" size={14} color="#166534" />
-                <Text style={[tw`text-[10px] text-gray-800 dark:text-slate-200 tracking-wide uppercase`, {fontFamily: 'PlusJakartaSans_800ExtraBold'}]}>TARGET</Text>
+              <View style={tw`flex-row items-center gap-1.5`}>
+                <MaterialCommunityIcons name="flag-outline" size={18} color="#166534" />
+                <Text style={[tw`text-[11px] text-gray-800 dark:text-slate-200 tracking-wide uppercase`, {fontFamily: 'PlusJakartaSans_800ExtraBold'}]}>TARGET</Text>
               </View>
               <TouchableOpacity hitSlop={{ top: 15, bottom: 15, left: 15, right: 15 }}  
                 style={tw`bg-gray-100 dark:bg-slate-700 px-2 py-0.5 rounded-full flex-row items-center gap-1`}
@@ -191,8 +191,8 @@ export default function YieldScreen() {
                   setTargetModalVisible(true);
                 }}
               >
-                <MaterialCommunityIcons name="pencil" size={10} color={tw.color('dark:text-slate-300') || "#334155"} />
-                <Text style={[tw`text-[8px] text-gray-600 dark:text-slate-300`, {fontFamily: 'PlusJakartaSans_800ExtraBold'}]}>Edit</Text>
+                <MaterialCommunityIcons name="pencil" size={12} color={tw.color('dark:text-slate-300') || "#334155"} />
+                <Text style={[tw`text-[10px] text-gray-600 dark:text-slate-300`, {fontFamily: 'PlusJakartaSans_800ExtraBold'}]}>Edit</Text>
               </TouchableOpacity>
             </View>
 

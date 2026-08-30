@@ -3,7 +3,8 @@ import { View, Text, ScrollView, TouchableOpacity, Alert, StatusBar } from 'reac
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useAuth } from '../context/AuthContext';
 import { signOut } from 'firebase/auth';
-import { auth } from '../services/firebase';
+import { auth, db } from '../services/firebase';
+import { ref, update } from 'firebase/database';
 import { useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { GlobalNavigationParamList } from '../types/navigation';
@@ -56,6 +57,9 @@ export default function ProfileScreen() {
   
   const handleLogout = async () => {
     try {
+      if (user?.uid) {
+        await update(ref(db, `kabutech/users/${user.uid}`), { pushToken: null });
+      }
       await signOut(auth);
     } catch (error) {
       console.error("Error signing out: ", error);

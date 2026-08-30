@@ -53,8 +53,13 @@ export default function StaffApprovalsScreen() {
       <StatusBar barStyle="light-content" />
       
       {/* Header */}
-      <View style={tw`flex-row items-center p-4 border-b border-gray-200 dark:border-slate-800 bg-white dark:bg-slate-900`}>
-        <TouchableOpacity hitSlop={{ top: 15, bottom: 15, left: 15, right: 15 }}  onPress={() => navigation.goBack()} style={tw`mr-3 p-1`}>
+      <View style={tw`flex-row items-center px-4 pb-4 pt-12 border-b border-gray-200 dark:border-slate-800 bg-white dark:bg-slate-900`}>
+        <TouchableOpacity 
+          activeOpacity={0.6}
+          hitSlop={{ top: 20, bottom: 20, left: 20, right: 20 }}  
+          onPress={() => navigation.goBack()} 
+          style={tw`mr-3 p-2 -ml-2 rounded-full`}
+        >
           <MaterialCommunityIcons name="arrow-left" size={24} color={isDarkMode ? '#f8fafc' : '#0f172a'} />
         </TouchableOpacity>
         <Text style={[tw`text-lg text-slate-900 dark:text-white`, {fontFamily: 'PlusJakartaSans_800ExtraBold'}]}>Staff Approvals</Text>
