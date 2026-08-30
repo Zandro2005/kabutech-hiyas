@@ -63,7 +63,7 @@ export default function StaffProfileScreen() {
               <Text style={tw`text-[9px] font-extrabold text-emerald-600 dark:text-emerald-400 uppercase tracking-widest`}>{role}</Text>
             </View>
           </View>
-          <TouchableOpacity 
+          <TouchableOpacity hitSlop={{ top: 15, bottom: 15, left: 15, right: 15 }}  
             onPress={handleLogout}
             style={tw`bg-red-50 dark:bg-red-900/30 p-2 rounded-full`}
           >
@@ -73,7 +73,7 @@ export default function StaffProfileScreen() {
 
         {/* Staff-Specific Links */}
 
-        <TouchableOpacity 
+        <TouchableOpacity hitSlop={{ top: 15, bottom: 15, left: 15, right: 15 }}  
           onPress={() => navigation.navigate('MyActivityHistory' as never)}
           style={tw`bg-white dark:bg-slate-800 rounded-2xl p-4 border border-gray-100 dark:border-slate-700 shadow-sm flex-row items-center justify-between mb-3 active:scale-95`}
         >

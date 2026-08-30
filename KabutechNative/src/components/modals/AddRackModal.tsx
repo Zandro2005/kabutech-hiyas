@@ -87,9 +87,9 @@ export default function AddRackModal({ visible, onClose, racks }: AddRackModalPr
         <View style={tw`z-10`}>
           <Text style={tw`text-[10px] font-bold text-gray-500 uppercase tracking-wider mb-1.5`}>RACK NAME / LABEL</Text>
           <TextInput
-            style={tw`bg-[#f4fbf7] border border-green-100 rounded-xl px-4 py-3.5 text-gray-900 font-semibold`}
+            style={tw`bg-[#f4fbf7] dark:bg-slate-700 border border-green-100 dark:border-slate-600 rounded-xl px-4 py-3.5 text-gray-900 dark:text-white font-semibold`}
             placeholder="e.g. Rack A"
-            placeholderTextColor="#9ca3af"
+            placeholderTextColor={tw.color('dark:text-slate-400') || "#9ca3af"}
             value={rackName}
             onChangeText={setRackName}
             returnKeyType="next"
@@ -104,9 +104,9 @@ export default function AddRackModal({ visible, onClose, racks }: AddRackModalPr
             <Text style={tw`text-[10px] font-bold text-gray-500 uppercase tracking-wider mb-1.5`}>NO. OF SLOTS</Text>
             <TextInput
               ref={slotsRef}
-              style={tw`bg-[#f4fbf7] border border-green-100 rounded-xl px-4 py-3.5 text-gray-900 font-semibold`}
+              style={tw`bg-[#f4fbf7] dark:bg-slate-700 border border-green-100 dark:border-slate-600 rounded-xl px-4 py-3.5 text-gray-900 dark:text-white font-semibold`}
               placeholder="20"
-              placeholderTextColor="#9ca3af"
+              placeholderTextColor={tw.color('dark:text-slate-400') || "#9ca3af"}
               keyboardType="numeric"
               value={slotsCount}
               onChangeText={setSlotsCount}
@@ -116,26 +116,26 @@ export default function AddRackModal({ visible, onClose, racks }: AddRackModalPr
           </View>
           <View style={tw`flex-1 z-50`}>
             <Text style={tw`text-[10px] font-bold text-gray-500 uppercase tracking-wider mb-1.5`}>SUBSTRATE</Text>
-            <TouchableOpacity 
+            <TouchableOpacity hitSlop={{ top: 15, bottom: 15, left: 15, right: 15 }}  
               onPress={() => setShowDropdown(!showDropdown)}
-              style={tw`bg-[#f4fbf7] border border-green-100 rounded-xl px-4 py-3.5 flex-row justify-between items-center`}
+              style={tw`bg-[#f4fbf7] dark:bg-slate-700 border border-green-100 dark:border-slate-600 rounded-xl px-4 py-3.5 flex-row justify-between items-center`}
             >
-              <Text style={tw`text-gray-900 font-semibold text-xs`} numberOfLines={1}>{substrate}</Text>
-              <MaterialCommunityIcons name={showDropdown ? "chevron-up" : "chevron-down"} size={16} color="#166534" />
+              <Text style={tw`text-gray-900 dark:text-white font-semibold text-xs`} numberOfLines={1}>{substrate}</Text>
+              <MaterialCommunityIcons name={showDropdown ? "chevron-up" : "chevron-down"} size={16} color={tw.color('dark:text-slate-300') || "#166534"} />
             </TouchableOpacity>
             
             {showDropdown && (
-              <View style={tw`absolute top-16 left-0 right-0 bg-white border border-gray-100 rounded-xl shadow-lg overflow-hidden z-50`}>
+              <View style={tw`absolute top-16 left-0 right-0 bg-white dark:bg-slate-800 border border-gray-100 dark:border-slate-700 rounded-xl shadow-lg overflow-hidden z-50`}>
                 {['Sawdust + Bran', 'Straw Mix', 'Coco Coir'].map((sub) => (
-                  <TouchableOpacity
+                  <TouchableOpacity hitSlop={{ top: 15, bottom: 15, left: 15, right: 15 }} 
                     key={sub}
-                    style={tw`px-4 py-3 border-b border-gray-50`}
+                    style={tw`px-4 py-3 border-b border-gray-50 dark:border-slate-700`}
                     onPress={() => {
                       setSubstrate(sub);
                       setShowDropdown(false);
                     }}
                   >
-                    <Text style={tw`text-gray-800 font-semibold text-xs`}>{sub}</Text>
+                    <Text style={tw`text-gray-800 dark:text-slate-200 font-semibold text-xs`}>{sub}</Text>
                   </TouchableOpacity>
                 ))}
               </View>
@@ -146,14 +146,14 @@ export default function AddRackModal({ visible, onClose, racks }: AddRackModalPr
         {/* Date Set Up */}
         <View style={tw`z-10 mt-4`}>
           <Text style={tw`text-[10px] font-bold text-gray-500 uppercase tracking-wider mb-1.5`}>DATE SET UP</Text>
-          <TouchableOpacity 
+          <TouchableOpacity hitSlop={{ top: 15, bottom: 15, left: 15, right: 15 }}  
             onPress={() => setShowDatePicker(true)}
-            style={tw`flex-row items-center justify-between bg-[#f4fbf7] border border-green-100 rounded-xl px-4 py-3.5`}
+            style={tw`flex-row items-center justify-between bg-[#f4fbf7] dark:bg-slate-700 border border-green-100 dark:border-slate-600 rounded-xl px-4 py-3.5`}
           >
-            <Text style={tw`text-gray-900 font-semibold`}>
+            <Text style={tw`text-gray-900 dark:text-white font-semibold`}>
               {setupDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
             </Text>
-            <MaterialCommunityIcons name="calendar" size={18} color="#166534" />
+            <MaterialCommunityIcons name="calendar" size={18} color={tw.color('dark:text-slate-300') || "#166534"} />
           </TouchableOpacity>
           
           {showDatePicker && (
@@ -174,10 +174,10 @@ export default function AddRackModal({ visible, onClose, racks }: AddRackModalPr
 
         {/* Actions */}
         <View style={tw`mt-6 z-10`}>
-          <TouchableOpacity 
+          <TouchableOpacity hitSlop={{ top: 15, bottom: 15, left: 15, right: 15 }}  
             onPress={handleSave}
             disabled={loading}
-            style={tw`w-full bg-[#032514] rounded-xl py-3.5 items-center`}
+            style={tw`w-full bg-[#032514] dark:bg-emerald-600 rounded-xl py-3.5 items-center`}
           >
             <Text style={[tw`text-white text-[13px]`, {fontFamily: 'PlusJakartaSans_800ExtraBold'}]}>
               {loading ? 'Saving...' : 'Add Rack'}

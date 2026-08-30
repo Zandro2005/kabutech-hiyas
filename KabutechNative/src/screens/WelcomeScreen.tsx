@@ -29,7 +29,7 @@ export default function WelcomeScreen() {
 
           {/* Buttons Area */}
           <View style={tw`w-full gap-4`}>
-            <TouchableOpacity
+            <TouchableOpacity hitSlop={{ top: 15, bottom: 15, left: 15, right: 15 }} 
               onPress={() => navigation.navigate('Register')}
               style={tw`w-full bg-white py-4 rounded-full items-center shadow-lg`}
               activeOpacity={0.8}
@@ -39,7 +39,7 @@ export default function WelcomeScreen() {
               </Text>
             </TouchableOpacity>
 
-            <TouchableOpacity
+            <TouchableOpacity hitSlop={{ top: 15, bottom: 15, left: 15, right: 15 }} 
               onPress={() => navigation.navigate('Login')}
               style={tw`w-full bg-[#3d8c63]/90 border border-white/20 py-4 rounded-full items-center shadow-lg`}
               activeOpacity={0.8}

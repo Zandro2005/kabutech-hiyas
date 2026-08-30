@@ -114,7 +114,7 @@ export default function HelpModal({ visible, onClose, onItemPress }: HelpModalPr
       animationType="fade"
       onRequestClose={slideOutAndClose}
     >
-      <TouchableOpacity activeOpacity={1} style={tw`flex-1 justify-end bg-black/60`} onPress={slideOutAndClose}>
+      <TouchableOpacity hitSlop={{ top: 15, bottom: 15, left: 15, right: 15 }}  activeOpacity={1} style={tw`flex-1 justify-end bg-black/60`} onPress={slideOutAndClose}>
         <Animated.View 
           {...panResponder.panHandlers}
           onStartShouldSetResponder={() => true}
@@ -145,7 +145,7 @@ export default function HelpModal({ visible, onClose, onItemPress }: HelpModalPr
               {/* Content Section */}
               <View style={tw`p-4 pt-4`}>
                 {menuItems.map((item, index) => (
-                  <TouchableOpacity 
+                  <TouchableOpacity hitSlop={{ top: 15, bottom: 15, left: 15, right: 15 }}  
                     key={index}
                     onPress={() => onItemPress(item.id)}
                     style={tw`flex-row items-center justify-between p-3 mb-2 border border-gray-100 dark:border-slate-800 rounded-2xl bg-white dark:bg-slate-800 shadow-sm`}

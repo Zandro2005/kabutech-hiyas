@@ -54,7 +54,7 @@ export default function StaffApprovalsScreen() {
       
       {/* Header */}
       <View style={tw`flex-row items-center p-4 border-b border-gray-200 dark:border-slate-800 bg-white dark:bg-slate-900`}>
-        <TouchableOpacity onPress={() => navigation.goBack()} style={tw`mr-3 p-1`}>
+        <TouchableOpacity hitSlop={{ top: 15, bottom: 15, left: 15, right: 15 }}  onPress={() => navigation.goBack()} style={tw`mr-3 p-1`}>
           <MaterialCommunityIcons name="arrow-left" size={24} color={isDarkMode ? '#f8fafc' : '#0f172a'} />
         </TouchableOpacity>
         <Text style={[tw`text-lg text-slate-900 dark:text-white`, {fontFamily: 'PlusJakartaSans_800ExtraBold'}]}>Staff Approvals</Text>
@@ -62,7 +62,7 @@ export default function StaffApprovalsScreen() {
 
       {/* Tabs */}
       <View style={tw`flex-row bg-white dark:bg-slate-900 border-b border-gray-200 dark:border-slate-800`}>
-        <TouchableOpacity 
+        <TouchableOpacity hitSlop={{ top: 15, bottom: 15, left: 15, right: 15 }}  
           onPress={() => setFilter('pending')}
           style={[tw`flex-1 py-3 items-center border-b-2`, filter === 'pending' ? tw`border-emerald-500` : tw`border-transparent`]}
         >
@@ -70,7 +70,7 @@ export default function StaffApprovalsScreen() {
             Pending ({pendingStaff.length})
           </Text>
         </TouchableOpacity>
-        <TouchableOpacity 
+        <TouchableOpacity hitSlop={{ top: 15, bottom: 15, left: 15, right: 15 }}  
           onPress={() => setFilter('approved')}
           style={[tw`flex-1 py-3 items-center border-b-2`, filter === 'approved' ? tw`border-emerald-500` : tw`border-transparent`]}
         >
@@ -78,7 +78,7 @@ export default function StaffApprovalsScreen() {
             Approved ({approvedStaff.length})
           </Text>
         </TouchableOpacity>
-        <TouchableOpacity 
+        <TouchableOpacity hitSlop={{ top: 15, bottom: 15, left: 15, right: 15 }}  
           onPress={() => setFilter('declined')}
           style={[tw`flex-1 py-3 items-center border-b-2`, filter === 'declined' ? tw`border-emerald-500` : tw`border-transparent`]}
         >
@@ -117,14 +117,14 @@ export default function StaffApprovalsScreen() {
 
                 {filter === 'pending' && (
                   <View style={tw`flex-row gap-2`}>
-                    <TouchableOpacity 
+                    <TouchableOpacity hitSlop={{ top: 15, bottom: 15, left: 15, right: 15 }}  
                       onPress={() => handleUpdateStatus(staff.uid, false)}
                       disabled={isSubmitting === staff.uid}
                       style={tw`bg-red-50 dark:bg-red-900/30 border border-red-200 dark:border-red-800 rounded-xl px-3 py-2.5 items-center justify-center shadow-sm ${isSubmitting === staff.uid ? 'opacity-70' : ''}`}
                     >
                       <MaterialCommunityIcons name="close" size={16} color={tw.color('red-600')} />
                     </TouchableOpacity>
-                    <TouchableOpacity 
+                    <TouchableOpacity hitSlop={{ top: 15, bottom: 15, left: 15, right: 15 }}  
                       onPress={() => handleUpdateStatus(staff.uid, true)}
                       disabled={isSubmitting === staff.uid}
                       style={tw`bg-[#166534] dark:bg-emerald-600 rounded-xl px-4 py-2.5 items-center justify-center shadow-sm ${isSubmitting === staff.uid ? 'opacity-70' : ''}`}
@@ -137,7 +137,7 @@ export default function StaffApprovalsScreen() {
                 )}
 
                 {filter === 'declined' && (
-                  <TouchableOpacity 
+                  <TouchableOpacity hitSlop={{ top: 15, bottom: 15, left: 15, right: 15 }}  
                     onPress={() => handleUpdateStatus(staff.uid, true)}
                     disabled={isSubmitting === staff.uid}
                     style={tw`bg-gray-100 dark:bg-slate-700 rounded-xl px-3 py-2 items-center justify-center flex-row shadow-sm ${isSubmitting === staff.uid ? 'opacity-70' : ''}`}
@@ -150,7 +150,7 @@ export default function StaffApprovalsScreen() {
                 )}
 
                 {filter === 'approved' && (
-                  <TouchableOpacity 
+                  <TouchableOpacity hitSlop={{ top: 15, bottom: 15, left: 15, right: 15 }}  
                     onPress={() => handleUpdateStatus(staff.uid, false)}
                     disabled={isSubmitting === staff.uid}
                     style={tw`bg-gray-100 dark:bg-slate-700 rounded-xl px-3 py-2 items-center justify-center flex-row shadow-sm ${isSubmitting === staff.uid ? 'opacity-70' : ''}`}

@@ -55,7 +55,7 @@ return (
 
       {/* Header */}
       <View style={tw`flex-row justify-between items-center mb-6 mt-4`}>
-        <TouchableOpacity
+        <TouchableOpacity hitSlop={{ top: 15, bottom: 15, left: 15, right: 15 }} 
           onPress={() => navigation.goBack()}
           style={tw`w-10 h-10 rounded-full bg-white items-center justify-center shadow-sm border border-gray-100 mr-3`}
         >
@@ -99,7 +99,7 @@ return (
               <Text style={tw`text-sm font-bold text-slate-800 dark:text-slate-100 mb-2`}>Temp Anomaly</Text>
               <Text style={tw`text-xs text-slate-500 dark:text-slate-400 leading-tight mb-5 text-justify`} numberOfLines={3}>Temp dropped to 21°C. Target is 24°C.</Text>
             </View>
-            <TouchableOpacity
+            <TouchableOpacity hitSlop={{ top: 15, bottom: 15, left: 15, right: 15 }} 
               onPress={() => overrideDevice('fans', 'Heating fans')}
               style={tw`bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-600 w-full py-2.5 rounded-xl flex-row items-center justify-center gap-1.5 shadow-sm active:bg-gray-50 dark:active:bg-slate-700`}
             >
@@ -117,7 +117,7 @@ return (
               <Text style={tw`text-sm font-bold text-slate-800 dark:text-slate-100 mb-2`}>Dry Substrate</Text>
               <Text style={tw`text-xs text-slate-500 dark:text-slate-400 leading-tight mb-5 text-justify`} numberOfLines={3}>Low humidity detected. Misting required.</Text>
             </View>
-            <TouchableOpacity
+            <TouchableOpacity hitSlop={{ top: 15, bottom: 15, left: 15, right: 15 }} 
               onPress={() => overrideDevice('misters', 'Misters')}
               style={tw`bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-600 w-full py-2.5 rounded-xl flex-row items-center justify-center gap-1.5 shadow-sm active:bg-gray-50 dark:active:bg-slate-700`}
             >
@@ -135,7 +135,7 @@ return (
               <Text style={tw`text-sm font-bold text-slate-800 dark:text-slate-100 mb-2`}>Light Cycle</Text>
               <Text style={tw`text-xs text-slate-500 dark:text-slate-400 leading-tight mb-5 text-justify`} numberOfLines={3}>Pinning detected. Increase light to 12h.</Text>
             </View>
-            <TouchableOpacity
+            <TouchableOpacity hitSlop={{ top: 15, bottom: 15, left: 15, right: 15 }} 
               onPress={() => overrideDevice('lights', 'Grow lights')}
               style={tw`bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-600 w-full py-2.5 rounded-xl flex-row items-center justify-center gap-1.5 shadow-sm active:bg-gray-50 dark:active:bg-slate-700`}
             >
@@ -153,7 +153,7 @@ return (
               <Text style={tw`text-sm font-bold text-slate-800 dark:text-slate-100 mb-2`}>CO2 Spike</Text>
               <Text style={tw`text-xs text-slate-500 dark:text-slate-400 leading-tight mb-5 text-justify`} numberOfLines={3}>CO2 near 1000ppm. Flush air needed.</Text>
             </View>
-            <TouchableOpacity
+            <TouchableOpacity hitSlop={{ top: 15, bottom: 15, left: 15, right: 15 }} 
               onPress={() => overrideDevice('co2', 'Ventilation system')}
               style={tw`bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-600 w-full py-2.5 rounded-xl flex-row items-center justify-center gap-1.5 shadow-sm active:bg-gray-50 dark:active:bg-slate-700`}
             >

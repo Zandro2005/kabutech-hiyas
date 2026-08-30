@@ -1,4 +1,4 @@
-import { createAudioPlayer, AudioSource } from 'expo-audio';
+import { createAudioPlayer, AudioSource, setAudioModeAsync } from 'expo-audio';
 import { VolumeManager } from 'react-native-volume-manager';
 
 // Preload sound sources for instant playback
@@ -11,6 +11,11 @@ class SoundManagerClass {
 
   async init() {
     try {
+      await setAudioModeAsync({
+        playsInSilentMode: true,
+        interruptionMode: 'mixWithOthers',
+        shouldPlayInBackground: true
+      });
       this.successPlayer = createAudioPlayer(successSource);
       this.errorPlayer = createAudioPlayer(errorSource);
     } catch (e) {

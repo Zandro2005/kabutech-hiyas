@@ -182,27 +182,28 @@ export default function DeviceSchedulesScreen() {
   const renderWindow = (w: TimeWindow, index: number, device: 'fans' | 'lights') => {
     return (
       <View key={w.id} style={tw`flex-row items-center gap-3 mb-3`}>
-        <View style={tw`flex-1 bg-gray-50 dark:bg-slate-700/50 border border-gray-100 dark:border-slate-600 rounded-[16px] p-1 flex-row`}>
-          <TouchableOpacity 
+        <View style={tw`flex-1 bg-gray-50/80 dark:bg-slate-900/50 rounded-2xl p-1 flex-row border border-gray-100/50 dark:border-slate-800/80`}>
+          <TouchableOpacity hitSlop={{ top: 15, bottom: 15, left: 15, right: 15 }}  
             onPress={() => openPicker(device, w.id, 'startTime', w.startTime)}
-            style={tw`flex-1 py-2 items-center border-r border-gray-100 dark:border-slate-600 active:bg-gray-100 dark:active:bg-slate-700 rounded-l-[16px]`}
+            style={tw`flex-1 py-2 items-center active:bg-gray-200/50 dark:active:bg-slate-800 rounded-[14px]`}
           >
-            <Text style={[tw`text-[10px] text-gray-400 dark:text-slate-400 uppercase`, {fontFamily: 'PlusJakartaSans_800ExtraBold'}]}>On At</Text>
-            <Text style={[tw`text-[14px] text-slate-800 dark:text-slate-100 mt-0.5`, {fontFamily: 'PlusJakartaSans_800ExtraBold'}]}>{formatTime(w.startTime)}</Text>
+            <Text style={[tw`text-[9px] text-gray-400 dark:text-slate-500 uppercase tracking-widest`, {fontFamily: 'PlusJakartaSans_800ExtraBold'}]}>Turn On</Text>
+            <Text style={[tw`text-[15px] text-slate-800 dark:text-slate-100 mt-0.5`, {fontFamily: 'PlusJakartaSans_800ExtraBold'}]}>{formatTime(w.startTime)}</Text>
           </TouchableOpacity>
-          <TouchableOpacity 
+          <View style={tw`w-[1px] bg-gray-200 dark:bg-slate-800 my-2`} />
+          <TouchableOpacity hitSlop={{ top: 15, bottom: 15, left: 15, right: 15 }}  
             onPress={() => openPicker(device, w.id, 'endTime', w.endTime)}
-            style={tw`flex-1 py-2 items-center active:bg-gray-100 dark:active:bg-slate-700 rounded-r-[16px]`}
+            style={tw`flex-1 py-2 items-center active:bg-gray-200/50 dark:active:bg-slate-800 rounded-[14px]`}
           >
-            <Text style={[tw`text-[10px] text-gray-400 dark:text-slate-400 uppercase`, {fontFamily: 'PlusJakartaSans_800ExtraBold'}]}>Off At</Text>
-            <Text style={[tw`text-[14px] text-slate-800 dark:text-slate-100 mt-0.5`, {fontFamily: 'PlusJakartaSans_800ExtraBold'}]}>{formatTime(w.endTime)}</Text>
+            <Text style={[tw`text-[9px] text-gray-400 dark:text-slate-500 uppercase tracking-widest`, {fontFamily: 'PlusJakartaSans_800ExtraBold'}]}>Turn Off</Text>
+            <Text style={[tw`text-[15px] text-slate-800 dark:text-slate-100 mt-0.5`, {fontFamily: 'PlusJakartaSans_800ExtraBold'}]}>{formatTime(w.endTime)}</Text>
           </TouchableOpacity>
         </View>
-        <TouchableOpacity 
+        <TouchableOpacity hitSlop={{ top: 15, bottom: 15, left: 15, right: 15 }}  
           onPress={() => removeWindow(device, w.id)}
-          style={tw`w-12 h-12 bg-red-50 dark:bg-red-900/30 rounded-[16px] items-center justify-center border border-red-100 dark:border-red-800/50`}
+          style={tw`w-12 h-12 bg-red-50/50 dark:bg-red-900/20 rounded-2xl items-center justify-center`}
         >
-          <MaterialCommunityIcons name="trash-can-outline" size={20} color={isDarkMode ? '#f87171' : '#ef4444'} />
+          <MaterialCommunityIcons name="trash-can-outline" size={20} color={isDarkMode ? '#ef4444' : '#ef4444'} />
         </TouchableOpacity>
       </View>
     );
@@ -213,20 +214,17 @@ export default function DeviceSchedulesScreen() {
       <StatusBar barStyle="light-content" />
       
       {/* Top Header - Modernized */}
-      <View style={[tw`bg-[#166534] pb-6 px-5 z-10 shadow-sm relative overflow-hidden`, { paddingTop: insets.top > 0 ? insets.top + 10 : 30 }]}>
-        <View style={tw`absolute -top-20 -right-20 w-56 h-56 bg-white/5 rounded-full`} />
-        <View style={tw`absolute top-10 -left-10 w-32 h-32 bg-white/5 rounded-full`} />
-
-        <View style={tw`flex-row items-center gap-3`}>
-          <TouchableOpacity 
+      <View style={[tw`px-5 pb-4 z-10`, { paddingTop: insets.top > 0 ? insets.top + 10 : 30 }]}>
+        <View style={tw`flex-row items-center gap-4`}>
+          <TouchableOpacity hitSlop={{ top: 15, bottom: 15, left: 15, right: 15 }}  
             onPress={() => navigation.goBack()}
-            style={tw`w-10 h-10 rounded-full bg-white/20 items-center justify-center`}
+            style={tw`w-10 h-10 rounded-full bg-white dark:bg-slate-800 items-center justify-center shadow-sm border border-gray-100 dark:border-slate-700`}
           >
-            <MaterialCommunityIcons name="arrow-left" size={22} color="white" />
+            <MaterialCommunityIcons name="arrow-left" size={20} color={isDarkMode ? '#f8fafc' : '#0f172a'} />
           </TouchableOpacity>
           <View>
-            <Text style={[tw`text-2xl text-white tracking-tight leading-none`, {fontFamily: 'PlusJakartaSans_800ExtraBold'}]}>Device Schedules</Text>
-            <Text style={[tw`text-[11px] text-[#bbf7d0] mt-1 opacity-90`, {fontFamily: 'PlusJakartaSans_700Bold'}]}>Configure automatic operating windows</Text>
+            <Text style={[tw`text-2xl text-slate-800 dark:text-slate-100 tracking-tight leading-none`, {fontFamily: 'PlusJakartaSans_800ExtraBold'}]}>Device Schedules</Text>
+            <Text style={[tw`text-[12px] text-gray-500 dark:text-slate-400 mt-1`, {fontFamily: 'PlusJakartaSans_500Medium'}]}>Configure automatic operating windows</Text>
           </View>
         </View>
       </View>
@@ -234,8 +232,8 @@ export default function DeviceSchedulesScreen() {
       <ScrollView contentContainerStyle={tw`p-4 pb-36`} showsVerticalScrollIndicator={false}>
         
         {/* ================= MISTERS ================= */}
-        <Text style={[tw`mx-2 mt-2 mb-2 text-[10px] text-gray-500 tracking-widest uppercase`, {fontFamily: 'PlusJakartaSans_800ExtraBold'}]}>Humidity Control</Text>
-        <View style={tw`bg-white dark:bg-slate-800 rounded-[24px] border border-gray-100 dark:border-slate-700 shadow-sm p-4 mb-5`}>
+        <Text style={[tw`mx-2 mt-2 mb-3 text-[10px] text-gray-400 dark:text-slate-500 tracking-widest uppercase`, {fontFamily: 'PlusJakartaSans_800ExtraBold'}]}>Humidity Control</Text>
+        <View style={tw`bg-white dark:bg-slate-800/80 rounded-3xl border border-gray-100 dark:border-slate-700/50 shadow-sm p-5 mb-6`}>
           <View style={tw`flex-row justify-between items-center mb-5`}>
             <View style={tw`flex-row items-center gap-3`}>
               <View style={tw`w-10 h-10 rounded-xl bg-[#eff6ff] dark:bg-blue-900/30 items-center justify-center`}>
@@ -252,24 +250,24 @@ export default function DeviceSchedulesScreen() {
           <View style={tw`flex-row gap-4 mb-4`}>
             <View style={tw`flex-1`}>
               <Text style={[tw`text-[12px] text-slate-800 dark:text-slate-200 mb-2 pl-1`, {fontFamily: 'PlusJakartaSans_800ExtraBold'}]}>Run Duration</Text>
-              <View style={tw`flex-row items-center justify-between bg-gray-50 dark:bg-slate-700 rounded-[16px] p-2 border border-gray-100 dark:border-slate-600`}>
-                <TouchableOpacity onPress={() => handleMisterDuration(-5)} style={tw`w-8 h-8 rounded-full border border-gray-200 dark:border-slate-500 items-center justify-center bg-white dark:bg-slate-600 shadow-sm`}><MaterialCommunityIcons name="minus" size={16} color={isDarkMode ? '#cbd5e1' : '#64748b'}/></TouchableOpacity>
+              <View style={tw`flex-row items-center justify-between bg-gray-50/80 dark:bg-slate-900/50 rounded-[16px] p-2 border border-gray-100/50 dark:border-slate-800/80`}>
+                <TouchableOpacity hitSlop={{ top: 15, bottom: 15, left: 15, right: 15 }}  onPress={() => handleMisterDuration(-5)} style={tw`w-8 h-8 rounded-full border border-gray-200/50 dark:border-slate-700 items-center justify-center bg-white dark:bg-slate-800 shadow-sm`}><MaterialCommunityIcons name="minus" size={16} color={isDarkMode ? '#94a3b8' : '#64748b'}/></TouchableOpacity>
                 <View style={tw`flex-row items-baseline gap-1`}>
                   <Text style={[tw`text-lg text-slate-800 dark:text-slate-100`, {fontFamily: 'PlusJakartaSans_800ExtraBold'}]}>{misterDuration}</Text>
-                  <Text style={[tw`text-[10px] text-gray-400 dark:text-slate-400`, {fontFamily: 'PlusJakartaSans_700Bold'}]}>min</Text>
+                  <Text style={[tw`text-[10px] text-gray-400 dark:text-slate-500`, {fontFamily: 'PlusJakartaSans_700Bold'}]}>min</Text>
                 </View>
-                <TouchableOpacity onPress={() => handleMisterDuration(5)} style={tw`w-8 h-8 rounded-full border border-gray-200 dark:border-slate-500 items-center justify-center bg-white dark:bg-slate-600 shadow-sm`}><MaterialCommunityIcons name="plus" size={16} color={isDarkMode ? '#cbd5e1' : '#64748b'}/></TouchableOpacity>
+                <TouchableOpacity hitSlop={{ top: 15, bottom: 15, left: 15, right: 15 }}  onPress={() => handleMisterDuration(5)} style={tw`w-8 h-8 rounded-full border border-gray-200/50 dark:border-slate-700 items-center justify-center bg-white dark:bg-slate-800 shadow-sm`}><MaterialCommunityIcons name="plus" size={16} color={isDarkMode ? '#94a3b8' : '#64748b'}/></TouchableOpacity>
               </View>
             </View>
             <View style={tw`flex-1`}>
               <Text style={[tw`text-[12px] text-slate-800 dark:text-slate-200 mb-2 pl-1`, {fontFamily: 'PlusJakartaSans_800ExtraBold'}]}>Repeat Every</Text>
-              <View style={tw`flex-row items-center justify-between bg-gray-50 dark:bg-slate-700 rounded-[16px] p-2 border border-gray-100 dark:border-slate-600`}>
-                <TouchableOpacity onPress={() => handleMisterInterval(-1)} style={tw`w-8 h-8 rounded-full border border-gray-200 dark:border-slate-500 items-center justify-center bg-white dark:bg-slate-600 shadow-sm`}><MaterialCommunityIcons name="minus" size={16} color={isDarkMode ? '#cbd5e1' : '#64748b'}/></TouchableOpacity>
+              <View style={tw`flex-row items-center justify-between bg-gray-50/80 dark:bg-slate-900/50 rounded-[16px] p-2 border border-gray-100/50 dark:border-slate-800/80`}>
+                <TouchableOpacity hitSlop={{ top: 15, bottom: 15, left: 15, right: 15 }}  onPress={() => handleMisterInterval(-1)} style={tw`w-8 h-8 rounded-full border border-gray-200/50 dark:border-slate-700 items-center justify-center bg-white dark:bg-slate-800 shadow-sm`}><MaterialCommunityIcons name="minus" size={16} color={isDarkMode ? '#94a3b8' : '#64748b'}/></TouchableOpacity>
                 <View style={tw`flex-row items-baseline gap-1`}>
                   <Text style={[tw`text-lg text-slate-800 dark:text-slate-100`, {fontFamily: 'PlusJakartaSans_800ExtraBold'}]}>{misterInterval}</Text>
-                  <Text style={[tw`text-[10px] text-gray-400 dark:text-slate-400`, {fontFamily: 'PlusJakartaSans_700Bold'}]}>hr</Text>
+                  <Text style={[tw`text-[10px] text-gray-400 dark:text-slate-500`, {fontFamily: 'PlusJakartaSans_700Bold'}]}>hr</Text>
                 </View>
-                <TouchableOpacity onPress={() => handleMisterInterval(1)} style={tw`w-8 h-8 rounded-full border border-gray-200 dark:border-slate-500 items-center justify-center bg-white dark:bg-slate-600 shadow-sm`}><MaterialCommunityIcons name="plus" size={16} color={isDarkMode ? '#cbd5e1' : '#64748b'}/></TouchableOpacity>
+                <TouchableOpacity hitSlop={{ top: 15, bottom: 15, left: 15, right: 15 }}  onPress={() => handleMisterInterval(1)} style={tw`w-8 h-8 rounded-full border border-gray-200/50 dark:border-slate-700 items-center justify-center bg-white dark:bg-slate-800 shadow-sm`}><MaterialCommunityIcons name="plus" size={16} color={isDarkMode ? '#94a3b8' : '#64748b'}/></TouchableOpacity>
               </View>
             </View>
           </View>
@@ -280,8 +278,8 @@ export default function DeviceSchedulesScreen() {
         </View>
 
         {/* ================= FANS ================= */}
-        <Text style={[tw`mx-2 mt-1 mb-2 text-[10px] text-gray-500 tracking-widest uppercase`, {fontFamily: 'PlusJakartaSans_800ExtraBold'}]}>Air Circulation</Text>
-        <View style={tw`bg-white dark:bg-slate-800 rounded-[24px] border border-gray-100 dark:border-slate-700 shadow-sm p-4 mb-5`}>
+        <Text style={[tw`mx-2 mt-1 mb-3 text-[10px] text-gray-400 dark:text-slate-500 tracking-widest uppercase`, {fontFamily: 'PlusJakartaSans_800ExtraBold'}]}>Air Circulation</Text>
+        <View style={tw`bg-white dark:bg-slate-800/80 rounded-3xl border border-gray-100 dark:border-slate-700/50 shadow-sm p-5 mb-6`}>
           <View style={tw`flex-row justify-between items-center mb-5`}>
             <View style={tw`flex-row items-center gap-3`}>
               <View style={tw`w-10 h-10 rounded-xl bg-[#ecfeff] dark:bg-cyan-900/30 items-center justify-center`}>
@@ -297,18 +295,18 @@ export default function DeviceSchedulesScreen() {
 
           {fanWindows.map((w, index) => renderWindow(w, index, 'fans'))}
 
-          <TouchableOpacity 
+          <TouchableOpacity hitSlop={{ top: 15, bottom: 15, left: 15, right: 15 }}  
             onPress={() => addWindow('fans')}
-            style={tw`flex-row items-center justify-center gap-2 py-3 mt-1 bg-gray-50 dark:bg-slate-700/50 border border-dashed border-gray-300 dark:border-slate-600 rounded-[16px] active:bg-gray-100 dark:active:bg-slate-700`}
+            style={tw`flex-row items-center justify-center gap-2 py-3.5 mt-2 bg-emerald-50 dark:bg-emerald-900/20 rounded-[16px] active:bg-emerald-100 dark:active:bg-emerald-900/40`}
           >
-            <MaterialCommunityIcons name="plus-circle-outline" size={18} color={isDarkMode ? '#94a3b8' : '#64748b'} />
-            <Text style={[tw`text-[12px] text-slate-600 dark:text-slate-300`, {fontFamily: 'PlusJakartaSans_800ExtraBold'}]}>Add Time Window</Text>
+            <MaterialCommunityIcons name="plus" size={18} color={isDarkMode ? '#34d399' : '#059669'} />
+            <Text style={[tw`text-[13px] text-emerald-700 dark:text-emerald-400`, {fontFamily: 'PlusJakartaSans_800ExtraBold'}]}>Add Time Window</Text>
           </TouchableOpacity>
         </View>
 
         {/* ================= GROW LIGHTS ================= */}
-        <Text style={[tw`mx-2 mt-1 mb-2 text-[10px] text-gray-500 tracking-widest uppercase`, {fontFamily: 'PlusJakartaSans_800ExtraBold'}]}>Illumination</Text>
-        <View style={tw`bg-white dark:bg-slate-800 rounded-[24px] border border-gray-100 dark:border-slate-700 shadow-sm p-4 mb-4`}>
+        <Text style={[tw`mx-2 mt-1 mb-3 text-[10px] text-gray-400 dark:text-slate-500 tracking-widest uppercase`, {fontFamily: 'PlusJakartaSans_800ExtraBold'}]}>Illumination</Text>
+        <View style={tw`bg-white dark:bg-slate-800/80 rounded-3xl border border-gray-100 dark:border-slate-700/50 shadow-sm p-5 mb-4`}>
           <View style={tw`flex-row justify-between items-center mb-5`}>
             <View style={tw`flex-row items-center gap-3`}>
               <View style={tw`w-10 h-10 rounded-xl bg-[#fefce8] dark:bg-yellow-900/30 items-center justify-center`}>
@@ -324,12 +322,12 @@ export default function DeviceSchedulesScreen() {
 
           {lightWindows.map((w, index) => renderWindow(w, index, 'lights'))}
 
-          <TouchableOpacity 
+          <TouchableOpacity hitSlop={{ top: 15, bottom: 15, left: 15, right: 15 }}  
             onPress={() => addWindow('lights')}
-            style={tw`flex-row items-center justify-center gap-2 py-3 mt-1 bg-gray-50 dark:bg-slate-700/50 border border-dashed border-gray-300 dark:border-slate-600 rounded-[16px] active:bg-gray-100 dark:active:bg-slate-700`}
+            style={tw`flex-row items-center justify-center gap-2 py-3.5 mt-2 bg-emerald-50 dark:bg-emerald-900/20 rounded-[16px] active:bg-emerald-100 dark:active:bg-emerald-900/40`}
           >
-            <MaterialCommunityIcons name="plus-circle-outline" size={18} color={isDarkMode ? '#94a3b8' : '#64748b'} />
-            <Text style={[tw`text-[12px] text-slate-600 dark:text-slate-300`, {fontFamily: 'PlusJakartaSans_800ExtraBold'}]}>Add Time Window</Text>
+            <MaterialCommunityIcons name="plus" size={18} color={isDarkMode ? '#34d399' : '#059669'} />
+            <Text style={[tw`text-[13px] text-emerald-700 dark:text-emerald-400`, {fontFamily: 'PlusJakartaSans_800ExtraBold'}]}>Add Time Window</Text>
           </TouchableOpacity>
         </View>
 
@@ -339,15 +337,15 @@ export default function DeviceSchedulesScreen() {
       {pickerState && pickerState.visible && (
         <>
           {Platform.OS === 'ios' && (
-            <TouchableOpacity 
+            <TouchableOpacity hitSlop={{ top: 15, bottom: 15, left: 15, right: 15 }}  
               activeOpacity={1} 
               onPress={() => setPickerState(null)} 
               style={tw`absolute inset-0 bg-black/40 z-40 justify-end`}
             >
-              <TouchableOpacity activeOpacity={1} style={tw`bg-white dark:bg-slate-800 p-4 rounded-t-3xl`}>
+              <TouchableOpacity hitSlop={{ top: 15, bottom: 15, left: 15, right: 15 }}  activeOpacity={1} style={tw`bg-white dark:bg-slate-800 p-4 rounded-t-3xl`}>
                 <View style={tw`flex-row justify-between items-center mb-4 px-2`}>
                   <Text style={[tw`text-[15px] text-slate-800 dark:text-slate-100`, {fontFamily: 'PlusJakartaSans_800ExtraBold'}]}>Select Time</Text>
-                  <TouchableOpacity onPress={() => setPickerState(null)} style={tw`bg-emerald-100 dark:bg-emerald-900/50 px-4 py-1.5 rounded-full`}>
+                  <TouchableOpacity hitSlop={{ top: 15, bottom: 15, left: 15, right: 15 }}  onPress={() => setPickerState(null)} style={tw`bg-emerald-100 dark:bg-emerald-900/50 px-4 py-1.5 rounded-full`}>
                     <Text style={[tw`text-emerald-700 dark:text-emerald-400 text-xs`, {fontFamily: 'PlusJakartaSans_800ExtraBold'}]}>Done</Text>
                   </TouchableOpacity>
                 </View>

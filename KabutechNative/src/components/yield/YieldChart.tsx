@@ -2,6 +2,7 @@ import React, { useRef } from 'react';
 import { View, Text, ScrollView, TouchableOpacity } from 'react-native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import tw from '../../tailwind';
+import { useTheme } from '../../context/ThemeContext';
 import { handleChartExport } from '../../utils/yieldExport';
 
 interface YieldChartProps {
@@ -12,6 +13,7 @@ interface YieldChartProps {
 }
 
 export default React.memo(function YieldChart({ dailyMap, chartPeriod, setChartPeriod, isExporting }: YieldChartProps) {
+  const { isDarkMode } = useTheme();
   const chartScrollRef = useRef<ScrollView>(null);
 
   const buildChartData = () => {
@@ -85,9 +87,8 @@ export default React.memo(function YieldChart({ dailyMap, chartPeriod, setChartP
           </View>
         </View>
 
-        {/* Export Button */}
-        <TouchableOpacity 
-          style={tw`flex-row items-center gap-1.5 bg-[#f0fdf4] dark:bg-emerald-900/30 px-3 py-1.5 rounded-full border border-emerald-100 dark:border-emerald-800`}
+        <TouchableOpacity hitSlop={{ top: 15, bottom: 15, left: 15, right: 15 }}  
+          style={tw`flex-row items-center gap-1.5 bg-[#f0fdf4] dark:bg-slate-700 px-3 py-1.5 rounded-full border border-emerald-100 dark:border-slate-600`}
           onPress={onExport}
         >
           <MaterialCommunityIcons name="export-variant" size={12} color="#166534" />
@@ -97,19 +98,19 @@ export default React.memo(function YieldChart({ dailyMap, chartPeriod, setChartP
 
       {/* Period Toggles */}
       <View style={tw`bg-gray-50 dark:bg-slate-700 rounded-full p-1 flex-row items-center border border-gray-100 dark:border-slate-600 mb-6 self-center`}>
-         <TouchableOpacity 
+         <TouchableOpacity hitSlop={{ top: 15, bottom: 15, left: 15, right: 15 }}  
             onPress={() => setChartPeriod('Monthly')}
             style={tw`${chartPeriod === 'Monthly' ? 'bg-[#166534] dark:bg-emerald-600' : 'bg-transparent'} rounded-full px-3 py-1.5`}
          >
             <Text style={[tw`text-[10px] ${chartPeriod === 'Monthly' ? 'text-white' : 'text-gray-500 dark:text-slate-300'}`, {fontFamily: 'PlusJakartaSans_800ExtraBold'}]}>Monthly</Text>
          </TouchableOpacity>
-         <TouchableOpacity 
+         <TouchableOpacity hitSlop={{ top: 15, bottom: 15, left: 15, right: 15 }}  
             onPress={() => setChartPeriod('Semi-Annually')}
             style={tw`${chartPeriod === 'Semi-Annually' ? 'bg-[#166534] dark:bg-emerald-600' : 'bg-transparent'} rounded-full px-3 py-1.5`}
          >
             <Text style={[tw`text-[10px] ${chartPeriod === 'Semi-Annually' ? 'text-white' : 'text-gray-500 dark:text-slate-300'}`, {fontFamily: 'PlusJakartaSans_800ExtraBold'}]}>Semi-Annually</Text>
          </TouchableOpacity>
-         <TouchableOpacity 
+         <TouchableOpacity hitSlop={{ top: 15, bottom: 15, left: 15, right: 15 }}  
             onPress={() => setChartPeriod('Annually')}
             style={tw`${chartPeriod === 'Annually' ? 'bg-[#166534] dark:bg-emerald-600' : 'bg-transparent'} rounded-full px-3 py-1.5`}
          >

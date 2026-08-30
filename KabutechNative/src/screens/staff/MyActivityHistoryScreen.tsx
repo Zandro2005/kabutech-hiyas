@@ -50,7 +50,7 @@ export default function MyActivityHistoryScreen() {
       
       {/* Header */}
       <View style={tw`flex-row items-center p-4 border-b border-gray-200 dark:border-slate-800 bg-white dark:bg-slate-900`}>
-        <TouchableOpacity onPress={() => navigation.goBack()} style={tw`mr-3 p-1`}>
+        <TouchableOpacity hitSlop={{ top: 15, bottom: 15, left: 15, right: 15 }}  onPress={() => navigation.goBack()} style={tw`mr-3 p-1`}>
           <MaterialCommunityIcons name="arrow-left" size={24} color={isDarkMode ? '#f8fafc' : '#0f172a'} />
         </TouchableOpacity>
         <Text style={[tw`text-lg text-slate-900 dark:text-white`, {fontFamily: 'PlusJakartaSans_800ExtraBold'}]}>Activity History</Text>
@@ -60,7 +60,7 @@ export default function MyActivityHistoryScreen() {
       <View style={tw`bg-white dark:bg-slate-900 py-3 border-b border-gray-200 dark:border-slate-800`}>
         <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={tw`px-4 gap-2`}>
           {ACTION_TYPES.map(type => (
-            <TouchableOpacity
+            <TouchableOpacity hitSlop={{ top: 15, bottom: 15, left: 15, right: 15 }} 
               key={type.id}
               onPress={() => setFilterAction(type.id)}
               style={[
@@ -81,7 +81,7 @@ export default function MyActivityHistoryScreen() {
         </ScrollView>
         <View style={tw`flex-row px-4 mt-3 gap-2`}>
           {['all', 'pending', 'reviewed'].map(status => (
-            <TouchableOpacity
+            <TouchableOpacity hitSlop={{ top: 15, bottom: 15, left: 15, right: 15 }} 
               key={status}
               onPress={() => setFilterStatus(status)}
               style={[

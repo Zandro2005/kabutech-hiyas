@@ -32,22 +32,22 @@ export default function ActionModal({ visible, onClose, title, iconName, childre
         <TouchableWithoutFeedback onPress={onClose}>
           <View style={tw`flex-1 justify-center items-center p-4`}>
             <TouchableWithoutFeedback onPress={(e) => e.stopPropagation()}>
-              <View style={tw`w-full max-w-md bg-white rounded-3xl overflow-hidden shadow-2xl max-h-[90%]`}>
+              <View style={tw`w-full max-w-md bg-white dark:bg-slate-800 rounded-3xl overflow-hidden shadow-2xl max-h-[90%]`}>
                 {/* Header */}
-                <View style={tw`flex-row items-center justify-between p-5 border-b border-gray-100`}>
+                <View style={tw`flex-row items-center justify-between p-5 border-b border-gray-100 dark:border-slate-700`}>
                   <View style={tw`flex-row items-center gap-3`}>
                     {iconName && (
-                      <View style={tw`w-10 h-10 rounded-full bg-green-50 items-center justify-center`}>
+                      <View style={tw`w-10 h-10 rounded-full bg-green-50 dark:bg-emerald-900/30 items-center justify-center`}>
                         <MaterialCommunityIcons name={iconName} size={24} color={tw.color('success-green') || '#16a34a'} />
                       </View>
                     )}
-                    <Text style={[tw`text-lg font-extrabold text-gray-900`, { fontFamily: 'PlusJakartaSans_800ExtraBold' }]}>{title}</Text>
+                    <Text style={[tw`text-lg font-extrabold text-gray-900 dark:text-white`, { fontFamily: 'PlusJakartaSans_800ExtraBold' }]}>{title}</Text>
                   </View>
-                  <TouchableOpacity 
+                  <TouchableOpacity hitSlop={{ top: 15, bottom: 15, left: 15, right: 15 }}  
                     onPress={onClose}
-                    style={tw`w-8 h-8 rounded-full bg-gray-100 items-center justify-center`}
+                    style={tw`w-8 h-8 rounded-full bg-gray-100 dark:bg-slate-700 items-center justify-center`}
                   >
-                    <MaterialCommunityIcons name="close" size={20} color="#6b7280" />
+                    <MaterialCommunityIcons name="close" size={20} color={tw.color('dark:text-slate-300') || "#6b7280"} />
                   </TouchableOpacity>
                 </View>
 

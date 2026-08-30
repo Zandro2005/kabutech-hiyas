@@ -110,7 +110,7 @@ export default function ActivityLogScreen() {
               
               <View style={tw`flex-row flex-wrap gap-2 mb-5`}>
                 {ACTION_TYPES.map(type => (
-                  <TouchableOpacity
+                  <TouchableOpacity hitSlop={{ top: 15, bottom: 15, left: 15, right: 15 }} 
                     key={type.id}
                     onPress={() => setSelectedAction(type.id)}
                     style={[
@@ -138,7 +138,7 @@ export default function ActivityLogScreen() {
               />
 
               <Text style={[tw`text-[11px] text-gray-500 dark:text-slate-400 uppercase tracking-widest mb-2`, {fontFamily: 'PlusJakartaSans_800ExtraBold'}]}>Related Rack</Text>
-              <TouchableOpacity 
+              <TouchableOpacity hitSlop={{ top: 15, bottom: 15, left: 15, right: 15 }}  
                 onPress={() => setShowRackPicker(!showRackPicker)}
                 style={tw`bg-gray-50 dark:bg-slate-900 border border-gray-200 dark:border-slate-700 rounded-xl px-4 py-3 flex-row justify-between items-center mb-6`}
               >
@@ -150,14 +150,14 @@ export default function ActivityLogScreen() {
 
               {showRackPicker && (
                 <View style={tw`bg-gray-50 dark:bg-slate-900 border border-gray-200 dark:border-slate-700 rounded-xl mb-6 overflow-hidden mt-[-16px]`}>
-                  <TouchableOpacity
+                  <TouchableOpacity hitSlop={{ top: 15, bottom: 15, left: 15, right: 15 }} 
                     style={tw`p-3 border-b border-gray-200 dark:border-slate-700`}
                     onPress={() => { setSelectedRackId(''); setShowRackPicker(false); }}
                   >
                     <Text style={tw`text-sm text-gray-500 dark:text-slate-400`}>None</Text>
                   </TouchableOpacity>
                   {activeRacks.map(rack => (
-                    <TouchableOpacity
+                    <TouchableOpacity hitSlop={{ top: 15, bottom: 15, left: 15, right: 15 }} 
                       key={String(rack.firebaseKey)}
                       style={tw`p-3 border-b border-gray-200 dark:border-slate-700`}
                       onPress={() => { setSelectedRackId(String(rack.firebaseKey)); setShowRackPicker(false); }}
@@ -168,7 +168,7 @@ export default function ActivityLogScreen() {
                 </View>
               )}
 
-              <TouchableOpacity 
+              <TouchableOpacity hitSlop={{ top: 15, bottom: 15, left: 15, right: 15 }}  
                 style={tw`bg-[#166534] dark:bg-emerald-600 rounded-xl py-3.5 items-center justify-center flex-row shadow-sm ${isSubmitting ? 'opacity-70' : ''}`}
                 onPress={handleSubmit}
                 disabled={isSubmitting}
@@ -187,7 +187,7 @@ export default function ActivityLogScreen() {
             {/* Recent Activity */}
             <View style={tw`flex-row justify-between items-center mb-4`}>
               <Text style={[tw`text-[15px] text-[#032514] dark:text-slate-200 tracking-tight`, {fontFamily: 'PlusJakartaSans_800ExtraBold'}]}>Recent Logs</Text>
-              <TouchableOpacity onPress={() => navigation.navigate('MyActivityHistory' as never)}>
+              <TouchableOpacity hitSlop={{ top: 15, bottom: 15, left: 15, right: 15 }}  onPress={() => navigation.navigate('MyActivityHistory' as never)}>
                 <Text style={[tw`text-[11px] text-emerald-600 dark:text-emerald-400`, {fontFamily: 'PlusJakartaSans_700Bold'}]}>View All</Text>
               </TouchableOpacity>
             </View>

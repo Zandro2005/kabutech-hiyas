@@ -38,7 +38,7 @@ export default function LiveFarmScreen() {
         
         {/* Left: Back & Title */}
         <View style={tw`flex-row items-center gap-2 flex-1 mr-2`}>
-          <TouchableOpacity 
+          <TouchableOpacity hitSlop={{ top: 15, bottom: 15, left: 15, right: 15 }}  
             onPress={() => navigation.goBack()}
             style={tw`w-8 h-8 rounded-full bg-white/10 items-center justify-center`}
           >
@@ -57,7 +57,7 @@ export default function LiveFarmScreen() {
 
         {/* Right: Actions */}
         <View style={tw`flex-row items-center gap-1.5 shrink-0`}>
-          <TouchableOpacity style={tw`border border-gray-600 rounded-full px-2 py-1 flex-row items-center gap-1`}>
+          <TouchableOpacity hitSlop={{ top: 15, bottom: 15, left: 15, right: 15 }}  style={tw`border border-gray-600 rounded-full px-2 py-1 flex-row items-center gap-1`}>
             <MaterialCommunityIcons name="video-off-outline" size={12} color="#e2e8f0" />
             <Text style={[tw`text-[10px] text-slate-200`, {fontFamily: 'PlusJakartaSans_700Bold'}]}>Disable</Text>
           </TouchableOpacity>

@@ -91,9 +91,9 @@ export default function FlagContaminationModal({ visible, onClose, selectedRack 
         <View style={tw`z-10 mt-4`}>
           <Text style={tw`text-[10px] font-bold text-gray-500 uppercase tracking-wider mb-1.5`}>BAGS TO FLAG</Text>
           <TextInput
-            style={tw`bg-[#fff5f5] border border-red-100 rounded-xl px-4 py-3.5 text-gray-900 font-semibold`}
+            style={tw`bg-[#fff5f5] dark:bg-slate-700 border border-red-100 dark:border-slate-600 rounded-xl px-4 py-3.5 text-gray-900 dark:text-white font-semibold`}
             placeholder="e.g. 2"
-            placeholderTextColor="#fca5a5"
+            placeholderTextColor={tw.color('dark:text-slate-400') || "#fca5a5"}
             keyboardType="numeric"
             value={bagsToFlag}
             onChangeText={setBagsToFlag}
@@ -108,10 +108,10 @@ export default function FlagContaminationModal({ visible, onClose, selectedRack 
 
         {/* Actions */}
         <View style={tw`mt-4 z-10`} pointerEvents="box-none">
-          <TouchableOpacity 
+          <TouchableOpacity hitSlop={{ top: 15, bottom: 15, left: 15, right: 15 }}  
             onPress={handleSave}
             disabled={loading}
-            style={tw`w-full bg-[#dc2626] rounded-xl py-3.5 items-center`}
+            style={tw`w-full bg-[#dc2626] dark:bg-red-600 rounded-xl py-3.5 items-center`}
           >
             <Text style={[tw`text-white text-[13px]`, {fontFamily: 'PlusJakartaSans_800ExtraBold'}]}>
               {loading ? 'Saving...' : 'Flag Bags'}

@@ -101,9 +101,9 @@ export default function LogHarvestModal({ visible, onClose, selectedRack }: LogH
         <View style={tw`z-10 mt-4`}>
           <Text style={tw`text-[10px] font-bold text-gray-500 uppercase tracking-wider mb-1.5`}>YIELD (GRAMS)</Text>
           <TextInput
-            style={tw`bg-[#f4fbf7] border border-green-100 rounded-xl px-4 py-3.5 text-gray-900 font-semibold`}
+            style={tw`bg-[#f4fbf7] dark:bg-slate-700 border border-green-100 dark:border-slate-600 rounded-xl px-4 py-3.5 text-gray-900 dark:text-white font-semibold`}
             placeholder="e.g. 500"
-            placeholderTextColor="#9ca3af"
+            placeholderTextColor={tw.color('dark:text-slate-400') || "#9ca3af"}
             keyboardType="numeric"
             value={yieldGrams}
             onChangeText={setYieldGrams}
@@ -115,14 +115,14 @@ export default function LogHarvestModal({ visible, onClose, selectedRack }: LogH
         {/* Date */}
         <View style={tw`z-10 mt-4`}>
           <Text style={tw`text-[10px] font-bold text-gray-500 uppercase tracking-wider mb-1.5`}>HARVEST DATE</Text>
-          <TouchableOpacity 
+          <TouchableOpacity hitSlop={{ top: 15, bottom: 15, left: 15, right: 15 }}  
             onPress={() => setShowDatePicker(true)}
-            style={tw`flex-row items-center justify-between bg-[#f4fbf7] border border-green-100 rounded-xl px-4 py-3.5`}
+            style={tw`flex-row items-center justify-between bg-[#f4fbf7] dark:bg-slate-700 border border-green-100 dark:border-slate-600 rounded-xl px-4 py-3.5`}
           >
-            <Text style={tw`text-gray-900 font-semibold`}>
+            <Text style={tw`text-gray-900 dark:text-white font-semibold`}>
               {harvestDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
             </Text>
-            <MaterialCommunityIcons name="calendar" size={18} color="#166534" />
+            <MaterialCommunityIcons name="calendar" size={18} color={tw.color('dark:text-slate-300') || "#166534"} />
           </TouchableOpacity>
           
           {showDatePicker && (
@@ -147,10 +147,10 @@ export default function LogHarvestModal({ visible, onClose, selectedRack }: LogH
 
         {/* Actions */}
         <View style={tw`mt-4 z-10`} pointerEvents="box-none">
-          <TouchableOpacity 
+          <TouchableOpacity hitSlop={{ top: 15, bottom: 15, left: 15, right: 15 }}  
             onPress={handleSave}
             disabled={loading}
-            style={tw`w-full bg-[#032514] rounded-xl py-3.5 items-center`}
+            style={tw`w-full bg-[#032514] dark:bg-emerald-600 rounded-xl py-3.5 items-center`}
           >
             <Text style={[tw`text-white text-[13px]`, {fontFamily: 'PlusJakartaSans_800ExtraBold'}]}>
               {loading ? 'Saving...' : 'Save Harvest'}

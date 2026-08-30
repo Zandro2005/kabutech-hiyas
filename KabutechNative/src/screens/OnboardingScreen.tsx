@@ -64,7 +64,7 @@ export default function OnboardingScreen() {
           <MaterialCommunityIcons name="flower" size={20} color="#004521" />
           <Text style={tw`font-bold text-[#004521]`}>KabuTech</Text>
         </View>
-        <TouchableOpacity onPress={skipToLogin}>
+        <TouchableOpacity hitSlop={{ top: 15, bottom: 15, left: 15, right: 15 }}  onPress={skipToLogin}>
           <Text style={tw`font-semibold text-[#004521]/70`}>Skip</Text>
         </TouchableOpacity>
       </View>
@@ -116,7 +116,7 @@ export default function OnboardingScreen() {
                 ))}
               </View>
 
-              <TouchableOpacity 
+              <TouchableOpacity hitSlop={{ top: 15, bottom: 15, left: 15, right: 15 }}  
                 onPress={activeSlide === slides.length - 1 ? skipToLogin : () => {
                   // TODO: Scroll to next index programmatically
                   console.log("Use swipe for now");

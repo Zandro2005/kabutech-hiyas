@@ -90,7 +90,7 @@ export default function AiInsightModal({ visible, onClose }: AiInsightModalProps
             </View>
 
             {/* Action Buttons */}
-            <TouchableOpacity 
+            <TouchableOpacity hitSlop={{ top: 15, bottom: 15, left: 15, right: 15 }}  
               onPress={handleActivateMisters}
               style={tw`w-full bg-blue-500 py-3.5 rounded-xl items-center justify-center flex-row gap-2 mb-3 shadow-sm`}
             >
@@ -100,7 +100,7 @@ export default function AiInsightModal({ visible, onClose }: AiInsightModalProps
               </Text>
             </TouchableOpacity>
 
-            <TouchableOpacity 
+            <TouchableOpacity hitSlop={{ top: 15, bottom: 15, left: 15, right: 15 }}  
               onPress={onClose}
               style={tw`w-full bg-slate-100 dark:bg-slate-800 py-3.5 rounded-xl items-center justify-center`}
             >

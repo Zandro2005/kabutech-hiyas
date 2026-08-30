@@ -58,11 +58,11 @@ export default React.memo(function ScoreArch({
   return (
     <View style={tw`w-full items-center relative z-0`}>
       {/* Background block to seamlessly blend with the dashboard nav bar */}
-      <View style={tw`absolute top-0 left-0 right-0 h-1/2 bg-[#dcfce7] dark:bg-[#0f172a]`} />
+      <View style={tw`absolute top-0 left-0 right-0 h-1/2 bg-[#dcfce7] dark:bg-[#020617]`} />
       
       <View style={{ width: width * 1.5, height: width * 0.95, overflow: 'hidden', alignItems: 'center' }}>
         <LinearGradient
-          colors={isDarkMode ? ['#0f172a', '#020617'] : ['#dcfce7', '#f0f9f4']}
+          colors={isDarkMode ? ['#020617', '#020617'] : ['#dcfce7', '#f0f9f4']}
           start={{ x: 0.5, y: 0 }}
           end={{ x: 0.5, y: 1 }}
           style={[tw`absolute bottom-0`, { width: width * 1.5, height: width * 1.5, borderRadius: width * 0.75 }]}
@@ -70,7 +70,7 @@ export default React.memo(function ScoreArch({
         
         {/* Top Header - "Hi, Admin" */}
         <View style={[tw`flex-row justify-between items-center px-6 pt-4 pb-2 z-10`, { width: width }]}>
-          <TouchableOpacity 
+          <TouchableOpacity hitSlop={{ top: 15, bottom: 15, left: 15, right: 15 }}  
             style={tw`flex-row items-center gap-3`} 
             onPress={() => navigation.navigate('Profile' as never)}
           >
@@ -133,7 +133,7 @@ export default React.memo(function ScoreArch({
           ].map((item, index) => {
             const showActive = item.active;
             return (
-            <TouchableOpacity 
+            <TouchableOpacity hitSlop={{ top: 15, bottom: 15, left: 15, right: 15 }}  
               key={index} 
               disabled={isAuto || isScheduled}
               onPress={() => {

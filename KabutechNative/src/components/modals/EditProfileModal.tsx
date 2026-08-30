@@ -46,7 +46,7 @@ export default function EditProfileModal({ visible, onClose }: EditProfileModalP
         <View>
           <Text style={tw`text-xs font-bold text-gray-500 uppercase tracking-wider mb-2`}>Full Name</Text>
           <TextInput
-            style={tw`bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 text-gray-900 font-semibold`}
+            style={tw`bg-gray-50 dark:bg-slate-700 border border-gray-200 dark:border-slate-600 rounded-xl px-4 py-3 text-gray-900 dark:text-white font-semibold`}
             value={name}
             onChangeText={setName}
           />
@@ -55,15 +55,15 @@ export default function EditProfileModal({ visible, onClose }: EditProfileModalP
       </View>
 
       <View style={tw`flex-row gap-3 mt-6`}>
-        <TouchableOpacity
+        <TouchableOpacity hitSlop={{ top: 15, bottom: 15, left: 15, right: 15 }} 
           onPress={onClose}
-          style={tw`flex-1 bg-gray-100 rounded-xl py-3.5 items-center`}
+          style={tw`flex-1 bg-gray-100 dark:bg-slate-700 rounded-xl py-3.5 items-center`}
         >
-          <Text style={tw`text-gray-600 font-bold`}>Cancel</Text>
+          <Text style={tw`text-gray-600 dark:text-slate-300 font-bold`}>Cancel</Text>
         </TouchableOpacity>
-        <TouchableOpacity
+        <TouchableOpacity hitSlop={{ top: 15, bottom: 15, left: 15, right: 15 }} 
           onPress={handleSave}
-          style={tw`flex-1 bg-green-600 rounded-xl py-3.5 items-center flex-row justify-center ${isSaving ? 'opacity-70' : ''}`}
+          style={tw`flex-1 bg-green-600 dark:bg-emerald-600 rounded-xl py-3.5 items-center flex-row justify-center ${isSaving ? 'opacity-70' : ''}`}
           disabled={isSaving}
         >
           {isSaving ? <ActivityIndicator color="white" size="small" style={tw`mr-2`} /> : null}

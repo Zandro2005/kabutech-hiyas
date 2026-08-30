@@ -57,7 +57,7 @@ export default class ErrorBoundary extends Component<Props, State> {
               </Text>
             </View>
 
-            <TouchableOpacity 
+            <TouchableOpacity hitSlop={{ top: 15, bottom: 15, left: 15, right: 15 }}  
               onPress={() => this.setState({ hasError: false })}
               style={tw`w-full bg-green-600 dark:bg-green-700 py-4 rounded-xl items-center shadow-sm`}
             >

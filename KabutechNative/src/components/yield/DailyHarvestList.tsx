@@ -102,7 +102,7 @@ export default React.memo(function DailyHarvestList({
           <MaterialCommunityIcons name="calendar-blank" size={18} color={tw.color('dark:text-slate-100') || "#032514"} />
           <Text style={[tw`text-[13px] text-[#032514] dark:text-slate-100 tracking-wide`, {fontFamily: 'PlusJakartaSans_800ExtraBold'}]}>HARVEST CALENDAR</Text>
         </View>
-        <TouchableOpacity onPress={onExport} style={tw`bg-gray-50 dark:bg-slate-700 border border-gray-200 dark:border-slate-600 px-2 py-1.5 rounded-lg flex-row items-center gap-1`}>
+        <TouchableOpacity hitSlop={{ top: 15, bottom: 15, left: 15, right: 15 }}  onPress={onExport} style={tw`bg-gray-50 dark:bg-slate-700 border border-gray-200 dark:border-slate-600 px-2 py-1.5 rounded-lg flex-row items-center gap-1`}>
           <MaterialCommunityIcons name="download" size={12} color={tw.color('dark:text-emerald-400') || "#166534"} />
           <Text style={[tw`text-[10px] text-[#166534] dark:text-emerald-400`, {fontFamily: 'PlusJakartaSans_800ExtraBold'}]}>Export</Text>
         </TouchableOpacity>
@@ -141,9 +141,9 @@ export default React.memo(function DailyHarvestList({
 
       {selectedHarvests.length > 0 ? (
         selectedHarvests.map((harvest, index) => (
-          <View key={harvest.id} style={tw`flex-row justify-between items-center bg-[#f0fdf4] dark:bg-emerald-900/20 border border-emerald-100 dark:border-emerald-800/50 rounded-[16px] p-4 shadow-sm mb-3`}>
+          <View key={harvest.id} style={tw`flex-row justify-between items-center bg-[#f0fdf4] dark:bg-slate-700/50 border border-emerald-100 dark:border-slate-600 rounded-[16px] p-4 shadow-sm mb-3`}>
             
-            <View style={tw`w-14 bg-white dark:bg-slate-800 rounded-[12px] border border-emerald-100 dark:border-emerald-800/50 items-center justify-center py-1.5 shadow-sm`}>
+            <View style={tw`w-14 bg-white dark:bg-slate-800 rounded-[12px] border border-emerald-100 dark:border-slate-600 items-center justify-center py-1.5 shadow-sm`}>
               <Text style={[tw`text-[9px] text-[#166534] dark:text-emerald-400 uppercase tracking-widest`, {fontFamily: 'PlusJakartaSans_800ExtraBold'}]}>{harvest.month}</Text>
               <Text style={[tw`text-lg text-slate-800 dark:text-slate-100 leading-tight`, {fontFamily: 'PlusJakartaSans_800ExtraBold'}]}>{harvest.day}</Text>
             </View>

@@ -96,7 +96,7 @@ export default function ProfileScreen() {
               <Text style={tw`text-[9px] font-extrabold text-emerald-600 dark:text-emerald-400 uppercase tracking-widest`}>{role}</Text>
             </View>
           </View>
-          <TouchableOpacity 
+          <TouchableOpacity hitSlop={{ top: 15, bottom: 15, left: 15, right: 15 }}  
             onPress={handleLogout}
             style={tw`bg-red-50 dark:bg-red-900/30 p-2 rounded-full`}
           >
@@ -148,7 +148,7 @@ export default function ProfileScreen() {
         </View>
 
         {/* Settings Links */}
-        <TouchableOpacity 
+        <TouchableOpacity hitSlop={{ top: 15, bottom: 15, left: 15, right: 15 }}  
           onPress={() => navigation.navigate('StaffReportsInbox' as never)}
           style={tw`bg-white dark:bg-slate-800 rounded-2xl p-4 border border-gray-100 dark:border-slate-700 shadow-sm flex-row items-center justify-between mb-3 active:scale-95`}
         >
@@ -168,7 +168,7 @@ export default function ProfileScreen() {
           <MaterialCommunityIcons name="chevron-right" size={24} color={tw.color('dark:text-slate-500') || "#94a3b8"} />
         </TouchableOpacity>
 
-        <TouchableOpacity 
+        <TouchableOpacity hitSlop={{ top: 15, bottom: 15, left: 15, right: 15 }}  
           onPress={() => navigation.navigate('StaffApprovals' as never)}
           style={tw`bg-white dark:bg-slate-800 rounded-2xl p-4 border border-gray-100 dark:border-slate-700 shadow-sm flex-row items-center justify-between mb-3 active:scale-95`}
         >
@@ -188,7 +188,7 @@ export default function ProfileScreen() {
           <MaterialCommunityIcons name="chevron-right" size={24} color={tw.color('dark:text-slate-500') || "#94a3b8"} />
         </TouchableOpacity>
 
-        <TouchableOpacity 
+        <TouchableOpacity hitSlop={{ top: 15, bottom: 15, left: 15, right: 15 }}  
           onPress={() => navigation.navigate('AssignTask' as never)}
           style={tw`bg-white dark:bg-slate-800 rounded-2xl p-4 border border-gray-100 dark:border-slate-700 shadow-sm flex-row items-center justify-between mb-3 active:scale-95`}
         >
@@ -201,7 +201,7 @@ export default function ProfileScreen() {
           <MaterialCommunityIcons name="chevron-right" size={24} color={tw.color('dark:text-slate-500') || "#94a3b8"} />
         </TouchableOpacity>
 
-        <TouchableOpacity 
+        <TouchableOpacity hitSlop={{ top: 15, bottom: 15, left: 15, right: 15 }}  
           onPress={() => navigation.navigate('StaffTaskHistory' as never)}
           style={tw`bg-white dark:bg-slate-800 rounded-2xl p-4 border border-gray-100 dark:border-slate-700 shadow-sm flex-row items-center justify-between mb-3 active:scale-95`}
         >

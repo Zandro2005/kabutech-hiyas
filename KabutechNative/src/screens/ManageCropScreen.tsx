@@ -195,7 +195,7 @@ export default function ManageCropScreen() {
               {/* ACTIVE RACKS SECTION */}
               <View style={tw`flex-row justify-between items-center mb-4 mt-2`}>
                 <Text style={[tw`text-[15px] text-[#032514] dark:text-slate-200 tracking-tight`, {fontFamily: 'PlusJakartaSans_800ExtraBold'}]}>Active Racks</Text>
-                <TouchableOpacity 
+                <TouchableOpacity hitSlop={{ top: 15, bottom: 15, left: 15, right: 15 }}  
                   onPress={() => setShowAddRack(true)}
                   style={tw`bg-[#10b981] dark:bg-emerald-600 px-3 py-1.5 rounded-full flex-row items-center gap-1 shadow-sm`}
                 >
@@ -218,7 +218,7 @@ export default function ManageCropScreen() {
               {/* Rack Header */}
               <View style={tw`flex-row justify-between items-start mb-2`}>
                 <Text style={[tw`text-[15px] text-[#032514] dark:text-slate-100`, {fontFamily: 'PlusJakartaSans_800ExtraBold'}]}>{rack.rack || 'Unnamed Rack'}</Text>
-                <TouchableOpacity onPress={() => handleArchiveRack(rack.firebaseKey, rack.rack || 'Unnamed Rack')}>
+                <TouchableOpacity hitSlop={{ top: 15, bottom: 15, left: 15, right: 15 }}  onPress={() => handleArchiveRack(rack.firebaseKey, rack.rack || 'Unnamed Rack')}>
                   <MaterialCommunityIcons name="delete-outline" size={16} color={isDarkMode ? '#475569' : '#94a3b8'} />
                 </TouchableOpacity>
               </View>
@@ -275,21 +275,21 @@ export default function ManageCropScreen() {
 
               {/* Action Buttons */}
               <View style={tw`flex-row items-center border-t border-gray-50 dark:border-slate-700 pt-3 gap-2`}>
-                <TouchableOpacity 
+                <TouchableOpacity hitSlop={{ top: 15, bottom: 15, left: 15, right: 15 }}  
                   onPress={() => openActionModal('harvest', rack)}
                   style={tw`flex-1 bg-emerald-50 dark:bg-emerald-900/30 rounded-lg py-2 flex-row items-center justify-center gap-1.5`}
                 >
                   <MaterialCommunityIcons name="leaf" size={12} color={tw.color('dark:text-emerald-400') || "#166534"} />
                   <Text style={[tw`text-[10px] text-[#166534] dark:text-emerald-400`, {fontFamily: 'PlusJakartaSans_800ExtraBold'}]}>Harvest</Text>
                 </TouchableOpacity>
-                <TouchableOpacity 
+                <TouchableOpacity hitSlop={{ top: 15, bottom: 15, left: 15, right: 15 }}  
                   onPress={() => openActionModal('capacity', rack)}
                   style={tw`flex-1 bg-gray-50 dark:bg-slate-700 rounded-lg py-2 flex-row items-center justify-center gap-1.5`}
                 >
                   <MaterialCommunityIcons name="plus-minus-variant" size={12} color={tw.color('dark:text-slate-300') || "#475569"} />
                   <Text style={[tw`text-[10px] text-gray-600 dark:text-slate-300`, {fontFamily: 'PlusJakartaSans_800ExtraBold'}]}>Capacity</Text>
                 </TouchableOpacity>
-                <TouchableOpacity 
+                <TouchableOpacity hitSlop={{ top: 15, bottom: 15, left: 15, right: 15 }}  
                   onPress={() => openActionModal('flag', rack)}
                   style={tw`bg-red-50 dark:bg-red-900/30 w-8 h-8 rounded-lg items-center justify-center`}
                 >

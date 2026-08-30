@@ -2,6 +2,7 @@ import React from 'react';
 import { View, Text, TouchableOpacity } from 'react-native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import tw from '../tailwind';
+import { useTheme } from '../context/ThemeContext';
 
 interface Props {
   temp: number;
@@ -12,15 +13,16 @@ interface Props {
 }
 
 export default React.memo(function EnvironmentMetricsGrid({ temp, hum, light, co2, navigation }: Props) {
+  const { isDarkMode } = useTheme();
   return (
     <View style={tw`px-6 pt-8`}>
       <View style={tw`flex-row justify-between items-end mb-4`}>
         <Text style={[tw`text-lg text-slate-800 dark:text-white tracking-wide`, { fontFamily: 'PlusJakartaSans_800ExtraBold' }]}>
           Environment Metrics
         </Text>
-        <TouchableOpacity 
+        <TouchableOpacity hitSlop={{ top: 15, bottom: 15, left: 15, right: 15 }}  
           onPress={() => navigation.navigate('Controls' as never)}
-          hitSlop={{ top: 15, bottom: 15, left: 15, right: 15 }}
+          
         >
           <Text style={[tw`text-xs text-slate-500 dark:text-slate-400`, { fontFamily: 'PlusJakartaSans_700Bold' }]}>View All</Text>
         </TouchableOpacity>

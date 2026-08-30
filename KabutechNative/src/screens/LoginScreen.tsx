@@ -186,10 +186,10 @@ export default function LoginScreen() {
                 returnKeyType="done"
                 onSubmitEditing={handleLogin}
               />
-              <TouchableOpacity
+              <TouchableOpacity hitSlop={{ top: 15, bottom: 15, left: 15, right: 15 }} 
                 onPress={() => setShowPassword(!showPassword)}
                 style={tw`absolute right-0 h-full px-4 justify-center z-10`}
-                hitSlop={{ top: 15, bottom: 15, left: 15, right: 15 }}
+                
               >
                 <MaterialCommunityIcons name={showPassword ? "eye-off-outline" : "eye-outline"} size={20} color="#9ca3af" />
               </TouchableOpacity>
@@ -197,10 +197,10 @@ export default function LoginScreen() {
 
             {/* Options */}
             <View style={tw`flex-row items-center justify-between mb-8 px-1`}>
-              <TouchableOpacity
+              <TouchableOpacity hitSlop={{ top: 15, bottom: 15, left: 15, right: 15 }} 
                 style={tw`flex-row items-center`}
                 onPress={() => setRememberMe(!rememberMe)}
-                hitSlop={{ top: 15, bottom: 15, left: 15, right: 15 }}
+                
               >
                 <MaterialCommunityIcons
                   name={rememberMe ? "checkbox-marked" : "checkbox-blank-outline"}
@@ -212,9 +212,9 @@ export default function LoginScreen() {
                 </Text>
               </TouchableOpacity>
               
-              <TouchableOpacity
+              <TouchableOpacity hitSlop={{ top: 15, bottom: 15, left: 15, right: 15 }}
                 onPress={handleForgotPassword}
-                hitSlop={{ top: 15, bottom: 15, left: 15, right: 15 }}
+                
               >
                 <Text style={[tw`text-[11px] text-slate-500`, { fontFamily: 'PlusJakartaSans_700Bold' }]}>Forgot Password?</Text>
               </TouchableOpacity>
@@ -225,7 +225,7 @@ export default function LoginScreen() {
             ) : null}
 
             {/* Submit Button */}
-            <TouchableOpacity
+            <TouchableOpacity hitSlop={{ top: 15, bottom: 15, left: 15, right: 15 }} 
               onPress={handleLogin}
               disabled={loading}
               style={tw`w-full bg-[#3d8c63] py-4 rounded-full items-center shadow-lg mb-6 ${loading ? 'opacity-70' : ''}`}
@@ -239,10 +239,10 @@ export default function LoginScreen() {
               <Text style={[tw`text-[12px] text-slate-400 mr-1`, { fontFamily: 'PlusJakartaSans_700Bold' }]}>
                 Don't have an account?
               </Text>
-              <TouchableOpacity
+              <TouchableOpacity hitSlop={{ top: 15, bottom: 15, left: 15, right: 15 }} 
                 onPress={() => navigation.navigate('Register')}
                 activeOpacity={0.6}
-                hitSlop={{ top: 15, bottom: 15, left: 15, right: 15 }}
+                
               >
                 <Text style={[tw`text-[12px] text-[#3d8c63] underline`, { fontFamily: 'PlusJakartaSans_700Bold' }]}>
                   Sign up

@@ -83,19 +83,19 @@ export default React.memo(function ScreenHeader({ title, subtitle, rightComponen
           {rightComponent}
           
           {/* Help Icon */}
-          <TouchableOpacity 
+          <TouchableOpacity hitSlop={{ top: 15, bottom: 15, left: 15, right: 15 }}  
             onPress={() => setHelpVisible(true)}
-            hitSlop={{ top: 15, bottom: 15, left: 10, right: 10 }}
+            
             style={tw`w-8 h-8 rounded-full bg-white dark:bg-slate-800 items-center justify-center border border-gray-200 dark:border-slate-700 shadow-sm`}
           >
             <MaterialCommunityIcons name="help-circle-outline" size={16} color={isDarkMode ? "#cbd5e1" : "#334155"} />
           </TouchableOpacity>
 
           {/* Theme Toggle */}
-          <TouchableOpacity 
+          <TouchableOpacity hitSlop={{ top: 15, bottom: 15, left: 15, right: 15 }} 
             onPress={handleToggleTheme}
             disabled={isToggling}
-            hitSlop={{ top: 15, bottom: 15, left: 10, right: 10 }}
+            
             style={tw`w-8 h-8 rounded-full bg-white dark:bg-slate-800 items-center justify-center border border-gray-200 dark:border-slate-700 shadow-sm`}
           >
             {isToggling ? (
@@ -110,7 +110,7 @@ export default React.memo(function ScreenHeader({ title, subtitle, rightComponen
           </TouchableOpacity>
 
           {/* More Button */}
-          <TouchableOpacity 
+          <TouchableOpacity hitSlop={{ top: 15, bottom: 15, left: 15, right: 15 }}  
             onPress={() => {
               if (profile?.role === 'staff') {
                 navigation.navigate('StaffMain' as any, { screen: 'Profile' } as any);
@@ -118,7 +118,7 @@ export default React.memo(function ScreenHeader({ title, subtitle, rightComponen
                 navigation.navigate('Main' as any, { screen: 'Profile' } as any);
               }
             }}
-            hitSlop={{ top: 15, bottom: 15, left: 10, right: 15 }}
+            
             style={tw`w-8 h-8 rounded-full bg-white dark:bg-slate-800 items-center justify-center border border-gray-200 dark:border-slate-700 shadow-sm`}
           >
             <MaterialCommunityIcons name="dots-vertical" size={16} color={isDarkMode ? "#cbd5e1" : "#334155"} />

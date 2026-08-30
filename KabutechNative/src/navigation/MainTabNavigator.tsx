@@ -116,7 +116,7 @@ export default function MainTabNavigator() {
           tabBarButton: (props) => (
             <View {...(props as any)} style={[props.style, { opacity: 1 }]} pointerEvents="box-none">
               <View style={tw`absolute -top-10 items-center w-full`}>
-                <TouchableOpacity 
+                <TouchableOpacity hitSlop={{ top: 15, bottom: 15, left: 15, right: 15 }}  
                   onPress={() => navigation.navigate('Report' as never)}
                   style={[
                     tw`w-[58px] h-[58px] bg-[#166534] dark:bg-emerald-600 rounded-full items-center justify-center shadow-lg`,
@@ -172,14 +172,14 @@ export default function MainTabNavigator() {
           </Text>
 
           <View style={tw`flex-row gap-2 w-full`}>
-            <TouchableOpacity 
+            <TouchableOpacity hitSlop={{ top: 15, bottom: 15, left: 15, right: 15 }}  
               onPress={() => setOverrideModalVisible(false)}
               style={tw`flex-1 border border-gray-200 dark:border-slate-600 py-3 rounded-xl items-center`}
             >
               <Text style={[tw`text-[13px] text-slate-700 dark:text-slate-300`, {fontFamily: 'PlusJakartaSans_800ExtraBold'}]}>Cancel</Text>
             </TouchableOpacity>
             
-            <TouchableOpacity 
+            <TouchableOpacity hitSlop={{ top: 15, bottom: 15, left: 15, right: 15 }}  
               onPress={confirmManualMode}
               style={tw`flex-1 bg-orange-500 py-3 rounded-xl items-center justify-center flex-row gap-1`}
             >

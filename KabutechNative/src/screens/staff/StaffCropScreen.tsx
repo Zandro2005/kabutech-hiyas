@@ -211,14 +211,14 @@ export default function StaffCropScreen() {
 
             {/* Action Buttons */}
             <View style={tw`flex-row items-center border-t border-gray-50 dark:border-slate-700 pt-3 gap-2`}>
-              <TouchableOpacity 
+              <TouchableOpacity hitSlop={{ top: 15, bottom: 15, left: 15, right: 15 }}  
                 onPress={() => openActionModal('harvest', rack)}
                 style={tw`flex-1 bg-emerald-50 dark:bg-emerald-900/30 rounded-lg py-2 flex-row items-center justify-center gap-1.5`}
               >
                 <MaterialCommunityIcons name="leaf" size={12} color={tw.color('dark:text-emerald-400') || "#166534"} />
                 <Text style={[tw`text-[10px] text-[#166534] dark:text-emerald-400`, {fontFamily: 'PlusJakartaSans_800ExtraBold'}]}>Harvest</Text>
               </TouchableOpacity>
-              <TouchableOpacity 
+              <TouchableOpacity hitSlop={{ top: 15, bottom: 15, left: 15, right: 15 }}  
                 onPress={() => openActionModal('flag', rack)}
                 style={tw`flex-1 bg-red-50 dark:bg-red-900/30 rounded-lg py-2 flex-row items-center justify-center gap-1.5`}
               >

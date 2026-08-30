@@ -194,10 +194,10 @@ export default function RegisterScreen() {
               onSubmitEditing={() => confirmRef.current?.focus()}
               blurOnSubmit={false}
             />
-            <TouchableOpacity 
+            <TouchableOpacity hitSlop={{ top: 15, bottom: 15, left: 15, right: 15 }}  
               onPress={() => setShowPassword(!showPassword)} 
               style={tw`absolute right-0 h-full px-4 justify-center z-10`}
-              hitSlop={{ top: 15, bottom: 15, left: 15, right: 15 }}
+              
             >
               <MaterialCommunityIcons name={showPassword ? "eye-off-outline" : "eye-outline"} size={20} color="#9ca3af" />
             </TouchableOpacity>
@@ -217,10 +217,10 @@ export default function RegisterScreen() {
               returnKeyType="done"
               onSubmitEditing={handleRegister}
             />
-            <TouchableOpacity 
+            <TouchableOpacity hitSlop={{ top: 15, bottom: 15, left: 15, right: 15 }}  
               onPress={() => setShowConfirmPassword(!showConfirmPassword)} 
               style={tw`absolute right-0 h-full px-4 justify-center z-10`}
-              hitSlop={{ top: 15, bottom: 15, left: 15, right: 15 }}
+              
             >
               <MaterialCommunityIcons name={showConfirmPassword ? "eye-off-outline" : "eye-outline"} size={20} color="#9ca3af" />
             </TouchableOpacity>
@@ -238,7 +238,7 @@ export default function RegisterScreen() {
           <View style={tw`flex-1`} />
 
           {/* Submit Button */}
-          <TouchableOpacity 
+          <TouchableOpacity hitSlop={{ top: 15, bottom: 15, left: 15, right: 15 }}  
             onPress={handleRegister} 
             disabled={loading}
             style={tw`w-full bg-[#3d8c63] py-4 rounded-full items-center shadow-lg mb-6 ${loading ? 'opacity-70' : ''}`}
@@ -252,10 +252,10 @@ export default function RegisterScreen() {
             <Text style={[tw`text-[12px] text-slate-400 mr-1`, { fontFamily: 'PlusJakartaSans_700Bold' }]}>
               Already have an account?
             </Text>
-            <TouchableOpacity 
+            <TouchableOpacity hitSlop={{ top: 15, bottom: 15, left: 15, right: 15 }}  
               onPress={() => navigation.navigate('Login')} 
               activeOpacity={0.6}
-              hitSlop={{ top: 15, bottom: 15, left: 15, right: 15 }}
+              
             >
               <Text style={[tw`text-[12px] text-[#3d8c63] underline`, { fontFamily: 'PlusJakartaSans_700Bold' }]}>
                 Login

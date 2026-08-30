@@ -184,7 +184,7 @@ export default function YieldScreen() {
                 <MaterialCommunityIcons name="flag-outline" size={14} color="#166534" />
                 <Text style={[tw`text-[10px] text-gray-800 dark:text-slate-200 tracking-wide uppercase`, {fontFamily: 'PlusJakartaSans_800ExtraBold'}]}>TARGET</Text>
               </View>
-              <TouchableOpacity 
+              <TouchableOpacity hitSlop={{ top: 15, bottom: 15, left: 15, right: 15 }}  
                 style={tw`bg-gray-100 dark:bg-slate-700 px-2 py-0.5 rounded-full flex-row items-center gap-1`}
                 onPress={() => {
                   setNewTargetYield(targetYieldKg);
@@ -238,7 +238,7 @@ export default function YieldScreen() {
           <View style={tw`bg-white dark:bg-slate-800 w-full rounded-[24px] p-6 shadow-xl`}>
             <View style={tw`flex-row justify-between items-center mb-4`}>
               <Text style={[tw`text-lg text-gray-900 dark:text-white`, {fontFamily: 'PlusJakartaSans_800ExtraBold'}]}>Edit Target Yield</Text>
-              <TouchableOpacity onPress={() => setTargetModalVisible(false)} disabled={isUpdatingTarget}>
+              <TouchableOpacity hitSlop={{ top: 15, bottom: 15, left: 15, right: 15 }}  onPress={() => setTargetModalVisible(false)} disabled={isUpdatingTarget}>
                 <MaterialCommunityIcons name="close" size={24} color={tw.color('gray-400')} />
               </TouchableOpacity>
             </View>
@@ -255,7 +255,7 @@ export default function YieldScreen() {
               editable={!isUpdatingTarget}
             />
             
-            <TouchableOpacity 
+            <TouchableOpacity hitSlop={{ top: 15, bottom: 15, left: 15, right: 15 }}  
               style={tw`bg-emerald-600 dark:bg-emerald-500 rounded-xl py-3.5 items-center justify-center flex-row shadow-sm ${isUpdatingTarget ? 'opacity-70' : ''}`}
               onPress={handleSaveTarget}
               disabled={isUpdatingTarget}

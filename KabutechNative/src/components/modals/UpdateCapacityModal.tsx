@@ -128,7 +128,7 @@ export default function UpdateCapacityModal({ visible, onClose, selectedRack }: 
           <View style={tw`flex-1`}>
             <Text style={tw`text-[10px] font-bold text-gray-500 uppercase tracking-wider mb-1.5`}>ACTIVE BAGS</Text>
             <TextInput
-              style={tw`bg-[#f4fbf7] border border-green-100 rounded-xl px-4 py-3.5 text-gray-900 font-semibold`}
+              style={tw`bg-[#f4fbf7] dark:bg-slate-700 border border-green-100 dark:border-slate-600 rounded-xl px-4 py-3.5 text-gray-900 dark:text-white font-semibold`}
               keyboardType="numeric"
               value={activeBags}
               onChangeText={setActiveBags}
@@ -141,7 +141,7 @@ export default function UpdateCapacityModal({ visible, onClose, selectedRack }: 
             <Text style={tw`text-[10px] font-bold text-gray-500 uppercase tracking-wider mb-1.5`}>EMPTY BAGS</Text>
             <TextInput
               ref={emptyBagsRef}
-              style={tw`bg-[#f4fbf7] border border-green-100 rounded-xl px-4 py-3.5 text-gray-900 font-semibold`}
+              style={tw`bg-[#f4fbf7] dark:bg-slate-700 border border-green-100 dark:border-slate-600 rounded-xl px-4 py-3.5 text-gray-900 dark:text-white font-semibold`}
               keyboardType="numeric"
               value={emptyBags}
               onChangeText={setEmptyBags}
@@ -153,7 +153,7 @@ export default function UpdateCapacityModal({ visible, onClose, selectedRack }: 
 
         <View style={tw`flex-row justify-between items-center mt-2 z-10`}>
           <Text style={tw`text-[11px] font-bold text-gray-600 uppercase tracking-wider`}>TOTAL SLOT CAPACITY:</Text>
-          <Text style={[tw`text-[15px] text-[#032514]`, {fontFamily: 'PlusJakartaSans_800ExtraBold'}]}>{totalCapacity}</Text>
+          <Text style={[tw`text-[15px] text-[#032514] dark:text-emerald-400`, {fontFamily: 'PlusJakartaSans_800ExtraBold'}]}>{totalCapacity}</Text>
         </View>
 
         {errorMsg ? (
@@ -162,10 +162,10 @@ export default function UpdateCapacityModal({ visible, onClose, selectedRack }: 
 
         {/* Actions */}
         <View style={tw`mt-4 z-10`} pointerEvents="box-none">
-          <TouchableOpacity 
+          <TouchableOpacity hitSlop={{ top: 15, bottom: 15, left: 15, right: 15 }}  
             onPress={handleSave}
             disabled={loading}
-            style={tw`w-full bg-[#032514] rounded-xl py-3.5 items-center`}
+            style={tw`w-full bg-[#032514] dark:bg-emerald-600 rounded-xl py-3.5 items-center`}
           >
             <Text style={[tw`text-white text-[13px]`, {fontFamily: 'PlusJakartaSans_800ExtraBold'}]}>
               {loading ? 'Saving...' : 'Save Capacity'}

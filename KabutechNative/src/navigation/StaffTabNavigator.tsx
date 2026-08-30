@@ -99,7 +99,7 @@ export default function StaffTabNavigator() {
           tabBarButton: (props) => (
             <View {...(props as any)} style={[props.style, { opacity: 1 }]} pointerEvents="box-none">
               <View style={tw`absolute -top-10 items-center w-full`}>
-                <TouchableOpacity 
+                <TouchableOpacity hitSlop={{ top: 15, bottom: 15, left: 15, right: 15 }}  
                   onPress={() => navigation.navigate('ActivityLog' as never)} // NOTE: This needs to map correctly
                   style={[
                     tw`w-[58px] h-[58px] bg-[#166534] dark:bg-emerald-600 rounded-full items-center justify-center shadow-lg`,

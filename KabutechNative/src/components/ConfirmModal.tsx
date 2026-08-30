@@ -2,6 +2,8 @@ import React from 'react';
 import { Modal, View, Text, TouchableOpacity, StyleSheet } from 'react-native';
 import { BlurView } from 'expo-blur';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
+import tw from '../tailwind';
+import { useTheme } from '../context/ThemeContext';
 
 interface ConfirmModalProps {
   visible: boolean;
@@ -26,29 +28,31 @@ export default function ConfirmModal({
   onConfirm,
   onCancel,
 }: ConfirmModalProps) {
+  const { isDarkMode } = useTheme();
+
   return (
     <Modal visible={visible} transparent animationType="fade" onRequestClose={onCancel}>
       <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', padding: 24 }}>
         <BlurView intensity={80} tint="dark" style={StyleSheet.absoluteFill} />
         <View style={[StyleSheet.absoluteFill, { backgroundColor: 'rgba(0,0,0,0.50)' }]} />
-        <View style={styles.card}>
+        <View style={[styles.card, isDarkMode && { backgroundColor: '#1e293b' }]}>
           {/* Icon */}
           <View style={[styles.iconCircle, { backgroundColor: confirmColor + '18' }]}>  
             <MaterialCommunityIcons name={iconName as any} size={36} color={confirmColor} />
           </View>
 
           {/* Title */}
-          <Text style={styles.title}>{title}</Text>
+          <Text style={[styles.title, isDarkMode && { color: '#ffffff' }]}>{title}</Text>
 
           {/* Message */}
-          <Text style={styles.message}>{message}</Text>
+          <Text style={[styles.message, isDarkMode && { color: '#cbd5e1' }]}>{message}</Text>
 
           {/* Buttons */}
           <View style={styles.buttonRow}>
-            <TouchableOpacity style={styles.cancelBtn} onPress={onCancel} activeOpacity={0.7}>
-              <Text style={styles.cancelText}>{cancelText}</Text>
+            <TouchableOpacity hitSlop={{ top: 15, bottom: 15, left: 15, right: 15 }}  style={[styles.cancelBtn, isDarkMode && { backgroundColor: '#334155' }]} onPress={onCancel} activeOpacity={0.7}>
+              <Text style={[styles.cancelText, isDarkMode && { color: '#cbd5e1' }]}>{cancelText}</Text>
             </TouchableOpacity>
-            <TouchableOpacity
+            <TouchableOpacity hitSlop={{ top: 15, bottom: 15, left: 15, right: 15 }} 
               style={[styles.confirmBtn, { backgroundColor: confirmColor }]}
               onPress={onConfirm}
               activeOpacity={0.7}

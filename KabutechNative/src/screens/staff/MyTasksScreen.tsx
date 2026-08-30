@@ -160,7 +160,7 @@ export default function MyTasksScreen() {
         </View>
 
         {!isCompleted ? (
-          <TouchableOpacity 
+          <TouchableOpacity hitSlop={{ top: 15, bottom: 15, left: 15, right: 15 }}  
             onPress={() => {
               setSelectedTaskId(task.id);
               setCompleteModalVisible(true);
@@ -188,7 +188,7 @@ export default function MyTasksScreen() {
       
       {/* Header */}
       <View style={tw`flex-row items-center p-4 border-b border-gray-200 dark:border-slate-800 bg-white dark:bg-slate-900`}>
-        <TouchableOpacity onPress={() => navigation.goBack()} style={tw`mr-3 p-1`}>
+        <TouchableOpacity hitSlop={{ top: 15, bottom: 15, left: 15, right: 15 }}  onPress={() => navigation.goBack()} style={tw`mr-3 p-1`}>
           <MaterialCommunityIcons name="arrow-left" size={24} color={isDarkMode ? '#f8fafc' : '#0f172a'} />
         </TouchableOpacity>
         <Text style={[tw`text-lg text-slate-900 dark:text-white`, {fontFamily: 'PlusJakartaSans_800ExtraBold'}]}>My Tasks</Text>
@@ -202,7 +202,7 @@ export default function MyTasksScreen() {
       <>
       {/* Tabs */}
       <View style={tw`flex-row bg-white dark:bg-slate-900 border-b border-gray-200 dark:border-slate-800`}>
-        <TouchableOpacity 
+        <TouchableOpacity hitSlop={{ top: 15, bottom: 15, left: 15, right: 15 }}  
           onPress={() => setFilter('active')}
           style={[tw`flex-1 py-3 items-center border-b-2`, filter === 'active' ? tw`border-emerald-500` : tw`border-transparent`]}
         >
@@ -210,7 +210,7 @@ export default function MyTasksScreen() {
             Active ({activeTasks.length})
           </Text>
         </TouchableOpacity>
-        <TouchableOpacity 
+        <TouchableOpacity hitSlop={{ top: 15, bottom: 15, left: 15, right: 15 }}  
           onPress={() => setFilter('completed')}
           style={[tw`flex-1 py-3 items-center border-b-2`, filter === 'completed' ? tw`border-emerald-500` : tw`border-transparent`]}
         >
@@ -244,7 +244,7 @@ export default function MyTasksScreen() {
           <View style={tw`bg-white dark:bg-slate-800 w-full rounded-[24px] p-6 shadow-xl`}>
             <View style={tw`flex-row justify-between items-center mb-4`}>
               <Text style={[tw`text-lg text-gray-900 dark:text-white`, {fontFamily: 'PlusJakartaSans_800ExtraBold'}]}>Complete Task</Text>
-              <TouchableOpacity onPress={() => setCompleteModalVisible(false)} disabled={isSubmitting}>
+              <TouchableOpacity hitSlop={{ top: 15, bottom: 15, left: 15, right: 15 }}  onPress={() => setCompleteModalVisible(false)} disabled={isSubmitting}>
                 <MaterialCommunityIcons name="close" size={24} color={tw.color('gray-400')} />
               </TouchableOpacity>
             </View>
@@ -264,7 +264,7 @@ export default function MyTasksScreen() {
               editable={!isSubmitting}
             />
             
-            <TouchableOpacity 
+            <TouchableOpacity hitSlop={{ top: 15, bottom: 15, left: 15, right: 15 }}  
               style={tw`bg-emerald-600 dark:bg-emerald-500 rounded-xl py-3.5 items-center justify-center flex-row shadow-sm ${isSubmitting ? 'opacity-70' : ''}`}
               onPress={handleMarkComplete}
               disabled={isSubmitting}

@@ -31,7 +31,7 @@ export default function PendingApprovalScreen() {
         Your account has been created successfully. Please wait for an administrator to approve your access before you can log in.
       </Text>
       
-      <TouchableOpacity 
+      <TouchableOpacity hitSlop={{ top: 15, bottom: 15, left: 15, right: 15 }}  
         onPress={handleLogout}
         style={tw`bg-slate-100 dark:bg-slate-800 px-6 py-3 rounded-full flex-row items-center gap-2`}
       >

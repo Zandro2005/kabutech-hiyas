@@ -117,7 +117,7 @@ export default function StaffHomeScreen() {
 
         {/* Camera Feed */}
         <View style={tw`px-5 mt-6 mb-8`}>
-          <TouchableOpacity
+          <TouchableOpacity hitSlop={{ top: 15, bottom: 15, left: 15, right: 15 }} 
             style={tw`w-full h-[220px] bg-[#0d3d1e] rounded-3xl overflow-hidden shadow-md relative border border-transparent dark:border-slate-800`}
             onPress={() => navigation.navigate('LiveFarm' as never)}
             activeOpacity={0.8}

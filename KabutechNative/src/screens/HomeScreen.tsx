@@ -75,7 +75,7 @@ export default function HomeScreen() {
   const envScore = ((tempScore + humScore) / 2 * 10).toFixed(1);
 
   return (
-    <View style={tw`flex-1 bg-[#dcfce7] dark:bg-[#0f172a]`}>
+    <View style={tw`flex-1 bg-[#dcfce7] dark:bg-[#020617]`}>
       <StatusBar barStyle="light-content" />
       <ScreenHeader />
 
@@ -86,7 +86,7 @@ export default function HomeScreen() {
       ) : (
       <ScrollView style={tw`bg-[#f0f9f4] dark:bg-[#020617]`} contentContainerStyle={tw`pb-36`} showsVerticalScrollIndicator={false}>
         {/* Overscroll Filler to prevent white gap when bouncing */}
-        <View style={[tw`absolute left-0 right-0 bg-[#dcfce7] dark:bg-[#0f172a]`, { top: -500, height: 500 }]} />
+        <View style={[tw`absolute left-0 right-0 bg-[#dcfce7] dark:bg-[#020617]`, { top: -500, height: 500 }]} />
 
 
         {/* Arch Gradient Score Section */}
@@ -146,7 +146,7 @@ export default function HomeScreen() {
 
         {/* Camera Feed */}
         <View style={tw`px-5 mt-6 mb-8`}>
-          <TouchableOpacity
+          <TouchableOpacity hitSlop={{ top: 15, bottom: 15, left: 15, right: 15 }} 
             style={tw`w-full h-[220px] bg-[#0d3d1e] rounded-3xl overflow-hidden shadow-md relative border border-transparent dark:border-slate-800`}
             onPress={() => navigation.navigate('LiveFarm' as never)}
             activeOpacity={0.8}

@@ -111,7 +111,7 @@ export default function AssignTaskScreen() {
       
       {/* Header */}
       <View style={tw`flex-row items-center p-4 border-b border-gray-200 dark:border-slate-800 bg-white dark:bg-slate-900`}>
-        <TouchableOpacity onPress={() => navigation.goBack()} style={tw`mr-3 p-1`}>
+        <TouchableOpacity hitSlop={{ top: 15, bottom: 15, left: 15, right: 15 }}  onPress={() => navigation.goBack()} style={tw`mr-3 p-1`}>
           <MaterialCommunityIcons name="arrow-left" size={24} color={isDarkMode ? '#f8fafc' : '#0f172a'} />
         </TouchableOpacity>
         <Text style={[tw`text-lg text-slate-900 dark:text-white`, {fontFamily: 'PlusJakartaSans_800ExtraBold'}]}>Assign Task</Text>
@@ -146,7 +146,7 @@ export default function AssignTaskScreen() {
           />
 
           <Text style={[tw`text-[11px] text-gray-500 dark:text-slate-400 uppercase tracking-widest mb-2`, {fontFamily: 'PlusJakartaSans_800ExtraBold'}]}>Assign To Staff *</Text>
-          <TouchableOpacity 
+          <TouchableOpacity hitSlop={{ top: 15, bottom: 15, left: 15, right: 15 }}  
             onPress={() => setShowStaffPicker(!showStaffPicker)}
             style={tw`bg-gray-50 dark:bg-slate-900 border border-gray-200 dark:border-slate-700 rounded-xl px-4 py-3.5 flex-row justify-between items-center mb-5`}
           >
@@ -164,7 +164,7 @@ export default function AssignTaskScreen() {
                 </View>
               ) : (
                 staffList.map(staff => (
-                  <TouchableOpacity
+                  <TouchableOpacity hitSlop={{ top: 15, bottom: 15, left: 15, right: 15 }} 
                     key={staff.uid}
                     style={tw`p-3 border-b border-gray-200 dark:border-slate-700`}
                     onPress={() => { setSelectedStaffId(staff.uid); setShowStaffPicker(false); }}
@@ -180,7 +180,7 @@ export default function AssignTaskScreen() {
           <View style={tw`flex-row gap-4 mb-8`}>
             <View style={tw`flex-1`}>
               <Text style={[tw`text-[11px] text-gray-500 dark:text-slate-400 uppercase tracking-widest mb-2`, {fontFamily: 'PlusJakartaSans_800ExtraBold'}]}>Due Date</Text>
-              <TouchableOpacity 
+              <TouchableOpacity hitSlop={{ top: 15, bottom: 15, left: 15, right: 15 }}  
                 onPress={() => setShowDatePicker(true)}
                 style={tw`bg-gray-50 dark:bg-slate-900 border border-gray-200 dark:border-slate-700 rounded-xl px-4 py-3.5 flex-row justify-between items-center`}
               >
@@ -192,7 +192,7 @@ export default function AssignTaskScreen() {
             </View>
             <View style={tw`flex-1`}>
               <Text style={[tw`text-[11px] text-gray-500 dark:text-slate-400 uppercase tracking-widest mb-2`, {fontFamily: 'PlusJakartaSans_800ExtraBold'}]}>Due Time</Text>
-              <TouchableOpacity 
+              <TouchableOpacity hitSlop={{ top: 15, bottom: 15, left: 15, right: 15 }}  
                 onPress={() => setShowTimePicker(true)}
                 style={tw`bg-gray-50 dark:bg-slate-900 border border-gray-200 dark:border-slate-700 rounded-xl px-4 py-3.5 flex-row justify-between items-center`}
               >
@@ -227,7 +227,7 @@ export default function AssignTaskScreen() {
             />
           )}
 
-          <TouchableOpacity 
+          <TouchableOpacity hitSlop={{ top: 15, bottom: 15, left: 15, right: 15 }}  
             style={tw`bg-[#166534] dark:bg-emerald-600 rounded-xl py-4 items-center justify-center flex-row shadow-sm ${isSubmitting ? 'opacity-70' : ''}`}
             onPress={handleSubmit}
             disabled={isSubmitting}

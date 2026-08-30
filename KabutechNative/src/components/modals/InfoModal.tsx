@@ -142,7 +142,7 @@ export default function InfoModal({ visible, onClose, id }: InfoModalProps) {
       onRequestClose={slideOutAndClose}
     >
       <BlurView intensity={60} tint="dark" style={[StyleSheet.absoluteFill, tw`bg-black/60`]}>
-        <TouchableOpacity activeOpacity={1} style={tw`flex-1 justify-center items-center p-4`} onPress={slideOutAndClose}>
+        <TouchableOpacity hitSlop={{ top: 15, bottom: 15, left: 15, right: 15 }}  activeOpacity={1} style={tw`flex-1 justify-center items-center p-4`} onPress={slideOutAndClose}>
             <Animated.View 
               onStartShouldSetResponder={() => true}
               style={[
@@ -162,7 +162,7 @@ export default function InfoModal({ visible, onClose, id }: InfoModalProps) {
                   <View style={tw`flex-1`}>
                     <Text style={[tw`text-xl text-slate-800 dark:text-white`, {fontFamily: 'PlusJakartaSans_800ExtraBold'}]}>{content.title}</Text>
                   </View>
-                  <TouchableOpacity onPress={slideOutAndClose} style={tw`w-8 h-8 rounded-full bg-gray-100 dark:bg-slate-800 items-center justify-center`}>
+                  <TouchableOpacity hitSlop={{ top: 15, bottom: 15, left: 15, right: 15 }}  onPress={slideOutAndClose} style={tw`w-8 h-8 rounded-full bg-gray-100 dark:bg-slate-800 items-center justify-center`}>
                     <MaterialCommunityIcons name="close" size={20} color={isDarkMode ? '#94a3b8' : '#64748b'} />
                   </TouchableOpacity>
                 </View>

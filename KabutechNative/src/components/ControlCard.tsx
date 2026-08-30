@@ -122,7 +122,7 @@ export default function ControlCard({
       {/* BOTTOM ROW: Stepper */}
       <View style={tw`flex-row items-center justify-between bg-gray-50 dark:bg-slate-900/40 rounded-xl p-1`}>
         
-        <TouchableOpacity 
+        <TouchableOpacity hitSlop={{ top: 15, bottom: 15, left: 15, right: 15 }}  
           activeOpacity={0.7}
           onPressIn={startDecrement}
           onPressOut={stopTimer}
@@ -138,7 +138,7 @@ export default function ControlCard({
            <Text style={[tw`text-[8px] text-gray-400 dark:text-slate-500 font-bold mt-0.5`, {fontFamily: 'PlusJakartaSans_700Bold'}]}>{unit.trim()}</Text>
         </View>
 
-        <TouchableOpacity 
+        <TouchableOpacity hitSlop={{ top: 15, bottom: 15, left: 15, right: 15 }}  
           activeOpacity={0.7}
           onPressIn={startIncrement}
           onPressOut={stopTimer}

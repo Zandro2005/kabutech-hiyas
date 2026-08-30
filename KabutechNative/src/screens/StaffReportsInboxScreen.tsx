@@ -70,7 +70,7 @@ export default function StaffReportsInboxScreen() {
       
       {/* Header */}
       <View style={tw`flex-row items-center p-4 border-b border-gray-200 dark:border-slate-800 bg-white dark:bg-slate-900`}>
-        <TouchableOpacity onPress={() => navigation.goBack()} style={tw`mr-3 p-1`}>
+        <TouchableOpacity hitSlop={{ top: 15, bottom: 15, left: 15, right: 15 }}  onPress={() => navigation.goBack()} style={tw`mr-3 p-1`}>
           <MaterialCommunityIcons name="arrow-left" size={24} color={isDarkMode ? '#f8fafc' : '#0f172a'} />
         </TouchableOpacity>
         <Text style={[tw`text-lg text-slate-900 dark:text-white`, {fontFamily: 'PlusJakartaSans_800ExtraBold'}]}>Staff Reports Inbox</Text>
@@ -78,7 +78,7 @@ export default function StaffReportsInboxScreen() {
 
       {/* Tabs */}
       <View style={tw`flex-row bg-white dark:bg-slate-900 border-b border-gray-200 dark:border-slate-800`}>
-        <TouchableOpacity 
+        <TouchableOpacity hitSlop={{ top: 15, bottom: 15, left: 15, right: 15 }}  
           onPress={() => setFilter('pending')}
           style={[tw`flex-1 py-3 items-center border-b-2`, filter === 'pending' ? tw`border-emerald-500` : tw`border-transparent`]}
         >
@@ -86,7 +86,7 @@ export default function StaffReportsInboxScreen() {
             Pending Review ({pendingLogs.length})
           </Text>
         </TouchableOpacity>
-        <TouchableOpacity 
+        <TouchableOpacity hitSlop={{ top: 15, bottom: 15, left: 15, right: 15 }}  
           onPress={() => setFilter('reviewed')}
           style={[tw`flex-1 py-3 items-center border-b-2`, filter === 'reviewed' ? tw`border-emerald-500` : tw`border-transparent`]}
         >
@@ -147,7 +147,7 @@ export default function StaffReportsInboxScreen() {
                 )}
 
                 {filter === 'pending' ? (
-                  <TouchableOpacity 
+                  <TouchableOpacity hitSlop={{ top: 15, bottom: 15, left: 15, right: 15 }}  
                     onPress={() => {
                       setSelectedLogId(log.id);
                       setReviewModalVisible(true);
@@ -177,7 +177,7 @@ export default function StaffReportsInboxScreen() {
           <View style={tw`bg-white dark:bg-slate-800 w-full rounded-[24px] p-6 shadow-xl`}>
             <View style={tw`flex-row justify-between items-center mb-4`}>
               <Text style={[tw`text-lg text-gray-900 dark:text-white`, {fontFamily: 'PlusJakartaSans_800ExtraBold'}]}>Review Report</Text>
-              <TouchableOpacity onPress={() => setReviewModalVisible(false)} disabled={isSubmitting}>
+              <TouchableOpacity hitSlop={{ top: 15, bottom: 15, left: 15, right: 15 }}  onPress={() => setReviewModalVisible(false)} disabled={isSubmitting}>
                 <MaterialCommunityIcons name="close" size={24} color={tw.color('gray-400')} />
               </TouchableOpacity>
             </View>
@@ -197,7 +197,7 @@ export default function StaffReportsInboxScreen() {
               editable={!isSubmitting}
             />
             
-            <TouchableOpacity 
+            <TouchableOpacity hitSlop={{ top: 15, bottom: 15, left: 15, right: 15 }}  
               style={tw`bg-emerald-600 dark:bg-emerald-500 rounded-xl py-3.5 items-center justify-center flex-row shadow-sm ${isSubmitting ? 'opacity-70' : ''}`}
               onPress={handleReview}
               disabled={isSubmitting}
