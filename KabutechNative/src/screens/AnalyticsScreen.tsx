@@ -15,9 +15,9 @@ const generateMockData = (base: number, variance: number, points: number, range:
   return Array.from({ length: points }).map((_, i) => {
     let label = '';
     if (range === '24H' && i % 4 === 0) label = `${i}h`;
-    if (range === '7D' && i % 1 === 0) label = `D${i+1}`;
-    if (range === '30D' && i % 5 === 0) label = `D${i+1}`;
-    
+    if (range === '7D' && i % 1 === 0) label = `D${i + 1}`;
+    if (range === '30D' && i % 5 === 0) label = `D${i + 1}`;
+
     return {
       value: Number((base + (Math.random() * variance * 2 - variance)).toFixed(1)),
       label
@@ -29,7 +29,7 @@ export default function AnalyticsScreen() {
   const { isDarkMode } = useTheme();
   const insets = useSafeAreaInsets();
   const navigation = useNavigation();
-  
+
   const [activeMetric, setActiveMetric] = useState<MetricType>('temp');
   const [activeRange, setActiveRange] = useState<TimeRange>('24H');
 
@@ -66,26 +66,28 @@ export default function AnalyticsScreen() {
   });
 
   return (
-    <View style={[tw`flex-1 bg-[#f0f9f4] dark:bg-[#020617]`, { paddingTop: insets.top }]}>
-      
-      <ScrollView contentContainerStyle={tw`pb-24 pt-6`} showsVerticalScrollIndicator={false}>
+    <View style={[tw`flex-1 bg-[#f8fafc] dark:bg-[#020617]`, { paddingTop: insets.top }]}>
+
+      {/* Simple Custom Back Button */}
+      <View style={tw`flex-row items-center px-4 py-3`}>
+        <TouchableOpacity
+          hitSlop={{ top: 15, bottom: 15, left: 15, right: 15 }}
+          onPress={() => navigation.goBack()}
+          style={tw`w-10 h-10 items-center justify-center rounded-full bg-white dark:bg-slate-800 shadow-sm border border-slate-100 dark:border-slate-700/50`}
+        >
+          <MaterialCommunityIcons name="arrow-left" size={24} color={isDarkMode ? '#f8fafc' : '#334155'} />
+        </TouchableOpacity>
+      </View>
+
+      <ScrollView contentContainerStyle={tw`pb-24 pt-2`} showsVerticalScrollIndicator={false}>
         {/* Header */}
-        <View style={tw`px-6 mb-8 flex-row items-center gap-4`}>
-          <TouchableOpacity 
-            hitSlop={{ top: 15, bottom: 15, left: 15, right: 15 }}
-            onPress={() => navigation.goBack()}
-            style={tw`w-11 h-11 items-center justify-center rounded-2xl bg-white dark:bg-slate-800 shadow-sm border border-slate-100 dark:border-slate-700/50`}
-          >
-            <MaterialCommunityIcons name="arrow-left" size={24} color={isDarkMode ? '#f8fafc' : '#334155'} />
-          </TouchableOpacity>
-          <View>
-            <Text style={[tw`text-2xl text-slate-800 dark:text-slate-100 tracking-wide`, {fontFamily: 'PlusJakartaSans_800ExtraBold'}]}>
-              Climate Analytics
-            </Text>
-            <Text style={[tw`text-xs text-slate-500 dark:text-slate-400 mt-1`, {fontFamily: 'PlusJakartaSans_500Medium'}]}>
-              Historical environmental trends
-            </Text>
-          </View>
+        <View style={tw`px-6 mb-6`}>
+          <Text style={[tw`text-2xl text-slate-800 dark:text-slate-100 tracking-wide`, { fontFamily: 'PlusJakartaSans_800ExtraBold' }]}>
+            Climate Analytics
+          </Text>
+          <Text style={[tw`text-sm text-slate-500 dark:text-slate-400 mt-1`, { fontFamily: 'PlusJakartaSans_500Medium' }]}>
+            Historical environmental trends
+          </Text>
         </View>
 
         {/* Metric Tabs */}
@@ -99,20 +101,20 @@ export default function AnalyticsScreen() {
                 onPress={() => setActiveMetric(key)}
                 style={[
                   tw`px-5 py-2.5 rounded-full border flex-row items-center gap-2`,
-                  isActive 
+                  isActive
                     ? { backgroundColor: info.color, borderColor: info.color }
                     : tw`bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700`
                 ]}
               >
-                <MaterialCommunityIcons 
-                  name={key === 'temp' ? 'thermometer' : key === 'hum' ? 'water-percent' : key === 'light' ? 'white-balance-sunny' : 'molecule-co2'} 
-                  size={16} 
-                  color={isActive ? 'white' : info.color} 
+                <MaterialCommunityIcons
+                  name={key === 'temp' ? 'thermometer' : key === 'hum' ? 'water-percent' : key === 'light' ? 'white-balance-sunny' : 'molecule-co2'}
+                  size={16}
+                  color={isActive ? 'white' : info.color}
                 />
                 <Text style={[
-                  tw`text-xs`, 
+                  tw`text-xs`,
                   isActive ? tw`text-white` : tw`text-slate-600 dark:text-slate-300`,
-                  {fontFamily: 'PlusJakartaSans_700Bold'}
+                  { fontFamily: 'PlusJakartaSans_700Bold' }
                 ]}>
                   {info.label}
                 </Text>
@@ -125,14 +127,14 @@ export default function AnalyticsScreen() {
         <View style={tw`bg-white dark:bg-slate-800 mx-4 rounded-3xl p-5 shadow-sm border border-slate-100 dark:border-slate-700/50 mb-6`}>
           <View style={tw`flex-row justify-between items-start mb-8`}>
             <View>
-              <Text style={[tw`text-3xl text-slate-800 dark:text-white tracking-tighter`, {fontFamily: 'PlusJakartaSans_800ExtraBold'}]}>
-                {avg} <Text style={[tw`text-sm text-slate-500 dark:text-slate-400`, {fontFamily: 'PlusJakartaSans_700Bold'}]}>{currentMetric.unit}</Text>
+              <Text style={[tw`text-3xl text-slate-800 dark:text-white tracking-tighter`, { fontFamily: 'PlusJakartaSans_800ExtraBold' }]}>
+                {avg} <Text style={[tw`text-sm text-slate-500 dark:text-slate-400`, { fontFamily: 'PlusJakartaSans_700Bold' }]}>{currentMetric.unit}</Text>
               </Text>
-              <Text style={[tw`text-[10px] text-slate-500 dark:text-slate-400 mt-1 uppercase tracking-wider`, {fontFamily: 'PlusJakartaSans_800ExtraBold'}]}>
+              <Text style={[tw`text-[10px] text-slate-500 dark:text-slate-400 mt-1 uppercase tracking-wider`, { fontFamily: 'PlusJakartaSans_800ExtraBold' }]}>
                 Average ({activeRange})
               </Text>
             </View>
-            
+
             {/* Time Range Selector */}
             <View style={tw`flex-row bg-slate-100 dark:bg-slate-900 rounded-xl p-1`}>
               {(['24H', '7D', '30D'] as TimeRange[]).map(range => (
@@ -147,7 +149,7 @@ export default function AnalyticsScreen() {
                   <Text style={[
                     tw`text-[10px]`,
                     activeRange === range ? tw`text-slate-800 dark:text-white` : tw`text-slate-500 dark:text-slate-400`,
-                    {fontFamily: 'PlusJakartaSans_700Bold'}
+                    { fontFamily: 'PlusJakartaSans_700Bold' }
                   ]}>
                     {range}
                   </Text>
@@ -158,12 +160,12 @@ export default function AnalyticsScreen() {
 
           {/* Pure JS Line Graph Area */}
           <View style={[tw`flex-row`, { height: chartHeight + 20 }]}>
-            
+
             {/* Y-Axis Labels */}
             <View style={[tw`justify-between pr-3 pb-5`, { height: chartHeight + 20 }]}>
-              <Text style={[tw`text-[9px] text-slate-400`, {fontFamily: 'PlusJakartaSans_700Bold'}]}>{maxDataValue.toFixed(0)}</Text>
-              <Text style={[tw`text-[9px] text-slate-400`, {fontFamily: 'PlusJakartaSans_700Bold'}]}>{((maxDataValue + minDataValue) / 2).toFixed(0)}</Text>
-              <Text style={[tw`text-[9px] text-slate-400`, {fontFamily: 'PlusJakartaSans_700Bold'}]}>{minDataValue.toFixed(0)}</Text>
+              <Text style={[tw`text-[9px] text-slate-400`, { fontFamily: 'PlusJakartaSans_700Bold' }]}>{maxDataValue.toFixed(0)}</Text>
+              <Text style={[tw`text-[9px] text-slate-400`, { fontFamily: 'PlusJakartaSans_700Bold' }]}>{((maxDataValue + minDataValue) / 2).toFixed(0)}</Text>
+              <Text style={[tw`text-[9px] text-slate-400`, { fontFamily: 'PlusJakartaSans_700Bold' }]}>{minDataValue.toFixed(0)}</Text>
             </View>
 
             {/* Graph Canvas */}
@@ -181,7 +183,7 @@ export default function AnalyticsScreen() {
                 const dy = p.y - prev.y;
                 const length = Math.sqrt(dx * dx + dy * dy);
                 const angle = Math.atan2(dy, dx) * (180 / Math.PI);
-                
+
                 return (
                   <View
                     key={`line-${i}`}
@@ -209,19 +211,14 @@ export default function AnalyticsScreen() {
                   key={`point-${i}`}
                   style={{
                     position: 'absolute',
-                    left: p.x - 5,
-                    top: p.y - 5,
-                    width: 10,
-                    height: 10,
-                    borderRadius: 5,
-                    backgroundColor: isDarkMode ? '#0f172a' : 'white',
-                    borderWidth: 2.5,
-                    borderColor: currentMetric.color,
-                    elevation: 2,
-                    shadowColor: currentMetric.color,
-                    shadowOpacity: 0.3,
-                    shadowRadius: 3,
-                    shadowOffset: { width: 0, height: 2 }
+                    left: p.x - 4,
+                    top: p.y - 4,
+                    width: 8,
+                    height: 8,
+                    borderRadius: 4,
+                    backgroundColor: 'white',
+                    borderWidth: 2,
+                    borderColor: currentMetric.color
                   }}
                 />
               ))}
@@ -240,7 +237,7 @@ export default function AnalyticsScreen() {
                       alignItems: 'center'
                     }}
                   >
-                    <Text style={[tw`text-[9px] text-slate-400`, {fontFamily: 'PlusJakartaSans_700Bold'}]}>
+                    <Text style={[tw`text-[9px] text-slate-400`, { fontFamily: 'PlusJakartaSans_700Bold' }]}>
                       {p.label}
                     </Text>
                   </View>
@@ -253,27 +250,27 @@ export default function AnalyticsScreen() {
         {/* Min/Max Summary Cards */}
         <View style={tw`px-6 flex-row justify-between`}>
           <View style={tw`w-[48%] bg-white dark:bg-slate-800 rounded-3xl p-5 shadow-sm border border-slate-100 dark:border-slate-700/50`}>
-             <View style={tw`flex-row items-center gap-2 mb-3`}>
-               <View style={tw`w-6 h-6 rounded-full bg-slate-100 dark:bg-slate-700 items-center justify-center`}>
-                 <MaterialCommunityIcons name="arrow-down-thick" size={12} color={currentMetric.color} />
-               </View>
-               <Text style={[tw`text-xs text-slate-500 dark:text-slate-400`, {fontFamily: 'PlusJakartaSans_700Bold'}]}>Minimum</Text>
-             </View>
-             <Text style={[tw`text-2xl text-slate-800 dark:text-white`, {fontFamily: 'PlusJakartaSans_800ExtraBold'}]}>
-               {min} <Text style={[tw`text-xs text-slate-500 dark:text-slate-400`, {fontFamily: 'PlusJakartaSans_700Bold'}]}>{currentMetric.unit}</Text>
-             </Text>
+            <View style={tw`flex-row items-center gap-2 mb-3`}>
+              <View style={tw`w-6 h-6 rounded-full bg-slate-100 dark:bg-slate-700 items-center justify-center`}>
+                <MaterialCommunityIcons name="arrow-down-thick" size={12} color={currentMetric.color} />
+              </View>
+              <Text style={[tw`text-xs text-slate-500 dark:text-slate-400`, { fontFamily: 'PlusJakartaSans_700Bold' }]}>Minimum</Text>
+            </View>
+            <Text style={[tw`text-2xl text-slate-800 dark:text-white`, { fontFamily: 'PlusJakartaSans_800ExtraBold' }]}>
+              {min} <Text style={[tw`text-xs text-slate-500 dark:text-slate-400`, { fontFamily: 'PlusJakartaSans_700Bold' }]}>{currentMetric.unit}</Text>
+            </Text>
           </View>
-          
+
           <View style={tw`w-[48%] bg-white dark:bg-slate-800 rounded-3xl p-5 shadow-sm border border-slate-100 dark:border-slate-700/50`}>
-             <View style={tw`flex-row items-center gap-2 mb-3`}>
-               <View style={tw`w-6 h-6 rounded-full bg-slate-100 dark:bg-slate-700 items-center justify-center`}>
-                 <MaterialCommunityIcons name="arrow-up-thick" size={12} color={currentMetric.color} />
-               </View>
-               <Text style={[tw`text-xs text-slate-500 dark:text-slate-400`, {fontFamily: 'PlusJakartaSans_700Bold'}]}>Maximum</Text>
-             </View>
-             <Text style={[tw`text-2xl text-slate-800 dark:text-white`, {fontFamily: 'PlusJakartaSans_800ExtraBold'}]}>
-               {max} <Text style={[tw`text-xs text-slate-500 dark:text-slate-400`, {fontFamily: 'PlusJakartaSans_700Bold'}]}>{currentMetric.unit}</Text>
-             </Text>
+            <View style={tw`flex-row items-center gap-2 mb-3`}>
+              <View style={tw`w-6 h-6 rounded-full bg-slate-100 dark:bg-slate-700 items-center justify-center`}>
+                <MaterialCommunityIcons name="arrow-up-thick" size={12} color={currentMetric.color} />
+              </View>
+              <Text style={[tw`text-xs text-slate-500 dark:text-slate-400`, { fontFamily: 'PlusJakartaSans_700Bold' }]}>Maximum</Text>
+            </View>
+            <Text style={[tw`text-2xl text-slate-800 dark:text-white`, { fontFamily: 'PlusJakartaSans_800ExtraBold' }]}>
+              {max} <Text style={[tw`text-xs text-slate-500 dark:text-slate-400`, { fontFamily: 'PlusJakartaSans_700Bold' }]}>{currentMetric.unit}</Text>
+            </Text>
           </View>
         </View>
 

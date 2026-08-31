@@ -50,30 +50,30 @@ export default function ReportScreen() {
   useEffect(() => {
     const currentTime = Date.now();
     ['fans', 'misters', 'lights', 'co2'].forEach(device => {
-       if (settings?.setpoints?.devices?.[device as keyof typeof settings.setpoints.devices]) {
-          if (!globalStartTimes[device]) globalStartTimes[device] = currentTime;
-       } else {
-          delete globalStartTimes[device];
-       }
+      if (settings?.setpoints?.devices?.[device as keyof typeof settings.setpoints.devices]) {
+        if (!globalStartTimes[device]) globalStartTimes[device] = currentTime;
+      } else {
+        delete globalStartTimes[device];
+      }
     });
   }, [settings?.setpoints?.devices]);
 
   const getElapsed = (device: string) => {
-     let goalSecs = 30;
-     if (device === 'misters') goalSecs = 10;
+    let goalSecs = 30;
+    if (device === 'misters') goalSecs = 10;
 
-     const goalM = Math.floor(goalSecs / 60).toString().padStart(2, '0');
-     const goalS = (goalSecs % 60).toString().padStart(2, '0');
-     const goalStr = `${goalM}:${goalS}`;
+    const goalM = Math.floor(goalSecs / 60).toString().padStart(2, '0');
+    const goalS = (goalSecs % 60).toString().padStart(2, '0');
+    const goalStr = `${goalM}:${goalS}`;
 
-     if (!globalStartTimes[device]) return { current: "00:00", goal: goalStr };
-     const diff = Math.floor((now - globalStartTimes[device]) / 1000);
-     if (diff < 0) return { current: "00:00", goal: goalStr };
-     
-     const cappedDiff = Math.min(diff, goalSecs);
-     const m = Math.floor(cappedDiff / 60).toString().padStart(2, '0');
-     const s = (cappedDiff % 60).toString().padStart(2, '0');
-     return { current: `${m}:${s}`, goal: goalStr };
+    if (!globalStartTimes[device]) return { current: "00:00", goal: goalStr };
+    const diff = Math.floor((now - globalStartTimes[device]) / 1000);
+    if (diff < 0) return { current: "00:00", goal: goalStr };
+
+    const cappedDiff = Math.min(diff, goalSecs);
+    const m = Math.floor(cappedDiff / 60).toString().padStart(2, '0');
+    const s = (cappedDiff % 60).toString().padStart(2, '0');
+    return { current: `${m}:${s}`, goal: goalStr };
   };
 
   const setProcessingState = (state: string | false) => {
@@ -88,7 +88,7 @@ export default function ReportScreen() {
     const stateSub = DeviceEventEmitter.addListener('processingStateChanged', (state) => {
       setIsProcessing(state);
     });
-    
+
     // Sync just in case it changed while unmounted
     setIsProcessing(isGlobalProcessing);
 
@@ -158,12 +158,12 @@ export default function ReportScreen() {
     setProcessingState('all');
     try {
       await update(ref(db, 'kabutech/settings/setpoints'), { mode: 'manual', aiOverride: true });
-      
+
       const updates: any = {};
       if (selectedActions.fans) updates.fans = true;
       if (selectedActions.misters) updates.misters = true;
       if (selectedActions.co2) updates.co2 = true;
-      
+
       await update(ref(db, `kabutech/settings/setpoints/devices`), updates);
 
       showToast({
@@ -182,7 +182,7 @@ export default function ReportScreen() {
               SoundManager.playRing();
               showToast({ type: 'info', text1: 'AI Task Complete', text2: 'Pulse misting finished.' });
             }
-          } catch (e) {}
+          } catch (e) { }
         }, 10000); // 10 seconds
         globalTimeouts.push(mistTimeoutId);
       }
@@ -194,7 +194,7 @@ export default function ReportScreen() {
             if (selectedActions.fans) revertUpdates.fans = false;
             if (selectedActions.co2) revertUpdates.co2 = false;
             if (selectedActions.misters && maxDuration === 10000) revertUpdates.misters = false;
-            
+
             update(ref(db, `kabutech/settings/setpoints/devices`), revertUpdates);
             update(ref(db, 'kabutech/settings/setpoints'), { mode: 'auto', aiOverride: false });
 
@@ -285,9 +285,9 @@ export default function ReportScreen() {
   };
 
   return (
-    <View style={tw`flex-1 bg-[#f0f9f4] dark:bg-[#020617]`}>
+    <View style={tw`flex-1 bg-[#f4f7fa] dark:bg-[#020617]`}>
       <StatusBar barStyle="dark-content" backgroundColor="transparent" translucent />
-      
+
       <ScrollView contentContainerStyle={[tw`px-5 pb-32`, { paddingTop: insets.top + 20 }]} showsVerticalScrollIndicator={false}>
 
         {/* Header */}
@@ -315,28 +315,28 @@ export default function ReportScreen() {
           <View style={tw`absolute -top-12 -left-10 w-32 h-32 rounded-full bg-white/10`} />
           <View style={tw`absolute -bottom-16 -right-10 w-40 h-40 rounded-full bg-black/10`} />
 
-          <Text style={[tw`text-blue-100 text-xs mb-1 tracking-wider uppercase`, {fontFamily: 'PlusJakartaSans_700Bold'}]}>Critical Forecast</Text>
-          <Text style={[tw`text-white text-3xl mb-6`, {fontFamily: 'PlusJakartaSans_800ExtraBold'}]}>26.5°C Peak</Text>
-          
+          <Text style={[tw`text-blue-100 text-xs mb-1 tracking-wider uppercase`, { fontFamily: 'PlusJakartaSans_700Bold' }]}>Critical Forecast</Text>
+          <Text style={[tw`text-white text-3xl mb-6`, { fontFamily: 'PlusJakartaSans_800ExtraBold' }]}>26.5°C Peak</Text>
+
           <View style={tw`flex-row justify-between w-full mb-5 px-2`}>
             <View style={tw`items-center flex-1`}>
-              <Text style={[tw`text-blue-200 text-[11px] mb-1`, {fontFamily: 'PlusJakartaSans_500Medium'}]}>Target</Text>
-              <Text style={[tw`text-white text-xl`, {fontFamily: 'PlusJakartaSans_800ExtraBold'}]}>24.0°C</Text>
+              <Text style={[tw`text-blue-200 text-[11px] mb-1`, { fontFamily: 'PlusJakartaSans_500Medium' }]}>Target</Text>
+              <Text style={[tw`text-white text-xl`, { fontFamily: 'PlusJakartaSans_800ExtraBold' }]}>24.0°C</Text>
             </View>
             <View style={tw`w-[1px] h-full bg-blue-400/50`} />
             <View style={tw`items-center flex-1`}>
-              <Text style={[tw`text-blue-200 text-[11px] mb-1`, {fontFamily: 'PlusJakartaSans_500Medium'}]}>Variance</Text>
-              <Text style={[tw`text-white text-xl`, {fontFamily: 'PlusJakartaSans_800ExtraBold'}]}>+2.5°C</Text>
+              <Text style={[tw`text-blue-200 text-[11px] mb-1`, { fontFamily: 'PlusJakartaSans_500Medium' }]}>Variance</Text>
+              <Text style={[tw`text-white text-xl`, { fontFamily: 'PlusJakartaSans_800ExtraBold' }]}>+2.5°C</Text>
             </View>
             <View style={tw`w-[1px] h-full bg-blue-400/50`} />
             <View style={tw`items-center flex-1`}>
-              <Text style={[tw`text-blue-200 text-[11px] mb-1`, {fontFamily: 'PlusJakartaSans_500Medium'}]}>ETA</Text>
-              <Text style={[tw`text-white text-xl`, {fontFamily: 'PlusJakartaSans_800ExtraBold'}]}>in 2 hrs</Text>
+              <Text style={[tw`text-blue-200 text-[11px] mb-1`, { fontFamily: 'PlusJakartaSans_500Medium' }]}>ETA</Text>
+              <Text style={[tw`text-white text-xl`, { fontFamily: 'PlusJakartaSans_800ExtraBold' }]}>in 2 hrs</Text>
             </View>
           </View>
 
           <View style={tw`bg-[#10b981] px-4 py-1.5 rounded-full shadow-sm`}>
-            <Text style={[tw`text-white text-xs tracking-wider`, {fontFamily: 'PlusJakartaSans_800ExtraBold'}]}>Model Active</Text>
+            <Text style={[tw`text-white text-xs tracking-wider`, { fontFamily: 'PlusJakartaSans_800ExtraBold' }]}>Model Active</Text>
           </View>
         </View>
 
@@ -345,78 +345,78 @@ export default function ReportScreen() {
           <View style={tw`w-[48%] bg-white dark:bg-slate-800 rounded-[24px] p-5 shadow-sm border border-slate-100 dark:border-slate-700/50`}>
             <View style={tw`flex-row items-center gap-1.5 mb-2`}>
               <MaterialCommunityIcons name="brain" size={16} color="#3b82f6" />
-              <Text style={[tw`text-xs text-slate-500 dark:text-slate-400`, {fontFamily: 'PlusJakartaSans_700Bold'}]}>Confidence:</Text>
+              <Text style={[tw`text-xs text-slate-500 dark:text-slate-400`, { fontFamily: 'PlusJakartaSans_700Bold' }]}>Confidence:</Text>
             </View>
             <View style={tw`flex-row items-baseline gap-1`}>
-              <Text style={[tw`text-3xl text-slate-800 dark:text-white tracking-tight`, {fontFamily: 'PlusJakartaSans_800ExtraBold'}]}>94</Text>
-              <Text style={[tw`text-[13px] text-slate-500 dark:text-slate-400`, {fontFamily: 'PlusJakartaSans_700Bold'}]}>%</Text>
+              <Text style={[tw`text-3xl text-slate-800 dark:text-white tracking-tight`, { fontFamily: 'PlusJakartaSans_800ExtraBold' }]}>94</Text>
+              <Text style={[tw`text-[13px] text-slate-500 dark:text-slate-400`, { fontFamily: 'PlusJakartaSans_700Bold' }]}>%</Text>
             </View>
           </View>
 
           <View style={tw`w-[48%] bg-white dark:bg-slate-800 rounded-[24px] p-5 shadow-sm border border-slate-100 dark:border-slate-700/50`}>
             <View style={tw`flex-row items-center gap-1.5 mb-2`}>
               <MaterialCommunityIcons name="update" size={16} color="#3b82f6" />
-              <Text style={[tw`text-xs text-slate-500 dark:text-slate-400`, {fontFamily: 'PlusJakartaSans_700Bold'}]}>Next Scan:</Text>
+              <Text style={[tw`text-xs text-slate-500 dark:text-slate-400`, { fontFamily: 'PlusJakartaSans_700Bold' }]}>Next Scan:</Text>
             </View>
             <View style={tw`flex-row items-baseline gap-1`}>
-              <Text style={[tw`text-3xl text-slate-800 dark:text-white tracking-tight`, {fontFamily: 'PlusJakartaSans_800ExtraBold'}]}>10</Text>
-              <Text style={[tw`text-[13px] text-slate-500 dark:text-slate-400`, {fontFamily: 'PlusJakartaSans_700Bold'}]}>min</Text>
+              <Text style={[tw`text-3xl text-slate-800 dark:text-white tracking-tight`, { fontFamily: 'PlusJakartaSans_800ExtraBold' }]}>10</Text>
+              <Text style={[tw`text-[13px] text-slate-500 dark:text-slate-400`, { fontFamily: 'PlusJakartaSans_700Bold' }]}>min</Text>
             </View>
           </View>
         </View>
 
         {/* Equipment Timers */}
-        <Text style={[tw`text-[17px] text-slate-800 dark:text-white mb-4 pl-1`, {fontFamily: 'PlusJakartaSans_800ExtraBold'}]}>Active Overrides</Text>
+        <Text style={[tw`text-[17px] text-slate-800 dark:text-white mb-4 pl-1`, { fontFamily: 'PlusJakartaSans_800ExtraBold' }]}>Active Overrides</Text>
         <View style={tw`bg-white dark:bg-slate-800 rounded-[28px] p-5 shadow-sm border border-slate-100 dark:border-slate-700/50 flex-row justify-between mb-8`}>
           {['fans', 'misters', 'lights', 'co2'].map(device => {
-             const active = settings?.setpoints?.devices?.[device as keyof typeof settings.setpoints.devices];
-             const color = device === 'fans' ? '#3b82f6' : device === 'misters' ? '#10b981' : device === 'lights' ? '#f59e0b' : '#8b5cf6';
-             let bgClass = tw`bg-slate-50 dark:bg-slate-700/50`;
-             if (active) {
-                if (device === 'fans') bgClass = tw`bg-blue-50 dark:bg-blue-500/20 border-2 border-blue-100 dark:border-blue-500/30`;
-                if (device === 'misters') bgClass = tw`bg-emerald-50 dark:bg-emerald-500/20 border-2 border-emerald-100 dark:border-emerald-500/30`;
-                if (device === 'lights') bgClass = tw`bg-amber-50 dark:bg-amber-500/20 border-2 border-amber-100 dark:border-amber-500/30`;
-                if (device === 'co2') bgClass = tw`bg-purple-50 dark:bg-purple-500/20 border-2 border-purple-100 dark:border-purple-500/30`;
-             }
-             
-             return (
-               <View key={device} style={tw`items-center flex-1`}>
-                 <View style={[tw`w-[48px] h-[48px] rounded-full items-center justify-center mb-2`, bgClass]}>
-                   <MaterialCommunityIcons 
-                     name={device === 'fans' ? 'fan' : device === 'misters' ? 'water' : device === 'lights' ? 'lightbulb-on' : 'weather-windy'} 
-                     size={22} 
-                     color={active ? color : '#94a3b8'} 
-                   />
-                 </View>
-                 <Text style={[tw`text-[10px] mb-1.5 uppercase tracking-wider`, {fontFamily: 'PlusJakartaSans_700Bold', color: active ? color : '#94a3b8'}]}>{device}</Text>
-                 <Text style={[tw`text-[13px]`, {fontFamily: 'PlusJakartaSans_800ExtraBold', color: active ? color : '#cbd5e1'}]}>
-                   {getElapsed(device).current}
-                 </Text>
-                 <View style={tw`h-[1.5px] w-6 bg-slate-100 dark:bg-slate-700/50 my-1 rounded-full`} />
-                 <Text style={[tw`text-[10px]`, {fontFamily: 'PlusJakartaSans_600SemiBold', color: '#94a3b8'}]}>
-                   {getElapsed(device).goal}
-                 </Text>
-               </View>
-             );
+            const active = settings?.setpoints?.devices?.[device as keyof typeof settings.setpoints.devices];
+            const color = device === 'fans' ? '#3b82f6' : device === 'misters' ? '#10b981' : device === 'lights' ? '#f59e0b' : '#8b5cf6';
+            let bgClass = tw`bg-slate-50 dark:bg-slate-700/50`;
+            if (active) {
+              if (device === 'fans') bgClass = tw`bg-blue-50 dark:bg-blue-500/20 border-2 border-blue-100 dark:border-blue-500/30`;
+              if (device === 'misters') bgClass = tw`bg-emerald-50 dark:bg-emerald-500/20 border-2 border-emerald-100 dark:border-emerald-500/30`;
+              if (device === 'lights') bgClass = tw`bg-amber-50 dark:bg-amber-500/20 border-2 border-amber-100 dark:border-amber-500/30`;
+              if (device === 'co2') bgClass = tw`bg-purple-50 dark:bg-purple-500/20 border-2 border-purple-100 dark:border-purple-500/30`;
+            }
+
+            return (
+              <View key={device} style={tw`items-center flex-1`}>
+                <View style={[tw`w-[48px] h-[48px] rounded-full items-center justify-center mb-2`, bgClass]}>
+                  <MaterialCommunityIcons
+                    name={device === 'fans' ? 'fan' : device === 'misters' ? 'water' : device === 'lights' ? 'lightbulb-on' : 'weather-windy'}
+                    size={22}
+                    color={active ? color : '#94a3b8'}
+                  />
+                </View>
+                <Text style={[tw`text-[10px] mb-1.5 uppercase tracking-wider`, { fontFamily: 'PlusJakartaSans_700Bold', color: active ? color : '#94a3b8' }]}>{device}</Text>
+                <Text style={[tw`text-[13px]`, { fontFamily: 'PlusJakartaSans_800ExtraBold', color: active ? color : '#cbd5e1' }]}>
+                  {getElapsed(device).current}
+                </Text>
+                <View style={tw`h-[1.5px] w-6 bg-slate-100 dark:bg-slate-700/50 my-1 rounded-full`} />
+                <Text style={[tw`text-[10px]`, { fontFamily: 'PlusJakartaSans_600SemiBold', color: '#94a3b8' }]}>
+                  {getElapsed(device).goal}
+                </Text>
+              </View>
+            );
           })}
         </View>
 
         {/* Metrics Grid */}
-        <Text style={[tw`text-[17px] text-slate-800 dark:text-white mb-4 pl-1`, {fontFamily: 'PlusJakartaSans_800ExtraBold'}]}>Future Sensor Values (2h)</Text>
+        <Text style={[tw`text-[17px] text-slate-800 dark:text-white mb-4 pl-1`, { fontFamily: 'PlusJakartaSans_800ExtraBold' }]}>Future Sensor Values (2h)</Text>
         <View style={tw`flex-row flex-wrap justify-between`}>
-          
+
           {/* Temp */}
           <View style={tw`w-[48%] bg-white dark:bg-slate-800 rounded-[24px] p-5 shadow-sm border border-slate-100 dark:border-slate-700/50 mb-4`}>
             <View style={tw`flex-row items-center gap-1.5 mb-3`}>
               <MaterialCommunityIcons name="thermometer" size={16} color="#ef4444" />
-              <Text style={[tw`text-[11px] text-slate-500 dark:text-slate-400`, {fontFamily: 'PlusJakartaSans_700Bold'}]}>Predicted Temp:</Text>
+              <Text style={[tw`text-[11px] text-slate-500 dark:text-slate-400`, { fontFamily: 'PlusJakartaSans_700Bold' }]}>Predicted Temp:</Text>
             </View>
             <View style={tw`flex-row items-baseline justify-center gap-1 mb-4`}>
-              <Text style={[tw`text-3xl text-slate-800 dark:text-white tracking-tight`, {fontFamily: 'PlusJakartaSans_800ExtraBold'}]}>26.5</Text>
-              <Text style={[tw`text-xs text-slate-500 dark:text-slate-400`, {fontFamily: 'PlusJakartaSans_700Bold'}]}>°C</Text>
+              <Text style={[tw`text-3xl text-slate-800 dark:text-white tracking-tight`, { fontFamily: 'PlusJakartaSans_800ExtraBold' }]}>26.5</Text>
+              <Text style={[tw`text-xs text-slate-500 dark:text-slate-400`, { fontFamily: 'PlusJakartaSans_700Bold' }]}>°C</Text>
             </View>
             <View style={tw`bg-red-50 dark:bg-red-500/10 py-2.5 px-3 rounded-xl border border-red-100 dark:border-red-900/30`}>
-              <Text style={[tw`text-[10px] text-red-600 dark:text-red-400 leading-4`, {fontFamily: 'PlusJakartaSans_700Bold'}]}>+2.5°C over target. Peak heat expected in 2h.</Text>
+              <Text style={[tw`text-[10px] text-red-600 dark:text-red-400 leading-4`, { fontFamily: 'PlusJakartaSans_700Bold' }]}>+2.5°C over target. Peak heat expected in 2h.</Text>
             </View>
           </View>
 
@@ -424,14 +424,14 @@ export default function ReportScreen() {
           <View style={tw`w-[48%] bg-white dark:bg-slate-800 rounded-[24px] p-5 shadow-sm border border-slate-100 dark:border-slate-700/50 mb-4`}>
             <View style={tw`flex-row items-center gap-1.5 mb-3`}>
               <MaterialCommunityIcons name="water-percent" size={18} color="#3b82f6" />
-              <Text style={[tw`text-[11px] text-slate-500 dark:text-slate-400`, {fontFamily: 'PlusJakartaSans_700Bold'}]}>Predicted Hum:</Text>
+              <Text style={[tw`text-[11px] text-slate-500 dark:text-slate-400`, { fontFamily: 'PlusJakartaSans_700Bold' }]}>Predicted Hum:</Text>
             </View>
             <View style={tw`flex-row items-baseline justify-center gap-1 mb-4`}>
-              <Text style={[tw`text-3xl text-slate-800 dark:text-white tracking-tight`, {fontFamily: 'PlusJakartaSans_800ExtraBold'}]}>60</Text>
-              <Text style={[tw`text-xs text-slate-500 dark:text-slate-400`, {fontFamily: 'PlusJakartaSans_700Bold'}]}>%</Text>
+              <Text style={[tw`text-3xl text-slate-800 dark:text-white tracking-tight`, { fontFamily: 'PlusJakartaSans_800ExtraBold' }]}>60</Text>
+              <Text style={[tw`text-xs text-slate-500 dark:text-slate-400`, { fontFamily: 'PlusJakartaSans_700Bold' }]}>%</Text>
             </View>
             <View style={tw`bg-blue-50 dark:bg-blue-500/10 py-2.5 px-3 rounded-xl border border-blue-100 dark:border-blue-900/30`}>
-              <Text style={[tw`text-[10px] text-blue-600 dark:text-blue-400 leading-4`, {fontFamily: 'PlusJakartaSans_700Bold'}]}>Approaching low threshold. Misting advised.</Text>
+              <Text style={[tw`text-[10px] text-blue-600 dark:text-blue-400 leading-4`, { fontFamily: 'PlusJakartaSans_700Bold' }]}>Approaching low threshold. Misting advised.</Text>
             </View>
           </View>
 
@@ -439,14 +439,14 @@ export default function ReportScreen() {
           <View style={tw`w-[48%] bg-white dark:bg-slate-800 rounded-[24px] p-5 shadow-sm border border-slate-100 dark:border-slate-700/50 mb-4`}>
             <View style={tw`flex-row items-center gap-1.5 mb-3`}>
               <MaterialCommunityIcons name="white-balance-sunny" size={16} color="#f59e0b" />
-              <Text style={[tw`text-[11px] text-slate-500 dark:text-slate-400`, {fontFamily: 'PlusJakartaSans_700Bold'}]}>Predicted Lux:</Text>
+              <Text style={[tw`text-[11px] text-slate-500 dark:text-slate-400`, { fontFamily: 'PlusJakartaSans_700Bold' }]}>Predicted Lux:</Text>
             </View>
             <View style={tw`flex-row items-baseline justify-center gap-1 mb-4`}>
-              <Text style={[tw`text-3xl text-slate-800 dark:text-white tracking-tight`, {fontFamily: 'PlusJakartaSans_800ExtraBold'}]}>400</Text>
-              <Text style={[tw`text-xs text-slate-500 dark:text-slate-400`, {fontFamily: 'PlusJakartaSans_700Bold'}]}>lux</Text>
+              <Text style={[tw`text-3xl text-slate-800 dark:text-white tracking-tight`, { fontFamily: 'PlusJakartaSans_800ExtraBold' }]}>400</Text>
+              <Text style={[tw`text-xs text-slate-500 dark:text-slate-400`, { fontFamily: 'PlusJakartaSans_700Bold' }]}>lux</Text>
             </View>
             <View style={tw`bg-emerald-50 dark:bg-emerald-500/10 py-2.5 px-3 rounded-xl border border-emerald-100 dark:border-emerald-900/30`}>
-              <Text style={[tw`text-[10px] text-emerald-600 dark:text-emerald-400 leading-4`, {fontFamily: 'PlusJakartaSans_700Bold'}]}>Stable lighting levels. No action required.</Text>
+              <Text style={[tw`text-[10px] text-emerald-600 dark:text-emerald-400 leading-4`, { fontFamily: 'PlusJakartaSans_700Bold' }]}>Stable lighting levels. No action required.</Text>
             </View>
           </View>
 
@@ -454,14 +454,14 @@ export default function ReportScreen() {
           <View style={tw`w-[48%] bg-white dark:bg-slate-800 rounded-[24px] p-5 shadow-sm border border-slate-100 dark:border-slate-700/50 mb-4`}>
             <View style={tw`flex-row items-center gap-1.5 mb-3`}>
               <MaterialCommunityIcons name="molecule-co2" size={16} color="#8b5cf6" />
-              <Text style={[tw`text-[11px] text-slate-500 dark:text-slate-400`, {fontFamily: 'PlusJakartaSans_700Bold'}]}>Predicted CO2:</Text>
+              <Text style={[tw`text-[11px] text-slate-500 dark:text-slate-400`, { fontFamily: 'PlusJakartaSans_700Bold' }]}>Predicted CO2:</Text>
             </View>
             <View style={tw`flex-row items-baseline justify-center gap-1 mb-4`}>
-              <Text style={[tw`text-3xl text-slate-800 dark:text-white tracking-tight`, {fontFamily: 'PlusJakartaSans_800ExtraBold'}]}>980</Text>
-              <Text style={[tw`text-xs text-slate-500 dark:text-slate-400`, {fontFamily: 'PlusJakartaSans_700Bold'}]}>ppm</Text>
+              <Text style={[tw`text-3xl text-slate-800 dark:text-white tracking-tight`, { fontFamily: 'PlusJakartaSans_800ExtraBold' }]}>980</Text>
+              <Text style={[tw`text-xs text-slate-500 dark:text-slate-400`, { fontFamily: 'PlusJakartaSans_700Bold' }]}>ppm</Text>
             </View>
             <View style={tw`bg-amber-50 dark:bg-amber-500/10 py-2.5 px-3 rounded-xl border border-amber-100 dark:border-amber-900/30`}>
-              <Text style={[tw`text-[10px] text-amber-600 dark:text-amber-400 leading-4`, {fontFamily: 'PlusJakartaSans_700Bold'}]}>Elevated concentration. Venting recommended.</Text>
+              <Text style={[tw`text-[10px] text-amber-600 dark:text-amber-400 leading-4`, { fontFamily: 'PlusJakartaSans_700Bold' }]}>Elevated concentration. Venting recommended.</Text>
             </View>
           </View>
         </View>
@@ -473,17 +473,17 @@ export default function ReportScreen() {
         {isProcessing ? (
           <TouchableOpacity onPress={cancelOverride} style={tw`flex-1 bg-red-500 py-3.5 rounded-[24px] items-center flex-row justify-center gap-2 active:opacity-80`}>
             <MaterialCommunityIcons name="cancel" size={18} color="white" />
-            <Text style={[tw`text-white text-[14px]`, {fontFamily: 'PlusJakartaSans_800ExtraBold'}]}>Cancel Action</Text>
+            <Text style={[tw`text-white text-[14px]`, { fontFamily: 'PlusJakartaSans_800ExtraBold' }]}>Cancel Action</Text>
           </TouchableOpacity>
         ) : (
           <>
             <TouchableOpacity onPress={handleAutoFix} style={tw`flex-1 bg-[#3b82f6] py-3.5 rounded-[24px] items-center flex-row justify-center gap-2 active:opacity-80`}>
               <MaterialCommunityIcons name="auto-fix" size={18} color="white" />
-              <Text style={[tw`text-white text-[14px]`, {fontFamily: 'PlusJakartaSans_800ExtraBold'}]}>Auto Fix</Text>
+              <Text style={[tw`text-white text-[14px]`, { fontFamily: 'PlusJakartaSans_800ExtraBold' }]}>Auto Fix</Text>
             </TouchableOpacity>
             <TouchableOpacity onPress={handleSuggestions} style={tw`flex-1 bg-[#10b981] py-3.5 rounded-[24px] items-center flex-row justify-center gap-2 active:opacity-80`}>
               <MaterialCommunityIcons name="lightbulb-on-outline" size={18} color="white" />
-              <Text style={[tw`text-white text-[14px]`, {fontFamily: 'PlusJakartaSans_800ExtraBold'}]}>Suggestions</Text>
+              <Text style={[tw`text-white text-[14px]`, { fontFamily: 'PlusJakartaSans_800ExtraBold' }]}>Suggestions</Text>
             </TouchableOpacity>
           </>
         )}
@@ -491,8 +491,8 @@ export default function ReportScreen() {
 
       {/* Custom AI Recommendations Modal (Bottom Sheet Style) */}
       <Modal visible={showSuggestionsModal} transparent={true} animationType="fade" onRequestClose={slideOutAndClose}>
-        <TouchableOpacity hitSlop={{ top: 15, bottom: 15, left: 15, right: 15 }}  activeOpacity={1} style={tw`flex-1 justify-end bg-black/60`} onPress={slideOutAndClose}>
-          <Animated.View 
+        <TouchableOpacity hitSlop={{ top: 15, bottom: 15, left: 15, right: 15 }} activeOpacity={1} style={tw`flex-1 justify-end bg-black/60`} onPress={slideOutAndClose}>
+          <Animated.View
             {...panResponder.panHandlers}
             onStartShouldSetResponder={() => true}
             style={[
@@ -500,7 +500,7 @@ export default function ReportScreen() {
               { transform: [{ translateY }] }
             ]}
           >
-            
+
             {/* Handle/Indicator */}
             <View style={tw`w-12 h-1.5 bg-slate-200 dark:bg-slate-700 rounded-full self-center mb-6`} />
 
@@ -509,61 +509,61 @@ export default function ReportScreen() {
                 <MaterialCommunityIcons name="brain" size={24} color="#10b981" />
               </View>
               <View>
-                <Text style={[tw`text-[19px] text-slate-800 dark:text-white tracking-wide`, {fontFamily: 'PlusJakartaSans_800ExtraBold'}]}>AI Recommendations</Text>
-                <Text style={[tw`text-xs text-slate-500 dark:text-slate-400 mt-0.5`, {fontFamily: 'PlusJakartaSans_500Medium'}]}>Actionable insights based on predictions</Text>
+                <Text style={[tw`text-[19px] text-slate-800 dark:text-white tracking-wide`, { fontFamily: 'PlusJakartaSans_800ExtraBold' }]}>AI Recommendations</Text>
+                <Text style={[tw`text-xs text-slate-500 dark:text-slate-400 mt-0.5`, { fontFamily: 'PlusJakartaSans_500Medium' }]}>Actionable insights based on predictions</Text>
               </View>
             </View>
 
             <View style={tw`gap-4 mb-8`}>
-              <TouchableOpacity disabled={!!isProcessing} onPress={() => setSelectedActions(p => ({...p, fans: !p.fans}))} style={[tw`flex-row items-center gap-4 p-4 rounded-[20px] bg-blue-50/50 dark:bg-blue-900/10 border border-blue-100 dark:border-blue-900/30`, (!!isProcessing && isProcessing !== 'fans') && tw`opacity-50`]}>
+              <TouchableOpacity disabled={!!isProcessing} onPress={() => setSelectedActions(p => ({ ...p, fans: !p.fans }))} style={[tw`flex-row items-center gap-4 p-4 rounded-[20px] bg-blue-50/50 dark:bg-blue-900/10 border border-blue-100 dark:border-blue-900/30`, (!!isProcessing && isProcessing !== 'fans') && tw`opacity-50`]}>
                 <View style={tw`w-10 h-10 bg-blue-100 dark:bg-blue-500/20 rounded-full items-center justify-center`}>
                   <MaterialCommunityIcons name="snowflake" size={20} color="#3b82f6" />
                 </View>
                 <View style={tw`flex-1`}>
-                  <Text style={[tw`text-[15px] text-slate-800 dark:text-white mb-1`, {fontFamily: 'PlusJakartaSans_800ExtraBold'}]}>Pre-cool Environment</Text>
-                  <Text style={[tw`text-[13px] text-slate-600 dark:text-slate-400 leading-5`, {fontFamily: 'PlusJakartaSans_500Medium'}]}>Activate fans before the 26.5°C peak hits in 2 hours to offset the heat spike.</Text>
+                  <Text style={[tw`text-[15px] text-slate-800 dark:text-white mb-1`, { fontFamily: 'PlusJakartaSans_800ExtraBold' }]}>Pre-cool Environment</Text>
+                  <Text style={[tw`text-[13px] text-slate-600 dark:text-slate-400 leading-5`, { fontFamily: 'PlusJakartaSans_500Medium' }]}>Activate fans before the 26.5°C peak hits in 2 hours to offset the heat spike.</Text>
                 </View>
                 <View style={tw`w-6 h-6 rounded-full border-2 items-center justify-center ${selectedActions.fans ? 'bg-[#10b981] border-[#10b981]' : 'border-slate-300 dark:border-slate-600'}`}>
-                   {selectedActions.fans && <MaterialCommunityIcons name="check" size={16} color="white" />}
+                  {selectedActions.fans && <MaterialCommunityIcons name="check" size={16} color="white" />}
                 </View>
               </TouchableOpacity>
 
-              <TouchableOpacity disabled={!!isProcessing} onPress={() => setSelectedActions(p => ({...p, misters: !p.misters}))} style={[tw`flex-row items-center gap-4 p-4 rounded-[20px] bg-emerald-50/50 dark:bg-emerald-900/10 border border-emerald-100 dark:border-emerald-900/30`, (!!isProcessing && isProcessing !== 'misters') && tw`opacity-50`]}>
+              <TouchableOpacity disabled={!!isProcessing} onPress={() => setSelectedActions(p => ({ ...p, misters: !p.misters }))} style={[tw`flex-row items-center gap-4 p-4 rounded-[20px] bg-emerald-50/50 dark:bg-emerald-900/10 border border-emerald-100 dark:border-emerald-900/30`, (!!isProcessing && isProcessing !== 'misters') && tw`opacity-50`]}>
                 <View style={tw`w-10 h-10 bg-emerald-100 dark:bg-emerald-500/20 rounded-full items-center justify-center`}>
                   <MaterialCommunityIcons name="weather-rainy" size={20} color="#10b981" />
                 </View>
                 <View style={tw`flex-1`}>
-                  <Text style={[tw`text-[15px] text-slate-800 dark:text-white mb-1`, {fontFamily: 'PlusJakartaSans_800ExtraBold'}]}>Pulse Misters</Text>
-                  <Text style={[tw`text-[13px] text-slate-600 dark:text-slate-400 leading-5`, {fontFamily: 'PlusJakartaSans_500Medium'}]}>Run misters for 10s to prevent humidity from dropping to 60%.</Text>
+                  <Text style={[tw`text-[15px] text-slate-800 dark:text-white mb-1`, { fontFamily: 'PlusJakartaSans_800ExtraBold' }]}>Pulse Misters</Text>
+                  <Text style={[tw`text-[13px] text-slate-600 dark:text-slate-400 leading-5`, { fontFamily: 'PlusJakartaSans_500Medium' }]}>Run misters for 10s to prevent humidity from dropping to 60%.</Text>
                 </View>
                 <View style={tw`w-6 h-6 rounded-full border-2 items-center justify-center ${selectedActions.misters ? 'bg-[#10b981] border-[#10b981]' : 'border-slate-300 dark:border-slate-600'}`}>
-                   {selectedActions.misters && <MaterialCommunityIcons name="check" size={16} color="white" />}
+                  {selectedActions.misters && <MaterialCommunityIcons name="check" size={16} color="white" />}
                 </View>
               </TouchableOpacity>
 
-              <TouchableOpacity disabled={!!isProcessing} onPress={() => setSelectedActions(p => ({...p, co2: !p.co2}))} style={[tw`flex-row items-center gap-4 p-4 rounded-[20px] bg-purple-50/50 dark:bg-purple-900/10 border border-purple-100 dark:border-purple-900/30`, (!!isProcessing && isProcessing !== 'co2') && tw`opacity-50`]}>
+              <TouchableOpacity disabled={!!isProcessing} onPress={() => setSelectedActions(p => ({ ...p, co2: !p.co2 }))} style={[tw`flex-row items-center gap-4 p-4 rounded-[20px] bg-purple-50/50 dark:bg-purple-900/10 border border-purple-100 dark:border-purple-900/30`, (!!isProcessing && isProcessing !== 'co2') && tw`opacity-50`]}>
                 <View style={tw`w-10 h-10 bg-purple-100 dark:bg-purple-500/20 rounded-full items-center justify-center`}>
                   <MaterialCommunityIcons name="fan" size={20} color="#8b5cf6" />
                 </View>
                 <View style={tw`flex-1`}>
-                  <Text style={[tw`text-[15px] text-slate-800 dark:text-white mb-1`, {fontFamily: 'PlusJakartaSans_800ExtraBold'}]}>Ventilation Flush</Text>
-                  <Text style={[tw`text-[13px] text-slate-600 dark:text-slate-400 leading-5`, {fontFamily: 'PlusJakartaSans_500Medium'}]}>Run a short 5-minute ventilation flush to clear impending CO2 spike.</Text>
+                  <Text style={[tw`text-[15px] text-slate-800 dark:text-white mb-1`, { fontFamily: 'PlusJakartaSans_800ExtraBold' }]}>Ventilation Flush</Text>
+                  <Text style={[tw`text-[13px] text-slate-600 dark:text-slate-400 leading-5`, { fontFamily: 'PlusJakartaSans_500Medium' }]}>Run a short 5-minute ventilation flush to clear impending CO2 spike.</Text>
                 </View>
                 <View style={tw`w-6 h-6 rounded-full border-2 items-center justify-center ${selectedActions.co2 ? 'bg-[#10b981] border-[#10b981]' : 'border-slate-300 dark:border-slate-600'}`}>
-                   {selectedActions.co2 && <MaterialCommunityIcons name="check" size={16} color="white" />}
+                  {selectedActions.co2 && <MaterialCommunityIcons name="check" size={16} color="white" />}
                 </View>
               </TouchableOpacity>
             </View>
 
             <View style={tw`flex-row gap-3`}>
               <TouchableOpacity onPress={slideOutAndClose} style={tw`flex-1 py-4 rounded-[20px] bg-slate-100 dark:bg-slate-800 items-center justify-center active:bg-slate-200 dark:active:bg-slate-700`}>
-                <Text style={[tw`text-slate-700 dark:text-slate-300 text-[14px]`, {fontFamily: 'PlusJakartaSans_800ExtraBold'}]}>Dismiss</Text>
+                <Text style={[tw`text-slate-700 dark:text-slate-300 text-[14px]`, { fontFamily: 'PlusJakartaSans_800ExtraBold' }]}>Dismiss</Text>
               </TouchableOpacity>
               <TouchableOpacity disabled={!!isProcessing} onPress={() => {
                 slideOutAndClose();
                 handleAutoFix();
               }} style={[tw`flex-1 py-4 rounded-[20px] bg-[#10b981] items-center justify-center shadow-md active:opacity-80`, (!!isProcessing && isProcessing !== 'all') && tw`opacity-50`]}>
-                <Text style={[tw`text-white text-[14px]`, {fontFamily: 'PlusJakartaSans_800ExtraBold'}]}>
+                <Text style={[tw`text-white text-[14px]`, { fontFamily: 'PlusJakartaSans_800ExtraBold' }]}>
                   {isProcessing === 'all' ? 'Processing...' : 'Apply Selected'}
                 </Text>
               </TouchableOpacity>
