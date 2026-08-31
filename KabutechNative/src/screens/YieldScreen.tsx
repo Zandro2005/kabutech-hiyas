@@ -165,7 +165,7 @@ export default function YieldScreen() {
             </View>
             
             <View style={tw`flex-1 flex-row items-center justify-center mb-3`}>
-              <Text style={[tw`text-4xl text-[#032514] dark:text-emerald-400 tracking-tighter leading-none text-center`, {fontFamily: 'PlusJakartaSans_800ExtraBold'}]}>{actualYieldKg}<Text style={tw`text-base`}>kg</Text></Text>
+              <Text style={[tw`text-4xl text-[#032514] dark:text-emerald-400 tracking-tighter text-center`, {fontFamily: 'PlusJakartaSans_800ExtraBold'}]}>{actualYieldKg}<Text style={tw`text-base`}>kg</Text></Text>
             </View>
 
             <View style={tw`flex-row justify-between mb-1.5 mt-auto flex-wrap gap-1`}>
@@ -197,7 +197,7 @@ export default function YieldScreen() {
             </View>
 
             <View style={tw`flex-1 flex-row items-center justify-center mb-3`}>
-              <Text style={[tw`text-4xl text-[#032514] dark:text-emerald-400 tracking-tighter leading-none text-center`, {fontFamily: 'PlusJakartaSans_800ExtraBold'}]}>{targetYieldKg}<Text style={tw`text-base`}>kg</Text></Text>
+              <Text style={[tw`text-4xl text-[#032514] dark:text-emerald-400 tracking-tighter text-center`, {fontFamily: 'PlusJakartaSans_800ExtraBold'}]}>{targetYieldKg}<Text style={tw`text-base`}>kg</Text></Text>
             </View>
 
             <View style={tw`flex-row justify-between items-end mb-1 mt-auto`}>

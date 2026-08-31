@@ -138,7 +138,7 @@ export default function StaffYieldScreen() {
             </View>
             
             <View style={tw`flex-row items-baseline mb-3`}>
-              <Text style={[tw`text-4xl text-[#032514] dark:text-emerald-400 tracking-tighter leading-none`, {fontFamily: 'PlusJakartaSans_800ExtraBold'}]}>{actualYieldKg}<Text style={tw`text-base`}>kg</Text></Text>
+              <Text style={[tw`text-4xl text-[#032514] dark:text-emerald-400 tracking-tighter`, {fontFamily: 'PlusJakartaSans_800ExtraBold'}]}>{actualYieldKg}<Text style={tw`text-base`}>kg</Text></Text>
             </View>
 
             <View style={tw`w-full h-1.5 bg-[#e2e8f0] dark:bg-slate-700 rounded-full overflow-hidden mb-2`}>
@@ -159,7 +159,7 @@ export default function StaffYieldScreen() {
             </View>
 
             <View style={tw`flex-1 flex-row items-center justify-center mb-3`}>
-              <Text style={[tw`text-4xl text-[#032514] dark:text-emerald-400 tracking-tighter leading-none text-center`, {fontFamily: 'PlusJakartaSans_800ExtraBold'}]}>{targetYieldKg}<Text style={tw`text-base`}>kg</Text></Text>
+              <Text style={[tw`text-4xl text-[#032514] dark:text-emerald-400 tracking-tighter text-center`, {fontFamily: 'PlusJakartaSans_800ExtraBold'}]}>{targetYieldKg}<Text style={tw`text-base`}>kg</Text></Text>
             </View>
 
             <View style={tw`flex-row justify-between items-end mb-1 mt-auto`}>
