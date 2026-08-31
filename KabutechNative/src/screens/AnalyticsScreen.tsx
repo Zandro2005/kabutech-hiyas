@@ -66,28 +66,26 @@ export default function AnalyticsScreen() {
   });
 
   return (
-    <View style={[tw`flex-1 bg-[#f8fafc] dark:bg-[#020617]`, { paddingTop: insets.top }]}>
+    <View style={[tw`flex-1 bg-[#f0f9f4] dark:bg-[#020617]`, { paddingTop: insets.top }]}>
 
-      {/* Simple Custom Back Button */}
-      <View style={tw`flex-row items-center px-4 py-3`}>
-        <TouchableOpacity
-          hitSlop={{ top: 15, bottom: 15, left: 15, right: 15 }}
-          onPress={() => navigation.goBack()}
-          style={tw`w-10 h-10 items-center justify-center rounded-full bg-white dark:bg-slate-800 shadow-sm border border-slate-100 dark:border-slate-700/50`}
-        >
-          <MaterialCommunityIcons name="arrow-left" size={24} color={isDarkMode ? '#f8fafc' : '#334155'} />
-        </TouchableOpacity>
-      </View>
-
-      <ScrollView contentContainerStyle={tw`pb-24 pt-2`} showsVerticalScrollIndicator={false}>
+      <ScrollView contentContainerStyle={tw`pb-24 pt-6`} showsVerticalScrollIndicator={false}>
         {/* Header */}
-        <View style={tw`px-6 mb-6`}>
-          <Text style={[tw`text-2xl text-slate-800 dark:text-slate-100 tracking-wide`, { fontFamily: 'PlusJakartaSans_800ExtraBold' }]}>
-            Climate Analytics
-          </Text>
-          <Text style={[tw`text-sm text-slate-500 dark:text-slate-400 mt-1`, { fontFamily: 'PlusJakartaSans_500Medium' }]}>
-            Historical environmental trends
-          </Text>
+        <View style={tw`px-6 mb-8 flex-row items-center gap-4`}>
+          <TouchableOpacity 
+            hitSlop={{ top: 15, bottom: 15, left: 15, right: 15 }}
+            onPress={() => navigation.goBack()}
+            style={tw`w-11 h-11 items-center justify-center rounded-2xl bg-white dark:bg-slate-800 shadow-sm border border-slate-100 dark:border-slate-700/50`}
+          >
+            <MaterialCommunityIcons name="arrow-left" size={24} color={isDarkMode ? '#ffffff' : '#334155'} />
+          </TouchableOpacity>
+          <View>
+            <Text style={[tw`text-2xl text-slate-800 dark:text-slate-100 tracking-wide`, {fontFamily: 'PlusJakartaSans_800ExtraBold'}]}>
+              Climate Analytics
+            </Text>
+            <Text style={[tw`text-xs text-slate-500 dark:text-slate-400 mt-1`, {fontFamily: 'PlusJakartaSans_500Medium'}]}>
+              Historical environmental trends
+            </Text>
+          </View>
         </View>
 
         {/* Metric Tabs */}
