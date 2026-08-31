@@ -21,7 +21,7 @@ export default React.memo(function EnvironmentMetricsGrid({ temp, hum, light, co
           Environment Metrics
         </Text>
         <TouchableOpacity hitSlop={{ top: 15, bottom: 15, left: 15, right: 15 }}  
-          onPress={() => navigation.navigate('Controls' as never)}
+          onPress={() => navigation.navigate('Analytics' as never)}
           
         >
           <Text style={[tw`text-xs text-slate-500 dark:text-slate-400`, { fontFamily: 'PlusJakartaSans_700Bold' }]}>View All</Text>

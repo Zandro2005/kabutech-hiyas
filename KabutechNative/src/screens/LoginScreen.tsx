@@ -16,7 +16,6 @@ import * as Speech from 'expo-speech';
 import { db } from '../services/firebase';
 import { ref, get } from 'firebase/database';
 import { VolumeManager } from 'react-native-volume-manager';
-
 export default function LoginScreen() {
   // Warm up TTS engine on mount to eliminate initial delay
   React.useEffect(() => {

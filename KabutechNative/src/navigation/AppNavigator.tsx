@@ -16,6 +16,7 @@ import StaffReportsInboxScreen from '../screens/StaffReportsInboxScreen';
 import StaffApprovalsScreen from '../screens/StaffApprovalsScreen';
 import AssignTaskScreen from '../screens/AssignTaskScreen';
 import StaffTaskHistoryScreen from '../screens/StaffTaskHistoryScreen';
+import AnalyticsScreen from '../screens/AnalyticsScreen';
 import MyActivityHistoryScreen from '../screens/staff/MyActivityHistoryScreen';
 import MyTasksScreen from '../screens/staff/MyTasksScreen';
 import ActivityLogScreen from '../screens/staff/ActivityLogScreen';
@@ -76,6 +77,7 @@ export default function AppNavigator() {
             <Stack.Screen name="StaffApprovals" component={StaffApprovalsScreen} />
             <Stack.Screen name="AssignTask" component={AssignTaskScreen} />
             <Stack.Screen name="StaffTaskHistory" component={StaffTaskHistoryScreen} />
+            <Stack.Screen name="Analytics" component={AnalyticsScreen} />
           </>
         )}
       </Stack.Navigator>

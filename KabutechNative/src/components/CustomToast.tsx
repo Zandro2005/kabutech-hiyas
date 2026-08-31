@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState, useCallback } from 'react';
-import { View, Text, Animated, StyleSheet } from 'react-native';
+import { View, Text, Animated, StyleSheet, PanResponder } from 'react-native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { SoundManager } from '../utils/SoundManager';
 import { hapticSuccess, hapticError } from '../utils/haptics';
@@ -22,6 +22,7 @@ export const showToast = (msg: ToastMessage) => {
 export default function CustomToast() {
   const [message, setMessage] = useState<ToastMessage | null>(null);
   const translateY = useRef(new Animated.Value(-120)).current;
+  const translateX = useRef(new Animated.Value(0)).current;
   const opacity = useRef(new Animated.Value(0)).current;
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -31,6 +32,27 @@ export default function CustomToast() {
       Animated.timing(opacity, { toValue: 0, duration: 300, useNativeDriver: true }),
     ]).start(() => setMessage(null));
   }, [translateY, opacity]);
+
+  const panResponder = useRef(
+    PanResponder.create({
+      onStartShouldSetPanResponder: () => true,
+      onMoveShouldSetPanResponder: (_, gestureState) => Math.abs(gestureState.dx) > 5,
+      onPanResponderMove: (_, gestureState) => {
+        translateX.setValue(gestureState.dx);
+      },
+      onPanResponderRelease: (_, gestureState) => {
+        if (Math.abs(gestureState.dx) > 50 || Math.abs(gestureState.vx) > 0.5) {
+          const direction = gestureState.dx > 0 ? 1 : -1;
+          Animated.parallel([
+            Animated.timing(translateX, { toValue: direction * 400, duration: 250, useNativeDriver: true }),
+            Animated.timing(opacity, { toValue: 0, duration: 250, useNativeDriver: true }),
+          ]).start(() => setMessage(null));
+        } else {
+          Animated.spring(translateX, { toValue: 0, friction: 8, tension: 60, useNativeDriver: true }).start();
+        }
+      },
+    })
+  ).current;
 
   const show = useCallback((msg: ToastMessage) => {
     if (timerRef.current) clearTimeout(timerRef.current);
@@ -48,6 +70,7 @@ export default function CustomToast() {
     }
 
     translateY.setValue(-120);
+    translateX.setValue(0);
     opacity.setValue(0);
     Animated.parallel([
       Animated.spring(translateY, { toValue: 0, friction: 8, tension: 60, useNativeDriver: true }),
@@ -75,12 +98,13 @@ export default function CustomToast() {
 
   return (
     <Animated.View
+      {...panResponder.panHandlers}
       style={[
         styles.container,
         {
           backgroundColor: bgColor,
           borderLeftColor: borderColor,
-          transform: [{ translateY }],
+          transform: [{ translateY }, { translateX }],
           opacity,
         },
       ]}

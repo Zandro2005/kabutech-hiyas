@@ -16,6 +16,7 @@ export type RootStackParamList = {
   AssignTask: undefined;
   MyActivityHistory: undefined;
   MyTasks: undefined;
+  Analytics: undefined;
 };
 
 export type MainTabParamList = {

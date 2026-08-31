@@ -66,13 +66,14 @@ export default function MainTabNavigator() {
       screenListeners={{ tabPress: () => hapticLight() }}
       screenOptions={{
         headerShown: false,
+        tabBarButton: (props) => <TouchableOpacity {...props} activeOpacity={1} />,
         tabBarActiveTintColor: isDarkMode ? '#6ee7b7' : (tw.color('brand-deep') || '#032514'),
         tabBarInactiveTintColor: isDarkMode ? '#64748b' : '#94a3b8',
         tabBarShowLabel: true,
         tabBarLabelStyle: {
           fontSize: 10,
           fontWeight: '700',
-          marginTop: 2,
+          marginTop: 6,
           marginBottom: 0,
           fontFamily: 'PlusJakartaSans_700Bold',
         },
@@ -112,22 +113,21 @@ export default function MainTabNavigator() {
         }}
         options={{ 
           tabBarLabel: 'AI Insights',
-          tabBarIcon: () => <View style={{ width: 24, height: 24 }} />, // Empty space for FAB
+          tabBarIcon: () => <View style={{ width: 24, height: 24 }} />,
           tabBarButton: (props) => (
-            <View {...(props as any)} style={[props.style, { opacity: 1 }]} pointerEvents="box-none">
-              <View style={tw`absolute -top-8 items-center w-full`}>
-                <TouchableOpacity hitSlop={{ top: 15, bottom: 15, left: 15, right: 15 }}  
-                  onPress={() => navigation.navigate('Report' as never)}
-                  style={[
-                    tw`w-[58px] h-[58px] bg-[#166534] dark:bg-emerald-600 rounded-full items-center justify-center shadow-lg`,
-                    { borderWidth: 4, borderColor: isDarkMode ? '#0f172a' : '#ffffff' }
-                  ]}
-                >
-                  <MaterialCommunityIcons name="chart-box-outline" size={34} color="white" />
-                </TouchableOpacity>
+            <TouchableOpacity 
+              {...props}
+              activeOpacity={0.8}
+              style={[props.style, tw`items-center justify-center`]}
+            >
+              <View style={[
+                tw`absolute -top-6 w-[56px] h-[56px] bg-[#166534] dark:bg-emerald-600 rounded-full items-center justify-center shadow-lg`,
+                { borderWidth: 4, borderColor: isDarkMode ? '#0f172a' : '#ffffff' }
+              ]}>
+                <MaterialCommunityIcons name="chart-box-outline" size={32} color="white" />
               </View>
               {props.children}
-            </View>
+            </TouchableOpacity>
           )
         }}
       />

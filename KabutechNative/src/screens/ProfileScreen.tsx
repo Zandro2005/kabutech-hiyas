@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { View, Text, ScrollView, TouchableOpacity, Alert, StatusBar } from 'react-native';
+import { View, Text, ScrollView, TouchableOpacity, Alert, StatusBar, DeviceEventEmitter } from 'react-native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useAuth } from '../context/AuthContext';
 import { signOut } from 'firebase/auth';
@@ -45,6 +45,11 @@ export default function ProfileScreen() {
   
   const handleLogout = async () => {
     try {
+      // Abort any active AI override and reset timers globally
+      DeviceEventEmitter.emit('cancelAiOverride');
+      await update(ref(db, 'kabutech/settings/setpoints/devices'), { fans: false, misters: false, lights: false, co2: false });
+      await update(ref(db, 'kabutech/settings/setpoints'), { mode: 'auto', aiOverride: false });
+
       if (user?.uid) {
         await update(ref(db, `kabutech/users/${user.uid}`), { pushToken: null });
       }

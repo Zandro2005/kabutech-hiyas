@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { View, Text, ScrollView, TouchableOpacity, StatusBar, DeviceEventEmitter, Alert, Dimensions, ActivityIndicator } from 'react-native';
+import { View, Text, ScrollView, TouchableOpacity, StatusBar, DeviceEventEmitter, Alert, Dimensions, ActivityIndicator, Modal } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { GlobalNavigationParamList } from '../types/navigation';
@@ -25,6 +25,8 @@ export default function ControlsScreen() {
   const settings = useSettings();
   
   const [isReady, setIsReady] = useState(false);
+  const [showStopAiModal, setShowStopAiModal] = useState(false);
+  const [pendingMode, setPendingMode] = useState<'auto' | 'manual' | 'scheduled' | null>(null);
   useEffect(() => {
     const timer = setTimeout(() => {
       setIsReady(true);
@@ -66,14 +68,23 @@ export default function ControlsScreen() {
     }).catch(err => Alert.alert("Error Saving", err.message));
   };
 
-  const setMode = (mode: 'auto' | 'manual' | 'scheduled') => {
-    hapticSelection();
+  const executeSetMode = (mode: 'auto' | 'manual' | 'scheduled') => {
     update(ref(db, 'kabutech/settings/setpoints'), {
       mode,
       aiOverride: false
     }).then(() => {
       showToast({ type: 'success', text1: `Switched to ${mode.toUpperCase()} Mode` });
     }).catch(err => Alert.alert("Error Saving", err.message));
+  };
+
+  const setMode = (mode: 'auto' | 'manual' | 'scheduled') => {
+    hapticSelection();
+    if (isAiOverride) {
+      setPendingMode(mode);
+      setShowStopAiModal(true);
+    } else {
+      executeSetMode(mode);
+    }
   };
 
   const tabs = [
@@ -278,6 +289,17 @@ export default function ControlsScreen() {
               <Text style={[tw`text-[10px] text-blue-800 dark:text-blue-300 flex-1`, {fontFamily: 'PlusJakartaSans_700Bold'}]}>
                 AI Pre-emptive Override is currently active. Controls are locked.
               </Text>
+              <TouchableOpacity 
+                onPress={() => {
+                  DeviceEventEmitter.emit('cancelAiOverride');
+                  update(ref(db, 'kabutech/settings/setpoints'), { mode: 'auto', aiOverride: false });
+                  update(ref(db, 'kabutech/settings/setpoints/devices'), { fans: false, misters: false, lights: false, co2: false });
+                  showToast({ type: 'info', text1: 'Action Cancelled', text2: 'Override aborted. Returned to AUTO.' });
+                }}
+                style={tw`bg-blue-500 px-3 py-1.5 rounded-full`}
+              >
+                <Text style={[tw`text-white text-[10px]`, {fontFamily: 'PlusJakartaSans_800ExtraBold'}]}>Cancel</Text>
+              </TouchableOpacity>
             </View>
           ) : isLocked ? (
             <View style={tw`bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-200 dark:border-emerald-800/50 rounded-xl p-3 flex-row items-center gap-2 mb-4 mx-2`}>
@@ -321,6 +343,42 @@ export default function ControlsScreen() {
 
       </ScrollView>
       )}
+
+      {/* Modern Stop AI Modal */}
+      <Modal visible={showStopAiModal} transparent={true} animationType="fade" onRequestClose={() => setShowStopAiModal(false)}>
+        <View style={tw`flex-1 bg-black/60 justify-center items-center px-6`}>
+          <View style={tw`w-full bg-white dark:bg-slate-800 rounded-3xl p-6 items-center shadow-2xl`}>
+            <View style={tw`w-14 h-14 bg-red-50 dark:bg-red-500/10 rounded-full items-center justify-center mb-4`}>
+              <MaterialCommunityIcons name="alert-circle-outline" size={32} color="#ef4444" />
+            </View>
+            <Text style={[tw`text-xl text-slate-800 dark:text-white mb-2 text-center`, {fontFamily: 'PlusJakartaSans_800ExtraBold'}]}>Stop AI Override?</Text>
+            <Text style={[tw`text-[13px] text-slate-500 dark:text-slate-400 text-center mb-6 leading-5`, {fontFamily: 'PlusJakartaSans_500Medium'}]}>
+              Switching modes will abort the current AI pre-emptive cycle and turn off all overridden equipment. Do you wish to continue?
+            </Text>
+            
+            <View style={tw`flex-row gap-3 w-full`}>
+              <TouchableOpacity 
+                style={tw`flex-1 py-3.5 rounded-xl bg-slate-100 dark:bg-slate-700 items-center justify-center`}
+                onPress={() => setShowStopAiModal(false)}
+              >
+                <Text style={[tw`text-slate-600 dark:text-slate-300`, {fontFamily: 'PlusJakartaSans_700Bold'}]}>Cancel</Text>
+              </TouchableOpacity>
+              
+              <TouchableOpacity 
+                style={tw`flex-1 py-3.5 rounded-xl bg-red-500 items-center justify-center`}
+                onPress={() => {
+                  setShowStopAiModal(false);
+                  DeviceEventEmitter.emit('cancelAiOverride');
+                  update(ref(db, 'kabutech/settings/setpoints/devices'), { fans: false, misters: false, lights: false, co2: false });
+                  if (pendingMode) executeSetMode(pendingMode);
+                }}
+              >
+                <Text style={[tw`text-white`, {fontFamily: 'PlusJakartaSans_700Bold'}]}>Yes, Stop AI</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 }
