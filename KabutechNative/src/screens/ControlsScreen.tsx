@@ -45,7 +45,8 @@ export default function ControlsScreen() {
   const devices = settings?.setpoints?.devices || { fans: false, misters: false, lights: false, co2: false };
   const isAuto = String(settings?.setpoints?.mode).toLowerCase() === 'auto';
   const isScheduled = String(settings?.setpoints?.mode).toLowerCase() === 'scheduled';
-  const isLocked = isAuto || isScheduled;
+  const isAiOverride = settings?.setpoints?.aiOverride === true;
+  const isLocked = isAuto || isScheduled || isAiOverride;
 
   const updateSetpoint = (key: string, value: number, label?: string, unit?: string) => {
     update(ref(db, 'kabutech/settings/setpoints'), {
@@ -68,7 +69,8 @@ export default function ControlsScreen() {
   const setMode = (mode: 'auto' | 'manual' | 'scheduled') => {
     hapticSelection();
     update(ref(db, 'kabutech/settings/setpoints'), {
-      mode
+      mode,
+      aiOverride: false
     }).then(() => {
       showToast({ type: 'success', text1: `Switched to ${mode.toUpperCase()} Mode` });
     }).catch(err => Alert.alert("Error Saving", err.message));
@@ -270,14 +272,21 @@ export default function ControlsScreen() {
 
         {/* Bottom Device Toggles */}
         <View style={tw`px-6`}>
-          {isLocked && (
+          {isAiOverride ? (
+            <View style={tw`bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800/50 rounded-xl p-3 flex-row items-center gap-2 mb-4 mx-2`}>
+              <MaterialCommunityIcons name="brain" size={16} color={isDarkMode ? '#60a5fa' : '#3b82f6'} />
+              <Text style={[tw`text-[10px] text-blue-800 dark:text-blue-300 flex-1`, {fontFamily: 'PlusJakartaSans_700Bold'}]}>
+                AI Pre-emptive Override is currently active. Controls are locked.
+              </Text>
+            </View>
+          ) : isLocked ? (
             <View style={tw`bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-200 dark:border-emerald-800/50 rounded-xl p-3 flex-row items-center gap-2 mb-4 mx-2`}>
               <MaterialCommunityIcons name="lock" size={16} color={isDarkMode ? '#34d399' : '#059669'} />
               <Text style={[tw`text-[10px] text-emerald-800 dark:text-emerald-300`, {fontFamily: 'PlusJakartaSans_700Bold'}]}>
                 Manual controls are locked.
               </Text>
             </View>
-          )}
+          ) : null}
 
           <View style={tw`flex-row justify-between w-full`}>
             {deviceToggles.map((device) => {

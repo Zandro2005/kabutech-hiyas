@@ -42,18 +42,6 @@ export default function ProfileScreen() {
   const activeRacksCount = batches.filter(b => !b.archived).length;
   const tasksDoneToday = tasks.filter(t => t.status === 'completed' && isToday(t.completedAt)).length;
   const alertsFiredToday = alerts.filter(a => isToday(a.timestamp)).length;
-
-  let totalSlots = 0;
-  let totalFlagged = 0;
-  batches.filter(b => !b.archived).forEach(rack => {
-    const bagsArray = Array.isArray(rack.bags) ? rack.bags : (rack.bags ? Object.values(rack.bags) : []);
-    const activeBags = bagsArray.filter((b: any) => b && b.status === 'Active');
-    const flaggedBags = bagsArray.filter((b: any) => b && b.status === 'Flagged');
-    totalSlots += bagsArray.length;
-    totalFlagged += flaggedBags.length;
-  });
-  const healthScore = Math.max(0, 100 - (totalSlots > 0 && totalFlagged > 0 ? (totalFlagged / totalSlots) * 500 : 0));
-  
   
   const handleLogout = async () => {
     try {
@@ -108,22 +96,7 @@ export default function ProfileScreen() {
           </TouchableOpacity>
         </View>
 
-        {/* Farm Health Score */}
-        <View style={tw`bg-white dark:bg-slate-800 rounded-2xl p-4 border border-gray-100 dark:border-slate-700 shadow-sm flex-row items-center justify-between mb-4`}>
-          <View style={tw`flex-row items-center gap-3`}>
-            <View style={tw`w-10 h-10 rounded-xl bg-gray-50 dark:bg-slate-700/50 items-center justify-center border border-gray-100 dark:border-slate-600/50`}>
-              <MaterialCommunityIcons name="heart-pulse" size={20} color="#10b981" />
-            </View>
-            <View>
-              <Text style={tw`text-sm font-bold text-gray-800 dark:text-slate-200`}>Farm Health Score</Text>
-              <Text style={tw`text-[10px] text-gray-500 dark:text-slate-400`}>Temp • Humidity • CO2 • Alerts</Text>
-            </View>
-          </View>
-          <View style={tw`flex-row items-baseline gap-0.5`}>
-            <Text style={tw`text-3xl font-extrabold ${healthScore < 80 ? 'text-amber-500' : 'text-[#10b981]'}`}>{Math.round(healthScore)}</Text>
-            <Text style={tw`text-xs text-gray-400 dark:text-slate-500 font-bold`}>/100</Text>
-          </View>
-        </View>
+
 
         {/* Today's Summary */}
         <View style={tw`bg-white dark:bg-slate-800 rounded-2xl p-5 border border-gray-100 dark:border-slate-700 shadow-sm mb-4`}>
@@ -151,72 +124,87 @@ export default function ProfileScreen() {
           </View>
         </View>
 
-        {/* Settings Links */}
-        <TouchableOpacity hitSlop={{ top: 15, bottom: 15, left: 15, right: 15 }}  
-          onPress={() => navigation.navigate('StaffReportsInbox' as never)}
-          style={tw`bg-white dark:bg-slate-800 rounded-2xl p-4 border border-gray-100 dark:border-slate-700 shadow-sm flex-row items-center justify-between mb-3 active:scale-95`}
-        >
-          <View style={tw`flex-row items-center gap-3`}>
-            <View style={tw`w-10 h-10 rounded-xl bg-gray-50 dark:bg-slate-700/50 items-center justify-center border border-gray-100 dark:border-slate-600/50`}>
-              <MaterialCommunityIcons name="inbox-multiple" size={20} color="#3b82f6" />
-            </View>
-            <View style={tw`flex-row items-center`}>
-              <Text style={tw`text-sm font-bold text-gray-800 dark:text-slate-200`}>Staff Reports Inbox</Text>
-              {pendingLogsCount > 0 && (
-                <View style={tw`ml-2 bg-red-500 rounded-full px-2 py-0.5 justify-center`}>
-                  <Text style={[tw`text-[10px] text-white font-bold`]}>{pendingLogsCount}</Text>
-                </View>
-              )}
-            </View>
-          </View>
-          <MaterialCommunityIcons name="chevron-right" size={24} color={tw.color('dark:text-slate-500') || "#94a3b8"} />
-        </TouchableOpacity>
+        {/* Management & Operations */}
+        <View style={tw`flex-row items-center gap-2 mb-4 mt-2`}>
+          <MaterialCommunityIcons name="shield-star-outline" size={20} color={tw.color('dark:text-slate-200') || "#1e293b"} />
+          <Text style={[tw`text-sm text-slate-800 dark:text-slate-200 tracking-wide`, {fontFamily: 'PlusJakartaSans_700Bold'}]}>
+            Management & Operations
+          </Text>
+        </View>
 
-        <TouchableOpacity hitSlop={{ top: 15, bottom: 15, left: 15, right: 15 }}  
-          onPress={() => navigation.navigate('StaffApprovals' as never)}
-          style={tw`bg-white dark:bg-slate-800 rounded-2xl p-4 border border-gray-100 dark:border-slate-700 shadow-sm flex-row items-center justify-between mb-3 active:scale-95`}
-        >
-          <View style={tw`flex-row items-center gap-3`}>
-            <View style={tw`w-10 h-10 rounded-xl bg-gray-50 dark:bg-slate-700/50 items-center justify-center border border-gray-100 dark:border-slate-600/50`}>
-              <MaterialCommunityIcons name="account-check" size={20} color="#10b981" />
+        <View style={tw`flex-row flex-wrap justify-between`}>
+          {/* Reports Widget */}
+          <TouchableOpacity 
+            onPress={() => navigation.navigate('StaffReportsInbox' as never)}
+            style={tw`w-[48%] bg-white dark:bg-slate-800 rounded-[24px] p-4 border border-slate-100 dark:border-slate-700/50 shadow-sm items-start relative active:scale-95 mb-3 overflow-hidden`}
+          >
+            {/* Background decoration */}
+            <View style={tw`absolute -right-4 -top-4 w-16 h-16 rounded-full bg-blue-50/50 dark:bg-blue-500/5`} />
+            
+            <View style={tw`w-12 h-12 rounded-[18px] bg-blue-50 dark:bg-blue-500/10 items-center justify-center mb-3 border border-blue-100/50 dark:border-blue-500/20`}>
+              <MaterialCommunityIcons name="inbox-multiple-outline" size={24} color="#3b82f6" />
             </View>
-            <View style={tw`flex-row items-center`}>
-              <Text style={tw`text-sm font-bold text-gray-800 dark:text-slate-200`}>Staff Approvals</Text>
-              {pendingStaffCount > 0 && (
-                <View style={tw`ml-2 bg-red-500 rounded-full px-2 py-0.5 justify-center`}>
-                  <Text style={[tw`text-[10px] text-white font-bold`]}>{pendingStaffCount}</Text>
-                </View>
-              )}
-            </View>
-          </View>
-          <MaterialCommunityIcons name="chevron-right" size={24} color={tw.color('dark:text-slate-500') || "#94a3b8"} />
-        </TouchableOpacity>
+            <Text style={[tw`text-[15px] text-slate-800 dark:text-slate-200 mb-0.5`, {fontFamily: 'PlusJakartaSans_700Bold'}]}>Reports</Text>
+            <Text style={[tw`text-[11px] text-slate-500 dark:text-slate-400`, {fontFamily: 'PlusJakartaSans_500Medium'}]}>Inbox & logs</Text>
+            
+            {pendingLogsCount > 0 && (
+              <View style={tw`absolute top-4 right-4 bg-red-500 min-w-[22px] h-[22px] rounded-full items-center justify-center px-1.5 shadow-sm border-2 border-white dark:border-slate-800`}>
+                <Text style={[tw`text-[10px] text-white leading-tight`, {fontFamily: 'PlusJakartaSans_800ExtraBold'}]}>{pendingLogsCount}</Text>
+              </View>
+            )}
+          </TouchableOpacity>
 
-        <TouchableOpacity hitSlop={{ top: 15, bottom: 15, left: 15, right: 15 }}  
-          onPress={() => navigation.navigate('AssignTask' as never)}
-          style={tw`bg-white dark:bg-slate-800 rounded-2xl p-4 border border-gray-100 dark:border-slate-700 shadow-sm flex-row items-center justify-between mb-3 active:scale-95`}
-        >
-          <View style={tw`flex-row items-center gap-3`}>
-            <View style={tw`w-10 h-10 rounded-xl bg-gray-50 dark:bg-slate-700/50 items-center justify-center border border-gray-100 dark:border-slate-600/50`}>
-              <MaterialCommunityIcons name="clipboard-check" size={20} color="#8b5cf6" />
-            </View>
-            <Text style={tw`text-sm font-bold text-gray-800 dark:text-slate-200`}>Assign Task</Text>
-          </View>
-          <MaterialCommunityIcons name="chevron-right" size={24} color={tw.color('dark:text-slate-500') || "#94a3b8"} />
-        </TouchableOpacity>
+          {/* Approvals Widget */}
+          <TouchableOpacity 
+            onPress={() => navigation.navigate('StaffApprovals' as never)}
+            style={tw`w-[48%] bg-white dark:bg-slate-800 rounded-[24px] p-4 border border-slate-100 dark:border-slate-700/50 shadow-sm items-start relative active:scale-95 mb-3 overflow-hidden`}
+          >
+            {/* Background decoration */}
+            <View style={tw`absolute -right-4 -top-4 w-16 h-16 rounded-full bg-emerald-50/50 dark:bg-emerald-500/5`} />
 
-        <TouchableOpacity hitSlop={{ top: 15, bottom: 15, left: 15, right: 15 }}  
-          onPress={() => navigation.navigate('StaffTaskHistory' as never)}
-          style={tw`bg-white dark:bg-slate-800 rounded-2xl p-4 border border-gray-100 dark:border-slate-700 shadow-sm flex-row items-center justify-between mb-3 active:scale-95`}
-        >
-          <View style={tw`flex-row items-center gap-3`}>
-            <View style={tw`w-10 h-10 rounded-xl bg-gray-50 dark:bg-slate-700/50 items-center justify-center border border-gray-100 dark:border-slate-600/50`}>
-              <MaterialCommunityIcons name="clipboard-text-clock" size={20} color="#8b5cf6" />
+            <View style={tw`w-12 h-12 rounded-[18px] bg-emerald-50 dark:bg-emerald-500/10 items-center justify-center mb-3 border border-emerald-100/50 dark:border-emerald-500/20`}>
+              <MaterialCommunityIcons name="account-check-outline" size={24} color="#10b981" />
             </View>
-            <Text style={tw`text-sm font-bold text-gray-800 dark:text-slate-200`}>Staff Task History</Text>
-          </View>
-          <MaterialCommunityIcons name="chevron-right" size={24} color={tw.color('dark:text-slate-500') || "#94a3b8"} />
-        </TouchableOpacity>
+            <Text style={[tw`text-[15px] text-slate-800 dark:text-slate-200 mb-0.5`, {fontFamily: 'PlusJakartaSans_700Bold'}]}>Approvals</Text>
+            <Text style={[tw`text-[11px] text-slate-500 dark:text-slate-400`, {fontFamily: 'PlusJakartaSans_500Medium'}]}>Manage staff</Text>
+            
+            {pendingStaffCount > 0 && (
+              <View style={tw`absolute top-4 right-4 bg-red-500 min-w-[22px] h-[22px] rounded-full items-center justify-center px-1.5 shadow-sm border-2 border-white dark:border-slate-800`}>
+                <Text style={[tw`text-[10px] text-white leading-tight`, {fontFamily: 'PlusJakartaSans_800ExtraBold'}]}>{pendingStaffCount}</Text>
+              </View>
+            )}
+          </TouchableOpacity>
+
+          {/* Assign Task Widget */}
+          <TouchableOpacity 
+            onPress={() => navigation.navigate('AssignTask' as never)}
+            style={tw`w-[48%] bg-white dark:bg-slate-800 rounded-[24px] p-4 border border-slate-100 dark:border-slate-700/50 shadow-sm items-start relative active:scale-95 mb-3 overflow-hidden`}
+          >
+            {/* Background decoration */}
+            <View style={tw`absolute -right-4 -top-4 w-16 h-16 rounded-full bg-amber-50/50 dark:bg-amber-500/5`} />
+
+            <View style={tw`w-12 h-12 rounded-[18px] bg-amber-50 dark:bg-amber-500/10 items-center justify-center mb-3 border border-amber-100/50 dark:border-amber-500/20`}>
+              <MaterialCommunityIcons name="clipboard-text-outline" size={24} color="#f59e0b" />
+            </View>
+            <Text style={[tw`text-[15px] text-slate-800 dark:text-slate-200 mb-0.5`, {fontFamily: 'PlusJakartaSans_700Bold'}]}>Assign Task</Text>
+            <Text style={[tw`text-[11px] text-slate-500 dark:text-slate-400`, {fontFamily: 'PlusJakartaSans_500Medium'}]}>Delegate work</Text>
+          </TouchableOpacity>
+
+          {/* Task History Widget */}
+          <TouchableOpacity 
+            onPress={() => navigation.navigate('StaffTaskHistory' as never)}
+            style={tw`w-[48%] bg-white dark:bg-slate-800 rounded-[24px] p-4 border border-slate-100 dark:border-slate-700/50 shadow-sm items-start relative active:scale-95 mb-3 overflow-hidden`}
+          >
+            {/* Background decoration */}
+            <View style={tw`absolute -right-4 -top-4 w-16 h-16 rounded-full bg-violet-50/50 dark:bg-violet-500/5`} />
+
+            <View style={tw`w-12 h-12 rounded-[18px] bg-violet-50 dark:bg-violet-500/10 items-center justify-center mb-3 border border-violet-100/50 dark:border-violet-500/20`}>
+              <MaterialCommunityIcons name="history" size={24} color="#8b5cf6" />
+            </View>
+            <Text style={[tw`text-[15px] text-slate-800 dark:text-slate-200 mb-0.5`, {fontFamily: 'PlusJakartaSans_700Bold'}]}>Task History</Text>
+            <Text style={[tw`text-[11px] text-slate-500 dark:text-slate-400`, {fontFamily: 'PlusJakartaSans_500Medium'}]}>Past activities</Text>
+          </TouchableOpacity>
+        </View>
 
       </ScrollView>
       <EditProfileModal visible={editProfileVisible} onClose={() => setEditProfileVisible(false)} />

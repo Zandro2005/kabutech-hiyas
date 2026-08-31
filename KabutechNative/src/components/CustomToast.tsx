@@ -5,7 +5,7 @@ import { SoundManager } from '../utils/SoundManager';
 import { hapticSuccess, hapticError } from '../utils/haptics';
 
 interface ToastMessage {
-  type: 'success' | 'error';
+  type: 'success' | 'error' | 'info';
   text1: string;
   text2?: string;
   duration?: number;
@@ -43,6 +43,8 @@ export default function CustomToast() {
     } else if (msg.type === 'error') {
       SoundManager.playError();
       hapticError();
+    } else if (msg.type === 'info') {
+      SoundManager.playRing();
     }
 
     translateY.setValue(-120);
@@ -62,12 +64,14 @@ export default function CustomToast() {
   if (!message) return null;
 
   const isSuccess = message.type === 'success';
-  const bgColor = isSuccess ? '#f0fdf4' : '#fef2f2';
-  const borderColor = isSuccess ? '#10b981' : '#ef4444';
-  const iconName = isSuccess ? 'check-circle' : 'alert-circle';
-  const iconColor = isSuccess ? '#10b981' : '#ef4444';
-  const titleColor = isSuccess ? '#064e3b' : '#7f1d1d';
-  const bodyColor = isSuccess ? '#166534' : '#991b1b';
+  const isInfo = message.type === 'info';
+  
+  const bgColor = isSuccess ? '#f0fdf4' : isInfo ? '#eff6ff' : '#fef2f2';
+  const borderColor = isSuccess ? '#10b981' : isInfo ? '#3b82f6' : '#ef4444';
+  const iconName = isSuccess ? 'check-circle' : isInfo ? 'information' : 'alert-circle';
+  const iconColor = isSuccess ? '#10b981' : isInfo ? '#3b82f6' : '#ef4444';
+  const titleColor = isSuccess ? '#064e3b' : isInfo ? '#1e3a8a' : '#7f1d1d';
+  const bodyColor = isSuccess ? '#166534' : isInfo ? '#1e40af' : '#991b1b';
 
   return (
     <Animated.View

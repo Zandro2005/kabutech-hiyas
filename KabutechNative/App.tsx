@@ -33,6 +33,7 @@ RNAlert.alert = (title, message, buttons, options) => {
 };
 
 import ErrorBoundary from './src/components/ErrorBoundary';
+import GlobalAlarmModal from './src/components/GlobalAlarmModal';
 
 export default function App() {
   const [fontsLoaded, setFontsLoaded] = useState(false);
@@ -65,6 +66,21 @@ export default function App() {
     loadResources();
   }, []);
 
+  useEffect(() => {
+    // Re-enable immersive mode (hidden until swipe)
+    async function configureNavBar() {
+      if (Platform.OS === 'android') {
+        try {
+          await NavigationBar.setVisibilityAsync('hidden');
+          await NavigationBar.setBehaviorAsync('inset-swipe');
+          await NavigationBar.setPositionAsync('absolute');
+          await NavigationBar.setBackgroundColorAsync('#00000000');
+        } catch (e) {}
+      }
+    }
+    configureNavBar();
+  }, []);
+
   if (!fontsLoaded) {
     return null; // Native splash screen remains visible
   }
@@ -77,6 +93,7 @@ export default function App() {
             <StatusBar style="auto" />
             <ErrorBoundary>
               <AppNavigator />
+              <GlobalAlarmModal />
             </ErrorBoundary>
             <CustomToast />
           </SafeAreaProvider>
