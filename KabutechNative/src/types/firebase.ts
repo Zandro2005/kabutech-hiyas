@@ -20,6 +20,7 @@ export interface Setpoints {
   co2: number;
   mode: 'auto' | 'manual' | 'scheduled';
   devices: DeviceStates;
+  aiOverride?: boolean;
 }
 
 export interface TimeWindow {
@@ -94,6 +95,7 @@ export interface UserProfile {
   role: 'admin' | 'operator' | 'staff';
   approved: boolean;
   declined?: boolean;
+  pushToken?: string;
   createdAt: string;
 }
 
