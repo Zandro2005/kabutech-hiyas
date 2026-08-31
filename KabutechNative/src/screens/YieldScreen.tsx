@@ -155,57 +155,90 @@ export default function YieldScreen() {
 
         {/* WIDGET 1: Top Metrics */}
         <View style={tw`flex-row gap-3 mb-5`}>
-          {/* Actual Yield */}
-          <View style={tw`flex-1 bg-white dark:bg-slate-800 rounded-[24px] p-4 shadow-sm border border-gray-100 dark:border-slate-700`}>
-            <View style={tw`flex-row justify-between items-center mb-3 flex-wrap gap-1`}>
-              <View style={tw`flex-row items-center gap-1.5`}>
-                <MaterialCommunityIcons name="bottle-tonic-outline" size={18} color="#166534" />
-                <Text style={[tw`text-[11px] text-gray-800 dark:text-slate-200 tracking-wide`, {fontFamily: 'PlusJakartaSans_800ExtraBold'}]}>Actual Yield</Text>
+          {/* Actual Yield Card */}
+          <View style={tw`flex-1 bg-white dark:bg-slate-900 rounded-[26px] p-4 shadow-sm border border-slate-200/70 dark:border-slate-800 justify-between`}>
+            <View style={tw`flex-row items-center gap-2 mb-2`}>
+              <View style={tw`w-7 h-7 rounded-xl bg-emerald-50 dark:bg-emerald-500/15 items-center justify-center`}>
+                <MaterialCommunityIcons name="sprout" size={15} color="#10b981" />
               </View>
+              <Text style={[tw`text-[11px] text-slate-500 dark:text-slate-400 tracking-wider uppercase`, { fontFamily: 'PlusJakartaSans_800ExtraBold' }]}>
+                Actual
+              </Text>
             </View>
             
-            <View style={tw`flex-1 flex-row items-center justify-center mb-3`}>
-              <Text style={[tw`text-4xl text-[#032514] dark:text-emerald-400 tracking-tighter text-center`, {fontFamily: 'PlusJakartaSans_800ExtraBold'}]}>{actualYieldKg}<Text style={tw`text-base`}>kg</Text></Text>
+            <View style={tw`my-1`}>
+              <View style={tw`flex-row items-baseline`}>
+                <Text style={[tw`text-3xl text-slate-900 dark:text-white tracking-tight`, { fontFamily: 'PlusJakartaSans_800ExtraBold' }]}>
+                  {actualYieldKg}
+                </Text>
+                <Text style={[tw`text-xs text-slate-400 dark:text-slate-500 ml-1 font-bold`]}>
+                  kg
+                </Text>
+              </View>
             </View>
 
-            <View style={tw`flex-row justify-between mb-1.5 mt-auto flex-wrap gap-1`}>
-              <Text style={[tw`text-[7.5px] text-gray-500 dark:text-slate-400 uppercase tracking-widest`, {fontFamily: 'PlusJakartaSans_800ExtraBold'}]}>TARGET: {targetYieldKg} KG</Text>
-              <Text style={[tw`text-[7.5px] text-gray-500 dark:text-slate-400 uppercase tracking-widest`, {fontFamily: 'PlusJakartaSans_800ExtraBold'}]}>MAX: 3.0 KG</Text>
-            </View>
-            <View style={tw`w-full h-1.5 bg-[#e2e8f0] dark:bg-slate-700 rounded-full overflow-hidden`}>
-              <View style={[tw`h-full bg-[#166534] dark:bg-emerald-500 rounded-full`, { width: `${efficiency}%` }]} />
+            <View style={tw`mt-2`}>
+              <View style={tw`flex-row justify-between items-center mb-1`}>
+                <Text style={[tw`text-[9px] text-slate-400 uppercase tracking-wider`, { fontFamily: 'PlusJakartaSans_700Bold' }]}>
+                  Goal: {targetYieldKg}kg
+                </Text>
+                <Text style={[tw`text-[9px] text-emerald-600 dark:text-emerald-400 font-extrabold`]}>
+                  {efficiency}%
+                </Text>
+              </View>
+              <View style={tw`w-full h-1.5 bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden`}>
+                <View style={[tw`h-full bg-emerald-500 rounded-full`, { width: `${Math.min(efficiency, 100)}%` }]} />
+              </View>
             </View>
           </View>
 
-          {/* Target */}
-          <View style={tw`flex-1 bg-white dark:bg-slate-800 rounded-[24px] p-4 shadow-sm border border-gray-100 dark:border-slate-700`}>
-            <View style={tw`flex-row justify-between items-center mb-3 flex-wrap gap-1`}>
-              <View style={tw`flex-row items-center gap-1.5`}>
-                <MaterialCommunityIcons name="flag-outline" size={18} color="#166534" />
-                <Text style={[tw`text-[11px] text-gray-800 dark:text-slate-200 tracking-wide uppercase`, {fontFamily: 'PlusJakartaSans_800ExtraBold'}]}>TARGET</Text>
+          {/* Target Yield Card */}
+          <View style={tw`flex-1 bg-white dark:bg-slate-900 rounded-[26px] p-4 shadow-sm border border-slate-200/70 dark:border-slate-800 justify-between`}>
+            <View style={tw`flex-row justify-between items-center mb-2`}>
+              <View style={tw`flex-row items-center gap-2`}>
+                <View style={tw`w-7 h-7 rounded-xl bg-amber-50 dark:bg-amber-500/15 items-center justify-center`}>
+                  <MaterialCommunityIcons name="flag-checkered" size={15} color="#f59e0b" />
+                </View>
+                <Text style={[tw`text-[11px] text-slate-500 dark:text-slate-400 tracking-wider uppercase`, { fontFamily: 'PlusJakartaSans_800ExtraBold' }]}>
+                  Target
+                </Text>
               </View>
-              <TouchableOpacity hitSlop={{ top: 15, bottom: 15, left: 15, right: 15 }}  
-                style={tw`bg-gray-100 dark:bg-slate-700 px-2 py-0.5 rounded-full flex-row items-center gap-1`}
+              <TouchableOpacity 
+                hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}  
+                style={tw`bg-slate-100 dark:bg-slate-800 px-2 py-0.5 rounded-full flex-row items-center gap-1 border border-slate-200/60 dark:border-slate-700`}
                 onPress={() => {
                   setNewTargetYield(targetYieldKg);
                   setTargetModalVisible(true);
                 }}
               >
-                <MaterialCommunityIcons name="pencil" size={12} color={tw.color('dark:text-slate-300') || "#334155"} />
-                <Text style={[tw`text-[10px] text-gray-600 dark:text-slate-300`, {fontFamily: 'PlusJakartaSans_800ExtraBold'}]}>Edit</Text>
+                <MaterialCommunityIcons name="pencil" size={10} color={isDarkMode ? '#94a3b8' : '#64748b'} />
+                <Text style={[tw`text-[9px] text-slate-600 dark:text-slate-300 font-bold`]}>Edit</Text>
               </TouchableOpacity>
             </View>
 
-            <View style={tw`flex-1 flex-row items-center justify-center mb-3`}>
-              <Text style={[tw`text-4xl text-[#032514] dark:text-emerald-400 tracking-tighter text-center`, {fontFamily: 'PlusJakartaSans_800ExtraBold'}]}>{targetYieldKg}<Text style={tw`text-base`}>kg</Text></Text>
+            <View style={tw`my-1`}>
+              <View style={tw`flex-row items-baseline`}>
+                <Text style={[tw`text-3xl text-slate-900 dark:text-white tracking-tight`, { fontFamily: 'PlusJakartaSans_800ExtraBold' }]}>
+                  {targetYieldKg}
+                </Text>
+                <Text style={[tw`text-xs text-slate-400 dark:text-slate-500 ml-1 font-bold`]}>
+                  kg
+                </Text>
+              </View>
             </View>
 
-            <View style={tw`flex-row justify-between items-end mb-1 mt-auto`}>
-              <Text style={[tw`text-[8px] text-gray-500 dark:text-slate-400 uppercase tracking-widest`, {fontFamily: 'PlusJakartaSans_800ExtraBold'}]}>EFFICIENCY</Text>
-              <Text style={[tw`text-[9px] text-[#eab308]`, {fontFamily: 'PlusJakartaSans_800ExtraBold'}]}>{efficiency}%</Text>
-            </View>
-            <View style={tw`w-full h-1.5 bg-[#fef08a] dark:bg-yellow-900/50 rounded-full overflow-hidden`}>
-              <View style={[tw`h-full bg-[#166534] dark:bg-yellow-500 rounded-full`, { width: `${efficiency}%` }]} />
+            <View style={tw`mt-2`}>
+              <View style={tw`flex-row justify-between items-center mb-1`}>
+                <Text style={[tw`text-[9px] text-slate-400 uppercase tracking-wider`, { fontFamily: 'PlusJakartaSans_700Bold' }]}>
+                  Capacity
+                </Text>
+                <Text style={[tw`text-[9px] text-slate-500 font-bold`]}>
+                  Max: 5.0kg
+                </Text>
+              </View>
+              <View style={tw`w-full h-1.5 bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden`}>
+                <View style={[tw`h-full bg-amber-500 rounded-full`, { width: `${Math.min((parseFloat(targetYieldKg) / 5.0) * 100, 100)}%` }]} />
+              </View>
             </View>
           </View>
         </View>

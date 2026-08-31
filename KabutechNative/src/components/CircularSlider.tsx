@@ -1,6 +1,6 @@
 import React from 'react';
 import { View, Text } from 'react-native';
-import Svg, { Circle } from 'react-native-svg';
+import Svg, { Circle, Defs, LinearGradient as SvgGradient, Stop } from 'react-native-svg';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import tw from '../tailwind';
 
@@ -12,33 +12,73 @@ interface Props {
     color: string;
     unit: string;
     optimal: string;
+    current: number;
+    label: string;
   };
   isDarkMode: boolean;
 }
 
 export default function CircularSlider({ localTarget, activeTabData, isDarkMode }: Props) {
-  const size = 260;
-  const radius = 110;
+  const size = 276;
+  const radius = 112;
   const strokeWidth = 14;
   const circumference = 2 * Math.PI * radius;
+  
   // Progress ratio limited between 0 and 1
   const progress = Math.max(0, Math.min(1, (localTarget - activeTabData.min) / (activeTabData.max - activeTabData.min)));
   const strokeDashoffset = circumference - (progress * circumference);
 
+  const diff = Number((activeTabData.current - localTarget).toFixed(1));
+  const isNearTarget = Math.abs(diff) <= 0.5;
+
   return (
-    <View style={tw`items-center justify-center relative mb-12`}>
+    <View style={tw`items-center justify-center relative mb-7`}>
+      {/* Background Soft Glow Plate */}
+      <View 
+        style={[
+          tw`absolute rounded-full`, 
+          { 
+            width: size - 36, 
+            height: size - 36, 
+            backgroundColor: isDarkMode ? '#0f172a' : '#ffffff',
+            shadowColor: activeTabData.color,
+            shadowOffset: { width: 0, height: 8 },
+            shadowOpacity: isDarkMode ? 0.28 : 0.14,
+            shadowRadius: 24,
+            elevation: 6
+          }
+        ]} 
+      />
+
       <Svg width={size} height={size} viewBox={`0 0 ${size} ${size}`}>
+        <Defs>
+          <SvgGradient id="dialGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+            <Stop offset="0%" stopColor={activeTabData.color} stopOpacity="1" />
+            <Stop offset="100%" stopColor={activeTabData.color} stopOpacity="0.7" />
+          </SvgGradient>
+        </Defs>
+
+        {/* Outer subtle guide track */}
+        <Circle 
+          cx={size/2} cy={size/2} r={radius + 14} 
+          stroke={isDarkMode ? '#1e293b' : '#e2e8f0'} 
+          strokeWidth={1} 
+          strokeDasharray="3 5"
+          fill="none" 
+        />
+
         {/* Background Track */}
         <Circle 
           cx={size/2} cy={size/2} r={radius} 
-          stroke={isDarkMode ? '#334155' : '#e2e8f0'} 
+          stroke={isDarkMode ? '#1e293b' : '#f1f5f9'} 
           strokeWidth={strokeWidth} 
           fill="none" 
         />
-        {/* Progress Track */}
+
+        {/* Active Progress Track */}
         <Circle 
           cx={size/2} cy={size/2} r={radius} 
-          stroke={activeTabData.color} 
+          stroke="url(#dialGrad)" 
           strokeWidth={strokeWidth} 
           strokeDasharray={circumference} 
           strokeDashoffset={strokeDashoffset} 
@@ -48,23 +88,48 @@ export default function CircularSlider({ localTarget, activeTabData, isDarkMode 
         />
       </Svg>
 
-      {/* Central Values */}
-      <View style={[tw`absolute items-center justify-center`, {width: size, height: size}]}>
-        <View style={tw`flex-row items-start`}>
-          <Text style={[tw`text-5xl text-slate-800 dark:text-white tracking-tighter`, {fontFamily: 'PlusJakartaSans_800ExtraBold'}]}>
+      {/* Central Display Content */}
+      <View style={[tw`absolute items-center justify-center`, { width: size - 44, height: size - 44 }]}>
+        
+        {/* Top Mini Tag: TARGET SETTING */}
+        <View style={tw`flex-row items-center gap-1.5 mb-1`}>
+          <View style={[tw`w-1.5 h-1.5 rounded-full`, { backgroundColor: activeTabData.color }]} />
+          <Text style={[tw`text-[10px] text-slate-400 dark:text-slate-500 uppercase tracking-widest`, { fontFamily: 'PlusJakartaSans_800ExtraBold' }]}>
+            TARGET SETPOINT
+          </Text>
+        </View>
+
+        {/* Large Value & Unit */}
+        <View style={tw`flex-row items-baseline justify-center`}>
+          <Text style={[tw`text-5xl text-slate-900 dark:text-white tracking-tighter`, { fontFamily: 'PlusJakartaSans_800ExtraBold' }]}>
             {localTarget}
           </Text>
-          <Text style={[tw`text-lg text-slate-500 dark:text-slate-400 mt-2 ml-1`, {fontFamily: 'PlusJakartaSans_700Bold'}]}>
+          <Text style={[tw`text-xl font-bold ml-1.5`, { color: activeTabData.color, fontFamily: 'PlusJakartaSans_800ExtraBold' }]}>
             {activeTabData.unit}
           </Text>
         </View>
-        <View style={tw`bg-slate-100 dark:bg-slate-800/60 px-3 py-1 rounded-full mt-2 flex-row items-center gap-1.5`}>
-          <MaterialCommunityIcons name="lightbulb-on-outline" size={12} color={activeTabData.color} />
-          <Text style={[tw`text-xs text-slate-600 dark:text-slate-400`, {fontFamily: 'PlusJakartaSans_700Bold'}]}>
-            Optimal: {activeTabData.optimal} {activeTabData.unit}
+
+        {/* Live vs Target Badge */}
+        <View style={tw`mt-2 flex-row items-center gap-2 bg-slate-100/90 dark:bg-slate-800/80 px-3 py-1.5 rounded-full border border-slate-200/60 dark:border-slate-700/60`}>
+          <Text style={[tw`text-[11px] text-slate-500 dark:text-slate-400`, { fontFamily: 'PlusJakartaSans_600SemiBold' }]}>
+            Current: <Text style={[tw`text-slate-800 dark:text-slate-200`, { fontFamily: 'PlusJakartaSans_800ExtraBold' }]}>{activeTabData.current}{activeTabData.unit}</Text>
+          </Text>
+          <View style={tw`w-1 h-1 rounded-full bg-slate-300 dark:bg-slate-600`} />
+          <Text style={[tw`text-[10.5px]`, isNearTarget ? tw`text-emerald-600 dark:text-emerald-400` : tw`text-amber-600 dark:text-amber-400`, { fontFamily: 'PlusJakartaSans_700Bold' }]}>
+            {isNearTarget ? 'Aligned' : `${diff > 0 ? `+${diff}` : diff}${activeTabData.unit}`}
           </Text>
         </View>
+
+        {/* Optimal Range Pill */}
+        <View style={tw`mt-2 flex-row items-center gap-1`}>
+          <MaterialCommunityIcons name="check-decagram-outline" size={12} color="#10b981" />
+          <Text style={[tw`text-[10.5px] text-slate-400 dark:text-slate-500`, { fontFamily: 'PlusJakartaSans_600SemiBold' }]}>
+            Ideal: <Text style={[tw`text-slate-600 dark:text-slate-300 font-bold`]}>{activeTabData.optimal} {activeTabData.unit}</Text>
+          </Text>
+        </View>
+
       </View>
     </View>
   );
 }
+

@@ -21,6 +21,7 @@ import StaffProfileScreen from '../screens/staff/StaffProfileScreen';
 import ActivityLogScreen from '../screens/staff/ActivityLogScreen';
 import LiveFarmScreen from '../screens/LiveFarmScreen';
 import MyTasksScreen from '../screens/staff/MyTasksScreen';
+import AnalyticsScreen from '../screens/AnalyticsScreen';
 
 const DummyScreen = () => null;
 
@@ -32,6 +33,7 @@ function StaffHomeStackNavigator() {
     <HomeStack.Navigator screenOptions={{ headerShown: false }}>
       <HomeStack.Screen name="HomeScreen" component={StaffHomeScreen} />
       <HomeStack.Screen name="LiveFarm" component={LiveFarmScreen} />
+      <HomeStack.Screen name="Analytics" component={AnalyticsScreen} />
     </HomeStack.Navigator>
   );
 }

@@ -14,6 +14,7 @@ import ControlsScreen from '../screens/ControlsScreen';
 import YieldScreen from '../screens/YieldScreen';
 import ProfileScreen from '../screens/ProfileScreen';
 import ManageCropScreen from '../screens/ManageCropScreen';
+import AnalyticsScreen from '../screens/AnalyticsScreen';
 import AddBatchModal from '../components/modals/AddBatchModal';
 import tw from '../tailwind';
 import { useTheme } from '../context/ThemeContext';
@@ -33,6 +34,7 @@ function HomeStackNavigator() {
     <HomeStack.Navigator screenOptions={{ headerShown: false }}>
       <HomeStack.Screen name="HomeScreen" component={HomeScreen} />
       <HomeStack.Screen name="LiveFarm" component={LiveFarmScreen} />
+      <HomeStack.Screen name="Analytics" component={AnalyticsScreen} />
     </HomeStack.Navigator>
   );
 }

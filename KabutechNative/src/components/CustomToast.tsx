@@ -1,6 +1,8 @@
 import React, { useEffect, useRef, useState, useCallback } from 'react';
 import { View, Text, Animated, StyleSheet, PanResponder } from 'react-native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useTheme } from '../context/ThemeContext';
 import { SoundManager } from '../utils/SoundManager';
 import { hapticSuccess, hapticError } from '../utils/haptics';
 
@@ -20,7 +22,10 @@ export const showToast = (msg: ToastMessage) => {
 };
 
 export default function CustomToast() {
+  const { isDarkMode } = useTheme();
+  const insets = useSafeAreaInsets();
   const [message, setMessage] = useState<ToastMessage | null>(null);
+
   const translateY = useRef(new Animated.Value(-120)).current;
   const translateX = useRef(new Animated.Value(0)).current;
   const opacity = useRef(new Animated.Value(0)).current;
@@ -72,10 +77,12 @@ export default function CustomToast() {
     translateY.setValue(-120);
     translateX.setValue(0);
     opacity.setValue(0);
+
     Animated.parallel([
       Animated.spring(translateY, { toValue: 0, friction: 8, tension: 60, useNativeDriver: true }),
       Animated.timing(opacity, { toValue: 1, duration: 250, useNativeDriver: true }),
     ]).start();
+
     timerRef.current = setTimeout(hide, msg.duration || 2500);
   }, [translateY, opacity, hide]);
 
@@ -89,12 +96,24 @@ export default function CustomToast() {
   const isSuccess = message.type === 'success';
   const isInfo = message.type === 'info';
   
-  const bgColor = isSuccess ? '#f0fdf4' : isInfo ? '#eff6ff' : '#fef2f2';
-  const borderColor = isSuccess ? '#10b981' : isInfo ? '#3b82f6' : '#ef4444';
   const iconName = isSuccess ? 'check-circle' : isInfo ? 'information' : 'alert-circle';
-  const iconColor = isSuccess ? '#10b981' : isInfo ? '#3b82f6' : '#ef4444';
-  const titleColor = isSuccess ? '#064e3b' : isInfo ? '#1e3a8a' : '#7f1d1d';
-  const bodyColor = isSuccess ? '#166534' : isInfo ? '#1e40af' : '#991b1b';
+  const borderColor = isSuccess ? '#10b981' : isInfo ? '#3b82f6' : '#ef4444';
+  const iconColor = isSuccess ? (isDarkMode ? '#34d399' : '#10b981') : isInfo ? (isDarkMode ? '#60a5fa' : '#3b82f6') : (isDarkMode ? '#f87171' : '#ef4444');
+
+  // Dark Mode vs Light Mode Color Palettes
+  const bgColor = isDarkMode 
+    ? (isSuccess ? '#062d20' : isInfo ? '#0c1e3d' : '#2d0a0a')
+    : (isSuccess ? '#f0fdf4' : isInfo ? '#eff6ff' : '#fef2f2');
+
+  const titleColor = isDarkMode
+    ? '#ffffff'
+    : (isSuccess ? '#064e3b' : isInfo ? '#1e3a8a' : '#7f1d1d');
+
+  const bodyColor = isDarkMode
+    ? (isSuccess ? '#a7f3d0' : isInfo ? '#bfdbfe' : '#fecaca')
+    : (isSuccess ? '#166534' : isInfo ? '#1e40af' : '#991b1b');
+
+  const topOffset = Math.max(insets.top + 10, 48);
 
   return (
     <Animated.View
@@ -102,6 +121,7 @@ export default function CustomToast() {
       style={[
         styles.container,
         {
+          top: topOffset,
           backgroundColor: bgColor,
           borderLeftColor: borderColor,
           transform: [{ translateY }, { translateX }],
@@ -125,7 +145,6 @@ export default function CustomToast() {
 const styles = StyleSheet.create({
   container: {
     position: 'absolute',
-    top: 50,
     left: 16,
     right: 16,
     flexDirection: 'row',
@@ -138,7 +157,7 @@ const styles = StyleSheet.create({
     elevation: 20,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.15,
+    shadowOpacity: 0.2,
     shadowRadius: 16,
   },
   iconWrap: {

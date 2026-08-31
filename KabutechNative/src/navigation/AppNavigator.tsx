@@ -17,6 +17,7 @@ import StaffApprovalsScreen from '../screens/StaffApprovalsScreen';
 import AssignTaskScreen from '../screens/AssignTaskScreen';
 import StaffTaskHistoryScreen from '../screens/StaffTaskHistoryScreen';
 import AnalyticsScreen from '../screens/AnalyticsScreen';
+import LiveFarmScreen from '../screens/LiveFarmScreen';
 import MyActivityHistoryScreen from '../screens/staff/MyActivityHistoryScreen';
 import MyTasksScreen from '../screens/staff/MyTasksScreen';
 import ActivityLogScreen from '../screens/staff/ActivityLogScreen';
@@ -66,6 +67,8 @@ export default function AppNavigator() {
             <Stack.Screen name="ActivityLog" component={ActivityLogScreen} />
             <Stack.Screen name="MyActivityHistory" component={MyActivityHistoryScreen} />
             <Stack.Screen name="MyTasks" component={MyTasksScreen} />
+            <Stack.Screen name="Analytics" component={AnalyticsScreen} />
+            <Stack.Screen name="LiveFarm" component={LiveFarmScreen} />
           </>
         ) : (
           // Admin App Stack
@@ -78,6 +81,7 @@ export default function AppNavigator() {
             <Stack.Screen name="AssignTask" component={AssignTaskScreen} />
             <Stack.Screen name="StaffTaskHistory" component={StaffTaskHistoryScreen} />
             <Stack.Screen name="Analytics" component={AnalyticsScreen} />
+            <Stack.Screen name="LiveFarm" component={LiveFarmScreen} />
           </>
         )}
       </Stack.Navigator>

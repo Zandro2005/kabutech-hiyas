@@ -1,11 +1,11 @@
 import React, { useState, useRef } from 'react';
 import { View, Text, TextInput, TouchableOpacity, KeyboardAvoidingView, Platform, ScrollView, Image, StatusBar } from 'react-native';
-import { MaterialCommunityIcons } from '@expo/vector-icons';
+import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 // @ts-ignore
 import { signInWithEmailAndPassword, sendPasswordResetEmail, setPersistence, inMemoryPersistence, getReactNativePersistence } from 'firebase/auth';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { auth } from '../services/firebase';
-import Svg, { Path } from 'react-native-svg';
+import Svg, { Path, Defs, LinearGradient, Stop } from 'react-native-svg';
 import tw from '../tailwind';
 import { useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
@@ -16,6 +16,8 @@ import * as Speech from 'expo-speech';
 import { db } from '../services/firebase';
 import { ref, get } from 'firebase/database';
 import { VolumeManager } from 'react-native-volume-manager';
+import RealisticMushroomIcon from '../components/RealisticMushroomIcon';
+
 export default function LoginScreen() {
   // Warm up TTS engine on mount to eliminate initial delay
   React.useEffect(() => {
@@ -123,31 +125,41 @@ export default function LoginScreen() {
               resizeMode="cover"
             />
 
-            {/* SVG White Wave overlayed at the bottom of the image */}
+            {/* SVG White Wave overlayed at the bottom of the image with colored wave border */}
             <View style={tw`absolute bottom-0 w-full h-[120px]`}>
               <Svg height="100%" width="100%" viewBox="0 0 1440 320" preserveAspectRatio="none">
+                <Defs>
+                  <LinearGradient id="loginWaveStroke" x1="0%" y1="0%" x2="100%" y2="0%">
+                    <Stop offset="0%" stopColor="#2d6a4f" />
+                    <Stop offset="50%" stopColor="#52b788" />
+                    <Stop offset="100%" stopColor="#3d8c63" />
+                  </LinearGradient>
+                </Defs>
                 <Path
                   fill="#ffffff"
                   d="M0,160 C480,420 960,-100 1440,160 L1440,320 L0,320 Z"
+                />
+                <Path
+                  d="M0,160 C480,420 960,-100 1440,160"
+                  stroke="url(#loginWaveStroke)"
+                  strokeWidth="16"
+                  fill="none"
                 />
               </Svg>
             </View>
           </View>
 
           {/* Form Area */}
-          <View style={tw`flex-1 px-8 pt-8 pb-6 relative`}>
+          <View style={tw`flex-1 px-8 pt-6 pb-6 relative`}>
 
-            <View style={tw`mb-8`}>
+            <View style={tw`mb-7`}>
               <View style={tw`flex-row items-center justify-center`}>
                 <Text style={[tw`text-3xl text-slate-800 text-center`, { fontFamily: 'PlusJakartaSans_800ExtraBold' }]}>
                   Welcome back
                 </Text>
-                <MaterialCommunityIcons
-                  name="mushroom"
-                  size={32}
-                  color="#3d8c63"
-                  style={[tw`ml-2 mt-1`, { transform: [{ rotate: '15deg' }] }]}
-                />
+                <View style={tw`ml-2.5 shadow-sm`}>
+                  <RealisticMushroomIcon size={34} rotate="12deg" />
+                </View>
               </View>
               <Text style={[tw`text-sm text-slate-400 text-center mt-2`, { fontFamily: 'PlusJakartaSans_700Bold' }]}>
                 Login to your account
@@ -156,7 +168,7 @@ export default function LoginScreen() {
 
             {/* Email Field */}
             <View style={tw`relative flex-row items-center w-full bg-[#f3f4f6] rounded-2xl mb-4 px-4`}>
-              <MaterialCommunityIcons name="email-outline" size={18} color="#9ca3af" />
+              <Ionicons name="mail" size={18} color="#3d8c63" />
               <TextInput
                 value={email}
                 onChangeText={setEmail}
@@ -173,7 +185,7 @@ export default function LoginScreen() {
 
             {/* Password Field */}
             <View style={tw`relative flex-row items-center w-full bg-[#f3f4f6] rounded-2xl mb-4 px-4`}>
-              <MaterialCommunityIcons name="lock-outline" size={18} color="#9ca3af" />
+              <Ionicons name="lock-closed" size={18} color="#3d8c63" />
               <TextInput
                 ref={passwordRef}
                 value={password}
@@ -188,34 +200,32 @@ export default function LoginScreen() {
               <TouchableOpacity hitSlop={{ top: 15, bottom: 15, left: 15, right: 15 }} 
                 onPress={() => setShowPassword(!showPassword)}
                 style={tw`absolute right-0 h-full px-4 justify-center z-10`}
-                
               >
-                <MaterialCommunityIcons name={showPassword ? "eye-off-outline" : "eye-outline"} size={20} color="#9ca3af" />
+                <Ionicons name={showPassword ? "eye-off" : "eye"} size={20} color="#9ca3af" />
               </TouchableOpacity>
             </View>
 
             {/* Options */}
-            <View style={tw`flex-row items-center justify-between mb-8 px-1`}>
+            <View style={tw`flex-row items-center justify-between mb-7 px-1`}>
               <TouchableOpacity hitSlop={{ top: 15, bottom: 15, left: 15, right: 15 }} 
                 style={tw`flex-row items-center`}
                 onPress={() => setRememberMe(!rememberMe)}
-                
               >
-                <MaterialCommunityIcons
-                  name={rememberMe ? "checkbox-marked" : "checkbox-blank-outline"}
-                  size={20}
-                  color={rememberMe ? "#3d8c63" : "#9ca3af"}
-                />
-                <Text style={[tw`text-[12px] text-slate-500 ml-2`, { fontFamily: 'PlusJakartaSans_700Bold' }]}>
+                <View style={[
+                  tw`w-5 h-5 rounded-md items-center justify-center mr-2 border-[1.5px]`,
+                  rememberMe ? tw`bg-[#3d8c63] border-[#3d8c63] shadow-sm` : tw`bg-white border-slate-300`
+                ]}>
+                  {rememberMe && <Ionicons name="checkmark" size={14} color="#ffffff" />}
+                </View>
+                <Text style={[tw`text-[12px] text-slate-600`, { fontFamily: 'PlusJakartaSans_700Bold' }]}>
                   Remember me
                 </Text>
               </TouchableOpacity>
               
               <TouchableOpacity hitSlop={{ top: 15, bottom: 15, left: 15, right: 15 }}
                 onPress={handleForgotPassword}
-                
               >
-                <Text style={[tw`text-[11px] text-slate-500`, { fontFamily: 'PlusJakartaSans_700Bold' }]}>Forgot Password?</Text>
+                <Text style={[tw`text-[11px] text-[#3d8c63]`, { fontFamily: 'PlusJakartaSans_700Bold' }]}>Forgot Password?</Text>
               </TouchableOpacity>
             </View>
 
@@ -227,11 +237,12 @@ export default function LoginScreen() {
             <TouchableOpacity hitSlop={{ top: 15, bottom: 15, left: 15, right: 15 }} 
               onPress={handleLogin}
               disabled={loading}
-              style={tw`w-full bg-[#3d8c63] py-4 rounded-full items-center shadow-lg mb-6 ${loading ? 'opacity-70' : ''}`}
+              style={tw`w-full bg-[#3d8c63] py-4 rounded-full flex-row items-center justify-center shadow-lg mb-6 ${loading ? 'opacity-70' : ''}`}
             >
-              <Text style={[tw`text-white text-[15px]`, { fontFamily: 'PlusJakartaSans_700Bold' }]}>
+              <Text style={[tw`text-white text-[15px] mr-2`, { fontFamily: 'PlusJakartaSans_700Bold' }]}>
                 {loading ? 'Logging in...' : 'Login'}
               </Text>
+              {!loading && <Ionicons name="arrow-forward-circle" size={20} color="#ffffff" />}
             </TouchableOpacity>
 
             <View style={tw`flex-row justify-center items-center`}>
@@ -241,7 +252,6 @@ export default function LoginScreen() {
               <TouchableOpacity hitSlop={{ top: 15, bottom: 15, left: 15, right: 15 }} 
                 onPress={() => navigation.navigate('Register')}
                 activeOpacity={0.6}
-                
               >
                 <Text style={[tw`text-[12px] text-[#3d8c63] underline`, { fontFamily: 'PlusJakartaSans_700Bold' }]}>
                   Sign up

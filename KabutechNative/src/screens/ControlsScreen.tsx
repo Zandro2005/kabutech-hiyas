@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { View, Text, ScrollView, TouchableOpacity, StatusBar, DeviceEventEmitter, Alert, Dimensions, ActivityIndicator, Modal } from 'react-native';
-import { useNavigation } from '@react-navigation/native';
+import { useNavigation, useRoute } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { GlobalNavigationParamList } from '../types/navigation';
 import tw from '../tailwind';
@@ -20,6 +20,7 @@ type TabId = 'temp' | 'hum' | 'light' | 'co2';
 
 export default function ControlsScreen() {
   const navigation = useNavigation<NativeStackNavigationProp<GlobalNavigationParamList>>();
+  const route = useRoute<any>();
   const { isDarkMode } = useTheme();
   const sensors = useSensors();
   const settings = useSettings();
@@ -93,8 +94,25 @@ export default function ControlsScreen() {
     { id: 'light' as TabId, label: 'Light Level', icon: 'white-balance-sunny', color: '#eab308', unit: 'Lx', min: 200, max: 800, step: 10, current: light, target: targetLight, optimal: '500-800', dbKey: 'light' },
     { id: 'co2' as TabId, label: 'CO2 Level', icon: 'molecule-co2', color: '#10b981', unit: 'ppm', min: 300, max: 1200, step: 10, current: co2, target: targetCO2, optimal: '< 800', dbKey: 'co2' },
   ];
+  const tabScrollRef = useRef<ScrollView>(null);
+  const tabLayouts = useRef<Record<string, { x: number; width: number }>>({});
 
-  const [activeTab, setActiveTab] = useState<TabId>('temp');
+  const scrollToTab = (tabId: string) => {
+    const layout = tabLayouts.current[tabId];
+    if (layout && tabScrollRef.current) {
+      const screenWidth = Dimensions.get('window').width;
+      const targetScrollX = Math.max(0, layout.x - screenWidth / 2 + layout.width / 2);
+      tabScrollRef.current.scrollTo({ x: targetScrollX, animated: true });
+    }
+  };
+
+  const [activeTab, setActiveTab] = useState<TabId>(route.params?.tab || 'temp');
+  useEffect(() => {
+    if (route.params?.tab) {
+      setActiveTab(route.params.tab);
+      setTimeout(() => scrollToTab(route.params.tab), 250);
+    }
+  }, [route.params?.tab]);
   const activeTabData = tabs.find(t => t.id === activeTab)!;
   const activeTabDataRef = useRef(activeTabData);
 
@@ -116,35 +134,7 @@ export default function ControlsScreen() {
     return () => clearTimeout(timeout);
   }, [localTarget]);
 
-  const increment = () => {
-    hapticLight();
-    setLocalTarget(prev => {
-      const data = activeTabDataRef.current;
-      const next = prev + data.step;
-      return next > data.max ? data.max : Number(next.toFixed(1));
-    });
-  };
-
-  const decrement = () => {
-    hapticLight();
-    setLocalTarget(prev => {
-      const data = activeTabDataRef.current;
-      const next = prev - data.step;
-      return next < data.min ? data.min : Number(next.toFixed(1));
-    });
-  };
-
-  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-
-  const startIncrement = () => {
-    increment();
-    timerRef.current = setInterval(increment, 150);
-  };
-
-  const startDecrement = () => {
-    decrement();
-    timerRef.current = setInterval(decrement, 150);
-  };
+  const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const stopTimer = () => {
     if (timerRef.current) {
@@ -153,13 +143,44 @@ export default function ControlsScreen() {
     }
   };
 
+  const startIncrement = () => {
+    hapticSelection();
+    setLocalTarget(prev => {
+      const next = Number((prev + activeTabDataRef.current.step).toFixed(1));
+      return next <= activeTabDataRef.current.max ? next : prev;
+    });
+
+    timerRef.current = setInterval(() => {
+      hapticLight();
+      setLocalTarget(prev => {
+        const next = Number((prev + activeTabDataRef.current.step).toFixed(1));
+        return next <= activeTabDataRef.current.max ? next : prev;
+      });
+    }, 120);
+  };
+
+  const startDecrement = () => {
+    hapticSelection();
+    setLocalTarget(prev => {
+      const next = Number((prev - activeTabDataRef.current.step).toFixed(1));
+      return next >= activeTabDataRef.current.min ? next : prev;
+    });
+
+    timerRef.current = setInterval(() => {
+      hapticLight();
+      setLocalTarget(prev => {
+        const next = Number((prev - activeTabDataRef.current.step).toFixed(1));
+        return next >= activeTabDataRef.current.min ? next : prev;
+      });
+    }, 120);
+  };
+
   useEffect(() => {
     return () => {
       stopTimer();
     };
   }, []);
 
-  // Device toggles list
   const deviceToggles = [
     { key: 'fans', label: 'FANS', icon: 'fan', active: devices.fans, color: '#3b82f6' },
     { key: 'misters', label: 'MISTERS', icon: 'water', active: devices.misters, color: '#0ea5e9' },
@@ -177,53 +198,93 @@ export default function ControlsScreen() {
           <ActivityIndicator size="large" color="#10b981" />
         </View>
       ) : (
-      <ScrollView contentContainerStyle={tw`pb-32 pt-2`} showsVerticalScrollIndicator={false}>
+      <ScrollView contentContainerStyle={tw`pb-28 pt-2`} showsVerticalScrollIndicator={false}>
         
-        {/* Horizontal Tabs */}
-        <View style={tw`mb-10 pl-4`}>
+        {/* Horizontal Environmental Parameter Selector */}
+        <View style={tw`mb-5`}>
           <ScrollView 
+            ref={tabScrollRef}
             horizontal 
-            showsHorizontalScrollIndicator={false} 
-            contentContainerStyle={tw`pr-4`}
-            snapToInterval={92}
-            decelerationRate="fast"
-            snapToAlignment="start"
+            showsHorizontalScrollIndicator={false}
+            nestedScrollEnabled={true}
+            directionalLockEnabled={true}
+            decelerationRate="normal"
+            keyboardShouldPersistTaps="handled"
+            scrollEventThrottle={16}
+            overScrollMode="never"
+            contentContainerStyle={tw`px-5 gap-2.5`}
           >
             {tabs.map((tab) => {
               const isActive = activeTab === tab.id;
               return (
-                <TouchableOpacity hitSlop={{ top: 15, bottom: 15, left: 15, right: 15 }} 
+                <TouchableOpacity 
+                  activeOpacity={0.75}
+                  delayPressIn={50}
                   key={tab.id}
-                  onPress={() => setActiveTab(tab.id)}
-                  style={tw`items-center justify-center mr-7 w-16`}
-                  
+                  onLayout={(e) => {
+                    const { x, width } = e.nativeEvent.layout;
+                    tabLayouts.current[tab.id] = { x, width };
+                  }}
+                  onPress={() => {
+                    hapticSelection();
+                    setActiveTab(tab.id);
+                    scrollToTab(tab.id);
+                  }}
+                  style={[
+                    tw`px-3.5 py-2.5 rounded-2xl border flex-row items-center gap-2.5 shadow-sm`,
+                    isActive 
+                      ? [tw`bg-white dark:bg-slate-800`, { borderColor: tab.color, borderWidth: 1.5 }] 
+                      : tw`bg-white dark:bg-slate-900 border-slate-200/70 dark:border-slate-800`
+                  ]}
                 >
-                  <MaterialCommunityIcons 
-                    name={tab.icon as any} 
-                    size={28} 
-                    color={isActive ? tab.color : (isDarkMode ? '#64748b' : '#94a3b8')} 
-                  />
-                  <Text style={[tw`text-[11px] mt-2 ${isActive ? 'text-slate-800 dark:text-white' : 'text-slate-500 dark:text-slate-500'}`, {fontFamily: 'PlusJakartaSans_700Bold'}]} numberOfLines={1}>
-                    {tab.label}
-                  </Text>
-                  {/* Subtle active indicator dot */}
-                  {isActive && <View style={[tw`w-1 h-1 rounded-full mt-1.5`, {backgroundColor: tab.color}]} />}
+                  <View style={[tw`w-8 h-8 rounded-xl items-center justify-center`, { backgroundColor: `${tab.color}18` }]}>
+                    <MaterialCommunityIcons 
+                      name={tab.icon as any} 
+                      size={18} 
+                      color={tab.color} 
+                    />
+                  </View>
+                  <View>
+                    <Text style={[tw`text-[10px] uppercase tracking-wider text-slate-400 dark:text-slate-500`, { fontFamily: 'PlusJakartaSans_700Bold' }]}>
+                      {tab.label}
+                    </Text>
+                    <Text style={[tw`text-[13px] ${isActive ? 'text-slate-900 dark:text-white' : 'text-slate-700 dark:text-slate-300'}`, { fontFamily: 'PlusJakartaSans_800ExtraBold' }]}>
+                      {tab.target}{tab.unit}
+                    </Text>
+                  </View>
                 </TouchableOpacity>
-              )
+              );
             })}
             
-            <TouchableOpacity hitSlop={{ top: 15, bottom: 15, left: 15, right: 15 }} 
-              onPress={() => navigation.navigate('DeviceSchedules')}
-              style={tw`items-center justify-center mr-7 w-16`}
+            {/* Quick Link to Schedule Config */}
+            <TouchableOpacity 
+              activeOpacity={0.75}
+              delayPressIn={50}
+              onLayout={(e) => {
+                const { x, width } = e.nativeEvent.layout;
+                tabLayouts.current['schedule'] = { x, width };
+              }}
+              onPress={() => {
+                hapticSelection();
+                navigation.navigate('DeviceSchedules');
+              }}
+              style={tw`px-3.5 py-2.5 rounded-2xl border border-dashed border-slate-300 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-900/40 flex-row items-center gap-2`}
             >
-              <MaterialCommunityIcons 
-                name="calendar-clock" 
-                size={28} 
-                color={isDarkMode ? '#64748b' : '#94a3b8'} 
-              />
-              <Text style={[tw`text-[11px] mt-2 text-slate-500 dark:text-slate-500`, {fontFamily: 'PlusJakartaSans_700Bold'}]} numberOfLines={1}>
-                Schedule
-              </Text>
+              <View style={tw`w-8 h-8 rounded-xl items-center justify-center bg-purple-500/10`}>
+                <MaterialCommunityIcons 
+                  name="calendar-clock" 
+                  size={18} 
+                  color="#a855f7" 
+                />
+              </View>
+              <View>
+                <Text style={[tw`text-[10px] uppercase tracking-wider text-purple-600 dark:text-purple-400`, { fontFamily: 'PlusJakartaSans_700Bold' }]}>
+                  Timer
+                </Text>
+                <Text style={[tw`text-[12px] text-slate-700 dark:text-slate-300`, { fontFamily: 'PlusJakartaSans_800ExtraBold' }]}>
+                  Schedule
+                </Text>
+              </View>
             </TouchableOpacity>
           </ScrollView>
         </View>
@@ -235,108 +296,160 @@ export default function ControlsScreen() {
           isDarkMode={isDarkMode} 
         />
 
-        {/* Controls Row (-, Mode, +) */}
-        <View style={tw`flex-row items-center justify-center px-4 mb-12 gap-2`}>
-          <TouchableOpacity hitSlop={{ top: 15, bottom: 15, left: 15, right: 15 }} 
+        {/* Precision Stepper & Mode Switcher Row */}
+        <View style={tw`flex-row items-center justify-center px-5 mb-6 gap-3`}>
+          {/* Decrement Button */}
+          <TouchableOpacity 
+            hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
             activeOpacity={0.7}
             onPressIn={startDecrement}
             onPressOut={stopTimer}
-            
-            style={tw`w-9 h-9 rounded-full border border-slate-200 dark:border-slate-700 items-center justify-center bg-white dark:bg-slate-800 shadow-sm`}
+            style={tw`w-11 h-11 rounded-2xl border border-slate-200/80 dark:border-slate-700 items-center justify-center bg-white dark:bg-slate-800 shadow-sm`}
           >
-            <MaterialCommunityIcons name="minus" size={20} color={isDarkMode ? '#94a3b8' : '#64748b'} />
+            <MaterialCommunityIcons name="minus" size={22} color={isDarkMode ? '#cbd5e1' : '#475569'} />
           </TouchableOpacity>
 
-          <View style={tw`flex-row bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-full p-1`}>
-            <TouchableOpacity hitSlop={{ top: 15, bottom: 15, left: 15, right: 15 }}  
+          {/* Mode Selector Pill */}
+          <View style={tw`flex-row bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 rounded-2xl p-1 shadow-sm`}>
+            <TouchableOpacity 
+              hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
               onPress={() => setMode('auto')}
-              style={[tw`px-4 py-2.5 rounded-full`, isAuto ? tw`bg-[#10b981] shadow-sm` : tw`bg-transparent`]}
+              style={[tw`px-3.5 py-2 rounded-xl flex-row items-center gap-1.5`, isAuto ? tw`bg-emerald-500 shadow-sm` : tw`bg-transparent`]}
             >
-              <Text style={[tw`text-[10px]`, isAuto ? tw`text-white` : tw`text-slate-500 dark:text-slate-400`, {fontFamily: 'PlusJakartaSans_800ExtraBold', letterSpacing: 0.5}]}>AUTO</Text>
+              {isAuto && <View style={tw`w-1.5 h-1.5 rounded-full bg-white`} />}
+              <Text style={[tw`text-[11px]`, isAuto ? tw`text-white` : tw`text-slate-500 dark:text-slate-400`, { fontFamily: 'PlusJakartaSans_800ExtraBold', letterSpacing: 0.3 }]}>
+                AUTO
+              </Text>
             </TouchableOpacity>
-            <TouchableOpacity hitSlop={{ top: 15, bottom: 15, left: 15, right: 15 }}  
+
+            <TouchableOpacity 
+              hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
               onPress={() => setMode('scheduled')}
-              style={[tw`px-4 py-2.5 rounded-full`, isScheduled ? tw`bg-[#8b5cf6] shadow-sm` : tw`bg-transparent`]}
+              style={[tw`px-3.5 py-2 rounded-xl flex-row items-center gap-1.5`, isScheduled ? tw`bg-purple-600 shadow-sm` : tw`bg-transparent`]}
             >
-              <Text style={[tw`text-[10px]`, isScheduled ? tw`text-white` : tw`text-slate-500 dark:text-slate-400`, {fontFamily: 'PlusJakartaSans_800ExtraBold', letterSpacing: 0.5}]}>SCHEDULED</Text>
+              {isScheduled && <View style={tw`w-1.5 h-1.5 rounded-full bg-white`} />}
+              <Text style={[tw`text-[11px]`, isScheduled ? tw`text-white` : tw`text-slate-500 dark:text-slate-400`, { fontFamily: 'PlusJakartaSans_800ExtraBold', letterSpacing: 0.3 }]}>
+                TIMED
+              </Text>
             </TouchableOpacity>
-            <TouchableOpacity hitSlop={{ top: 15, bottom: 15, left: 15, right: 15 }}  
+
+            <TouchableOpacity 
+              hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
               onPress={() => {
                 if (isLocked) DeviceEventEmitter.emit('showManualOverrideModal');
               }}
-              style={[tw`px-4 py-2.5 rounded-full`, (!isAuto && !isScheduled) ? tw`bg-[#f59e0b] shadow-sm` : tw`bg-transparent`]}
+              style={[tw`px-3.5 py-2 rounded-xl flex-row items-center gap-1.5`, (!isAuto && !isScheduled) ? tw`bg-amber-500 shadow-sm` : tw`bg-transparent`]}
             >
-              <Text style={[tw`text-[10px]`, (!isAuto && !isScheduled) ? tw`text-white` : tw`text-slate-500 dark:text-slate-400`, {fontFamily: 'PlusJakartaSans_800ExtraBold', letterSpacing: 0.5}]}>MANUAL</Text>
+              {(!isAuto && !isScheduled) && <View style={tw`w-1.5 h-1.5 rounded-full bg-white`} />}
+              <Text style={[tw`text-[11px]`, (!isAuto && !isScheduled) ? tw`text-white` : tw`text-slate-500 dark:text-slate-400`, { fontFamily: 'PlusJakartaSans_800ExtraBold', letterSpacing: 0.3 }]}>
+                MANUAL
+              </Text>
             </TouchableOpacity>
           </View>
 
-          <TouchableOpacity hitSlop={{ top: 15, bottom: 15, left: 15, right: 15 }} 
+          {/* Increment Button */}
+          <TouchableOpacity 
+            hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
             activeOpacity={0.7}
             onPressIn={startIncrement}
             onPressOut={stopTimer}
-            
-            style={tw`w-9 h-9 rounded-full border border-slate-200 dark:border-slate-700 items-center justify-center bg-white dark:bg-slate-800 shadow-sm`}
+            style={tw`w-11 h-11 rounded-2xl border border-slate-200/80 dark:border-slate-700 items-center justify-center bg-white dark:bg-slate-800 shadow-sm`}
           >
-            <MaterialCommunityIcons name="plus" size={20} color={isDarkMode ? '#94a3b8' : '#64748b'} />
+            <MaterialCommunityIcons name="plus" size={22} color={isDarkMode ? '#cbd5e1' : '#475569'} />
           </TouchableOpacity>
         </View>
 
-        {/* Bottom Device Toggles */}
-        <View style={tw`px-6`}>
-          {isAiOverride ? (
-            <View style={tw`bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800/50 rounded-xl p-3 flex-row items-center gap-2 mb-4 mx-2`}>
-              <MaterialCommunityIcons name="brain" size={16} color={isDarkMode ? '#60a5fa' : '#3b82f6'} />
-              <Text style={[tw`text-[10px] text-blue-800 dark:text-blue-300 flex-1`, {fontFamily: 'PlusJakartaSans_700Bold'}]}>
-                AI Pre-emptive Override is currently active. Controls are locked.
-              </Text>
-              <TouchableOpacity 
-                onPress={() => {
-                  DeviceEventEmitter.emit('cancelAiOverride');
-                  update(ref(db, 'kabutech/settings/setpoints'), { mode: 'auto', aiOverride: false });
-                  update(ref(db, 'kabutech/settings/setpoints/devices'), { fans: false, misters: false, lights: false, co2: false });
-                  showToast({ type: 'info', text1: 'Action Cancelled', text2: 'Override aborted. Returned to AUTO.' });
-                }}
-                style={tw`bg-blue-500 px-3 py-1.5 rounded-full`}
-              >
-                <Text style={[tw`text-white text-[10px]`, {fontFamily: 'PlusJakartaSans_800ExtraBold'}]}>Cancel</Text>
-              </TouchableOpacity>
-            </View>
-          ) : isLocked ? (
-            <View style={tw`bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-200 dark:border-emerald-800/50 rounded-xl p-3 flex-row items-center gap-2 mb-4 mx-2`}>
-              <MaterialCommunityIcons name="lock" size={16} color={isDarkMode ? '#34d399' : '#059669'} />
-              <Text style={[tw`text-[10px] text-emerald-800 dark:text-emerald-300`, {fontFamily: 'PlusJakartaSans_700Bold'}]}>
-                Manual controls are locked.
-              </Text>
-            </View>
-          ) : null}
+        {/* AI / Lock Status Notification */}
+        {isAiOverride ? (
+          <View style={tw`mx-5 bg-blue-500/10 border border-blue-500/30 rounded-2xl px-4 py-2.5 flex-row items-center gap-3 mb-4`}>
+            <MaterialCommunityIcons name="brain" size={18} color="#3b82f6" />
+            <Text style={[tw`text-[11px] text-blue-900 dark:text-blue-200 flex-1`, { fontFamily: 'PlusJakartaSans_600SemiBold' }]}>
+              AI Pre-emptive Override is active. Controls are locked.
+            </Text>
+            <TouchableOpacity 
+              onPress={() => {
+                DeviceEventEmitter.emit('cancelAiOverride');
+                update(ref(db, 'kabutech/settings/setpoints'), { mode: 'auto', aiOverride: false });
+                update(ref(db, 'kabutech/settings/setpoints/devices'), { fans: false, misters: false, lights: false, co2: false });
+                showToast({ type: 'info', text1: 'Action Cancelled', text2: 'Override aborted. Returned to AUTO.' });
+              }}
+              style={tw`bg-blue-500 px-3 py-1.5 rounded-xl`}
+            >
+              <Text style={[tw`text-white text-[10px]`, { fontFamily: 'PlusJakartaSans_800ExtraBold' }]}>Abort</Text>
+            </TouchableOpacity>
+          </View>
+        ) : null}
 
-          <View style={tw`flex-row justify-between w-full`}>
-            {deviceToggles.map((device) => {
+        {/* Hardware Actuators Single Widget */}
+        <View style={tw`px-5`}>
+          <View style={tw`flex-row justify-between items-center mb-2.5`}>
+            <View style={tw`flex-row items-center gap-2`}>
+              <View style={tw`w-2 h-4 rounded-full bg-[#10b981]`} />
+              <Text style={[tw`text-[14px] text-slate-900 dark:text-white tracking-wide`, { fontFamily: 'PlusJakartaSans_800ExtraBold' }]}>
+                Hardware Actuators
+              </Text>
+            </View>
+            <View style={tw`bg-slate-100 dark:bg-slate-800 px-2 py-0.5 rounded-full border border-slate-200/60 dark:border-slate-700 flex-row items-center gap-1`}>
+              {isLocked ? (
+                <MaterialCommunityIcons name="lock-outline" size={10} color={isDarkMode ? '#94a3b8' : '#64748b'} />
+              ) : (
+                <View style={tw`w-1.5 h-1.5 rounded-full bg-emerald-500`} />
+              )}
+              <Text style={[tw`text-[9.5px] text-slate-600 dark:text-slate-400`, { fontFamily: 'PlusJakartaSans_700Bold' }]}>
+                {isAiOverride ? 'AI Active' : isLocked ? `${isAuto ? 'AUTO' : 'TIMED'}` : `${Object.values(devices).filter(Boolean).length} Active`}
+              </Text>
+            </View>
+          </View>
+
+          {/* Unified Single Widget Bar */}
+          <View style={[
+            tw`bg-white dark:bg-slate-900 rounded-[24px] py-3.5 px-2 border border-slate-200/70 dark:border-slate-800 shadow-sm flex-row items-center justify-between`,
+            isLocked ? tw`opacity-60` : null
+          ]}>
+            {deviceToggles.map((device, index) => {
               const showActive = device.active;
               return (
-                <TouchableOpacity hitSlop={{ top: 15, bottom: 15, left: 15, right: 15 }} 
+                <TouchableOpacity 
+                  hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
                   key={device.key}
                   disabled={isLocked}
+                  activeOpacity={0.7}
                   onPress={() => toggleDevice(device.key, !device.active)}
-                  style={[
-                    tw`w-[22%] aspect-square rounded-2xl items-center justify-center border`,
-                    isLocked 
-                      ? tw`bg-slate-200 dark:bg-slate-900 border-transparent opacity-40` 
-                      : tw`bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 shadow-sm`
-                  ]}
+                  style={tw`flex-1 items-center justify-center`}
                 >
-                  <View style={tw`mb-2 p-1.5 rounded-full bg-transparent`}>
-                    <MaterialCommunityIcons 
-                      name={device.icon as any} 
-                      size={26} 
-                      color={showActive ? device.color : (isDarkMode ? '#64748b' : '#94a3b8')} 
-                    />
-                  </View>
-                  <Text style={[tw`text-[9px] uppercase`, showActive ? {color: device.color, fontFamily: 'PlusJakartaSans_800ExtraBold'} : tw`text-slate-500 dark:text-slate-400 font-bold`, { letterSpacing: 0.5 }]}>
+                  <MaterialCommunityIcons 
+                    name={device.icon as any} 
+                    size={22} 
+                    color={showActive ? device.color : (isDarkMode ? '#64748b' : '#94a3b8')} 
+                  />
+
+                  <Text 
+                    style={[
+                      tw`text-[10px] mt-1.5 text-center uppercase tracking-wide`, 
+                      showActive 
+                        ? [tw`text-slate-900 dark:text-white`, { fontFamily: 'PlusJakartaSans_800ExtraBold' }] 
+                        : tw`text-slate-500 dark:text-slate-400 font-bold`
+                    ]} 
+                    numberOfLines={1}
+                  >
                     {device.label}
                   </Text>
+
+                  {/* Status Indicator Dot + Text */}
+                  <View style={tw`flex-row items-center gap-1 mt-1`}>
+                    <View style={[
+                      tw`w-1.5 h-1.5 rounded-full`,
+                      showActive ? { backgroundColor: device.color } : tw`bg-slate-300 dark:bg-slate-600`
+                    ]} />
+                    <Text style={[
+                      tw`text-[9px]`,
+                      showActive ? { color: device.color, fontFamily: 'PlusJakartaSans_800ExtraBold' } : tw`text-slate-400 dark:text-slate-500 font-bold`
+                    ]}>
+                      {showActive ? 'ON' : 'OFF'}
+                    </Text>
+                  </View>
                 </TouchableOpacity>
-              )
+              );
             })}
           </View>
         </View>

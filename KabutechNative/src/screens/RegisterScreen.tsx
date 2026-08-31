@@ -1,8 +1,8 @@
 import React, { useState, useRef } from 'react';
 import { View, Text, TextInput, TouchableOpacity, KeyboardAvoidingView, Platform, ScrollView, StatusBar, Image } from 'react-native';
-import { MaterialCommunityIcons } from '@expo/vector-icons';
+import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { SoundManager } from '../utils/SoundManager';
-import Svg, { Path } from 'react-native-svg';
+import Svg, { Path, Defs, LinearGradient, Stop } from 'react-native-svg';
 import { createUserWithEmailAndPassword, updateProfile } from 'firebase/auth';
 import { ref, set } from 'firebase/database';
 import { auth, db } from '../services/firebase';
@@ -10,6 +10,7 @@ import tw from '../tailwind';
 import { useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { GlobalNavigationParamList } from '../types/navigation';
+import RealisticMushroomIcon from '../components/RealisticMushroomIcon';
 
 export default function RegisterScreen() {
   const [fullName, setFullName] = useState('');
@@ -114,12 +115,25 @@ export default function RegisterScreen() {
               resizeMode="cover"
             />
             
-            {/* SVG White Wave overlayed at the bottom of the image */}
+            {/* SVG White Wave overlayed at the bottom of the image with colored wave border */}
             <View style={tw`absolute bottom-0 w-full h-[80px]`}>
               <Svg height="100%" width="100%" viewBox="0 0 1440 320" preserveAspectRatio="none">
+                <Defs>
+                  <LinearGradient id="regWaveStroke" x1="0%" y1="0%" x2="100%" y2="0%">
+                    <Stop offset="0%" stopColor="#2d6a4f" />
+                    <Stop offset="50%" stopColor="#52b788" />
+                    <Stop offset="100%" stopColor="#3d8c63" />
+                  </LinearGradient>
+                </Defs>
                 <Path 
                   fill="#ffffff" 
                   d="M0,160 C480,420 960,-100 1440,160 L1440,320 L0,320 Z" 
+                />
+                <Path
+                  d="M0,160 C480,420 960,-100 1440,160"
+                  stroke="url(#regWaveStroke)"
+                  strokeWidth="16"
+                  fill="none"
                 />
               </Svg>
             </View>
@@ -129,140 +143,132 @@ export default function RegisterScreen() {
           <View style={tw`flex-1 px-8 pt-4 pb-6 relative`}>
 
             <View style={tw`mb-6`}>
-            <View style={tw`flex-row items-center justify-center`}>
-              <Text style={[tw`text-3xl text-slate-800 text-center`, { fontFamily: 'PlusJakartaSans_800ExtraBold' }]}>
-                Register
+              <View style={tw`flex-row items-center justify-center`}>
+                <Text style={[tw`text-3xl text-slate-800 text-center`, { fontFamily: 'PlusJakartaSans_800ExtraBold' }]}>
+                  Register
+                </Text>
+                <View style={tw`ml-2.5 shadow-sm`}>
+                  <RealisticMushroomIcon size={34} rotate="12deg" />
+                </View>
+              </View>
+              <Text style={[tw`text-sm text-slate-400 text-center mt-2`, { fontFamily: 'PlusJakartaSans_700Bold' }]}>
+                Create your new account
               </Text>
-              <MaterialCommunityIcons 
-                name="mushroom" 
-                size={32} 
-                color="#3d8c63" 
-                style={[tw`ml-2 mt-1`, { transform: [{ rotate: '15deg' }] }]} 
+            </View>
+
+            {/* Full Name Field */}
+            <View style={tw`relative flex-row items-center w-full bg-[#f3f4f6] rounded-2xl mb-4 px-4`}>
+              <Ionicons name="person" size={18} color="#3d8c63" />
+              <TextInput 
+                value={fullName}
+                onChangeText={setFullName}
+                placeholder="Full Name"
+                placeholderTextColor="#9ca3af"
+                style={[tw`flex-1 py-4 pl-3 text-[13px] text-slate-800`, { fontFamily: 'PlusJakartaSans_700Bold' }]}
+                autoCapitalize="words"
+                returnKeyType="next"
+                onSubmitEditing={() => emailRef.current?.focus()}
+                blurOnSubmit={false}
               />
             </View>
-            <Text style={[tw`text-sm text-slate-400 text-center mt-2`, { fontFamily: 'PlusJakartaSans_700Bold' }]}>
-              Create your new account
+
+            {/* Email Field */}
+            <View style={tw`relative flex-row items-center w-full bg-[#f3f4f6] rounded-2xl mb-4 px-4`}>
+              <Ionicons name="mail" size={18} color="#3d8c63" />
+              <TextInput 
+                ref={emailRef}
+                value={email}
+                onChangeText={setEmail}
+                placeholder="Email Address"
+                placeholderTextColor="#9ca3af"
+                style={[tw`flex-1 py-4 pl-3 text-[13px] text-slate-800`, { fontFamily: 'PlusJakartaSans_700Bold' }]}
+                autoCapitalize="none"
+                keyboardType="email-address"
+                returnKeyType="next"
+                onSubmitEditing={() => passwordRef.current?.focus()}
+                blurOnSubmit={false}
+              />
+            </View>
+
+            {/* Password Field */}
+            <View style={tw`relative flex-row items-center w-full bg-[#f3f4f6] rounded-2xl mb-4 px-4`}>
+              <Ionicons name="lock-closed" size={18} color="#3d8c63" />
+              <TextInput 
+                ref={passwordRef}
+                value={password}
+                onChangeText={setPassword}
+                placeholder="Password"
+                placeholderTextColor="#9ca3af"
+                secureTextEntry={!showPassword}
+                style={[tw`flex-1 py-4 pl-3 pr-10 text-[13px] text-slate-800`, { fontFamily: 'PlusJakartaSans_700Bold' }]}
+                returnKeyType="next"
+                onSubmitEditing={() => confirmRef.current?.focus()}
+                blurOnSubmit={false}
+              />
+              <TouchableOpacity hitSlop={{ top: 15, bottom: 15, left: 15, right: 15 }}  
+                onPress={() => setShowPassword(!showPassword)} 
+                style={tw`absolute right-0 h-full px-4 justify-center z-10`}
+              >
+                <Ionicons name={showPassword ? "eye-off" : "eye"} size={20} color="#9ca3af" />
+              </TouchableOpacity>
+            </View>
+
+            {/* Confirm Password Field */}
+            <View style={tw`relative flex-row items-center w-full bg-[#f3f4f6] rounded-2xl mb-5 px-4`}>
+              <Ionicons name="shield-checkmark" size={18} color="#3d8c63" />
+              <TextInput 
+                ref={confirmRef}
+                value={confirmPassword}
+                onChangeText={setConfirmPassword}
+                placeholder="Confirm Password"
+                placeholderTextColor="#9ca3af"
+                secureTextEntry={!showConfirmPassword}
+                style={[tw`flex-1 py-4 pl-3 pr-10 text-[13px] text-slate-800`, { fontFamily: 'PlusJakartaSans_700Bold' }]}
+                returnKeyType="done"
+                onSubmitEditing={handleRegister}
+              />
+              <TouchableOpacity hitSlop={{ top: 15, bottom: 15, left: 15, right: 15 }}  
+                onPress={() => setShowConfirmPassword(!showConfirmPassword)} 
+                style={tw`absolute right-0 h-full px-4 justify-center z-10`}
+              >
+                <Ionicons name={showConfirmPassword ? "eye-off" : "eye"} size={20} color="#9ca3af" />
+              </TouchableOpacity>
+            </View>
+
+            <Text style={[tw`text-center text-[10px] text-slate-400 mb-6 px-4 leading-relaxed`, { fontFamily: 'PlusJakartaSans_700Bold' }]}>
+              By signing you agree to our <Text style={tw`text-slate-500`}>Term of use</Text> and <Text style={tw`text-slate-500`}>privacy notice</Text>
             </Text>
-          </View>
 
-          {/* Full Name Field */}
-          <View style={tw`relative flex-row items-center w-full bg-[#f3f4f6] rounded-2xl mb-4 px-4`}>
-            <MaterialCommunityIcons name="account-outline" size={18} color="#9ca3af" />
-            <TextInput 
-              value={fullName}
-              onChangeText={setFullName}
-              placeholder="Full Name"
-              placeholderTextColor="#9ca3af"
-              style={[tw`flex-1 py-4 pl-3 text-[13px] text-slate-800`, { fontFamily: 'PlusJakartaSans_700Bold' }]}
-              autoCapitalize="words"
-              returnKeyType="next"
-              onSubmitEditing={() => emailRef.current?.focus()}
-              blurOnSubmit={false}
-            />
-          </View>
+            {errorMsg ? (
+              <Text style={tw`text-red-500 text-center mb-4 text-xs font-bold`}>{errorMsg}</Text>
+            ) : null}
 
-          {/* Email Field */}
-          <View style={tw`relative flex-row items-center w-full bg-[#f3f4f6] rounded-2xl mb-4 px-4`}>
-            <MaterialCommunityIcons name="email-outline" size={18} color="#9ca3af" />
-            <TextInput 
-              ref={emailRef}
-              value={email}
-              onChangeText={setEmail}
-              placeholder="Email Address"
-              placeholderTextColor="#9ca3af"
-              style={[tw`flex-1 py-4 pl-3 text-[13px] text-slate-800`, { fontFamily: 'PlusJakartaSans_700Bold' }]}
-              autoCapitalize="none"
-              keyboardType="email-address"
-              returnKeyType="next"
-              onSubmitEditing={() => passwordRef.current?.focus()}
-              blurOnSubmit={false}
-            />
-          </View>
-
-          {/* Password Field */}
-          <View style={tw`relative flex-row items-center w-full bg-[#f3f4f6] rounded-2xl mb-4 px-4`}>
-            <MaterialCommunityIcons name="lock-outline" size={18} color="#9ca3af" />
-            <TextInput 
-              ref={passwordRef}
-              value={password}
-              onChangeText={setPassword}
-              placeholder="Password"
-              placeholderTextColor="#9ca3af"
-              secureTextEntry={!showPassword}
-              style={[tw`flex-1 py-4 pl-3 pr-10 text-[13px] text-slate-800`, { fontFamily: 'PlusJakartaSans_700Bold' }]}
-              returnKeyType="next"
-              onSubmitEditing={() => confirmRef.current?.focus()}
-              blurOnSubmit={false}
-            />
+            {/* Submit Button */}
             <TouchableOpacity hitSlop={{ top: 15, bottom: 15, left: 15, right: 15 }}  
-              onPress={() => setShowPassword(!showPassword)} 
-              style={tw`absolute right-0 h-full px-4 justify-center z-10`}
-              
+              onPress={handleRegister} 
+              disabled={loading}
+              style={tw`w-full bg-[#3d8c63] py-4 rounded-full flex-row items-center justify-center shadow-lg mt-2 mb-5 ${loading ? 'opacity-70' : ''}`}
             >
-              <MaterialCommunityIcons name={showPassword ? "eye-off-outline" : "eye-outline"} size={20} color="#9ca3af" />
-            </TouchableOpacity>
-          </View>
-
-          {/* Confirm Password Field */}
-          <View style={tw`relative flex-row items-center w-full bg-[#f3f4f6] rounded-2xl mb-8 px-4`}>
-            <MaterialCommunityIcons name="lock-outline" size={18} color="#9ca3af" />
-            <TextInput 
-              ref={confirmRef}
-              value={confirmPassword}
-              onChangeText={setConfirmPassword}
-              placeholder="Confirm Password"
-              placeholderTextColor="#9ca3af"
-              secureTextEntry={!showConfirmPassword}
-              style={[tw`flex-1 py-4 pl-3 pr-10 text-[13px] text-slate-800`, { fontFamily: 'PlusJakartaSans_700Bold' }]}
-              returnKeyType="done"
-              onSubmitEditing={handleRegister}
-            />
-            <TouchableOpacity hitSlop={{ top: 15, bottom: 15, left: 15, right: 15 }}  
-              onPress={() => setShowConfirmPassword(!showConfirmPassword)} 
-              style={tw`absolute right-0 h-full px-4 justify-center z-10`}
-              
-            >
-              <MaterialCommunityIcons name={showConfirmPassword ? "eye-off-outline" : "eye-outline"} size={20} color="#9ca3af" />
-            </TouchableOpacity>
-          </View>
-
-          <Text style={[tw`text-center text-[10px] text-slate-400 mb-8 px-4 leading-relaxed`, { fontFamily: 'PlusJakartaSans_700Bold' }]}>
-            By signing you agree to our <Text style={tw`text-slate-500`}>Term of use</Text> and <Text style={tw`text-slate-500`}>privacy notice</Text>
-          </Text>
-
-          {errorMsg ? (
-            <Text style={tw`text-red-500 text-center mb-4 text-xs font-bold`}>{errorMsg}</Text>
-          ) : null}
-
-          {/* Spacer to push buttons down */}
-          <View style={tw`flex-1`} />
-
-          {/* Submit Button */}
-          <TouchableOpacity hitSlop={{ top: 15, bottom: 15, left: 15, right: 15 }}  
-            onPress={handleRegister} 
-            disabled={loading}
-            style={tw`w-full bg-[#3d8c63] py-4 rounded-full items-center shadow-lg mb-6 ${loading ? 'opacity-70' : ''}`}
-          >
-            <Text style={[tw`text-white text-[15px]`, { fontFamily: 'PlusJakartaSans_700Bold' }]}>
-              {loading ? 'Creating account...' : 'Sign Up'}
-            </Text>
-          </TouchableOpacity>
-
-          <View style={tw`flex-row justify-center items-center`}>
-            <Text style={[tw`text-[12px] text-slate-400 mr-1`, { fontFamily: 'PlusJakartaSans_700Bold' }]}>
-              Already have an account?
-            </Text>
-            <TouchableOpacity hitSlop={{ top: 15, bottom: 15, left: 15, right: 15 }}  
-              onPress={() => navigation.navigate('Login')} 
-              activeOpacity={0.6}
-              
-            >
-              <Text style={[tw`text-[12px] text-[#3d8c63] underline`, { fontFamily: 'PlusJakartaSans_700Bold' }]}>
-                Login
+              <Text style={[tw`text-white text-[15px] mr-2`, { fontFamily: 'PlusJakartaSans_700Bold' }]}>
+                {loading ? 'Creating account...' : 'Sign Up'}
               </Text>
+              {!loading && <Ionicons name="person-add" size={18} color="#ffffff" />}
             </TouchableOpacity>
-          </View>
-          
+
+            <View style={tw`flex-row justify-center items-center pb-4`}>
+              <Text style={[tw`text-[12px] text-slate-400 mr-1`, { fontFamily: 'PlusJakartaSans_700Bold' }]}>
+                Already have an account?
+              </Text>
+              <TouchableOpacity hitSlop={{ top: 15, bottom: 15, left: 15, right: 15 }}  
+                onPress={() => navigation.navigate('Login')} 
+                activeOpacity={0.6}
+              >
+                <Text style={[tw`text-[12px] text-[#3d8c63] underline`, { fontFamily: 'PlusJakartaSans_700Bold' }]}>
+                  Login
+                </Text>
+              </TouchableOpacity>
+            </View>
+            
           </View>
         </ScrollView>
       </KeyboardAvoidingView>

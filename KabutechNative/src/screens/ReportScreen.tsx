@@ -50,13 +50,13 @@ export default function ReportScreen() {
   useEffect(() => {
     const currentTime = Date.now();
     ['fans', 'misters', 'lights', 'co2'].forEach(device => {
-      if (settings?.setpoints?.devices?.[device as keyof typeof settings.setpoints.devices]) {
+      if (settings?.setpoints?.aiOverride && settings?.setpoints?.devices?.[device as keyof typeof settings.setpoints.devices]) {
         if (!globalStartTimes[device]) globalStartTimes[device] = currentTime;
       } else {
         delete globalStartTimes[device];
       }
     });
-  }, [settings?.setpoints?.devices]);
+  }, [settings?.setpoints?.devices, settings?.setpoints?.aiOverride]);
 
   const getElapsed = (device: string) => {
     let goalSecs = 30;
@@ -285,7 +285,7 @@ export default function ReportScreen() {
   };
 
   return (
-    <View style={tw`flex-1 bg-[#f4f7fa] dark:bg-[#020617]`}>
+    <View style={tw`flex-1 bg-[#f0f9f4] dark:bg-[#020617]`}>
       <StatusBar barStyle="dark-content" backgroundColor="transparent" translucent />
 
       <ScrollView contentContainerStyle={[tw`px-5 pb-32`, { paddingTop: insets.top + 20 }]} showsVerticalScrollIndicator={false}>
@@ -369,7 +369,7 @@ export default function ReportScreen() {
         <Text style={[tw`text-[17px] text-slate-800 dark:text-white mb-4 pl-1`, { fontFamily: 'PlusJakartaSans_800ExtraBold' }]}>Active Overrides</Text>
         <View style={tw`bg-white dark:bg-slate-800 rounded-[28px] p-5 shadow-sm border border-slate-100 dark:border-slate-700/50 flex-row justify-between mb-8`}>
           {['fans', 'misters', 'lights', 'co2'].map(device => {
-            const active = settings?.setpoints?.devices?.[device as keyof typeof settings.setpoints.devices];
+            const active = settings?.setpoints?.aiOverride && settings?.setpoints?.devices?.[device as keyof typeof settings.setpoints.devices];
             const color = device === 'fans' ? '#3b82f6' : device === 'misters' ? '#10b981' : device === 'lights' ? '#f59e0b' : '#8b5cf6';
             let bgClass = tw`bg-slate-50 dark:bg-slate-700/50`;
             if (active) {

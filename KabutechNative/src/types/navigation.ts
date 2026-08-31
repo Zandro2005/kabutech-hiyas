@@ -31,6 +31,7 @@ export type MainTabParamList = {
 export type HomeStackParamList = {
   HomeScreen: undefined;
   LiveFarm: undefined;
+  Analytics: undefined;
 };
 
 export type StaffTabParamList = {
