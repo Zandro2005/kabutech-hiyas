@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, ScrollView, TouchableOpacity, Image, StatusBar, ActivityIndicator } from 'react-native';
+import { View, Text, ScrollView, TouchableOpacity, Image, StatusBar } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { GlobalNavigationParamList } from '../../types/navigation';
@@ -14,6 +14,7 @@ import CriticalSystemAlerts from '../../components/CriticalSystemAlerts';
 import LiveFarmCard from '../../components/LiveFarmCard';
 import EnvironmentMetricsGrid from '../../components/EnvironmentMetricsGrid';
 import ScoreArch from '../../components/ScoreArch';
+import HomeScreenSkeleton from '../../components/skeletons/HomeScreenSkeleton';
 
 export default function StaffHomeScreen() {
   const navigation = useNavigation<NativeStackNavigationProp<GlobalNavigationParamList>>();
@@ -23,10 +24,12 @@ export default function StaffHomeScreen() {
 
   const [isReady, setIsReady] = useState(false);
   useEffect(() => {
-    const timer = setTimeout(() => {
-      setIsReady(true);
-    }, 200);
-    return () => clearTimeout(timer);
+    if (typeof requestIdleCallback !== 'undefined') {
+      const handle = requestIdleCallback(() => setIsReady(true));
+      return () => cancelIdleCallback(handle);
+    }
+    const handle = requestAnimationFrame(() => setIsReady(true));
+    return () => cancelAnimationFrame(handle);
   }, []);
 
   // Safe extraction of sensor values
@@ -43,9 +46,7 @@ export default function StaffHomeScreen() {
       <ScreenHeader />
 
       {!isReady ? (
-        <View style={tw`flex-1 items-center justify-center`}>
-          <ActivityIndicator size="large" color="#10b981" />
-        </View>
+        <HomeScreenSkeleton />
       ) : (
       <ScrollView contentContainerStyle={tw`pb-36`} showsVerticalScrollIndicator={false}>
         

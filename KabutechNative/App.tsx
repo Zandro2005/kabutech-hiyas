@@ -22,7 +22,12 @@ import tw from './src/tailwind';
 import CustomToast from './src/components/CustomToast';
 import { SoundManager } from './src/utils/SoundManager';
 import * as NavigationBar from 'expo-navigation-bar';
-import { Platform, Alert as RNAlert } from 'react-native';
+import { Platform, Alert as RNAlert, LogBox } from 'react-native';
+
+LogBox.ignoreLogs([
+  '`transition-all` unknown or invalid utility',
+  'InteractionManager has been deprecated',
+]);
 
 const originalAlert = RNAlert.alert;
 RNAlert.alert = (title, message, buttons, options) => {

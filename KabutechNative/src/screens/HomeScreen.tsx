@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, ScrollView, TouchableOpacity, Image, StatusBar, Dimensions, ActivityIndicator } from 'react-native';
+import { View, Text, ScrollView, TouchableOpacity, Image, StatusBar, Dimensions } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { GlobalNavigationParamList } from '../types/navigation';
@@ -15,9 +15,11 @@ import CriticalSystemAlerts from '../components/CriticalSystemAlerts';
 import LiveFarmCard from '../components/LiveFarmCard';
 import EnvironmentMetricsGrid from '../components/EnvironmentMetricsGrid';
 import ScoreArch from '../components/ScoreArch';
+import HomeScreenSkeleton from '../components/skeletons/HomeScreenSkeleton';
 import { ref, update } from 'firebase/database';
 import { db } from '../services/firebase';
 import { showToast } from '../components/CustomToast';
+import { computeScheduledDevicesState } from '../utils/scheduleLogic';
 
 const { width } = Dimensions.get('window');
 
@@ -33,10 +35,12 @@ export default function HomeScreen() {
   
   const [isReady, setIsReady] = useState(false);
   useEffect(() => {
-    const timer = setTimeout(() => {
-      setIsReady(true);
-    }, 200);
-    return () => clearTimeout(timer);
+    if (typeof requestIdleCallback !== 'undefined') {
+      const handle = requestIdleCallback(() => setIsReady(true));
+      return () => cancelIdleCallback(handle);
+    }
+    const handle = requestAnimationFrame(() => setIsReady(true));
+    return () => cancelAnimationFrame(handle);
   }, []);
 
   // Safe extraction of sensor values
@@ -48,7 +52,21 @@ export default function HomeScreen() {
   const isAuto = String(settings?.setpoints?.mode).toLowerCase() === 'auto';
   const isScheduled = String(settings?.setpoints?.mode).toLowerCase() === 'scheduled';
   const isLocked = isAuto || isScheduled;
-  const devices = settings?.setpoints?.devices || { fans: false, misters: false, lights: false };
+  
+  const rawDevices = settings?.setpoints?.devices || { fans: false, misters: false, lights: false };
+  const [devices, setDevices] = useState(rawDevices);
+
+  useEffect(() => {
+    if (isScheduled) {
+      const interval = setInterval(() => {
+        setDevices({ ...rawDevices, ...computeScheduledDevicesState(settings?.schedules) });
+      }, 5000);
+      setDevices({ ...rawDevices, ...computeScheduledDevicesState(settings?.schedules) });
+      return () => clearInterval(interval);
+    } else {
+      setDevices(rawDevices);
+    }
+  }, [isScheduled, settings?.schedules, rawDevices]);
   
   const fansActive = devices.fans;
   const misterActive = devices.misters;
@@ -77,9 +95,7 @@ export default function HomeScreen() {
       <ScreenHeader />
 
       {!isReady ? (
-        <View style={tw`flex-1 items-center justify-center bg-[#f0f9f4] dark:bg-[#020617]`}>
-          <ActivityIndicator size="large" color="#10b981" />
-        </View>
+        <HomeScreenSkeleton />
       ) : (
       <ScrollView style={tw`bg-[#f0f9f4] dark:bg-[#020617]`} contentContainerStyle={tw`pb-36`} showsVerticalScrollIndicator={false}>
         {/* Overscroll Filler to prevent white gap when bouncing */}

@@ -33,8 +33,11 @@ export default React.memo(function DailyHarvestList({
   
   const { isDarkMode } = useTheme();
 
-  // Default selected date to latest harvest date or today (YYYY-MM-DD)
-  const today = new Date().toISOString().split('T')[0];
+  // Default selected date to latest harvest date or today (YYYY-MM-DD in local time)
+  const today = useMemo(() => {
+    const now = new Date();
+    return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+  }, []);
   const initialDate = sortedDates.length > 0 ? sortedDates[0] : today;
   const [selectedDate, setSelectedDate] = useState<string>(initialDate);
 

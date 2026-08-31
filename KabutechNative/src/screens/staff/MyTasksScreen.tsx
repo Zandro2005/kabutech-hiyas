@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, TouchableOpacity, StatusBar, Modal, TextInput, ActivityIndicator, FlatList, ScrollView } from 'react-native';
+import { View, Text, TouchableOpacity, StatusBar, Modal, TextInput, FlatList, ScrollView } from 'react-native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
@@ -11,6 +11,7 @@ import { ref, update, push, get, child } from 'firebase/database';
 import { db } from '../../services/firebase';
 import { showToast } from '../../components/CustomToast';
 import { sendPushNotification } from '../../utils/PushNotifications';
+import TasksScreenSkeleton from '../../components/skeletons/TasksScreenSkeleton';
 
 export default function MyTasksScreen() {
   const navigation = useNavigation();
@@ -195,9 +196,7 @@ export default function MyTasksScreen() {
       </View>
 
       {!isReady ? (
-        <View style={tw`flex-1 items-center justify-center`}>
-          <ActivityIndicator size="large" color="#10b981" />
-        </View>
+        <TasksScreenSkeleton />
       ) : (
       <>
       {/* Tabs */}

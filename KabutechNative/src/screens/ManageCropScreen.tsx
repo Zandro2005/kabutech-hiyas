@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useEffect } from 'react';
-import { View, Text, ScrollView, TouchableOpacity, StatusBar, ActivityIndicator, FlatList } from 'react-native';
+import { View, Text, ScrollView, TouchableOpacity, StatusBar, FlatList } from 'react-native';
 import { MaterialCommunityIcons, Feather } from '@expo/vector-icons';
 import { useSafeAreaInsets, SafeAreaView } from 'react-native-safe-area-context';
 import tw from '../tailwind';
@@ -17,6 +17,7 @@ import AddRackModal from '../components/modals/AddRackModal';
 import ConfirmModal from '../components/ConfirmModal';
 import CustomToast, { showToast } from '../components/CustomToast';
 import { SoundManager } from '../utils/SoundManager';
+import CropsScreenSkeleton from '../components/skeletons/CropsScreenSkeleton';
 
 export default function ManageCropScreen() {
   const insets = useSafeAreaInsets();
@@ -139,9 +140,7 @@ export default function ManageCropScreen() {
       <ScreenHeader />
 
       {!isReady ? (
-        <View style={tw`flex-1 items-center justify-center`}>
-          <ActivityIndicator size="large" color="#10b981" />
-        </View>
+        <CropsScreenSkeleton />
       ) : (
         <FlatList
           data={activeRacks}

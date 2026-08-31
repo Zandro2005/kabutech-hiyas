@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { View, Text, ScrollView, TouchableOpacity, Alert, StatusBar, DeviceEventEmitter } from 'react-native';
+import React, { useState, useEffect } from 'react';
+import { View, Text, ScrollView, TouchableOpacity, StatusBar, DeviceEventEmitter } from 'react-native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useAuth } from '../context/AuthContext';
 import { signOut } from 'firebase/auth';
@@ -8,12 +8,14 @@ import { ref, update } from 'firebase/database';
 import { useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { GlobalNavigationParamList } from '../types/navigation';
-import { useSafeAreaInsets, SafeAreaView } from 'react-native-safe-area-context';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import tw from '../tailwind';
 import EditProfileModal from '../components/modals/EditProfileModal';
 import ScreenHeader from '../components/ScreenHeader';
 import { useTheme } from '../context/ThemeContext';
 import { useAllUsers, useActivityLogs, useBatches, useAlerts, useStaffTasks } from '../hooks/useFirebaseData';
+import { hapticLight, hapticMedium } from '../utils/haptics';
+import ProfileScreenSkeleton from '../components/skeletons/ProfileScreenSkeleton';
 
 const isToday = (dateString?: string) => {
   if (!dateString) return false;
@@ -36,6 +38,16 @@ export default function ProfileScreen() {
   const alerts = useAlerts();
   const tasks = useStaffTasks();
 
+  const [isReady, setIsReady] = useState(false);
+  useEffect(() => {
+    if (typeof requestIdleCallback !== 'undefined') {
+      const handle = requestIdleCallback(() => setIsReady(true));
+      return () => cancelIdleCallback(handle);
+    }
+    const handle = requestAnimationFrame(() => setIsReady(true));
+    return () => cancelAnimationFrame(handle);
+  }, []);
+
   const pendingStaffCount = Object.values(allUsers).filter(u => u.role === 'staff' && !u.approved && !u.declined).length;
   const pendingLogsCount = activityLogs.filter(log => log.status === 'pending').length;
   
@@ -45,7 +57,7 @@ export default function ProfileScreen() {
   
   const handleLogout = async () => {
     try {
-      // Abort any active AI override and reset timers globally
+      hapticMedium();
       DeviceEventEmitter.emit('cancelAiOverride');
       await update(ref(db, 'kabutech/settings/setpoints/devices'), { fans: false, misters: false, lights: false, co2: false });
       await update(ref(db, 'kabutech/settings/setpoints'), { mode: 'auto', aiOverride: false });
@@ -62,156 +74,190 @@ export default function ProfileScreen() {
   const name = profile?.name || user?.displayName || 'Unknown User';
   const role = profile?.role ? profile.role.toUpperCase() : 'STAFF';
   const email = profile?.email || user?.email || 'No email';
+  const initials = name.split(' ').map((n: string) => n[0]).join('').substring(0, 2).toUpperCase();
+
+  const menuItems = [
+    {
+      id: 'reports',
+      title: 'Reports Inbox',
+      subtitle: 'Review staff submissions & logs',
+      icon: 'inbox-multiple-outline',
+      color: '#3b82f6',
+      badge: pendingLogsCount,
+      onPress: () => navigation.navigate('StaffReportsInbox' as never),
+    },
+    {
+      id: 'approvals',
+      title: 'Staff Approvals',
+      subtitle: 'Manage pending registration requests',
+      icon: 'account-check-outline',
+      color: '#10b981',
+      badge: pendingStaffCount,
+      onPress: () => navigation.navigate('StaffApprovals' as never),
+    },
+    {
+      id: 'assign',
+      title: 'Assign Task',
+      subtitle: 'Delegate tasks to farm personnel',
+      icon: 'clipboard-text-outline',
+      color: '#f59e0b',
+      badge: 0,
+      onPress: () => navigation.navigate('AssignTask' as never),
+    },
+    {
+      id: 'history',
+      title: 'Task History',
+      subtitle: 'View completed staff activity logs',
+      icon: 'history',
+      color: '#8b5cf6',
+      badge: 0,
+      onPress: () => navigation.navigate('StaffTaskHistory' as never),
+    },
+  ];
 
   return (
-    <View style={tw`flex-1 bg-[#f8fafc] dark:bg-[#020617]`}>
+    <View style={tw`flex-1 bg-[#f0f9f4] dark:bg-[#020617]`}>
       <StatusBar barStyle="light-content" />
       <ScreenHeader />
-      <ScrollView contentContainerStyle={tw`p-6 pt-5 pb-36`} showsVerticalScrollIndicator={false}>
+      
+      {!isReady ? (
+        <ProfileScreenSkeleton />
+      ) : (
+      <ScrollView contentContainerStyle={tw`p-5 pt-4 pb-36`} showsVerticalScrollIndicator={false}>
         
-        {/* Page Title & Subtitle */}
-        <View style={tw`mb-2`}>
-          <Text style={[tw`text-xl text-slate-800 dark:text-slate-100 tracking-wide`, {fontFamily: 'PlusJakartaSans_800ExtraBold'}]}>
-            Profile & Settings
+        {/* Title Header */}
+        <View style={tw`mb-4`}>
+          <Text style={[tw`text-[20px] text-slate-900 dark:text-slate-100 tracking-tight`, { fontFamily: 'PlusJakartaSans_800ExtraBold' }]}>
+            Account & Operations
           </Text>
-          <Text style={[tw`text-xs text-slate-500 dark:text-slate-400 mt-0.5 tracking-wide`, {fontFamily: 'PlusJakartaSans_400Regular'}]}>
-            Manage your account
+          <Text style={[tw`text-[11.5px] text-slate-400 dark:text-slate-500 mt-0.5`, { fontFamily: 'PlusJakartaSans_500Medium' }]}>
+            Manage profile, personnel, and daily tasks
           </Text>
         </View>
-        
-        {/* Profile Card */}
-        <View style={tw`bg-white dark:bg-slate-800 rounded-2xl p-5 border border-gray-100 dark:border-slate-700 shadow-sm flex-row items-center gap-4 mb-4 mt-2`}>
-          <View style={tw`w-14 h-14 rounded-full bg-emerald-50 dark:bg-emerald-900/30 items-center justify-center`}>
-            <Text style={tw`text-emerald-600 dark:text-emerald-400 font-extrabold text-xl`}>
-              {name.split(' ').map((n: string) => n[0]).join('').substring(0, 2).toUpperCase()}
+
+        {/* Sleek User Profile Card */}
+        <View style={tw`bg-white dark:bg-slate-900 rounded-[26px] p-4.5 border border-slate-200/70 dark:border-slate-800 shadow-sm mb-4`}>
+          <View style={tw`flex-row items-center justify-between mb-3`}>
+            <View style={tw`flex-row items-center gap-3.5 flex-1 mr-2`}>
+              <View style={tw`w-13 h-13 rounded-2xl bg-emerald-500/10 border border-emerald-500/20 items-center justify-center`}>
+                <Text style={[tw`text-emerald-600 dark:text-emerald-400 text-lg`, { fontFamily: 'PlusJakartaSans_800ExtraBold' }]}>
+                  {initials}
+                </Text>
+              </View>
+              <View style={tw`flex-1`}>
+                <View style={tw`flex-row items-center gap-2 mb-0.5`}>
+                  <Text style={[tw`text-[16px] text-slate-900 dark:text-slate-100`, { fontFamily: 'PlusJakartaSans_800ExtraBold' }]} numberOfLines={1}>
+                    {name}
+                  </Text>
+                </View>
+                <Text style={[tw`text-[11.5px] text-slate-400 dark:text-slate-500 mb-1.5`, { fontFamily: 'PlusJakartaSans_500Medium' }]} numberOfLines={1}>
+                  {email}
+                </Text>
+                <View style={tw`bg-emerald-500/10 px-2.5 py-0.5 rounded-full border border-emerald-500/20 self-start`}>
+                  <Text style={[tw`text-[9.5px] text-emerald-600 dark:text-emerald-400 uppercase tracking-wider`, { fontFamily: 'PlusJakartaSans_800ExtraBold' }]}>
+                    {role}
+                  </Text>
+                </View>
+              </View>
+            </View>
+
+            {/* Logout Button */}
+            <TouchableOpacity 
+              hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}  
+              onPress={handleLogout}
+              style={tw`w-9 h-9 rounded-xl bg-red-500/10 dark:bg-red-500/20 border border-red-500/20 items-center justify-center`}
+            >
+              <MaterialCommunityIcons name="logout" size={18} color="#ef4444" />
+            </TouchableOpacity>
+          </View>
+        </View>
+
+        {/* Clean 3-Pillar Summary Strip */}
+        <View style={tw`bg-white dark:bg-slate-900 rounded-[24px] p-4 border border-slate-200/70 dark:border-slate-800 shadow-sm flex-row items-center justify-between mb-5`}>
+          {/* Stat 1 */}
+          <View style={tw`flex-1 items-center border-r border-slate-100 dark:border-slate-800 px-1`}>
+            <Text style={[tw`text-[18px] text-emerald-600 dark:text-emerald-400`, { fontFamily: 'PlusJakartaSans_800ExtraBold' }]}>
+              {tasksDoneToday}
+            </Text>
+            <Text style={[tw`text-[10px] text-slate-400 dark:text-slate-500 uppercase tracking-wider mt-0.5`, { fontFamily: 'PlusJakartaSans_700Bold' }]}>
+              Tasks Done
             </Text>
           </View>
-          <View style={tw`flex-1`}>
-            <Text style={tw`text-lg font-bold text-gray-800 dark:text-slate-200`}>{name}</Text>
-            <Text style={tw`text-xs text-gray-500 dark:text-slate-400 mb-1`}>{email}</Text>
-            <View style={tw`bg-emerald-50 dark:bg-emerald-900/40 px-2 py-0.5 rounded border border-emerald-100 dark:border-emerald-800/50 self-start`}>
-              <Text style={tw`text-[9px] font-extrabold text-emerald-600 dark:text-emerald-400 uppercase tracking-widest`}>{role}</Text>
-            </View>
+
+          {/* Stat 2 */}
+          <View style={tw`flex-1 items-center border-r border-slate-100 dark:border-slate-800 px-1`}>
+            <Text style={[tw`text-[18px] text-amber-500`, { fontFamily: 'PlusJakartaSans_800ExtraBold' }]}>
+              {alertsFiredToday}
+            </Text>
+            <Text style={[tw`text-[10px] text-slate-400 dark:text-slate-500 uppercase tracking-wider mt-0.5`, { fontFamily: 'PlusJakartaSans_700Bold' }]}>
+              Alerts Today
+            </Text>
           </View>
-          <TouchableOpacity hitSlop={{ top: 15, bottom: 15, left: 15, right: 15 }}  
-            onPress={handleLogout}
-            style={tw`bg-red-50 dark:bg-red-900/30 p-2 rounded-full`}
-          >
-            <MaterialCommunityIcons name="logout" size={20} color="#ef4444" />
-          </TouchableOpacity>
-        </View>
 
-
-
-        {/* Today's Summary */}
-        <View style={tw`bg-white dark:bg-slate-800 rounded-2xl p-5 border border-gray-100 dark:border-slate-700 shadow-sm mb-4`}>
-          <View style={tw`flex-row items-center gap-2 mb-4`}>
-            <MaterialCommunityIcons name="calendar-today" size={18} color={tw.color('dark:text-slate-200') || "#1e293b"} />
-            <Text style={tw`text-sm font-bold text-gray-800 dark:text-slate-200`}>Today's Summary</Text>
-          </View>
-          
-          <View style={tw`flex-row justify-between`}>
-            <View style={tw`flex-1 bg-gray-50 dark:bg-slate-700/50 rounded-xl p-3 items-center mr-2 border border-transparent dark:border-slate-600/50`}>
-              <MaterialCommunityIcons name="check-circle" size={20} color="#10b981" />
-              <Text style={tw`text-xl font-extrabold text-gray-800 dark:text-slate-200 my-1`}>{tasksDoneToday}</Text>
-              <Text style={tw`text-[9px] text-gray-500 dark:text-slate-400 uppercase font-bold`}>Tasks Done</Text>
-            </View>
-            <View style={tw`flex-1 bg-gray-50 dark:bg-slate-700/50 rounded-xl p-3 items-center mx-1 border border-transparent dark:border-slate-600/50`}>
-              <MaterialCommunityIcons name="alert" size={20} color="#ef4444" />
-              <Text style={tw`text-xl font-extrabold text-gray-800 dark:text-slate-200 my-1`}>{alertsFiredToday}</Text>
-              <Text style={tw`text-[9px] text-gray-500 dark:text-slate-400 uppercase font-bold`}>Alerts Fired</Text>
-            </View>
-            <View style={tw`flex-1 bg-gray-50 dark:bg-slate-700/50 rounded-xl p-3 items-center ml-2 border border-transparent dark:border-slate-600/50`}>
-              <MaterialCommunityIcons name="leaf" size={20} color="#10b981" />
-              <Text style={tw`text-xl font-extrabold text-gray-800 dark:text-slate-200 my-1`}>{activeRacksCount}</Text>
-              <Text style={tw`text-[9px] text-gray-500 dark:text-slate-400 uppercase font-bold`}>Active Racks</Text>
-            </View>
+          {/* Stat 3 */}
+          <View style={tw`flex-1 items-center px-1`}>
+            <Text style={[tw`text-[18px] text-blue-500`, { fontFamily: 'PlusJakartaSans_800ExtraBold' }]}>
+              {activeRacksCount}
+            </Text>
+            <Text style={[tw`text-[10px] text-slate-400 dark:text-slate-500 uppercase tracking-wider mt-0.5`, { fontFamily: 'PlusJakartaSans_700Bold' }]}>
+              Active Racks
+            </Text>
           </View>
         </View>
 
-        {/* Management & Operations */}
-        <View style={tw`flex-row items-center gap-2 mb-4 mt-2`}>
-          <MaterialCommunityIcons name="shield-star-outline" size={20} color={tw.color('dark:text-slate-200') || "#1e293b"} />
-          <Text style={[tw`text-sm text-slate-800 dark:text-slate-200 tracking-wide`, {fontFamily: 'PlusJakartaSans_700Bold'}]}>
-            Management & Operations
-          </Text>
-        </View>
+        {/* Section Label */}
+        <Text style={[tw`text-[11px] text-slate-400 dark:text-slate-500 uppercase tracking-wider mb-2.5 px-1`, { fontFamily: 'PlusJakartaSans_700Bold' }]}>
+          Farm Management
+        </Text>
 
-        <View style={tw`flex-row flex-wrap justify-between`}>
-          {/* Reports Widget */}
-          <TouchableOpacity 
-            onPress={() => navigation.navigate('StaffReportsInbox' as never)}
-            style={tw`w-[48%] bg-white dark:bg-slate-800 rounded-[24px] p-4 border border-slate-100 dark:border-slate-700/50 shadow-sm items-start relative active:scale-95 mb-3 overflow-hidden`}
-          >
-            {/* Background decoration */}
-            <View style={tw`absolute -right-4 -top-4 w-16 h-16 rounded-full bg-blue-50/50 dark:bg-blue-500/5`} />
-            
-            <View style={tw`w-12 h-12 rounded-[18px] bg-blue-50 dark:bg-blue-500/10 items-center justify-center mb-3 border border-blue-100/50 dark:border-blue-500/20`}>
-              <MaterialCommunityIcons name="inbox-multiple-outline" size={24} color="#3b82f6" />
-            </View>
-            <Text style={[tw`text-[15px] text-slate-800 dark:text-slate-200 mb-0.5`, {fontFamily: 'PlusJakartaSans_700Bold'}]}>Reports</Text>
-            <Text style={[tw`text-[11px] text-slate-500 dark:text-slate-400`, {fontFamily: 'PlusJakartaSans_500Medium'}]}>Inbox & logs</Text>
-            
-            {pendingLogsCount > 0 && (
-              <View style={tw`absolute top-4 right-4 bg-red-500 min-w-[22px] h-[22px] rounded-full items-center justify-center px-1.5 shadow-sm border-2 border-white dark:border-slate-800`}>
-                <Text style={[tw`text-[10px] text-white leading-tight`, {fontFamily: 'PlusJakartaSans_800ExtraBold'}]}>{pendingLogsCount}</Text>
-              </View>
-            )}
-          </TouchableOpacity>
+        {/* Minimalist Action List */}
+        <View style={tw`bg-white dark:bg-slate-900 rounded-[26px] border border-slate-200/70 dark:border-slate-800 shadow-sm overflow-hidden mb-6`}>
+          {menuItems.map((item, index) => {
+            const isLast = index === menuItems.length - 1;
+            return (
+              <TouchableOpacity
+                key={item.id}
+                activeOpacity={0.7}
+                onPress={() => {
+                  hapticLight();
+                  item.onPress();
+                }}
+                style={[
+                  tw`flex-row items-center justify-between p-4 bg-white dark:bg-slate-900`,
+                  !isLast ? tw`border-b border-slate-100 dark:border-slate-800` : null
+                ]}
+              >
+                <View style={tw`flex-row items-center gap-3.5 flex-1 mr-2`}>
+                  <View style={[tw`w-10 h-10 rounded-2xl items-center justify-center`, { backgroundColor: `${item.color}15` }]}>
+                    <MaterialCommunityIcons name={item.icon as any} size={20} color={item.color} />
+                  </View>
+                  <View style={tw`flex-1`}>
+                    <Text style={[tw`text-[14.5px] text-slate-900 dark:text-slate-100`, { fontFamily: 'PlusJakartaSans_700Bold' }]}>
+                      {item.title}
+                    </Text>
+                    <Text style={[tw`text-[11px] text-slate-400 dark:text-slate-500 mt-0.5`, { fontFamily: 'PlusJakartaSans_500Medium' }]} numberOfLines={1}>
+                      {item.subtitle}
+                    </Text>
+                  </View>
+                </View>
 
-          {/* Approvals Widget */}
-          <TouchableOpacity 
-            onPress={() => navigation.navigate('StaffApprovals' as never)}
-            style={tw`w-[48%] bg-white dark:bg-slate-800 rounded-[24px] p-4 border border-slate-100 dark:border-slate-700/50 shadow-sm items-start relative active:scale-95 mb-3 overflow-hidden`}
-          >
-            {/* Background decoration */}
-            <View style={tw`absolute -right-4 -top-4 w-16 h-16 rounded-full bg-emerald-50/50 dark:bg-emerald-500/5`} />
-
-            <View style={tw`w-12 h-12 rounded-[18px] bg-emerald-50 dark:bg-emerald-500/10 items-center justify-center mb-3 border border-emerald-100/50 dark:border-emerald-500/20`}>
-              <MaterialCommunityIcons name="account-check-outline" size={24} color="#10b981" />
-            </View>
-            <Text style={[tw`text-[15px] text-slate-800 dark:text-slate-200 mb-0.5`, {fontFamily: 'PlusJakartaSans_700Bold'}]}>Approvals</Text>
-            <Text style={[tw`text-[11px] text-slate-500 dark:text-slate-400`, {fontFamily: 'PlusJakartaSans_500Medium'}]}>Manage staff</Text>
-            
-            {pendingStaffCount > 0 && (
-              <View style={tw`absolute top-4 right-4 bg-red-500 min-w-[22px] h-[22px] rounded-full items-center justify-center px-1.5 shadow-sm border-2 border-white dark:border-slate-800`}>
-                <Text style={[tw`text-[10px] text-white leading-tight`, {fontFamily: 'PlusJakartaSans_800ExtraBold'}]}>{pendingStaffCount}</Text>
-              </View>
-            )}
-          </TouchableOpacity>
-
-          {/* Assign Task Widget */}
-          <TouchableOpacity 
-            onPress={() => navigation.navigate('AssignTask' as never)}
-            style={tw`w-[48%] bg-white dark:bg-slate-800 rounded-[24px] p-4 border border-slate-100 dark:border-slate-700/50 shadow-sm items-start relative active:scale-95 mb-3 overflow-hidden`}
-          >
-            {/* Background decoration */}
-            <View style={tw`absolute -right-4 -top-4 w-16 h-16 rounded-full bg-amber-50/50 dark:bg-amber-500/5`} />
-
-            <View style={tw`w-12 h-12 rounded-[18px] bg-amber-50 dark:bg-amber-500/10 items-center justify-center mb-3 border border-amber-100/50 dark:border-amber-500/20`}>
-              <MaterialCommunityIcons name="clipboard-text-outline" size={24} color="#f59e0b" />
-            </View>
-            <Text style={[tw`text-[15px] text-slate-800 dark:text-slate-200 mb-0.5`, {fontFamily: 'PlusJakartaSans_700Bold'}]}>Assign Task</Text>
-            <Text style={[tw`text-[11px] text-slate-500 dark:text-slate-400`, {fontFamily: 'PlusJakartaSans_500Medium'}]}>Delegate work</Text>
-          </TouchableOpacity>
-
-          {/* Task History Widget */}
-          <TouchableOpacity 
-            onPress={() => navigation.navigate('StaffTaskHistory' as never)}
-            style={tw`w-[48%] bg-white dark:bg-slate-800 rounded-[24px] p-4 border border-slate-100 dark:border-slate-700/50 shadow-sm items-start relative active:scale-95 mb-3 overflow-hidden`}
-          >
-            {/* Background decoration */}
-            <View style={tw`absolute -right-4 -top-4 w-16 h-16 rounded-full bg-violet-50/50 dark:bg-violet-500/5`} />
-
-            <View style={tw`w-12 h-12 rounded-[18px] bg-violet-50 dark:bg-violet-500/10 items-center justify-center mb-3 border border-violet-100/50 dark:border-violet-500/20`}>
-              <MaterialCommunityIcons name="history" size={24} color="#8b5cf6" />
-            </View>
-            <Text style={[tw`text-[15px] text-slate-800 dark:text-slate-200 mb-0.5`, {fontFamily: 'PlusJakartaSans_700Bold'}]}>Task History</Text>
-            <Text style={[tw`text-[11px] text-slate-500 dark:text-slate-400`, {fontFamily: 'PlusJakartaSans_500Medium'}]}>Past activities</Text>
-          </TouchableOpacity>
+                <View style={tw`flex-row items-center gap-2`}>
+                  {item.badge > 0 && (
+                    <View style={tw`bg-red-500 min-w-[20px] h-[20px] rounded-full items-center justify-center px-1.5`}>
+                      <Text style={[tw`text-[10px] text-white`, { fontFamily: 'PlusJakartaSans_800ExtraBold' }]}>
+                        {item.badge}
+                      </Text>
+                    </View>
+                  )}
+                  <MaterialCommunityIcons name="chevron-right" size={20} color={isDarkMode ? '#475569' : '#cbd5e1'} />
+                </View>
+              </TouchableOpacity>
+            );
+          })}
         </View>
 
       </ScrollView>
+      )}
       <EditProfileModal visible={editProfileVisible} onClose={() => setEditProfileVisible(false)} />
     </View>
   );

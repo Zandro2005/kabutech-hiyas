@@ -27,7 +27,7 @@ export default function LoginScreen() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
-  const [rememberMe, setRememberMe] = useState(true);
+  const [rememberMe, setRememberMe] = useState(false);
 
   const [loading, setLoading] = useState(false);
   const [errorMsg, _setErrorMsg] = useState('');
@@ -168,7 +168,7 @@ export default function LoginScreen() {
 
             {/* Email Field */}
             <View style={tw`relative flex-row items-center w-full bg-[#f3f4f6] rounded-2xl mb-4 px-4`}>
-              <Ionicons name="mail" size={18} color="#3d8c63" />
+              <Ionicons name="mail" size={18} color="#9ca3af" />
               <TextInput
                 value={email}
                 onChangeText={setEmail}
@@ -185,7 +185,7 @@ export default function LoginScreen() {
 
             {/* Password Field */}
             <View style={tw`relative flex-row items-center w-full bg-[#f3f4f6] rounded-2xl mb-4 px-4`}>
-              <Ionicons name="lock-closed" size={18} color="#3d8c63" />
+              <Ionicons name="lock-closed" size={18} color="#9ca3af" />
               <TextInput
                 ref={passwordRef}
                 value={password}

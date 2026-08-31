@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { View, Text, ScrollView, TouchableOpacity, StatusBar, DeviceEventEmitter, Alert, Dimensions, ActivityIndicator, Modal } from 'react-native';
+import { View, Text, ScrollView, TouchableOpacity, StatusBar, DeviceEventEmitter, Alert, Dimensions, Modal } from 'react-native';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { GlobalNavigationParamList } from '../types/navigation';
@@ -10,9 +10,11 @@ import { db } from '../services/firebase';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import CircularSlider from '../components/CircularSlider';
 import ScreenHeader from '../components/ScreenHeader';
+import ControlsScreenSkeleton from '../components/skeletons/ControlsScreenSkeleton';
 import { useTheme } from '../context/ThemeContext';
 import { showToast } from '../components/CustomToast';
 import { hapticLight, hapticMedium, hapticSelection } from '../utils/haptics';
+import { computeScheduledDevicesState } from '../utils/scheduleLogic';
 
 const { width } = Dimensions.get('window');
 
@@ -29,10 +31,12 @@ export default function ControlsScreen() {
   const [showStopAiModal, setShowStopAiModal] = useState(false);
   const [pendingMode, setPendingMode] = useState<'auto' | 'manual' | 'scheduled' | null>(null);
   useEffect(() => {
-    const timer = setTimeout(() => {
-      setIsReady(true);
-    }, 200);
-    return () => clearTimeout(timer);
+    if (typeof requestIdleCallback !== 'undefined') {
+      const handle = requestIdleCallback(() => setIsReady(true));
+      return () => cancelIdleCallback(handle);
+    }
+    const handle = requestAnimationFrame(() => setIsReady(true));
+    return () => cancelAnimationFrame(handle);
   }, []);
 
   const temp = typeof sensors.temperature === 'number' ? sensors.temperature : 32.8;
@@ -45,9 +49,24 @@ export default function ControlsScreen() {
   const targetLight = settings?.setpoints?.light || 580;
   const targetCO2 = settings?.setpoints?.co2 || 690;
 
-  const devices = settings?.setpoints?.devices || { fans: false, misters: false, lights: false, co2: false };
   const isAuto = String(settings?.setpoints?.mode).toLowerCase() === 'auto';
   const isScheduled = String(settings?.setpoints?.mode).toLowerCase() === 'scheduled';
+  
+  const rawDevices = settings?.setpoints?.devices || { fans: false, misters: false, lights: false, co2: false };
+  const [devices, setDevices] = useState(rawDevices);
+
+  useEffect(() => {
+    if (isScheduled) {
+      const interval = setInterval(() => {
+        setDevices({ ...rawDevices, ...computeScheduledDevicesState(settings?.schedules) });
+      }, 5000);
+      setDevices({ ...rawDevices, ...computeScheduledDevicesState(settings?.schedules) });
+      return () => clearInterval(interval);
+    } else {
+      setDevices(rawDevices);
+    }
+  }, [isScheduled, settings?.schedules, rawDevices]);
+
   const isAiOverride = settings?.setpoints?.aiOverride === true;
   const isLocked = isAuto || isScheduled || isAiOverride;
 
@@ -194,9 +213,7 @@ export default function ControlsScreen() {
       <ScreenHeader />
       
       {!isReady ? (
-        <View style={tw`flex-1 items-center justify-center`}>
-          <ActivityIndicator size="large" color="#10b981" />
-        </View>
+        <ControlsScreenSkeleton />
       ) : (
       <ScrollView contentContainerStyle={tw`pb-28 pt-2`} showsVerticalScrollIndicator={false}>
         

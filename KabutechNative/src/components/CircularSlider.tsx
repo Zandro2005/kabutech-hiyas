@@ -1,5 +1,5 @@
-import React from 'react';
-import { View, Text } from 'react-native';
+import React, { useEffect, useRef } from 'react';
+import { View, Text, Animated, Easing } from 'react-native';
 import Svg, { Circle, Defs, LinearGradient as SvgGradient, Stop } from 'react-native-svg';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import tw from '../tailwind';
@@ -31,9 +31,79 @@ export default function CircularSlider({ localTarget, activeTabData, isDarkMode 
   const diff = Number((activeTabData.current - localTarget).toFixed(1));
   const isNearTarget = Math.abs(diff) <= 0.5;
 
+  // Passive Orbiting Rotation Animation
+  const rotateAnim = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    // Continuous Subtle Orbit Rotation Loop (28s cycle)
+    const rotateLoop = Animated.loop(
+      Animated.timing(rotateAnim, {
+        toValue: 1,
+        duration: 28000,
+        easing: Easing.linear,
+        useNativeDriver: true,
+      })
+    );
+
+    rotateLoop.start();
+
+    return () => {
+      rotateLoop.stop();
+    };
+  }, []);
+
+  const spin = rotateAnim.interpolate({
+    inputRange: [0, 1],
+    outputRange: ['0deg', '360deg'],
+  });
+
   return (
     <View style={tw`items-center justify-center relative mb-7`}>
-      {/* Background Soft Glow Plate */}
+      
+      {/* 1. Steady Subtle Ambient Glow (Constant, Non-Blinking) */}
+      <View
+        style={[
+          tw`absolute rounded-full`,
+          {
+            width: size - 20,
+            height: size - 20,
+            backgroundColor: activeTabData.color,
+            opacity: isDarkMode ? 0.12 : 0.08,
+            shadowColor: activeTabData.color,
+            shadowOffset: { width: 0, height: 0 },
+            shadowOpacity: isDarkMode ? 0.4 : 0.25,
+            shadowRadius: 22,
+          },
+        ]}
+      />
+
+      {/* 2. Rotating Dashed Orbit Line */}
+      <Animated.View
+        style={[
+          tw`absolute`,
+          {
+            width: size + 16,
+            height: size + 16,
+            transform: [{ rotate: spin }],
+          },
+        ]}
+        pointerEvents="none"
+      >
+        <Svg width={size + 16} height={size + 16} viewBox={`0 0 ${size + 16} ${size + 16}`}>
+          <Circle
+            cx={(size + 16) / 2}
+            cy={(size + 16) / 2}
+            r={radius + 18}
+            stroke={activeTabData.color}
+            strokeWidth={1.2}
+            strokeDasharray="4 8"
+            strokeOpacity={isDarkMode ? 0.32 : 0.25}
+            fill="none"
+          />
+        </Svg>
+      </Animated.View>
+
+      {/* Background Soft Plate */}
       <View 
         style={[
           tw`absolute rounded-full`, 
@@ -43,8 +113,8 @@ export default function CircularSlider({ localTarget, activeTabData, isDarkMode 
             backgroundColor: isDarkMode ? '#0f172a' : '#ffffff',
             shadowColor: activeTabData.color,
             shadowOffset: { width: 0, height: 8 },
-            shadowOpacity: isDarkMode ? 0.28 : 0.14,
-            shadowRadius: 24,
+            shadowOpacity: isDarkMode ? 0.25 : 0.12,
+            shadowRadius: 20,
             elevation: 6
           }
         ]} 
@@ -58,12 +128,12 @@ export default function CircularSlider({ localTarget, activeTabData, isDarkMode 
           </SvgGradient>
         </Defs>
 
-        {/* Outer subtle guide track */}
+        {/* Outer subtle static guide track */}
         <Circle 
-          cx={size/2} cy={size/2} r={radius + 14} 
+          cx={size/2} cy={size/2} r={radius + 10} 
           stroke={isDarkMode ? '#1e293b' : '#e2e8f0'} 
           strokeWidth={1} 
-          strokeDasharray="3 5"
+          strokeDasharray="2 4"
           fill="none" 
         />
 
@@ -132,4 +202,3 @@ export default function CircularSlider({ localTarget, activeTabData, isDarkMode 
     </View>
   );
 }
-

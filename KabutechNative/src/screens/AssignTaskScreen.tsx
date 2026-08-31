@@ -49,7 +49,7 @@ export default function AssignTaskScreen() {
       const staffUser = staffList.find(s => s.uid === selectedStaffId);
       if (!staffUser) throw new Error("Staff not found");
 
-      const dateStr = dueDate.toISOString().split('T')[0];
+      const dateStr = `${dueDate.getFullYear()}-${String(dueDate.getMonth() + 1).padStart(2, '0')}-${String(dueDate.getDate()).padStart(2, '0')}`;
       const timeStr = `${dueTime.getHours().toString().padStart(2, '0')}:${dueTime.getMinutes().toString().padStart(2, '0')}`;
 
       const newTaskRef = push(ref(db, 'kabutech/tasks'));

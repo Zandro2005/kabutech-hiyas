@@ -8,6 +8,7 @@ import tw from '../tailwind';
 import { useNavigation } from '@react-navigation/native';
 import { useSensors } from '../hooks/useFirebaseData';
 import { hapticLight, hapticSelection } from '../utils/haptics';
+import AnalyticsScreenSkeleton from '../components/skeletons/AnalyticsScreenSkeleton';
 
 type MetricType = 'temp' | 'hum' | 'light' | 'co2';
 type TimeRange = '24H' | '7D' | '30D';
@@ -62,6 +63,16 @@ export default function AnalyticsScreen() {
   const insets = useSafeAreaInsets();
   const navigation = useNavigation<any>();
   const sensors = useSensors();
+
+  const [isReady, setIsReady] = useState(false);
+  useEffect(() => {
+    if (typeof requestIdleCallback !== 'undefined') {
+      const handle = requestIdleCallback(() => setIsReady(true));
+      return () => cancelIdleCallback(handle);
+    }
+    const handle = requestAnimationFrame(() => setIsReady(true));
+    return () => cancelAnimationFrame(handle);
+  }, []);
 
   const [activeMetric, setActiveMetric] = useState<MetricType>('temp');
   const [activeRange, setActiveRange] = useState<TimeRange>('24H');
@@ -207,6 +218,9 @@ export default function AnalyticsScreen() {
     <View style={[tw`flex-1 bg-[#f0f9f4] dark:bg-[#020617]`, { paddingTop: insets.top }]}>
       <StatusBar barStyle="dark-content" backgroundColor="transparent" translucent />
 
+      {!isReady ? (
+        <AnalyticsScreenSkeleton />
+      ) : (
       <ScrollView contentContainerStyle={tw`pb-32 pt-4`} showsVerticalScrollIndicator={false}>
         
         {/* Header */}
@@ -606,6 +620,7 @@ export default function AnalyticsScreen() {
         </View>
 
       </ScrollView>
+      )}
     </View>
   );
 }

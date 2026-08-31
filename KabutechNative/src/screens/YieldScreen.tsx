@@ -12,6 +12,7 @@ import { db } from '../services/firebase';
 import { ref, update } from 'firebase/database';
 import { showToast } from '../components/CustomToast';
 import { useTheme } from '../context/ThemeContext';
+import YieldScreenSkeleton from '../components/skeletons/YieldScreenSkeleton';
 
 export default function YieldScreen() {
   const { isDarkMode } = useTheme();
@@ -137,9 +138,7 @@ export default function YieldScreen() {
       <ScreenHeader />
       
       {!isReady ? (
-        <View style={tw`flex-1 items-center justify-center`}>
-          <ActivityIndicator size="large" color="#10b981" />
-        </View>
+        <YieldScreenSkeleton />
       ) : (
       <ScrollView contentContainerStyle={tw`px-5 pt-2 pb-36`} showsVerticalScrollIndicator={false}>
 

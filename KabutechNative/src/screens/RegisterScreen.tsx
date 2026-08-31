@@ -158,7 +158,7 @@ export default function RegisterScreen() {
 
             {/* Full Name Field */}
             <View style={tw`relative flex-row items-center w-full bg-[#f3f4f6] rounded-2xl mb-4 px-4`}>
-              <Ionicons name="person" size={18} color="#3d8c63" />
+              <Ionicons name="person" size={18} color="#9ca3af" />
               <TextInput 
                 value={fullName}
                 onChangeText={setFullName}
@@ -174,7 +174,7 @@ export default function RegisterScreen() {
 
             {/* Email Field */}
             <View style={tw`relative flex-row items-center w-full bg-[#f3f4f6] rounded-2xl mb-4 px-4`}>
-              <Ionicons name="mail" size={18} color="#3d8c63" />
+              <Ionicons name="mail" size={18} color="#9ca3af" />
               <TextInput 
                 ref={emailRef}
                 value={email}
@@ -192,7 +192,7 @@ export default function RegisterScreen() {
 
             {/* Password Field */}
             <View style={tw`relative flex-row items-center w-full bg-[#f3f4f6] rounded-2xl mb-4 px-4`}>
-              <Ionicons name="lock-closed" size={18} color="#3d8c63" />
+              <Ionicons name="lock-closed" size={18} color="#9ca3af" />
               <TextInput 
                 ref={passwordRef}
                 value={password}
@@ -215,7 +215,7 @@ export default function RegisterScreen() {
 
             {/* Confirm Password Field */}
             <View style={tw`relative flex-row items-center w-full bg-[#f3f4f6] rounded-2xl mb-5 px-4`}>
-              <Ionicons name="shield-checkmark" size={18} color="#3d8c63" />
+              <Ionicons name="shield-checkmark" size={18} color="#9ca3af" />
               <TextInput 
                 ref={confirmRef}
                 value={confirmPassword}

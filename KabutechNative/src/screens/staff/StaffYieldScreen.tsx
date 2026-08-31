@@ -1,6 +1,6 @@
 import { SafeAreaView } from 'react-native-safe-area-context';
 import React, { useState, useRef, useMemo, useEffect } from 'react';
-import { View, Text, ScrollView, StatusBar, ActivityIndicator } from 'react-native';
+import { View, Text, ScrollView, StatusBar } from 'react-native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import tw from '../../tailwind';
 import ScreenHeader from '../../components/ScreenHeader';
@@ -9,6 +9,7 @@ import YieldChart from '../../components/yield/YieldChart';
 import DailyHarvestList from '../../components/yield/DailyHarvestList';
 import { getRackStats } from '../../utils/dataHelpers';
 import { useTheme } from '../../context/ThemeContext';
+import YieldScreenSkeleton from '../../components/skeletons/YieldScreenSkeleton';
 
 export default function StaffYieldScreen() {
   const { isDarkMode } = useTheme();
@@ -110,9 +111,7 @@ export default function StaffYieldScreen() {
       <ScreenHeader />
 
       {!isReady ? (
-        <View style={tw`flex-1 items-center justify-center bg-[#f4f8f4] dark:bg-[#020617]`}>
-          <ActivityIndicator size="large" color="#10b981" />
-        </View>
+        <YieldScreenSkeleton />
       ) : (
       <ScrollView contentContainerStyle={tw`px-5 pt-2 pb-36`} showsVerticalScrollIndicator={false}>
 

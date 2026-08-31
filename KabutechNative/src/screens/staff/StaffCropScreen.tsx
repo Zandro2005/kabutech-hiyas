@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useEffect } from 'react';
-import { View, Text, TouchableOpacity, StatusBar, ActivityIndicator, FlatList, ScrollView } from 'react-native';
+import { View, Text, TouchableOpacity, StatusBar, FlatList, ScrollView } from 'react-native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useSafeAreaInsets, SafeAreaView } from 'react-native-safe-area-context';
 import tw from '../../tailwind';
@@ -10,6 +10,7 @@ import { getRackStats } from '../../utils/dataHelpers';
 import { BatchData } from '../../types/firebase';
 import LogHarvestModal from '../../components/modals/LogHarvestModal';
 import FlagContaminationModal from '../../components/modals/FlagContaminationModal';
+import CropsScreenSkeleton from '../../components/skeletons/CropsScreenSkeleton';
 
 export default function StaffCropScreen() {
   const insets = useSafeAreaInsets();
@@ -97,9 +98,7 @@ export default function StaffCropScreen() {
       <ScreenHeader />
 
       {!isReady ? (
-        <View style={tw`flex-1 items-center justify-center bg-[#f0f9f4] dark:bg-[#020617]`}>
-          <ActivityIndicator size="large" color="#10b981" />
-        </View>
+        <CropsScreenSkeleton />
       ) : (
       <FlatList
         data={activeRacks}
