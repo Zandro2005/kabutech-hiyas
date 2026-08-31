@@ -14,7 +14,7 @@ import { useSensors, useSettings } from '../hooks/useFirebaseData';
 import { useTheme } from '../context/ThemeContext';
 import { DeviceEventEmitter } from 'react-native';
 
-const globalTimeouts: NodeJS.Timeout[] = [];
+const globalTimeouts: ReturnType<typeof setTimeout>[] = [];
 let isGlobalProcessing: string | false = false;
 const globalStartTimes: Record<string, number> = {};
 
