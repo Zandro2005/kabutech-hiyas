@@ -66,7 +66,7 @@ export default function AnalyticsScreen() {
   });
 
   return (
-    <View style={[tw`flex-1 bg-[#f8fafc] dark:bg-[#020617]`, { paddingTop: insets.top }]}>
+    <View style={[tw`flex-1 bg-[#f0f9f4] dark:bg-[#020617]`, { paddingTop: insets.top }]}>
       
       <ScrollView contentContainerStyle={tw`pb-24 pt-6`} showsVerticalScrollIndicator={false}>
         {/* Header */}

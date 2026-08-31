@@ -285,7 +285,7 @@ export default function ReportScreen() {
   };
 
   return (
-    <View style={tw`flex-1 bg-[#f4f7fa] dark:bg-[#020617]`}>
+    <View style={tw`flex-1 bg-[#f0f9f4] dark:bg-[#020617]`}>
       <StatusBar barStyle="dark-content" backgroundColor="transparent" translucent />
       
       <ScrollView contentContainerStyle={[tw`px-5 pb-32`, { paddingTop: insets.top + 20 }]} showsVerticalScrollIndicator={false}>
