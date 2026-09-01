@@ -11,8 +11,12 @@ import { useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { GlobalNavigationParamList } from '../types/navigation';
 import RealisticMushroomIcon from '../components/RealisticMushroomIcon';
+import { useResponsive } from '../utils/responsive';
 
 export default function RegisterScreen() {
+  const { height, isShortScreen, isSmallDevice } = useResponsive();
+  const headerHeight = Math.min(200, Math.max(140, isShortScreen ? height * 0.2 : height * 0.25));
+
   const [fullName, setFullName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -108,7 +112,7 @@ export default function RegisterScreen() {
         >
           
           {/* Header Image with SVG Wave (Compact Design) */}
-          <View style={tw`w-full h-[200px] relative overflow-hidden bg-white`}>
+          <View style={[tw`w-full relative overflow-hidden bg-white`, { height: headerHeight }]}>
             <Image 
               source={require('../../assets/realistic_mushrooms_bg.png')} 
               style={tw`w-full h-full absolute`}
@@ -116,7 +120,7 @@ export default function RegisterScreen() {
             />
             
             {/* SVG White Wave overlayed at the bottom of the image with colored wave border */}
-            <View style={tw`absolute bottom-0 w-full h-[80px]`}>
+            <View style={[tw`absolute bottom-0 w-full`, { height: Math.min(80, headerHeight * 0.45) }]}>
               <Svg height="100%" width="100%" viewBox="0 0 1440 320" preserveAspectRatio="none">
                 <Defs>
                   <LinearGradient id="regWaveStroke" x1="0%" y1="0%" x2="100%" y2="0%">
@@ -140,18 +144,18 @@ export default function RegisterScreen() {
           </View>
 
           {/* Form Area */}
-          <View style={tw`flex-1 px-8 pt-4 pb-6 relative`}>
+          <View style={tw`flex-1 px-6 sm:px-8 pt-3 sm:pt-4 pb-6 relative`}>
 
-            <View style={tw`mb-6`}>
+            <View style={tw`mb-4 sm:mb-6`}>
               <View style={tw`flex-row items-center justify-center`}>
-                <Text style={[tw`text-3xl text-slate-800 text-center`, { fontFamily: 'PlusJakartaSans_800ExtraBold' }]}>
+                <Text style={[tw`text-2xl sm:text-3xl text-slate-800 text-center`, { fontFamily: 'PlusJakartaSans_800ExtraBold' }]}>
                   Register
                 </Text>
-                <View style={tw`ml-2.5 shadow-sm`}>
-                  <RealisticMushroomIcon size={34} rotate="12deg" />
+                <View style={tw`ml-2 sm:ml-2.5 shadow-sm`}>
+                  <RealisticMushroomIcon size={isSmallDevice ? 28 : 34} rotate="12deg" />
                 </View>
               </View>
-              <Text style={[tw`text-sm text-slate-400 text-center mt-2`, { fontFamily: 'PlusJakartaSans_700Bold' }]}>
+              <Text style={[tw`text-xs sm:text-sm text-slate-400 text-center mt-1.5`, { fontFamily: 'PlusJakartaSans_700Bold' }]}>
                 Create your new account
               </Text>
             </View>

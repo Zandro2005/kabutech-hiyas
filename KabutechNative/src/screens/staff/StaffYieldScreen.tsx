@@ -133,14 +133,14 @@ export default function StaffYieldScreen() {
               <View style={tw`w-7 h-7 rounded-xl bg-emerald-50 dark:bg-emerald-500/15 items-center justify-center`}>
                 <MaterialCommunityIcons name="sprout" size={15} color="#10b981" />
               </View>
-              <Text style={[tw`text-[11px] text-slate-500 dark:text-slate-400 tracking-wider uppercase`, { fontFamily: 'PlusJakartaSans_800ExtraBold' }]}>
+              <Text numberOfLines={1} style={[tw`text-[11px] text-slate-500 dark:text-slate-400 tracking-wider uppercase flex-1`, { fontFamily: 'PlusJakartaSans_800ExtraBold' }]}>
                 Actual
               </Text>
             </View>
             
             <View style={tw`my-1`}>
               <View style={tw`flex-row items-baseline`}>
-                <Text style={[tw`text-3xl text-slate-900 dark:text-white tracking-tight`, { fontFamily: 'PlusJakartaSans_800ExtraBold' }]}>
+                <Text numberOfLines={1} style={[tw`text-2xl sm:text-3xl text-slate-900 dark:text-white tracking-tight`, { fontFamily: 'PlusJakartaSans_800ExtraBold' }]}>
                   {actualYieldKg}
                 </Text>
                 <Text style={[tw`text-xs text-slate-400 dark:text-slate-500 ml-1 font-bold`]}>
@@ -149,12 +149,12 @@ export default function StaffYieldScreen() {
               </View>
             </View>
 
-            <View style={tw`mt-2`}>
+            <View style={tw`mt-1.5`}>
               <View style={tw`flex-row justify-between items-center mb-1`}>
-                <Text style={[tw`text-[9px] text-slate-400 uppercase tracking-wider`, { fontFamily: 'PlusJakartaSans_700Bold' }]}>
+                <Text numberOfLines={1} style={[tw`text-[9px] text-slate-400 uppercase tracking-wider flex-1 mr-1`, { fontFamily: 'PlusJakartaSans_700Bold' }]}>
                   Goal: {targetYieldKg}kg
                 </Text>
-                <Text style={[tw`text-[9px] text-emerald-600 dark:text-emerald-400 font-extrabold`]}>
+                <Text numberOfLines={1} style={[tw`text-[9px] text-emerald-600 dark:text-emerald-400 font-extrabold shrink-0`]}>
                   {efficiency}%
                 </Text>
               </View>
@@ -165,19 +165,19 @@ export default function StaffYieldScreen() {
           </View>
 
           {/* Target Yield Card */}
-          <View style={tw`flex-1 bg-white dark:bg-slate-900 rounded-[26px] p-4 shadow-sm border border-slate-200/70 dark:border-slate-800 justify-between`}>
-            <View style={tw`flex-row items-center gap-2 mb-2`}>
-              <View style={tw`w-7 h-7 rounded-xl bg-amber-50 dark:bg-amber-500/15 items-center justify-center`}>
+          <View style={tw`flex-1 bg-white dark:bg-slate-900 rounded-[26px] p-3.5 sm:p-4 shadow-sm border border-slate-200/70 dark:border-slate-800 justify-between min-h-[140px]`}>
+            <View style={tw`flex-row items-center gap-2 mb-1.5`}>
+              <View style={tw`w-7 h-7 rounded-xl bg-amber-50 dark:bg-amber-500/15 items-center justify-center shrink-0`}>
                 <MaterialCommunityIcons name="flag-checkered" size={15} color="#f59e0b" />
               </View>
-              <Text style={[tw`text-[11px] text-slate-500 dark:text-slate-400 tracking-wider uppercase`, { fontFamily: 'PlusJakartaSans_800ExtraBold' }]}>
+              <Text numberOfLines={1} style={[tw`text-[11px] text-slate-500 dark:text-slate-400 tracking-wider uppercase flex-1`, { fontFamily: 'PlusJakartaSans_800ExtraBold' }]}>
                 Target
               </Text>
             </View>
 
             <View style={tw`my-1`}>
               <View style={tw`flex-row items-baseline`}>
-                <Text style={[tw`text-3xl text-slate-900 dark:text-white tracking-tight`, { fontFamily: 'PlusJakartaSans_800ExtraBold' }]}>
+                <Text numberOfLines={1} style={[tw`text-2xl sm:text-3xl text-slate-900 dark:text-white tracking-tight`, { fontFamily: 'PlusJakartaSans_800ExtraBold' }]}>
                   {targetYieldKg}
                 </Text>
                 <Text style={[tw`text-xs text-slate-400 dark:text-slate-500 ml-1 font-bold`]}>
@@ -186,12 +186,12 @@ export default function StaffYieldScreen() {
               </View>
             </View>
 
-            <View style={tw`mt-2`}>
+            <View style={tw`mt-1.5`}>
               <View style={tw`flex-row justify-between items-center mb-1`}>
-                <Text style={[tw`text-[9px] text-slate-400 uppercase tracking-wider`, { fontFamily: 'PlusJakartaSans_700Bold' }]}>
+                <Text numberOfLines={1} style={[tw`text-[9px] text-slate-400 uppercase tracking-wider flex-1 mr-1`, { fontFamily: 'PlusJakartaSans_700Bold' }]}>
                   Capacity
                 </Text>
-                <Text style={[tw`text-[9px] text-slate-500 font-bold`]}>
+                <Text numberOfLines={1} style={[tw`text-[9px] text-slate-500 font-bold shrink-0`]}>
                   Max: 5.0kg
                 </Text>
               </View>

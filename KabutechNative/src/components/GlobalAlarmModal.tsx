@@ -23,7 +23,7 @@ export default function GlobalAlarmModal() {
   return (
     <Modal visible={!!alarmData} transparent={true} animationType="fade">
       <View style={tw`flex-1 justify-center items-center bg-black/60 px-6`}>
-        <View style={tw`bg-white dark:bg-slate-900 rounded-[28px] p-6 w-full max-w-[280px] items-center shadow-2xl border border-slate-100 dark:border-slate-800`}>
+        <View style={tw`bg-white dark:bg-slate-900 rounded-[28px] p-6 w-full max-w-[320px] items-center shadow-2xl border border-slate-100 dark:border-slate-800`}>
           <View style={tw`w-14 h-14 bg-blue-100 dark:bg-blue-500/20 rounded-full items-center justify-center mb-4`}>
             <MaterialCommunityIcons name="bell-ring-outline" size={28} color="#3b82f6" />
           </View>

@@ -10,7 +10,7 @@ import { useTheme } from '../../context/ThemeContext';
 import { ref, update, push, get, child } from 'firebase/database';
 import { db } from '../../services/firebase';
 import { showToast } from '../../components/CustomToast';
-import { sendPushNotification } from '../../utils/PushNotifications';
+import { notifyAdmins } from '../../utils/PushNotifications';
 import TasksScreenSkeleton from '../../components/skeletons/TasksScreenSkeleton';
 
 export default function MyTasksScreen() {
@@ -75,21 +75,14 @@ export default function MyTasksScreen() {
 
       await update(ref(db), updates);
 
-      // Trigger Push Notification to Admin
-      if (task.assignedBy) {
-        try {
-          const adminProfileSnapshot = await get(child(ref(db), `kabutech/users/${task.assignedBy}`));
-          const adminProfile = adminProfileSnapshot.val();
-          if (adminProfile && adminProfile.pushToken) {
-            sendPushNotification(
-              adminProfile.pushToken,
-              'Task Completed! ✅',
-              `${profile?.name || 'Staff'} has completed: ${task.title}`
-            );
-          }
-        } catch(e) {
-          console.log('Failed to send push notification', e);
-        }
+      // Trigger Push Notification to all Admin devices
+      try {
+        await notifyAdmins(
+          'Task Completed! ✅',
+          `${profile?.name || user?.displayName || 'Staff'} has completed: ${task.title}`
+        );
+      } catch(e) {
+        console.log('Failed to send push notification to admins', e);
       }
 
       showToast({ type: 'success', text1: 'Task Completed', text2: 'Great job!' });

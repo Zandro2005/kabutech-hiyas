@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, ScrollView, TouchableOpacity, Image, StatusBar, Dimensions } from 'react-native';
+import { View, Text, ScrollView, TouchableOpacity, Image, StatusBar } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { GlobalNavigationParamList } from '../types/navigation';
@@ -20,8 +20,6 @@ import { ref, update } from 'firebase/database';
 import { db } from '../services/firebase';
 import { showToast } from '../components/CustomToast';
 import { computeScheduledDevicesState } from '../utils/scheduleLogic';
-
-const { width } = Dimensions.get('window');
 
 export default function HomeScreen() {
   const navigation = useNavigation<NativeStackNavigationProp<GlobalNavigationParamList>>();

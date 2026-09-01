@@ -1,10 +1,8 @@
 import React from 'react';
-import { View, ScrollView, Dimensions } from 'react-native';
+import { View, ScrollView } from 'react-native';
 import tw from '../../tailwind';
 import { Skeleton } from '../Skeleton';
 import { useTheme } from '../../context/ThemeContext';
-
-const { width } = Dimensions.get('window');
 
 export default function HomeScreenSkeleton() {
   const { isDarkMode } = useTheme();

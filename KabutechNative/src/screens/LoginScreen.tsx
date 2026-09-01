@@ -17,8 +17,12 @@ import { db } from '../services/firebase';
 import { ref, get } from 'firebase/database';
 import { VolumeManager } from 'react-native-volume-manager';
 import RealisticMushroomIcon from '../components/RealisticMushroomIcon';
+import { useResponsive } from '../utils/responsive';
 
 export default function LoginScreen() {
+  const { height, isShortScreen, isSmallDevice } = useResponsive();
+  const headerHeight = Math.min(300, Math.max(180, isShortScreen ? height * 0.28 : height * 0.35));
+
   // Warm up TTS engine on mount to eliminate initial delay
   React.useEffect(() => {
     Speech.speak('', { rate: 0, volume: 0 });
@@ -63,7 +67,9 @@ export default function LoginScreen() {
         const firstName = fullName.split(' ')[0];
 
         setTimeout(async () => {
-          await VolumeManager.setVolume(1, { showUI: false });
+          try {
+            await VolumeManager.setVolume(1, { showUI: false });
+          } catch (e) {}
           
           const hour = new Date().getHours();
           let greeting = 'Good evening';
@@ -118,7 +124,7 @@ export default function LoginScreen() {
         >
 
           {/* Header Image with SVG Wave */}
-          <View style={tw`w-full h-[320px] relative overflow-hidden bg-white`}>
+          <View style={[tw`w-full relative overflow-hidden bg-white`, { height: headerHeight }]}>
             <Image
               source={require('../../assets/mushroom_bg.png')}
               style={tw`w-full h-full absolute`}
@@ -126,7 +132,7 @@ export default function LoginScreen() {
             />
 
             {/* SVG White Wave overlayed at the bottom of the image with colored wave border */}
-            <View style={tw`absolute bottom-0 w-full h-[120px]`}>
+            <View style={[tw`absolute bottom-0 w-full`, { height: Math.min(120, headerHeight * 0.4) }]}>
               <Svg height="100%" width="100%" viewBox="0 0 1440 320" preserveAspectRatio="none">
                 <Defs>
                   <LinearGradient id="loginWaveStroke" x1="0%" y1="0%" x2="100%" y2="0%">
@@ -150,18 +156,18 @@ export default function LoginScreen() {
           </View>
 
           {/* Form Area */}
-          <View style={tw`flex-1 px-8 pt-6 pb-6 relative`}>
+          <View style={tw`flex-1 px-6 sm:px-8 pt-4 sm:pt-6 pb-6 relative`}>
 
-            <View style={tw`mb-7`}>
+            <View style={tw`mb-5 sm:mb-7`}>
               <View style={tw`flex-row items-center justify-center`}>
-                <Text style={[tw`text-3xl text-slate-800 text-center`, { fontFamily: 'PlusJakartaSans_800ExtraBold' }]}>
+                <Text style={[tw`text-2xl sm:text-3xl text-slate-800 text-center`, { fontFamily: 'PlusJakartaSans_800ExtraBold' }]}>
                   Welcome back
                 </Text>
-                <View style={tw`ml-2.5 shadow-sm`}>
-                  <RealisticMushroomIcon size={34} rotate="12deg" />
+                <View style={tw`ml-2 sm:ml-2.5 shadow-sm`}>
+                  <RealisticMushroomIcon size={isSmallDevice ? 28 : 34} rotate="12deg" />
                 </View>
               </View>
-              <Text style={[tw`text-sm text-slate-400 text-center mt-2`, { fontFamily: 'PlusJakartaSans_700Bold' }]}>
+              <Text style={[tw`text-xs sm:text-sm text-slate-400 text-center mt-1.5`, { fontFamily: 'PlusJakartaSans_700Bold' }]}>
                 Login to your account
               </Text>
             </View>

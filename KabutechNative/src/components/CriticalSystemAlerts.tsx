@@ -57,17 +57,17 @@ export default React.memo(function CriticalSystemAlerts({ alerts, onAlertPress }
   };
 
   return (
-    <View style={tw`px-6 mt-6`}>
+    <View style={tw`px-5 sm:px-6 mt-6`}>
       <View
-        style={tw`bg-white dark:bg-slate-900 rounded-[24px] p-4.5 shadow-sm border border-slate-200/70 dark:border-slate-800`}
+        style={tw`bg-white dark:bg-slate-900 rounded-[24px] p-3.5 sm:p-4 shadow-sm border border-slate-200/70 dark:border-slate-800`}
       >
         {/* Section Header */}
         <View style={tw`flex-row justify-between items-center mb-3.5`}>
-          <View style={tw`flex-row items-center gap-2.5`}>
+          <View style={tw`flex-row items-center gap-2 sm:gap-2.5 flex-1 mr-2`}>
             <View
-              style={tw`w-8 h-8 rounded-xl ${
+              style={tw`w-7 h-7 sm:w-8 sm:h-8 rounded-xl ${
                 isAllClear ? 'bg-emerald-50 dark:bg-emerald-500/15' : 'bg-rose-50 dark:bg-rose-500/15'
-              } items-center justify-center`}
+              } items-center justify-center shrink-0`}
             >
               <MaterialCommunityIcons
                 name={isAllClear ? 'shield-check-outline' : 'alert-circle-outline'}
@@ -75,11 +75,11 @@ export default React.memo(function CriticalSystemAlerts({ alerts, onAlertPress }
                 color={isAllClear ? '#10b981' : '#ef4444'}
               />
             </View>
-            <View>
-              <Text style={[tw`text-[13px] text-slate-800 dark:text-white`, { fontFamily: 'PlusJakartaSans_800ExtraBold' }]}>
+            <View style={tw`flex-1`}>
+              <Text numberOfLines={1} style={[tw`text-[12.5px] sm:text-[13px] text-slate-800 dark:text-white`, { fontFamily: 'PlusJakartaSans_800ExtraBold' }]}>
                 Critical System Alerts
               </Text>
-              <Text style={[tw`text-[10px] text-slate-400 dark:text-slate-500`, { fontFamily: 'PlusJakartaSans_600SemiBold' }]}>
+              <Text numberOfLines={1} style={[tw`text-[9.5px] sm:text-[10px] text-slate-400 dark:text-slate-500`, { fontFamily: 'PlusJakartaSans_600SemiBold' }]}>
                 Hardware & Sensor Guard
               </Text>
             </View>
@@ -87,11 +87,10 @@ export default React.memo(function CriticalSystemAlerts({ alerts, onAlertPress }
 
           {/* Status Pill */}
           <View
-            style={tw`flex-row items-center px-2.5 py-0.8 rounded-full ${
-              isAllClear
-                ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400'
-                : 'bg-rose-500/10 text-rose-600 dark:text-rose-400'
-            }`}
+            style={[
+              tw`flex-row items-center px-2 py-0.5 sm:px-2.5 sm:py-1 rounded-full shrink-0`,
+              { backgroundColor: isAllClear ? 'rgba(16, 185, 129, 0.12)' : 'rgba(239, 68, 68, 0.12)' }
+            ]}
           >
             <View
               style={[
@@ -101,7 +100,7 @@ export default React.memo(function CriticalSystemAlerts({ alerts, onAlertPress }
             />
             <Text
               style={[
-                tw`text-[10px] uppercase tracking-wider ${
+                tw`text-[9px] sm:text-[10px] uppercase tracking-wider ${
                   isAllClear ? 'text-emerald-600 dark:text-emerald-400' : 'text-rose-600 dark:text-rose-400'
                 }`,
                 { fontFamily: 'PlusJakartaSans_800ExtraBold' }
@@ -115,7 +114,7 @@ export default React.memo(function CriticalSystemAlerts({ alerts, onAlertPress }
         {/* Content */}
         {isAllClear ? (
           <View style={tw`bg-slate-50 dark:bg-slate-800/40 rounded-2xl p-3.5 flex-row items-center gap-3 border border-slate-100 dark:border-slate-800`}>
-            <View style={tw`w-7 h-7 rounded-lg bg-emerald-500/10 dark:bg-emerald-500/20 items-center justify-center`}>
+            <View style={tw`w-7 h-7 rounded-lg bg-emerald-500/10 dark:bg-emerald-500/20 items-center justify-center shrink-0`}>
               <MaterialCommunityIcons name="check" size={15} color="#10b981" />
             </View>
             <View style={tw`flex-1`}>
@@ -139,18 +138,18 @@ export default React.memo(function CriticalSystemAlerts({ alerts, onAlertPress }
                     hapticSelection();
                     onAlertPress?.(alert);
                   }}
-                  style={tw`bg-slate-50 dark:bg-slate-800/50 rounded-2xl p-3.5 border ${badge.border} flex-row items-start gap-3`}
+                  style={tw`bg-slate-50 dark:bg-slate-800/50 rounded-2xl p-3 sm:p-3.5 border ${badge.border} flex-row items-start gap-3`}
                 >
-                  <View style={tw`w-8 h-8 rounded-xl ${badge.bg} items-center justify-center mt-0.5`}>
-                    <MaterialCommunityIcons name={badge.icon as any} size={18} color={badge.color} />
+                  <View style={tw`w-7 h-7 sm:w-8 sm:h-8 rounded-xl ${badge.bg} items-center justify-center mt-0.5 shrink-0`}>
+                    <MaterialCommunityIcons name={badge.icon as any} size={16} color={badge.color} />
                   </View>
                   <View style={tw`flex-1`}>
                     <View style={tw`flex-row justify-between items-center mb-0.5`}>
-                      <Text style={[tw`text-xs text-slate-900 dark:text-white`, { fontFamily: 'PlusJakartaSans_800ExtraBold' }]}>
+                      <Text numberOfLines={1} style={[tw`text-xs text-slate-900 dark:text-white flex-1 mr-2`, { fontFamily: 'PlusJakartaSans_800ExtraBold' }]}>
                         {alert.title || 'System Alert'}
                       </Text>
                       {alert.timestamp && (
-                        <Text style={[tw`text-[9px] text-slate-400`, { fontFamily: 'PlusJakartaSans_600SemiBold' }]}>
+                        <Text style={[tw`text-[9px] text-slate-400 shrink-0`, { fontFamily: 'PlusJakartaSans_600SemiBold' }]}>
                           {formatTimestamp(alert.timestamp)}
                         </Text>
                       )}
@@ -162,7 +161,7 @@ export default React.memo(function CriticalSystemAlerts({ alerts, onAlertPress }
                       {alert.message || 'Action required to restore optimal balance.'}
                     </Text>
                   </View>
-                  <Ionicons name="chevron-forward" size={14} color="#94a3b8" style={tw`self-center`} />
+                  <Ionicons name="chevron-forward" size={14} color="#94a3b8" style={tw`self-center shrink-0`} />
                 </TouchableOpacity>
               );
             })}

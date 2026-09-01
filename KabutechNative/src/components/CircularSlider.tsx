@@ -3,6 +3,7 @@ import { View, Text, Animated, Easing } from 'react-native';
 import Svg, { Circle, Defs, LinearGradient as SvgGradient, Stop } from 'react-native-svg';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import tw from '../tailwind';
+import { useResponsive } from '../utils/responsive';
 
 interface Props {
   localTarget: number;
@@ -19,9 +20,11 @@ interface Props {
 }
 
 export default function CircularSlider({ localTarget, activeTabData, isDarkMode }: Props) {
-  const size = 276;
-  const radius = 112;
-  const strokeWidth = 14;
+  const { isSmallDevice, isLargeDevice } = useResponsive();
+  
+  const size = isSmallDevice ? 285 : isLargeDevice ? 345 : 315;
+  const strokeWidth = isSmallDevice ? 13 : isLargeDevice ? 16 : 14.5;
+  const radius = (size / 2) - strokeWidth - (isLargeDevice ? 14 : 12);
   const circumference = 2 * Math.PI * radius;
   
   // Progress ratio limited between 0 and 1
@@ -30,6 +33,10 @@ export default function CircularSlider({ localTarget, activeTabData, isDarkMode 
 
   const diff = Number((activeTabData.current - localTarget).toFixed(1));
   const isNearTarget = Math.abs(diff) <= 0.5;
+
+  const valueFontSize = isSmallDevice ? 42 : isLargeDevice ? 54 : 48;
+  const valueLineHeight = isSmallDevice ? 48 : isLargeDevice ? 62 : 54;
+  const unitFontSize = isSmallDevice ? 18 : isLargeDevice ? 24 : 21;
 
   // Passive Orbiting Rotation Animation
   const rotateAnim = useRef(new Animated.Value(0)).current;
@@ -58,7 +65,7 @@ export default function CircularSlider({ localTarget, activeTabData, isDarkMode 
   });
 
   return (
-    <View style={tw`items-center justify-center relative mb-7`}>
+    <View style={tw`items-center justify-center relative mt-6 sm:mt-8 mb-12 sm:mb-14`}>
       
       {/* 1. Steady Subtle Ambient Glow (Constant, Non-Blinking) */}
       <View
@@ -93,7 +100,7 @@ export default function CircularSlider({ localTarget, activeTabData, isDarkMode 
           <Circle
             cx={(size + 16) / 2}
             cy={(size + 16) / 2}
-            r={radius + 18}
+            r={radius + (isLargeDevice ? 18 : 16)}
             stroke={activeTabData.color}
             strokeWidth={1.2}
             strokeDasharray="4 8"
@@ -130,7 +137,7 @@ export default function CircularSlider({ localTarget, activeTabData, isDarkMode 
 
         {/* Outer subtle static guide track */}
         <Circle 
-          cx={size/2} cy={size/2} r={radius + 10} 
+          cx={size/2} cy={size/2} r={radius + (isLargeDevice ? 10 : 8)} 
           stroke={isDarkMode ? '#1e293b' : '#e2e8f0'} 
           strokeWidth={1} 
           strokeDasharray="2 4"
@@ -159,41 +166,41 @@ export default function CircularSlider({ localTarget, activeTabData, isDarkMode 
       </Svg>
 
       {/* Central Display Content */}
-      <View style={[tw`absolute items-center justify-center`, { width: size - 44, height: size - 44 }]}>
+      <View style={[tw`absolute items-center justify-center`, { width: size - (isLargeDevice ? 62 : 54), height: size - (isLargeDevice ? 62 : 54) }]}>
         
         {/* Top Mini Tag: TARGET SETTING */}
         <View style={tw`flex-row items-center gap-1.5 mb-1`}>
           <View style={[tw`w-1.5 h-1.5 rounded-full`, { backgroundColor: activeTabData.color }]} />
-          <Text style={[tw`text-[10px] text-slate-400 dark:text-slate-500 uppercase tracking-widest`, { fontFamily: 'PlusJakartaSans_800ExtraBold' }]}>
+          <Text style={[tw`text-[10px] sm:text-[11px] text-slate-400 dark:text-slate-500 uppercase tracking-widest`, { fontFamily: 'PlusJakartaSans_800ExtraBold' }]}>
             TARGET SETPOINT
           </Text>
         </View>
 
         {/* Large Value & Unit */}
         <View style={tw`flex-row items-baseline justify-center`}>
-          <Text style={[tw`text-5xl text-slate-900 dark:text-white tracking-tighter`, { fontFamily: 'PlusJakartaSans_800ExtraBold' }]}>
+          <Text style={[tw`text-slate-900 dark:text-white tracking-tighter`, { fontSize: valueFontSize, fontFamily: 'PlusJakartaSans_800ExtraBold', lineHeight: valueLineHeight }]}>
             {localTarget}
           </Text>
-          <Text style={[tw`text-xl font-bold ml-1.5`, { color: activeTabData.color, fontFamily: 'PlusJakartaSans_800ExtraBold' }]}>
+          <Text style={[tw`font-bold ml-1.5`, { fontSize: unitFontSize, color: activeTabData.color, fontFamily: 'PlusJakartaSans_800ExtraBold' }]}>
             {activeTabData.unit}
           </Text>
         </View>
 
         {/* Live vs Target Badge */}
-        <View style={tw`mt-2 flex-row items-center gap-2 bg-slate-100/90 dark:bg-slate-800/80 px-3 py-1.5 rounded-full border border-slate-200/60 dark:border-slate-700/60`}>
-          <Text style={[tw`text-[11px] text-slate-500 dark:text-slate-400`, { fontFamily: 'PlusJakartaSans_600SemiBold' }]}>
+        <View style={tw`mt-1.5 sm:mt-2 flex-row items-center gap-1.5 bg-slate-100/90 dark:bg-slate-800/80 px-3 py-1 sm:px-3.5 sm:py-1.2 rounded-full border border-slate-200/60 dark:border-slate-700/60`}>
+          <Text style={[tw`text-[11px] sm:text-[12px] text-slate-500 dark:text-slate-400`, { fontFamily: 'PlusJakartaSans_600SemiBold' }]}>
             Current: <Text style={[tw`text-slate-800 dark:text-slate-200`, { fontFamily: 'PlusJakartaSans_800ExtraBold' }]}>{activeTabData.current}{activeTabData.unit}</Text>
           </Text>
           <View style={tw`w-1 h-1 rounded-full bg-slate-300 dark:bg-slate-600`} />
-          <Text style={[tw`text-[10.5px]`, isNearTarget ? tw`text-emerald-600 dark:text-emerald-400` : tw`text-amber-600 dark:text-amber-400`, { fontFamily: 'PlusJakartaSans_700Bold' }]}>
+          <Text style={[tw`text-[10.5px] sm:text-[11.5px]`, isNearTarget ? tw`text-emerald-600 dark:text-emerald-400` : tw`text-amber-600 dark:text-amber-400`, { fontFamily: 'PlusJakartaSans_700Bold' }]}>
             {isNearTarget ? 'Aligned' : `${diff > 0 ? `+${diff}` : diff}${activeTabData.unit}`}
           </Text>
         </View>
 
         {/* Optimal Range Pill */}
-        <View style={tw`mt-2 flex-row items-center gap-1`}>
+        <View style={tw`mt-1.5 sm:mt-2 flex-row items-center gap-1`}>
           <MaterialCommunityIcons name="check-decagram-outline" size={12} color="#10b981" />
-          <Text style={[tw`text-[10.5px] text-slate-400 dark:text-slate-500`, { fontFamily: 'PlusJakartaSans_600SemiBold' }]}>
+          <Text style={[tw`text-[10.5px] sm:text-[11.5px] text-slate-400 dark:text-slate-500`, { fontFamily: 'PlusJakartaSans_600SemiBold' }]}>
             Ideal: <Text style={[tw`text-slate-600 dark:text-slate-300 font-bold`]}>{activeTabData.optimal} {activeTabData.unit}</Text>
           </Text>
         </View>

@@ -12,7 +12,7 @@ import { db } from '../services/firebase';
 import { showToast } from '../components/CustomToast';
 import { useAuth } from '../context/AuthContext';
 import { StaffTask } from '../types/firebase';
-import { sendPushNotification } from '../utils/PushNotifications';
+import { sendPushNotification, notifyUser } from '../utils/PushNotifications';
 
 export default function AssignTaskScreen() {
   const navigation = useNavigation();
@@ -69,16 +69,22 @@ export default function AssignTaskScreen() {
       await set(newTaskRef, task);
       
       // Trigger Push Notification to assigned staff
-      if (staffUser.pushToken) {
-        try {
-          sendPushNotification(
+      try {
+        if (staffUser.pushToken) {
+          await sendPushNotification(
             staffUser.pushToken,
             'New Task Assigned 📋',
             `${profile?.name || user?.displayName || 'Admin'} assigned you a new task: ${title.trim()}`
           );
-        } catch (e) {
-          console.log('Push error', e);
+        } else {
+          await notifyUser(
+            selectedStaffId,
+            'New Task Assigned 📋',
+            `${profile?.name || user?.displayName || 'Admin'} assigned you a new task: ${title.trim()}`
+          );
         }
+      } catch (e) {
+        console.log('Push error', e);
       }
 
       showToast({ type: 'success', text1: 'Task Assigned', text2: 'Task has been assigned successfully.' });

@@ -19,12 +19,12 @@ const LiveFarmCard = React.memo(function LiveFarmCard({ navigation }: Props) {
   };
 
   return (
-    <View style={tw`px-6 mt-6 mb-8`}>
+    <View style={tw`px-5 sm:px-6 mt-6 mb-8`}>
       {/* Section Header */}
       <View style={tw`flex-row justify-between items-center mb-3.5`}>
         <View style={tw`flex-row items-center gap-2`}>
           <View style={tw`w-2 h-4.5 rounded-full bg-[#10b981]`} />
-          <Text style={[tw`text-lg tracking-wide`, { fontFamily: 'PlusJakartaSans_800ExtraBold', color: isDarkMode ? '#ffffff' : '#0f172a' }]}>
+          <Text style={[tw`text-base sm:text-lg tracking-wide`, { fontFamily: 'PlusJakartaSans_800ExtraBold', color: isDarkMode ? '#ffffff' : '#0f172a' }]}>
             Live Farm Feed
           </Text>
         </View>
@@ -42,7 +42,7 @@ const LiveFarmCard = React.memo(function LiveFarmCard({ navigation }: Props) {
       <TouchableOpacity
         activeOpacity={0.88}
         onPress={handlePress}
-        style={tw`w-full h-[210px] bg-slate-900 rounded-[26px] overflow-hidden shadow-md relative border border-slate-200/60 dark:border-slate-800`}
+        style={[tw`w-full bg-slate-900 rounded-[24px] sm:rounded-[26px] overflow-hidden shadow-md relative border border-slate-200/60 dark:border-slate-800`, { minHeight: 200, height: 215 }]}
       >
         {/* Camera Image Feed */}
         <Image
@@ -59,9 +59,9 @@ const LiveFarmCard = React.memo(function LiveFarmCard({ navigation }: Props) {
         />
 
         {/* Top HUD Row: Live Pill & Expand Button */}
-        <View style={tw`absolute top-3.5 left-3.5 right-3.5 flex-row justify-between items-center`}>
+        <View style={tw`absolute top-3.5 left-3.5 right-3.5 flex-row justify-between items-center z-10`}>
           {/* Live Badge */}
-          <View style={tw`flex-row items-center gap-2`}>
+          <View style={tw`flex-row items-center gap-1.5 sm:gap-2`}>
             <View style={tw`bg-emerald-500/90 px-2.5 py-1 rounded-full flex-row items-center gap-1.5 shadow-sm`}>
               <View style={tw`w-1.5 h-1.5 bg-white rounded-full`} />
               <Text style={[tw`text-white text-[10px] uppercase tracking-wider`, { fontFamily: 'PlusJakartaSans_800ExtraBold' }]}>
@@ -82,20 +82,20 @@ const LiveFarmCard = React.memo(function LiveFarmCard({ navigation }: Props) {
         </View>
 
         {/* Bottom HUD Bar */}
-        <View style={tw`absolute bottom-0 left-0 right-0 p-4 pt-2 flex-row justify-between items-end`}>
-          <View>
+        <View style={tw`absolute bottom-0 left-0 right-0 p-3.5 sm:p-4 pt-2 flex-row justify-between items-end z-10`}>
+          <View style={tw`flex-1 mr-2`}>
             <View style={tw`flex-row items-center gap-1.5 mb-0.5`}>
               <MaterialCommunityIcons name="video" size={14} color="#34d399" />
-              <Text style={[tw`text-white text-[15px] tracking-tight`, { fontFamily: 'PlusJakartaSans_800ExtraBold' }]}>
+              <Text numberOfLines={1} style={[tw`text-white text-[14px] sm:text-[15px] tracking-tight`, { fontFamily: 'PlusJakartaSans_800ExtraBold' }]}>
                 Growing Room A
               </Text>
             </View>
-            <Text style={[tw`text-white/70 text-[11px]`, { fontFamily: 'PlusJakartaSans_500Medium' }]}>
+            <Text numberOfLines={1} style={[tw`text-white/75 text-[10px] sm:text-[11px]`, { fontFamily: 'PlusJakartaSans_500Medium' }]}>
               Real-time chamber monitoring
             </Text>
           </View>
 
-          <View style={tw`bg-white/15 px-2.5 py-1 rounded-lg border border-white/10 flex-row items-center gap-1`}>
+          <View style={tw`bg-white/15 px-2.5 py-1 rounded-lg border border-white/10 flex-row items-center gap-1 shrink-0`}>
             <Text style={[tw`text-white text-[10px]`, { fontFamily: 'PlusJakartaSans_700Bold' }]}>
               1080p • 30fps
             </Text>

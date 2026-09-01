@@ -222,15 +222,15 @@ export default React.memo(function DailyHarvestList({
 
       {/* Selected Date Header & Telemetry */}
       <View style={tw`flex-row items-center justify-between mb-3 px-1 pt-1`}>
-        <View style={tw`flex-row items-center gap-1.5`}>
-          <View style={tw`w-2 h-2 rounded-full bg-emerald-500`} />
-          <Text style={[tw`text-[12px] text-slate-800 dark:text-slate-200 tracking-wide uppercase`, { fontFamily: 'PlusJakartaSans_800ExtraBold' }]}>
+        <View style={tw`flex-row items-center gap-1.5 flex-1 mr-2`}>
+          <View style={tw`w-2 h-2 rounded-full bg-emerald-500 shrink-0`} />
+          <Text numberOfLines={1} style={[tw`text-[12px] text-slate-800 dark:text-slate-200 tracking-wide uppercase`, { fontFamily: 'PlusJakartaSans_800ExtraBold' }]}>
             {selectedDateFormatted}
           </Text>
         </View>
 
         {selectedHarvests.length > 0 && (
-          <View style={tw`bg-emerald-50 dark:bg-emerald-500/15 border border-emerald-200/60 dark:border-emerald-500/30 px-2 py-0.5 rounded-full flex-row items-center gap-1`}>
+          <View style={tw`bg-emerald-50 dark:bg-emerald-500/15 border border-emerald-200/60 dark:border-emerald-500/30 px-2 py-0.5 rounded-full flex-row items-center gap-1 shrink-0`}>
             <Text style={[tw`text-[10px] text-emerald-700 dark:text-emerald-400 font-extrabold`]}>
               {selectedHarvests.length} Rack{selectedHarvests.length !== 1 ? 's' : ''} • {dayTotalGrams >= 1000 ? `${(dayTotalGrams / 1000).toFixed(2)} kg` : `${dayTotalGrams} g`}
             </Text>

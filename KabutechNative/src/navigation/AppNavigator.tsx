@@ -69,6 +69,8 @@ export default function AppNavigator() {
             <Stack.Screen name="MyTasks" component={MyTasksScreen} />
             <Stack.Screen name="Analytics" component={AnalyticsScreen} />
             <Stack.Screen name="LiveFarm" component={LiveFarmScreen} />
+            <Stack.Screen name="Report" component={ReportScreen} />
+            <Stack.Screen name="DeviceSchedules" component={DeviceSchedulesScreen} />
           </>
         ) : (
           // Admin App Stack

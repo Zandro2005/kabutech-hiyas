@@ -1,13 +1,11 @@
 import React, { useState } from 'react';
-import { View, Text, Image, TouchableOpacity, Dimensions, ScrollView } from 'react-native';
+import { View, Text, Image, TouchableOpacity, ScrollView } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { GlobalNavigationParamList } from '../types/navigation';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
-import { SafeAreaView } from 'react-native-safe-area-context';
 import tw from 'twrnc';
-
-const { width } = Dimensions.get('window');
+import { useResponsive } from '../utils/responsive';
 
 const slides = [
   {
@@ -33,10 +31,11 @@ const slides = [
 
 export default function OnboardingScreen() {
   const navigation = useNavigation<NativeStackNavigationProp<GlobalNavigationParamList>>();
+  const { width } = useResponsive();
   const [activeSlide, setActiveSlide] = useState(0);
 
   const handleScroll = (event: any) => {
-    const slide = Math.round(event.nativeEvent.contentOffset.x / width);
+    const slide = Math.round(event.nativeEvent.contentOffset.x / (width || 1));
     if (slide !== activeSlide) {
       setActiveSlide(slide);
     }

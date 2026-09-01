@@ -45,7 +45,7 @@ export default function AiInsightModal({ visible, onClose }: AiInsightModalProps
       onRequestClose={onClose}
     >
       <View style={tw`flex-1 bg-black/60 justify-center items-center px-6`}>
-        <View style={tw`w-full bg-white dark:bg-slate-900 rounded-3xl overflow-hidden shadow-2xl`}>
+        <View style={tw`w-full max-w-md bg-white dark:bg-slate-900 rounded-3xl overflow-hidden shadow-2xl`}>
           
           {/* Header */}
           <View style={tw`bg-blue-500 px-6 py-5 flex-row items-center gap-3`}>

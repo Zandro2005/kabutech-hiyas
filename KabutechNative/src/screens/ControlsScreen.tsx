@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { View, Text, ScrollView, TouchableOpacity, StatusBar, DeviceEventEmitter, Alert, Dimensions, Modal } from 'react-native';
+import { View, Text, ScrollView, TouchableOpacity, StatusBar, DeviceEventEmitter, Alert, Modal } from 'react-native';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { GlobalNavigationParamList } from '../types/navigation';
@@ -15,8 +15,7 @@ import { useTheme } from '../context/ThemeContext';
 import { showToast } from '../components/CustomToast';
 import { hapticLight, hapticMedium, hapticSelection } from '../utils/haptics';
 import { computeScheduledDevicesState } from '../utils/scheduleLogic';
-
-const { width } = Dimensions.get('window');
+import { useResponsive } from '../utils/responsive';
 
 type TabId = 'temp' | 'hum' | 'light' | 'co2';
 
@@ -24,6 +23,7 @@ export default function ControlsScreen() {
   const navigation = useNavigation<NativeStackNavigationProp<GlobalNavigationParamList>>();
   const route = useRoute<any>();
   const { isDarkMode } = useTheme();
+  const { width, isSmallDevice } = useResponsive();
   const sensors = useSensors();
   const settings = useSettings();
   
@@ -119,8 +119,7 @@ export default function ControlsScreen() {
   const scrollToTab = (tabId: string) => {
     const layout = tabLayouts.current[tabId];
     if (layout && tabScrollRef.current) {
-      const screenWidth = Dimensions.get('window').width;
-      const targetScrollX = Math.max(0, layout.x - screenWidth / 2 + layout.width / 2);
+      const targetScrollX = Math.max(0, layout.x - width / 2 + layout.width / 2);
       tabScrollRef.current.scrollTo({ x: targetScrollX, animated: true });
     }
   };
@@ -314,7 +313,7 @@ export default function ControlsScreen() {
         />
 
         {/* Precision Stepper & Mode Switcher Row */}
-        <View style={tw`flex-row items-center justify-center px-5 mb-6 gap-3`}>
+        <View style={tw`flex-row items-center justify-center px-5 mb-3 sm:mb-4 gap-3`}>
           {/* Decrement Button */}
           <TouchableOpacity 
             hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
@@ -378,7 +377,7 @@ export default function ControlsScreen() {
 
         {/* AI / Lock Status Notification */}
         {isAiOverride ? (
-          <View style={tw`mx-5 bg-blue-500/10 border border-blue-500/30 rounded-2xl px-4 py-2.5 flex-row items-center gap-3 mb-4`}>
+          <View style={tw`mx-5 bg-blue-500/10 border border-blue-500/30 rounded-2xl px-4 py-2.5 flex-row items-center gap-3 mb-5`}>
             <MaterialCommunityIcons name="brain" size={18} color="#3b82f6" />
             <Text style={[tw`text-[11px] text-blue-900 dark:text-blue-200 flex-1`, { fontFamily: 'PlusJakartaSans_600SemiBold' }]}>
               AI Pre-emptive Override is active. Controls are locked.
@@ -398,7 +397,7 @@ export default function ControlsScreen() {
         ) : null}
 
         {/* Hardware Actuators Single Widget */}
-        <View style={tw`px-5`}>
+        <View style={tw`px-5 pt-1`}>
           <View style={tw`flex-row justify-between items-center mb-2.5`}>
             <View style={tw`flex-row items-center gap-2`}>
               <View style={tw`w-2 h-4 rounded-full bg-[#10b981]`} />

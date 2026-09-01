@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useRef, useEffect } from 'react';
-import { View, Text, ScrollView, TouchableOpacity, Dimensions, StatusBar } from 'react-native';
+import { View, Text, ScrollView, TouchableOpacity, StatusBar } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { MaterialCommunityIcons, Ionicons } from '@expo/vector-icons';
 import Svg, { Path, Defs, LinearGradient as SvgGradient, Stop, Line, Circle, Text as SvgText, G, Rect } from 'react-native-svg';
@@ -9,11 +9,10 @@ import { useNavigation } from '@react-navigation/native';
 import { useSensors } from '../hooks/useFirebaseData';
 import { hapticLight, hapticSelection } from '../utils/haptics';
 import AnalyticsScreenSkeleton from '../components/skeletons/AnalyticsScreenSkeleton';
+import { useResponsive } from '../utils/responsive';
 
 type MetricType = 'temp' | 'hum' | 'light' | 'co2';
 type TimeRange = '24H' | '7D' | '30D';
-
-const { width } = Dimensions.get('window');
 
 // Generate realistic mock history
 const generateHistoryData = (base: number, variance: number, points: number, range: TimeRange) => {
@@ -63,6 +62,7 @@ export default function AnalyticsScreen() {
   const insets = useSafeAreaInsets();
   const navigation = useNavigation<any>();
   const sensors = useSensors();
+  const { width, isSmallDevice } = useResponsive();
 
   const [isReady, setIsReady] = useState(false);
   useEffect(() => {
@@ -195,8 +195,7 @@ export default function AnalyticsScreen() {
   const scrollToTab = (key: MetricType) => {
     const layout = tabLayouts.current[key];
     if (layout && tabScrollRef.current) {
-      const screenWidth = Dimensions.get('window').width;
-      const targetScrollX = Math.max(0, layout.x - screenWidth / 2 + layout.width / 2);
+      const targetScrollX = Math.max(0, layout.x - width / 2 + layout.width / 2);
       tabScrollRef.current.scrollTo({ x: targetScrollX, animated: true });
     }
   };

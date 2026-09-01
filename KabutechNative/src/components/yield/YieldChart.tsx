@@ -117,7 +117,7 @@ export default React.memo(function YieldChart({ dailyMap, chartPeriod, setChartP
   const yAxisSteps = [maxYield, maxYield * 0.66, maxYield * 0.33, 0];
 
   return (
-    <View style={tw`bg-white dark:bg-slate-900 rounded-[28px] p-5 shadow-sm border border-slate-200/70 dark:border-slate-800 mb-5`}>
+    <View style={tw`bg-white dark:bg-slate-900 rounded-[26px] sm:rounded-[28px] p-4 sm:p-5 shadow-sm border border-slate-200/70 dark:border-slate-800 mb-5`}>
       
       {/* Header & Export */}
       <View style={tw`flex-row justify-between items-center mb-4`}>

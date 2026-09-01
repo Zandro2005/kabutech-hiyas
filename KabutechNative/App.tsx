@@ -11,6 +11,8 @@ import { Asset } from 'expo-asset';
 SplashScreen.preventAutoHideAsync();
 import {
   PlusJakartaSans_400Regular,
+  PlusJakartaSans_500Medium,
+  PlusJakartaSans_600SemiBold,
   PlusJakartaSans_700Bold,
   PlusJakartaSans_800ExtraBold,
 } from '@expo-google-fonts/plus-jakarta-sans';
@@ -22,7 +24,22 @@ import tw from './src/tailwind';
 import CustomToast from './src/components/CustomToast';
 import { SoundManager } from './src/utils/SoundManager';
 import * as NavigationBar from 'expo-navigation-bar';
-import { Platform, Alert as RNAlert, LogBox } from 'react-native';
+import { Platform, Alert as RNAlert, LogBox, Text, TextInput } from 'react-native';
+
+// Force consistent font family and font scaling across all Android and iOS devices/custom OS fonts
+if ((Text as any).defaultProps == null) {
+  (Text as any).defaultProps = {};
+}
+(Text as any).defaultProps.style = { fontFamily: 'PlusJakartaSans_400Regular' };
+(Text as any).defaultProps.allowFontScaling = false;
+(Text as any).defaultProps.maxFontSizeMultiplier = 1.0;
+
+if ((TextInput as any).defaultProps == null) {
+  (TextInput as any).defaultProps = {};
+}
+(TextInput as any).defaultProps.style = { fontFamily: 'PlusJakartaSans_400Regular' };
+(TextInput as any).defaultProps.allowFontScaling = false;
+(TextInput as any).defaultProps.maxFontSizeMultiplier = 1.0;
 
 LogBox.ignoreLogs([
   '`transition-all` unknown or invalid utility',
@@ -52,6 +69,8 @@ export default function App() {
         await Promise.all([
           Font.loadAsync({
             PlusJakartaSans_400Regular,
+            PlusJakartaSans_500Medium,
+            PlusJakartaSans_600SemiBold,
             PlusJakartaSans_700Bold,
             PlusJakartaSans_800ExtraBold,
           }),
