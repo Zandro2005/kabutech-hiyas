@@ -5,7 +5,7 @@ import { MaterialCommunityIcons, Ionicons } from '@expo/vector-icons';
 import Svg, { Path, Defs, LinearGradient as SvgGradient, Stop, Line, Circle, Text as SvgText, G, Rect } from 'react-native-svg';
 import { useTheme } from '../context/ThemeContext';
 import tw from '../tailwind';
-import { useNavigation } from '@react-navigation/native';
+import { useNavigation, useRoute } from '@react-navigation/native';
 import { useSensors } from '../hooks/useFirebaseData';
 import { hapticLight, hapticSelection } from '../utils/haptics';
 import AnalyticsScreenSkeleton from '../components/skeletons/AnalyticsScreenSkeleton';
@@ -61,6 +61,7 @@ export default function AnalyticsScreen() {
   const { isDarkMode } = useTheme();
   const insets = useSafeAreaInsets();
   const navigation = useNavigation<any>();
+  const route = useRoute<any>();
   const sensors = useSensors();
   const { width, isSmallDevice } = useResponsive();
 
@@ -74,9 +75,21 @@ export default function AnalyticsScreen() {
     return () => cancelAnimationFrame(handle);
   }, []);
 
-  const [activeMetric, setActiveMetric] = useState<MetricType>('temp');
+  const initialMetric = (route.params?.metric || route.params?.tab) as MetricType | undefined;
+  const [activeMetric, setActiveMetric] = useState<MetricType>(
+    initialMetric && ['temp', 'hum', 'light', 'co2'].includes(initialMetric) ? initialMetric : 'temp'
+  );
   const [activeRange, setActiveRange] = useState<TimeRange>('24H');
   const [selectedPointIndex, setSelectedPointIndex] = useState<number | null>(null);
+
+  useEffect(() => {
+    const paramMetric = route.params?.metric || route.params?.tab;
+    if (paramMetric && ['temp', 'hum', 'light', 'co2'].includes(paramMetric)) {
+      setActiveMetric(paramMetric as MetricType);
+      setSelectedPointIndex(null);
+      setTimeout(() => scrollToTab(paramMetric as MetricType), 250);
+    }
+  }, [route.params?.metric, route.params?.tab]);
 
   const currentLiveValues = {
     temp: typeof sensors.temperature === 'number' ? sensors.temperature : 26.5,

@@ -178,7 +178,7 @@ export default function CircularSlider({ localTarget, activeTabData, isDarkMode 
 
         {/* Large Value & Unit */}
         <View style={tw`flex-row items-baseline justify-center`}>
-          <Text style={[tw`text-slate-900 dark:text-white tracking-tighter`, { fontSize: valueFontSize, fontFamily: 'PlusJakartaSans_800ExtraBold', lineHeight: valueLineHeight }]}>
+          <Text style={[tw`text-slate-900 dark:text-white`, { fontSize: valueFontSize, fontFamily: 'PlusJakartaSans_800ExtraBold', lineHeight: valueLineHeight, letterSpacing: -1.5 }]}>
             {localTarget}
           </Text>
           <Text style={[tw`font-bold ml-1.5`, { fontSize: unitFontSize, color: activeTabData.color, fontFamily: 'PlusJakartaSans_800ExtraBold' }]}>

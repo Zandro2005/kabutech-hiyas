@@ -105,8 +105,8 @@ export default React.memo(function ScoreArch({
         <View style={tw`items-center px-4 mt-6 sm:mt-8 z-10`}>
           <Text style={[tw`text-xs sm:text-[13px] text-slate-700 dark:text-slate-300 tracking-widest mb-0.5 uppercase`, { fontFamily: 'PlusJakartaSans_700Bold' }]}>Environment Score</Text>
           <View style={tw`flex-row items-baseline mb-1`}>
-            <Text style={[tw`text-slate-900 dark:text-white tracking-tighter`, { fontSize: scoreFontSize, fontFamily: 'PlusJakartaSans_800ExtraBold', lineHeight: scoreFontSize + 4 }]}>{envScore}</Text>
-            <Text style={[tw`text-slate-900 dark:text-white tracking-tighter`, { fontSize: scoreSubSize, fontFamily: 'PlusJakartaSans_800ExtraBold' }]}>/10</Text>
+            <Text style={[tw`text-slate-900 dark:text-white`, { fontSize: scoreFontSize, fontFamily: 'PlusJakartaSans_800ExtraBold', lineHeight: scoreFontSize + 4, letterSpacing: -1.5 }]}>{envScore}</Text>
+            <Text style={[tw`text-slate-900 dark:text-white`, { fontSize: scoreSubSize, fontFamily: 'PlusJakartaSans_800ExtraBold', letterSpacing: -1 }]}>/10</Text>
           </View>
 
           {/* Progress Bar */}

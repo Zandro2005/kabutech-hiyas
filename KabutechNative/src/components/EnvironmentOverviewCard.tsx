@@ -54,7 +54,7 @@ export default function EnvironmentOverviewCard({ temp, hum, co2, light }: Envir
       >
         {/* Top Header */}
         <View style={tw`flex-row justify-between items-center mb-6`}>
-          <Text style={[tw`text-slate-400 dark:text-slate-400 tracking-widest text-[10px] uppercase`, { fontFamily: 'PlusJakartaSans_800ExtraBold' }]}>
+          <Text style={[tw`text-[10px] text-slate-400 dark:text-slate-400 uppercase tracking-widest`, { fontFamily: 'PlusJakartaSans_800ExtraBold' }]}>
             Live Environment
           </Text>
           

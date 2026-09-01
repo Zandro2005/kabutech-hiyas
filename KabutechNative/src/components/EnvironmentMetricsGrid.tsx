@@ -6,6 +6,7 @@ import { useTheme } from '../context/ThemeContext';
 import { hapticSelection } from '../utils/haptics';
 
 import { useResponsive } from '../utils/responsive';
+import { useAuth } from '../context/AuthContext';
 
 interface Props {
   temp: number;
@@ -18,6 +19,8 @@ interface Props {
 export default React.memo(function EnvironmentMetricsGrid({ temp, hum, light, co2, navigation }: Props) {
   const { isDarkMode } = useTheme();
   const { isSmallDevice } = useResponsive();
+  const { profile } = useAuth();
+  const isStaff = profile?.role === 'staff';
 
   // Metric status & percentage calculations
   const tempStatus = React.useMemo(() => {
@@ -50,7 +53,14 @@ export default React.memo(function EnvironmentMetricsGrid({ temp, hum, light, co
 
   const handleCardPress = (tabKey: 'temp' | 'hum' | 'light' | 'co2') => {
     hapticSelection();
-    navigation.navigate('Controls', { tab: tabKey });
+    if (isStaff) {
+      navigation.navigate('Analytics', { metric: tabKey, tab: tabKey });
+    } else {
+      navigation.navigate('Main', {
+        screen: 'Controls',
+        params: { tab: tabKey }
+      });
+    }
   };
 
   const metrics = [
@@ -168,7 +178,7 @@ export default React.memo(function EnvironmentMetricsGrid({ temp, hum, light, co
                 {item.name}
               </Text>
               <View style={tw`flex-row items-baseline mt-0.5`}>
-                <Text style={[tw`text-slate-900 dark:text-white tracking-tight`, { fontSize: isSmallDevice ? 22 : 25, fontFamily: 'PlusJakartaSans_800ExtraBold' }]}>
+                <Text style={[tw`text-slate-900 dark:text-white`, { fontSize: isSmallDevice ? 22 : 25, fontFamily: 'PlusJakartaSans_800ExtraBold', letterSpacing: -0.5 }]}>
                   {item.value}
                 </Text>
                 <Text style={[tw`text-[11px] sm:text-xs text-slate-400 dark:text-slate-500 ml-1`, { fontFamily: 'PlusJakartaSans_700Bold' }]}>
