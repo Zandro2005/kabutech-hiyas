@@ -42,13 +42,15 @@ export default function StaffHomeScreen() {
 
   return (
     <View style={tw`flex-1 bg-[#f0f9f4] dark:bg-[#020617]`}>
-      <StatusBar barStyle="dark-content" />
+      <StatusBar barStyle={isDarkMode ? 'light-content' : 'dark-content'} />
       <ScreenHeader />
 
       {!isReady ? (
         <HomeScreenSkeleton />
       ) : (
-      <ScrollView contentContainerStyle={tw`pb-36`} showsVerticalScrollIndicator={false}>
+      <ScrollView style={tw`flex-1 bg-[#f0f9f4] dark:bg-[#020617]`} contentContainerStyle={tw`pb-36`} showsVerticalScrollIndicator={false}>
+        {/* Overscroll Filler */}
+        <View style={[tw`absolute left-0 right-0 bg-[#f0f9f4] dark:bg-[#020617]`, { top: -500, height: 500 }]} />
         
         {/* Top Arch and Score (Staff view - Read Only) */}
         <ScoreArch 

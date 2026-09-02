@@ -57,15 +57,15 @@ export default React.memo(function CriticalSystemAlerts({ alerts, onAlertPress }
   };
 
   return (
-    <View style={tw`px-5 sm:px-6 mt-6`}>
+    <View style={tw`px-5 sm:px-6 pt-6`}>
       <View
-        style={tw`bg-white dark:bg-slate-900 rounded-[24px] p-3.5 sm:p-4 shadow-sm border border-slate-200/70 dark:border-slate-800`}
+        style={tw`bg-white dark:bg-slate-900 rounded-[24px] p-4 shadow-sm border border-slate-200/70 dark:border-slate-800`}
       >
         {/* Section Header */}
-        <View style={tw`flex-row justify-between items-center mb-3.5`}>
-          <View style={tw`flex-row items-center gap-2 sm:gap-2.5 flex-1 mr-2`}>
+        <View style={tw`flex-row justify-between items-center ${isAllClear ? '' : 'mb-3'}`}>
+          <View style={tw`flex-row items-center gap-2.5 flex-1 mr-2`}>
             <View
-              style={tw`w-7 h-7 sm:w-8 sm:h-8 rounded-xl ${
+              style={tw`w-8 h-8 rounded-xl ${
                 isAllClear ? 'bg-emerald-50 dark:bg-emerald-500/15' : 'bg-rose-50 dark:bg-rose-500/15'
               } items-center justify-center shrink-0`}
             >
@@ -76,11 +76,11 @@ export default React.memo(function CriticalSystemAlerts({ alerts, onAlertPress }
               />
             </View>
             <View style={tw`flex-1`}>
-              <Text numberOfLines={1} style={[tw`text-[12.5px] sm:text-[13px] text-slate-800 dark:text-white`, { fontFamily: 'PlusJakartaSans_800ExtraBold' }]}>
-                Critical System Alerts
+              <Text numberOfLines={1} style={[tw`text-[13px] text-slate-800 dark:text-white`, { fontFamily: 'PlusJakartaSans_800ExtraBold' }]}>
+                System Guard & Alerts
               </Text>
-              <Text numberOfLines={1} style={[tw`text-[9.5px] sm:text-[10px] text-slate-400 dark:text-slate-500`, { fontFamily: 'PlusJakartaSans_600SemiBold' }]}>
-                Hardware & Sensor Guard
+              <Text numberOfLines={1} style={[tw`text-[10px] text-slate-400 dark:text-slate-500`, { fontFamily: 'PlusJakartaSans_500Medium' }]}>
+                {isAllClear ? 'All sensors nominal • No active hazards' : 'Active alerts require attention'}
               </Text>
             </View>
           </View>
@@ -88,8 +88,10 @@ export default React.memo(function CriticalSystemAlerts({ alerts, onAlertPress }
           {/* Status Pill */}
           <View
             style={[
-              tw`flex-row items-center px-2 py-0.5 sm:px-2.5 sm:py-1 rounded-full shrink-0`,
-              { backgroundColor: isAllClear ? 'rgba(16, 185, 129, 0.12)' : 'rgba(239, 68, 68, 0.12)' }
+              tw`flex-row items-center px-2.5 py-1 rounded-full shrink-0 border`,
+              isAllClear
+                ? tw`bg-emerald-50 dark:bg-emerald-950/40 border-emerald-200/60 dark:border-emerald-800/60`
+                : tw`bg-rose-50 dark:bg-rose-950/40 border-rose-200/60 dark:border-rose-800/60`
             ]}
           >
             <View
@@ -100,34 +102,20 @@ export default React.memo(function CriticalSystemAlerts({ alerts, onAlertPress }
             />
             <Text
               style={[
-                tw`text-[9px] sm:text-[10px] uppercase tracking-wider ${
-                  isAllClear ? 'text-emerald-600 dark:text-emerald-400' : 'text-rose-600 dark:text-rose-400'
+                tw`text-[9.5px] uppercase tracking-wider ${
+                  isAllClear ? 'text-emerald-700 dark:text-emerald-400' : 'text-rose-700 dark:text-rose-400'
                 }`,
                 { fontFamily: 'PlusJakartaSans_800ExtraBold' }
               ]}
             >
-              {isAllClear ? 'All Clear' : `${unresolvedAlerts.length} Active`}
+              {isAllClear ? 'Nominal' : `${unresolvedAlerts.length} Active`}
             </Text>
           </View>
         </View>
 
-        {/* Content */}
-        {isAllClear ? (
-          <View style={tw`bg-slate-50 dark:bg-slate-800/40 rounded-2xl p-3.5 flex-row items-center gap-3 border border-slate-100 dark:border-slate-800`}>
-            <View style={tw`w-7 h-7 rounded-lg bg-emerald-500/10 dark:bg-emerald-500/20 items-center justify-center shrink-0`}>
-              <MaterialCommunityIcons name="check" size={15} color="#10b981" />
-            </View>
-            <View style={tw`flex-1`}>
-              <Text style={[tw`text-xs text-slate-700 dark:text-slate-300`, { fontFamily: 'PlusJakartaSans_700Bold' }]}>
-                No active emergencies
-              </Text>
-              <Text style={[tw`text-[10px] text-slate-400 dark:text-slate-500 mt-0.5 leading-tight`, { fontFamily: 'PlusJakartaSans_500Medium' }]}>
-                All environmental systems and controllers are functioning within optimal safety thresholds.
-              </Text>
-            </View>
-          </View>
-        ) : (
-          <View style={tw`gap-2.5`}>
+        {/* Content for active alerts */}
+        {!isAllClear && (
+          <View style={tw`gap-2.5 mt-3`}>
             {unresolvedAlerts.slice(0, 3).map((alert, idx) => {
               const badge = getAlertBadge(alert.type);
               return (

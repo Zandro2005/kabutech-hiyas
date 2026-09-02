@@ -11,22 +11,16 @@ import { useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { GlobalNavigationParamList } from '../types/navigation';
 import { showToast } from '../components/CustomToast';
+import { showWelcomeHud } from '../components/InteractiveWelcomeHud';
 import { SoundManager } from '../utils/SoundManager';
-import * as Speech from 'expo-speech';
 import { db } from '../services/firebase';
 import { ref, get } from 'firebase/database';
-import { VolumeManager } from 'react-native-volume-manager';
 import RealisticMushroomIcon from '../components/RealisticMushroomIcon';
 import { useResponsive } from '../utils/responsive';
 
 export default function LoginScreen() {
   const { height, isShortScreen, isSmallDevice } = useResponsive();
   const headerHeight = Math.min(300, Math.max(180, isShortScreen ? height * 0.28 : height * 0.35));
-
-  // Warm up TTS engine on mount to eliminate initial delay
-  React.useEffect(() => {
-    Speech.speak('', { rate: 0, volume: 0 });
-  }, []);
 
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -61,29 +55,19 @@ export default function LoginScreen() {
       // Fetch user data for personalized greeting
       const userRef = ref(db, `kabutech/users/${userCredential.user.uid}`);
       const snapshot = await get(userRef);
+      let firstName = 'User';
+      let role = 'Admin';
       if (snapshot.exists()) {
         const data = snapshot.val();
         const fullName = data.name || 'User';
-        const firstName = fullName.split(' ')[0];
-
-        setTimeout(async () => {
-          try {
-            await VolumeManager.setVolume(1, { showUI: false });
-          } catch (e) {}
-          
-          const hour = new Date().getHours();
-          let greeting = 'Good evening';
-          if (hour < 12) greeting = 'Good morning';
-          else if (hour < 18) greeting = 'Good afternoon';
-          
-          // Jarvis-like advanced British AI voice (Lady tone)
-          Speech.speak(`${greeting} ${firstName}. All Kabutech systems are online and fully operational. Welcome back.`, {
-            language: 'en-GB', 
-            rate: 0.9,
-            pitch: 1.1,
-          });
-        }, 600); // 600ms wait ensures the dashboard has transitioned and rendered before speaking
+        firstName = fullName.split(' ')[0] || 'User';
+        role = data.role || 'Admin';
       }
+
+      // Modern Interactive Welcome HUD (appears smoothly over the dashboard)
+      setTimeout(() => {
+        showWelcomeHud({ name: firstName, role });
+      }, 450);
     } catch (error: any) {
       setLoading(false);
       setErrorMsg('Invalid email or password.');

@@ -88,16 +88,16 @@ export default function HomeScreen() {
   const envScore = calculateEnvironmentScore(temp, hum, light, co2);
 
   return (
-    <View style={tw`flex-1 bg-[#dcfce7] dark:bg-[#020617]`}>
-      <StatusBar barStyle="light-content" />
+    <View style={tw`flex-1 bg-[#f0f9f4] dark:bg-[#020617]`}>
+      <StatusBar barStyle={isDarkMode ? 'light-content' : 'dark-content'} />
       <ScreenHeader />
 
       {!isReady ? (
         <HomeScreenSkeleton />
       ) : (
-      <ScrollView style={tw`bg-[#f0f9f4] dark:bg-[#020617]`} contentContainerStyle={tw`pb-36`} showsVerticalScrollIndicator={false}>
+      <ScrollView style={tw`flex-1 bg-[#f0f9f4] dark:bg-[#020617]`} contentContainerStyle={tw`pb-36`} showsVerticalScrollIndicator={false}>
         {/* Overscroll Filler to prevent white gap when bouncing */}
-        <View style={[tw`absolute left-0 right-0 bg-[#dcfce7] dark:bg-[#020617]`, { top: -500, height: 500 }]} />
+        <View style={[tw`absolute left-0 right-0 bg-[#f0f9f4] dark:bg-[#020617]`, { top: -500, height: 500 }]} />
 
 
         {/* Arch Gradient Score Section */}

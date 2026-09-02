@@ -56,12 +56,13 @@ RNAlert.alert = (title, message, buttons, options) => {
 
 import ErrorBoundary from './src/components/ErrorBoundary';
 import GlobalAlarmModal from './src/components/GlobalAlarmModal';
+import InteractiveWelcomeHud from './src/components/InteractiveWelcomeHud';
 
 export default function App() {
   const [fontsLoaded, setFontsLoaded] = useState(false);
   
   // Initialize Tailwind device context to listen for color scheme changes, but ignore system scheme
-  useDeviceContext(tw, { observeDeviceColorSchemeChanges: false });
+  useDeviceContext(tw, { observeDeviceColorSchemeChanges: false, initialColorScheme: 'light' });
 
   useEffect(() => {
     async function loadResources() {
@@ -120,6 +121,7 @@ export default function App() {
               <GlobalAlarmModal />
             </ErrorBoundary>
             <CustomToast />
+            <InteractiveWelcomeHud />
           </SafeAreaProvider>
         </FirebaseDataProvider>
       </AuthProvider>

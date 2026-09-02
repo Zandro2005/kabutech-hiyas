@@ -36,13 +36,9 @@ export default React.memo(function ScreenHeader({ title, subtitle, rightComponen
     hapticMedium();
     setIsToggling(true);
     
-    // Defer the heavy theme switch to allow the spinner to render
+    // Defer the theme switch to allow the spinner to render
     setTimeout(() => {
-      const newTheme = isDarkMode ? 'light' : 'dark';
       toggleTheme();
-      if (user) {
-        update(ref(db, `kabutech/users/${user.uid}`), { theme: newTheme }).catch((err) => console.error("Theme update error:", err));
-      }
       setIsToggling(false);
     }, 50);
   };

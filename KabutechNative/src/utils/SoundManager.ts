@@ -5,12 +5,14 @@ const successSource: AudioSource = require('../../assets/sounds/success_fast.wav
 const errorSource: AudioSource = require('../../assets/sounds/engk.wav');
 const ringSource: AudioSource = require('../../assets/sounds/ting.wav');
 const alarmSource: AudioSource = require('../../assets/sounds/error.mp3');
+const welcomeSource: AudioSource = require('../../assets/sounds/welcome.mp3');
 
 class SoundManagerClass {
   private successPlayer: ReturnType<typeof createAudioPlayer> | null = null;
   private errorPlayer: ReturnType<typeof createAudioPlayer> | null = null;
   private ringPlayer: ReturnType<typeof createAudioPlayer> | null = null;
   private alarmPlayer: ReturnType<typeof createAudioPlayer> | null = null;
+  private welcomePlayer: ReturnType<typeof createAudioPlayer> | null = null;
 
   async init() {
     try {
@@ -23,9 +25,24 @@ class SoundManagerClass {
       this.errorPlayer = createAudioPlayer(errorSource);
       this.ringPlayer = createAudioPlayer(ringSource);
       this.alarmPlayer = createAudioPlayer(alarmSource);
+      this.welcomePlayer = createAudioPlayer(welcomeSource);
       this.alarmPlayer.loop = true; // Nonstop loop
     } catch (e) {
       console.log('Audio init error:', e);
+    }
+  }
+
+  playWelcome() {
+    try {
+      if (!this.welcomePlayer) {
+        this.welcomePlayer = createAudioPlayer(welcomeSource);
+      }
+      if (this.welcomePlayer) {
+        this.welcomePlayer.seekTo(0);
+        this.welcomePlayer.play();
+      }
+    } catch (e) {
+      console.log('Audio play error:', e);
     }
   }
 

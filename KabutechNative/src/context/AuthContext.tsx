@@ -41,7 +41,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             const cachedProfile = JSON.parse(cachedStr);
             setUser(firebaseUser);
             setProfile(cachedProfile);
-            setTheme(cachedProfile.theme === 'dark' ? 'dark' : 'light');
+            if (cachedProfile.theme === 'dark' || cachedProfile.theme === 'light') {
+              setTheme(cachedProfile.theme);
+            }
             setIsLoading(false); // Instant login from cache
           }
         } catch (e) {
@@ -57,11 +59,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           
           if (userProfile) {
             setProfile(userProfile);
-            setTheme(userProfile.theme === 'dark' ? 'dark' : 'light');
+            if (userProfile.theme === 'dark' || userProfile.theme === 'light') {
+              setTheme(userProfile.theme);
+            }
             AsyncStorage.setItem(`cached_profile_${firebaseUser.uid}`, JSON.stringify(userProfile)).catch(() => {});
           } else {
             setProfile(null);
-            setTheme('light');
             AsyncStorage.removeItem(`cached_profile_${firebaseUser.uid}`).catch(() => {});
           }
           setIsLoading(false);
@@ -78,7 +81,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         }
         setUser(null);
         setProfile(null);
-        setTheme('light');
+        // Do NOT reset theme to light on logout - preserve exactly what the user had
         setIsLoading(false);
       }
     });

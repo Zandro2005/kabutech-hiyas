@@ -67,6 +67,7 @@ export default React.memo(function EnvironmentMetricsGrid({ temp, hum, light, co
     {
       id: 'temp' as const,
       name: 'Temperature',
+      target: '22-28°C',
       value: temp,
       unit: '°C',
       icon: 'thermometer' as const,
@@ -79,6 +80,7 @@ export default React.memo(function EnvironmentMetricsGrid({ temp, hum, light, co
     {
       id: 'hum' as const,
       name: 'Humidity',
+      target: '75-92%',
       value: hum,
       unit: '%',
       icon: 'water-percent' as const,
@@ -91,6 +93,7 @@ export default React.memo(function EnvironmentMetricsGrid({ temp, hum, light, co
     {
       id: 'light' as const,
       name: 'Light Level',
+      target: '400-850 lx',
       value: light,
       unit: 'lx',
       icon: 'white-balance-sunny' as const,
@@ -103,6 +106,7 @@ export default React.memo(function EnvironmentMetricsGrid({ temp, hum, light, co
     {
       id: 'co2' as const,
       name: 'CO2 Level',
+      target: '< 750 ppm',
       value: co2,
       unit: 'ppm',
       icon: 'molecule-co2' as const,
@@ -115,21 +119,27 @@ export default React.memo(function EnvironmentMetricsGrid({ temp, hum, light, co
   ];
 
   return (
-    <View style={tw`px-5 sm:px-6 pt-7`}>
+    <View style={tw`px-5 sm:px-6 pt-6`}>
       {/* Header */}
-      <View style={tw`flex-row justify-between items-center mb-4`}>
+      <View style={tw`flex-row justify-between items-center mb-3.5`}>
         <View style={tw`flex-row items-center gap-2`}>
-          <View style={tw`w-2 h-4.5 rounded-full bg-[#10b981]`} />
-          <Text style={[tw`text-base sm:text-lg tracking-wide`, { fontFamily: 'PlusJakartaSans_800ExtraBold', color: isDarkMode ? '#ffffff' : '#0f172a' }]}>
+          <Text style={[tw`text-base sm:text-lg tracking-tight`, { fontFamily: 'PlusJakartaSans_800ExtraBold', color: isDarkMode ? '#f8fafc' : '#0f172a' }]}>
             Environment Metrics
           </Text>
+          <View style={tw`bg-emerald-100/70 dark:bg-emerald-950/60 px-2 py-0.5 rounded-full border border-emerald-200/60 dark:border-emerald-800/60`}>
+            <Text style={[tw`text-[10px] text-emerald-700 dark:text-emerald-400`, { fontFamily: 'PlusJakartaSans_700Bold' }]}>4 Active</Text>
+          </View>
         </View>
+
         <TouchableOpacity 
           hitSlop={{ top: 15, bottom: 15, left: 15, right: 15 }}  
-          onPress={() => navigation.navigate('Analytics' as never)}
-          style={tw`flex-row items-center`}
+          onPress={() => {
+            hapticSelection();
+            navigation.navigate('Analytics' as never);
+          }}
+          style={tw`flex-row items-center py-1 px-2 rounded-lg`}
         >
-          <Text style={[tw`text-xs text-[#10b981] mr-1`, { fontFamily: 'PlusJakartaSans_700Bold' }]}>View All</Text>
+          <Text style={[tw`text-xs text-[#10b981] mr-1`, { fontFamily: 'PlusJakartaSans_700Bold' }]}>Analytics</Text>
           <Ionicons name="chevron-forward" size={13} color="#10b981" />
         </TouchableOpacity>
       </View>
@@ -139,31 +149,31 @@ export default React.memo(function EnvironmentMetricsGrid({ temp, hum, light, co
         {metrics.map((item) => (
           <TouchableOpacity
             key={item.id}
-            activeOpacity={0.7}
+            activeOpacity={0.75}
             onPress={() => handleCardPress(item.id)}
             style={[
-              tw`bg-white dark:bg-slate-900 rounded-[22px] sm:rounded-[24px] p-3.5 sm:p-4 border border-slate-100 dark:border-slate-800/80 shadow-sm justify-between`,
-              { width: '48.5%', minHeight: isSmallDevice ? 130 : 140 }
+              tw`bg-white dark:bg-slate-900 rounded-[24px] p-4 border border-slate-200/70 dark:border-slate-800 shadow-sm justify-between`,
+              { width: '48.5%', minHeight: isSmallDevice ? 132 : 142 }
             ]}
           >
             {/* Top Bar: Icon chip + Status badge */}
-            <View style={tw`flex-row justify-between items-center mb-2.5 sm:mb-3`}>
-              <View style={tw`w-7 h-7 sm:w-8 sm:h-8 rounded-xl ${item.iconBg} items-center justify-center`}>
-                <MaterialCommunityIcons name={item.icon} size={isSmallDevice ? 16 : 18} color={item.iconColor} />
+            <View style={tw`flex-row justify-between items-center mb-2.5`}>
+              <View style={tw`w-8 h-8 rounded-xl ${item.iconBg} items-center justify-center`}>
+                <MaterialCommunityIcons name={item.icon} size={18} color={item.iconColor} />
               </View>
               <View 
                 style={[
-                  tw`flex-row items-center px-2 py-0.5 sm:px-2.5 sm:py-1 rounded-full border border-slate-100 dark:border-slate-700/60`,
+                  tw`flex-row items-center px-2 py-0.5 rounded-full border border-slate-200/50 dark:border-slate-700/60`,
                   { backgroundColor: isDarkMode ? '#1e293b' : item.status.lightBg }
                 ]}
               >
                 <View style={[tw`w-1.5 h-1.5 rounded-full mr-1.5`, { backgroundColor: item.status.color }]} />
                 <Text 
                   style={[
-                    tw`text-[9px] sm:text-[10px]`,
+                    tw`text-[9.5px]`,
                     { 
                       fontFamily: 'PlusJakartaSans_700Bold',
-                      color: isDarkMode ? '#ffffff' : (item.status.color === '#eab308' ? '#b45309' : item.status.color)
+                      color: isDarkMode ? '#e2e8f0' : (item.status.color === '#eab308' ? '#b45309' : item.status.color)
                     }
                   ]}
                 >
@@ -174,21 +184,24 @@ export default React.memo(function EnvironmentMetricsGrid({ temp, hum, light, co
 
             {/* Middle: Label & Big Hero Value */}
             <View>
-              <Text numberOfLines={1} style={[tw`text-[10px] sm:text-[11px] text-slate-400 dark:text-slate-500 uppercase tracking-wider`, { fontFamily: 'PlusJakartaSans_700Bold' }]}>
+              <Text numberOfLines={1} style={[tw`text-[10.5px] text-slate-400 dark:text-slate-500 uppercase tracking-wider`, { fontFamily: 'PlusJakartaSans_700Bold' }]}>
                 {item.name}
               </Text>
               <View style={tw`flex-row items-baseline mt-0.5`}>
-                <Text style={[tw`text-slate-900 dark:text-white`, { fontSize: isSmallDevice ? 22 : 25, fontFamily: 'PlusJakartaSans_800ExtraBold', letterSpacing: -0.5 }]}>
+                <Text style={[tw`text-slate-900 dark:text-white`, { fontSize: isSmallDevice ? 23 : 26, fontFamily: 'PlusJakartaSans_800ExtraBold', letterSpacing: -0.6 }]}>
                   {item.value}
                 </Text>
-                <Text style={[tw`text-[11px] sm:text-xs text-slate-400 dark:text-slate-500 ml-1`, { fontFamily: 'PlusJakartaSans_700Bold' }]}>
+                <Text style={[tw`text-xs text-slate-400 dark:text-slate-500 ml-1`, { fontFamily: 'PlusJakartaSans_700Bold' }]}>
                   {item.unit}
                 </Text>
               </View>
+              <Text style={[tw`text-[10px] text-slate-400 dark:text-slate-500 mt-0.5`, { fontFamily: 'PlusJakartaSans_500Medium' }]}>
+                Target: {item.target}
+              </Text>
             </View>
 
             {/* Bottom: Modern Slim Track Bar */}
-            <View style={tw`w-full h-1 bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden mt-2.5 sm:mt-3`}>
+            <View style={tw`w-full h-1.5 bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden mt-3`}>
               <View style={[tw`h-full rounded-full`, { width: `${item.percent}%`, backgroundColor: item.accentColor }]} />
             </View>
           </TouchableOpacity>

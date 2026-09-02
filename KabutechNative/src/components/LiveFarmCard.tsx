@@ -19,21 +19,23 @@ const LiveFarmCard = React.memo(function LiveFarmCard({ navigation }: Props) {
   };
 
   return (
-    <View style={tw`px-5 sm:px-6 mt-6 mb-8`}>
+    <View style={tw`px-5 sm:px-6 pt-6 pb-8`}>
       {/* Section Header */}
       <View style={tw`flex-row justify-between items-center mb-3.5`}>
         <View style={tw`flex-row items-center gap-2`}>
-          <View style={tw`w-2 h-4.5 rounded-full bg-[#10b981]`} />
-          <Text style={[tw`text-base sm:text-lg tracking-wide`, { fontFamily: 'PlusJakartaSans_800ExtraBold', color: isDarkMode ? '#ffffff' : '#0f172a' }]}>
-            Live Farm Feed
+          <Text style={[tw`text-base sm:text-lg tracking-tight`, { fontFamily: 'PlusJakartaSans_800ExtraBold', color: isDarkMode ? '#f8fafc' : '#0f172a' }]}>
+            Live Chamber Feed
           </Text>
+          <View style={tw`bg-emerald-100/70 dark:bg-emerald-950/60 px-2 py-0.5 rounded-full border border-emerald-200/60 dark:border-emerald-800/60`}>
+            <Text style={[tw`text-[10px] text-emerald-700 dark:text-emerald-400`, { fontFamily: 'PlusJakartaSans_700Bold' }]}>1080p</Text>
+          </View>
         </View>
         <TouchableOpacity
           hitSlop={{ top: 15, bottom: 15, left: 15, right: 15 }}
           onPress={handlePress}
-          style={tw`flex-row items-center`}
+          style={tw`flex-row items-center py-1 px-2 rounded-lg`}
         >
-          <Text style={[tw`text-xs text-[#10b981] mr-1`, { fontFamily: 'PlusJakartaSans_700Bold' }]}>Expand</Text>
+          <Text style={[tw`text-xs text-[#10b981] mr-1`, { fontFamily: 'PlusJakartaSans_700Bold' }]}>Fullscreen</Text>
           <Ionicons name="expand" size={12} color="#10b981" />
         </TouchableOpacity>
       </View>
@@ -42,7 +44,7 @@ const LiveFarmCard = React.memo(function LiveFarmCard({ navigation }: Props) {
       <TouchableOpacity
         activeOpacity={0.88}
         onPress={handlePress}
-        style={[tw`w-full bg-slate-900 rounded-[24px] sm:rounded-[26px] overflow-hidden shadow-md relative border border-slate-200/60 dark:border-slate-800`, { minHeight: 200, height: 215 }]}
+        style={[tw`w-full bg-slate-900 rounded-[26px] overflow-hidden shadow-sm relative border border-slate-200/70 dark:border-slate-800`, { minHeight: 205, height: 215 }]}
       >
         {/* Camera Image Feed */}
         <Image
