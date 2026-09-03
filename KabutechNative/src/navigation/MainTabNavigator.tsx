@@ -68,7 +68,7 @@ export default function MainTabNavigator() {
       screenListeners={{ tabPress: () => hapticLight() }}
       screenOptions={{
         headerShown: false,
-        tabBarButton: (props) => <TouchableOpacity {...props} activeOpacity={1} />,
+        tabBarButton: (props) => <TouchableOpacity {...(props as any)} activeOpacity={1} />,
         tabBarActiveTintColor: isDarkMode ? '#6ee7b7' : (tw.color('brand-deep') || '#032514'),
         tabBarInactiveTintColor: isDarkMode ? '#64748b' : '#94a3b8',
         tabBarShowLabel: true,
@@ -118,7 +118,7 @@ export default function MainTabNavigator() {
           tabBarIcon: () => <View style={{ width: 24, height: 24 }} />,
           tabBarButton: (props) => (
             <TouchableOpacity 
-              {...props}
+              {...(props as any)}
               activeOpacity={0.8}
               style={[props.style, tw`items-center justify-center`]}
             >

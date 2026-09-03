@@ -216,7 +216,7 @@ export default React.memo(function DailyHarvestList({
                 padding: 4
               }
             }
-          }}
+          } as any}
         />
       </View>
 

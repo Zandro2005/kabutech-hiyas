@@ -23,7 +23,7 @@ import { useDeviceContext } from 'twrnc';
 import tw from './src/tailwind';
 import CustomToast from './src/components/CustomToast';
 import { SoundManager } from './src/utils/SoundManager';
-import * as NavigationBar from 'expo-navigation-bar';
+import { NavigationBar } from 'expo-navigation-bar';
 import { Platform, Alert as RNAlert, LogBox, Text, TextInput } from 'react-native';
 
 // Force consistent font family and font scaling across all Android and iOS devices/custom OS fonts
@@ -96,10 +96,7 @@ export default function App() {
     async function configureNavBar() {
       if (Platform.OS === 'android') {
         try {
-          await NavigationBar.setVisibilityAsync('hidden');
-          await NavigationBar.setBehaviorAsync('inset-swipe');
-          await NavigationBar.setPositionAsync('absolute');
-          await NavigationBar.setBackgroundColorAsync('#00000000');
+          NavigationBar.setHidden(true);
         } catch (e) {}
       }
     }
@@ -116,6 +113,7 @@ export default function App() {
         <FirebaseDataProvider>
           <SafeAreaProvider>
             <StatusBar style="auto" />
+            <NavigationBar hidden={true} />
             <ErrorBoundary>
               <AppNavigator />
               <GlobalAlarmModal />
