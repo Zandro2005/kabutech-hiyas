@@ -5,7 +5,7 @@ import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { signInWithEmailAndPassword, sendPasswordResetEmail, setPersistence, inMemoryPersistence, getReactNativePersistence } from 'firebase/auth';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { auth } from '../services/firebase';
-import Svg, { Path, Defs, LinearGradient, Stop } from 'react-native-svg';
+import Svg, { Path } from 'react-native-svg';
 import tw from '../tailwind';
 import { useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
@@ -15,7 +15,6 @@ import { showWelcomeHud } from '../components/InteractiveWelcomeHud';
 import { SoundManager } from '../utils/SoundManager';
 import { db } from '../services/firebase';
 import { ref, get } from 'firebase/database';
-import RealisticMushroomIcon from '../components/RealisticMushroomIcon';
 import { useResponsive } from '../utils/responsive';
 
 export default function LoginScreen() {
@@ -115,25 +114,12 @@ export default function LoginScreen() {
               resizeMode="cover"
             />
 
-            {/* SVG White Wave overlayed at the bottom of the image with colored wave border */}
+            {/* SVG White Wave overlayed at the bottom of the image */}
             <View style={[tw`absolute bottom-0 w-full`, { height: Math.min(120, headerHeight * 0.4) }]}>
               <Svg height="100%" width="100%" viewBox="0 0 1440 320" preserveAspectRatio="none">
-                <Defs>
-                  <LinearGradient id="loginWaveStroke" x1="0%" y1="0%" x2="100%" y2="0%">
-                    <Stop offset="0%" stopColor="#2d6a4f" />
-                    <Stop offset="50%" stopColor="#52b788" />
-                    <Stop offset="100%" stopColor="#3d8c63" />
-                  </LinearGradient>
-                </Defs>
                 <Path
                   fill="#ffffff"
                   d="M0,160 C480,420 960,-100 1440,160 L1440,320 L0,320 Z"
-                />
-                <Path
-                  d="M0,160 C480,420 960,-100 1440,160"
-                  stroke="url(#loginWaveStroke)"
-                  strokeWidth="16"
-                  fill="none"
                 />
               </Svg>
             </View>
@@ -143,14 +129,9 @@ export default function LoginScreen() {
           <View style={tw`flex-1 px-6 sm:px-8 pt-4 sm:pt-6 pb-6 relative`}>
 
             <View style={tw`mb-5 sm:mb-7`}>
-              <View style={tw`flex-row items-center justify-center`}>
-                <Text style={[tw`text-2xl sm:text-3xl text-slate-800 text-center`, { fontFamily: 'PlusJakartaSans_800ExtraBold' }]}>
-                  Welcome back
-                </Text>
-                <View style={tw`ml-2 sm:ml-2.5 shadow-sm`}>
-                  <RealisticMushroomIcon size={isSmallDevice ? 28 : 34} rotate="12deg" />
-                </View>
-              </View>
+              <Text style={[tw`text-2xl sm:text-3xl text-slate-800 text-center`, { fontFamily: 'PlusJakartaSans_800ExtraBold' }]}>
+                Welcome back
+              </Text>
               <Text style={[tw`text-xs sm:text-sm text-slate-400 text-center mt-1.5`, { fontFamily: 'PlusJakartaSans_700Bold' }]}>
                 Login to your account
               </Text>
