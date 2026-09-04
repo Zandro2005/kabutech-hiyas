@@ -1,5 +1,5 @@
 import React, { useState, useRef } from 'react';
-import { View, Text, TextInput, TouchableOpacity, KeyboardAvoidingView, Platform, ScrollView, StatusBar, Image } from 'react-native';
+import { View, Text, TextInput, TouchableOpacity, KeyboardAvoidingView, Platform, ScrollView, StatusBar, Image, Keyboard } from 'react-native';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { SoundManager } from '../utils/SoundManager';
 import Svg, { Path } from 'react-native-svg';
@@ -12,6 +12,8 @@ import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { GlobalNavigationParamList } from '../types/navigation';
 import { useResponsive } from '../utils/responsive';
 
+import { showToast } from '../components/CustomToast';
+
 export default function RegisterScreen() {
   const { height, isShortScreen, isSmallDevice } = useResponsive();
   const headerHeight = Math.min(200, Math.max(140, isShortScreen ? height * 0.2 : height * 0.25));
@@ -23,10 +25,15 @@ export default function RegisterScreen() {
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [loading, setLoading] = useState(false);
-  const [errorMsg, _setErrorMsg] = useState('');
-  const setErrorMsg = (msg: string) => {
-    if (msg) SoundManager.playError();
-    _setErrorMsg(msg);
+
+  const showNotification = (title: string, message?: string, type: 'error' | 'success' | 'info' = 'error') => {
+    showToast({
+      type,
+      text1: title,
+      text2: message,
+      duration: 3500,
+      forceTheme: 'light',
+    });
   };
 
   const emailRef = useRef<TextInput>(null);
@@ -36,30 +43,41 @@ export default function RegisterScreen() {
   const navigation = useNavigation<NativeStackNavigationProp<GlobalNavigationParamList>>();
 
   const handleRegister = async () => {
-    if (!fullName || !email || !password || !confirmPassword) {
-      setErrorMsg('Please fill in all fields.');
+    if (!fullName.trim() || !email.trim() || !password || !confirmPassword) {
+      showNotification('Missing Information', 'Please fill in all fields.');
       return;
     }
     if (password !== confirmPassword) {
-      setErrorMsg('Passwords do not match.');
+      showNotification('Password Mismatch', 'Passwords do not match.');
       return;
     }
     if (password.length < 8) {
-      setErrorMsg('Password must be at least 8 characters long.');
+      showNotification('Weak Password', 'Password must be at least 8 characters long.');
       return;
     }
     if (!/[A-Z]/.test(password)) {
-      setErrorMsg('Password must contain at least one uppercase letter.');
+      showNotification('Password Requirement', 'Password must contain at least one uppercase letter.');
       return;
     }
     if (!/[0-9]/.test(password) || !/[a-zA-Z]/.test(password)) {
-      setErrorMsg('Password must be alphanumeric (contain both letters and numbers).');
+      showNotification('Password Requirement', 'Password must be alphanumeric (letters and numbers).');
       return;
     }
+    Keyboard.dismiss();
     setLoading(true);
-    setErrorMsg('');
+
+    // 10-second timeout: if request is still pending after 10s, report network error once
+    let timedOut = false;
+    const timeoutTimer = setTimeout(() => {
+      timedOut = true;
+      setLoading(false);
+      showNotification('Network Error', 'Please check your internet connection.');
+    }, 10000);
+
     try {
       const userCredential = await createUserWithEmailAndPassword(auth, email.trim(), password);
+      clearTimeout(timeoutTimer);
+      Keyboard.dismiss();
       
       // Update Auth Profile
       await updateProfile(userCredential.user, {
@@ -77,22 +95,23 @@ export default function RegisterScreen() {
       
       // Navigation handled via AuthContext
     } catch (error: any) {
+      clearTimeout(timeoutTimer);
+      if (timedOut) return;
       setLoading(false);
-      let friendlyMessage = 'Registration failed. Please try again.';
       if (error.code === 'auth/email-already-in-use') {
-        friendlyMessage = 'This email is already registered.';
+        showNotification('Email In Use', 'This email is already registered.');
       } else if (error.code === 'auth/invalid-email') {
-        friendlyMessage = 'Invalid email address format.';
+        showNotification('Invalid Email', 'Invalid email address format.');
       } else if (error.code === 'auth/weak-password') {
-        // Firebase Identity Platform returns detailed policy errors in error.message
-        friendlyMessage = error.message ? error.message.replace(/^Firebase:\s*/, '').replace(/\(auth\/weak-password\)\.?/, '').trim() : 'Password does not meet the security requirements.';
+        showNotification('Password Error', 'Password does not meet the security requirements.');
       } else if (error.code === 'auth/network-request-failed') {
-        friendlyMessage = 'Network error. Please check your connection.';
-      } else if (error.message) {
-        // Fallback to error message but remove the "Firebase: " prefix if present
-        friendlyMessage = error.message.replace(/^Firebase:\s*/, '').replace(/\(auth\/.*?\)\.?/, '').trim();
+        showNotification('Network Error', 'Please check your internet connection.');
+      } else {
+        const friendlyMessage = error.message
+          ? error.message.replace(/^Firebase:\s*/, '').replace(/\(auth\/.*?\)\.?/, '').trim()
+          : 'Registration failed. Please try again.';
+        showNotification('Registration Failed', friendlyMessage);
       }
-      setErrorMsg(friendlyMessage);
     }
   };
 
@@ -133,7 +152,7 @@ export default function RegisterScreen() {
           <View style={tw`flex-1 px-6 sm:px-8 pt-3 sm:pt-4 pb-6 relative`}>
 
             <View style={tw`mb-4 sm:mb-6`}>
-              <Text style={[tw`text-2xl sm:text-3xl text-slate-800 text-center`, { fontFamily: 'PlusJakartaSans_800ExtraBold' }]}>
+              <Text style={[tw`text-[28px] sm:text-[34px] text-slate-800 text-center tracking-tight`, { fontFamily: 'PlusJakartaSans_800ExtraBold' }]}>
                 Register
               </Text>
               <Text style={[tw`text-xs sm:text-sm text-slate-400 text-center mt-1.5`, { fontFamily: 'PlusJakartaSans_700Bold' }]}>
@@ -223,10 +242,6 @@ export default function RegisterScreen() {
             <Text style={[tw`text-center text-[10px] text-slate-400 mb-6 px-4 leading-relaxed`, { fontFamily: 'PlusJakartaSans_700Bold' }]}>
               By signing you agree to our <Text style={tw`text-slate-500`}>Term of use</Text> and <Text style={tw`text-slate-500`}>privacy notice</Text>
             </Text>
-
-            {errorMsg ? (
-              <Text style={tw`text-red-500 text-center mb-4 text-xs font-bold`}>{errorMsg}</Text>
-            ) : null}
 
             {/* Submit Button */}
             <TouchableOpacity hitSlop={{ top: 15, bottom: 15, left: 15, right: 15 }}  

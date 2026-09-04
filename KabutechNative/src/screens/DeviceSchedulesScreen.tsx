@@ -288,9 +288,9 @@ export default function DeviceSchedulesScreen() {
       {/* Modern Header */}
       <View style={[tw`px-5 pb-3 z-10 bg-white/90 dark:bg-slate-900/90 border-b border-slate-100 dark:border-slate-800`, { paddingTop: insets.top > 0 ? insets.top + 8 : 28 }]}>
         <View style={tw`flex-row items-center justify-between`}>
-          <View style={tw`flex-row items-center gap-3.5`}>
+          <View style={tw`flex-row items-center gap-3.5 flex-1 mr-2`}>
             <TouchableOpacity 
-              hitSlop={{ top: 15, bottom: 15, left: 15, right: 15 }}  
+              hitSlop={{ top: 15, bottom: 15, left: 15, right: 15 }}
               onPress={() => {
                 hapticLight();
                 navigation.goBack();
@@ -299,18 +299,18 @@ export default function DeviceSchedulesScreen() {
             >
               <MaterialCommunityIcons name="arrow-left" size={20} color={isDarkMode ? '#f8fafc' : '#0f172a'} />
             </TouchableOpacity>
-            <View>
-              <Text style={[tw`text-[20px] text-slate-900 dark:text-slate-100 tracking-tight`, { fontFamily: 'PlusJakartaSans_800ExtraBold' }]}>
+            <View style={tw`flex-1`}>
+              <Text numberOfLines={1} style={[tw`text-[19px] text-slate-900 dark:text-slate-100 tracking-tight`, { fontFamily: 'PlusJakartaSans_800ExtraBold' }]}>
                 Device Schedules
               </Text>
-              <Text style={[tw`text-[11.5px] text-slate-400 dark:text-slate-500`, { fontFamily: 'PlusJakartaSans_600SemiBold' }]}>
+              <Text numberOfLines={1} style={[tw`text-[11.5px] text-slate-400 dark:text-slate-500`, { fontFamily: 'PlusJakartaSans_600SemiBold' }]}>
                 Automated operating timers
               </Text>
             </View>
           </View>
 
           {/* Status Badge */}
-          <View style={tw`flex-row items-center gap-1.5 px-3 py-1.5 rounded-full ${isScheduledMode ? 'bg-emerald-500/10 border border-emerald-500/30' : 'bg-slate-100 dark:bg-slate-800'}`}>
+          <View style={tw`flex-row items-center gap-1.5 px-3 py-1.5 rounded-full ${isScheduledMode ? 'bg-emerald-500/10 border border-emerald-500/30' : 'bg-slate-100 dark:bg-slate-800'} flex-shrink-0`}>
             <View style={tw`w-2 h-2 rounded-full ${isScheduledMode ? 'bg-emerald-500' : 'bg-slate-400'}`} />
             <Text style={[tw`text-[11px] ${isScheduledMode ? 'text-emerald-600 dark:text-emerald-400' : 'text-slate-500'}`, { fontFamily: 'PlusJakartaSans_800ExtraBold' }]}>
               {isScheduledMode ? 'Running' : 'Standby'}
@@ -320,6 +320,31 @@ export default function DeviceSchedulesScreen() {
       </View>
 
       <ScrollView contentContainerStyle={tw`p-4 pb-32`} showsVerticalScrollIndicator={false}>
+        
+        {/* Quick Link to Setpoints Controls */}
+        <TouchableOpacity
+          activeOpacity={0.8}
+          onPress={() => {
+            hapticLight();
+            navigation.navigate('Main', { screen: 'Controls' } as any);
+          }}
+          style={tw`flex-row items-center justify-between bg-white dark:bg-slate-900 border border-slate-200/70 dark:border-slate-800 rounded-2xl px-4 py-3 mb-3.5 shadow-sm`}
+        >
+          <View style={tw`flex-row items-center gap-2.5`}>
+            <View style={tw`w-8 h-8 rounded-xl bg-emerald-500/10 items-center justify-center`}>
+              <MaterialCommunityIcons name="tune" size={18} color="#10b981" />
+            </View>
+            <View>
+              <Text style={[tw`text-[12.5px] text-slate-800 dark:text-slate-200`, { fontFamily: 'PlusJakartaSans_700Bold' }]}>
+                Climate Controls & Setpoints
+              </Text>
+              <Text style={[tw`text-[10.5px] text-slate-400 dark:text-slate-500`, { fontFamily: 'PlusJakartaSans_500Medium' }]}>
+                Switch modes & tune environmental targets
+              </Text>
+            </View>
+          </View>
+          <MaterialCommunityIcons name="chevron-right" size={20} color={isDarkMode ? '#64748b' : '#94a3b8'} />
+        </TouchableOpacity>
         
         {/* Subtle Mode Alert Banner if not in Scheduled Mode */}
         {!isScheduledMode && (

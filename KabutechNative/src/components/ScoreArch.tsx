@@ -139,6 +139,13 @@ export default React.memo(function ScoreArch({
             hapticSelection();
             if (profile?.role !== 'staff') {
               navigation.navigate('Main', { screen: 'Controls' });
+            } else {
+              showToast({
+                type: 'info',
+                text1: `System Mode: ${isAuto ? 'AUTO' : isScheduled ? 'SCHEDULED' : 'MANUAL'}`,
+                text2: 'System mode is managed by Farm Administrators.',
+                duration: 2500,
+              });
             }
           }}
           style={[

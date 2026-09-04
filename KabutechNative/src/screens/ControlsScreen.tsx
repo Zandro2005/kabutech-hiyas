@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { View, Text, ScrollView, TouchableOpacity, StatusBar, DeviceEventEmitter, Alert, Modal } from 'react-native';
+import { View, Text, ScrollView, TouchableOpacity, StatusBar, DeviceEventEmitter, Alert, Modal, PanResponder } from 'react-native';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { GlobalNavigationParamList } from '../types/navigation';
@@ -131,6 +131,37 @@ export default function ControlsScreen() {
       setTimeout(() => scrollToTab(route.params.tab), 250);
     }
   }, [route.params?.tab]);
+  const tabIds: TabId[] = ['temp', 'hum', 'light', 'co2'];
+  const switchTabRelative = (direction: 'next' | 'prev') => {
+    const currentIndex = tabIds.indexOf(activeTab);
+    if (direction === 'next' && currentIndex < tabIds.length - 1) {
+      const nextTab = tabIds[currentIndex + 1];
+      setActiveTab(nextTab);
+      scrollToTab(nextTab);
+      hapticSelection();
+    } else if (direction === 'prev' && currentIndex > 0) {
+      const prevTab = tabIds[currentIndex - 1];
+      setActiveTab(prevTab);
+      scrollToTab(prevTab);
+      hapticSelection();
+    }
+  };
+
+  const swipePanResponder = useRef(
+    PanResponder.create({
+      onMoveShouldSetPanResponder: (_, gestureState) => {
+        return Math.abs(gestureState.dx) > 30 && Math.abs(gestureState.dx) > Math.abs(gestureState.dy) * 1.5;
+      },
+      onPanResponderRelease: (_, gestureState) => {
+        if (gestureState.dx < -40) {
+          switchTabRelative('next');
+        } else if (gestureState.dx > 40) {
+          switchTabRelative('prev');
+        }
+      },
+    })
+  ).current;
+
   const activeTabData = tabs.find(t => t.id === activeTab)!;
   const activeTabDataRef = useRef(activeTabData);
 
@@ -302,6 +333,33 @@ export default function ControlsScreen() {
                 </Text>
               </View>
             </TouchableOpacity>
+
+            {/* Quick Link to Analytics Trends */}
+            <TouchableOpacity 
+              activeOpacity={0.75}
+              delayPressIn={50}
+              onPress={() => {
+                hapticSelection();
+                navigation.navigate('Analytics', { metric: activeTab });
+              }}
+              style={tw`px-3.5 py-2.5 rounded-2xl border border-dashed border-emerald-300 dark:border-emerald-700 bg-emerald-50/50 dark:bg-emerald-950/30 flex-row items-center gap-2`}
+            >
+              <View style={tw`w-8 h-8 rounded-xl items-center justify-center bg-emerald-500/10`}>
+                <MaterialCommunityIcons 
+                  name="chart-line" 
+                  size={18} 
+                  color="#10b981" 
+                />
+              </View>
+              <View>
+                <Text style={[tw`text-[10px] uppercase tracking-wider text-emerald-600 dark:text-emerald-400`, { fontFamily: 'PlusJakartaSans_700Bold' }]}>
+                  History
+                </Text>
+                <Text style={[tw`text-[12px] text-slate-700 dark:text-slate-300`, { fontFamily: 'PlusJakartaSans_800ExtraBold' }]}>
+                  Trends
+                </Text>
+              </View>
+            </TouchableOpacity>
           </ScrollView>
         </View>
 
@@ -312,8 +370,11 @@ export default function ControlsScreen() {
           isDarkMode={isDarkMode} 
         />
 
-        {/* Precision Stepper & Mode Switcher Row */}
-        <View style={tw`flex-row items-center justify-center px-5 mb-3 sm:mb-4 gap-3`}>
+        {/* Precision Stepper & Mode Switcher Row (Swipe left/right to change parameter) */}
+        <View 
+          {...swipePanResponder.panHandlers}
+          style={tw`flex-row items-center justify-center px-5 mb-3 sm:mb-4 gap-3`}
+        >
           {/* Decrement Button */}
           <TouchableOpacity 
             hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}

@@ -67,7 +67,6 @@ export default React.memo(function EnvironmentMetricsGrid({ temp, hum, light, co
     {
       id: 'temp' as const,
       name: 'Temperature',
-      target: '22-28°C',
       value: temp,
       unit: '°C',
       icon: 'thermometer' as const,
@@ -80,7 +79,6 @@ export default React.memo(function EnvironmentMetricsGrid({ temp, hum, light, co
     {
       id: 'hum' as const,
       name: 'Humidity',
-      target: '75-92%',
       value: hum,
       unit: '%',
       icon: 'water-percent' as const,
@@ -93,7 +91,6 @@ export default React.memo(function EnvironmentMetricsGrid({ temp, hum, light, co
     {
       id: 'light' as const,
       name: 'Light Level',
-      target: '400-850 lx',
       value: light,
       unit: 'lx',
       icon: 'white-balance-sunny' as const,
@@ -106,7 +103,6 @@ export default React.memo(function EnvironmentMetricsGrid({ temp, hum, light, co
     {
       id: 'co2' as const,
       name: 'CO2 Level',
-      target: '< 750 ppm',
       value: co2,
       unit: 'ppm',
       icon: 'molecule-co2' as const,
@@ -187,17 +183,14 @@ export default React.memo(function EnvironmentMetricsGrid({ temp, hum, light, co
               <Text numberOfLines={1} style={[tw`text-[10.5px] text-slate-400 dark:text-slate-500 uppercase tracking-wider`, { fontFamily: 'PlusJakartaSans_700Bold' }]}>
                 {item.name}
               </Text>
-              <View style={tw`flex-row items-baseline mt-0.5`}>
-                <Text style={[tw`text-slate-900 dark:text-white`, { fontSize: isSmallDevice ? 23 : 26, fontFamily: 'PlusJakartaSans_800ExtraBold', letterSpacing: -0.6 }]}>
+              <View style={tw`flex-row items-baseline mt-1`}>
+                <Text style={[tw`text-slate-900 dark:text-white`, { fontSize: isSmallDevice ? 27 : 31, fontFamily: 'PlusJakartaSans_800ExtraBold', letterSpacing: -0.6 }]}>
                   {item.value}
                 </Text>
-                <Text style={[tw`text-xs text-slate-400 dark:text-slate-500 ml-1`, { fontFamily: 'PlusJakartaSans_700Bold' }]}>
+                <Text style={[tw`text-sm text-slate-400 dark:text-slate-500 ml-1.5`, { fontFamily: 'PlusJakartaSans_700Bold' }]}>
                   {item.unit}
                 </Text>
               </View>
-              <Text style={[tw`text-[10px] text-slate-400 dark:text-slate-500 mt-0.5`, { fontFamily: 'PlusJakartaSans_500Medium' }]}>
-                Target: {item.target}
-              </Text>
             </View>
 
             {/* Bottom: Modern Slim Track Bar */}

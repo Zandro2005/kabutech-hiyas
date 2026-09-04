@@ -3,14 +3,16 @@ import { View, Text, Animated, StyleSheet, PanResponder } from 'react-native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTheme } from '../context/ThemeContext';
+import { useAuth } from '../context/AuthContext';
 import { SoundManager } from '../utils/SoundManager';
 import { hapticSuccess, hapticError } from '../utils/haptics';
 
-interface ToastMessage {
+export interface ToastMessage {
   type: 'success' | 'error' | 'info';
   text1: string;
   text2?: string;
   duration?: number;
+  forceTheme?: 'light' | 'dark';
 }
 
 let globalShowToast: ((msg: ToastMessage) => void) | null = null;
@@ -22,7 +24,8 @@ export const showToast = (msg: ToastMessage) => {
 };
 
 export default function CustomToast() {
-  const { isDarkMode } = useTheme();
+  const { isDarkMode: contextDarkMode } = useTheme();
+  const { user } = useAuth();
   const insets = useSafeAreaInsets();
   const [message, setMessage] = useState<ToastMessage | null>(null);
 
@@ -63,11 +66,13 @@ export default function CustomToast() {
     if (timerRef.current) clearTimeout(timerRef.current);
     setMessage(msg);
 
-    // Trigger sounds and haptics
+    const isError = msg.type === 'error';
+
+    // Trigger sounds and haptics synchronously on the exact frame
     if (msg.type === 'success') {
       SoundManager.playSuccess();
       hapticSuccess();
-    } else if (msg.type === 'error') {
+    } else if (isError) {
       SoundManager.playError();
       hapticError();
     } else if (msg.type === 'info') {
@@ -78,13 +83,30 @@ export default function CustomToast() {
     translateX.setValue(0);
     opacity.setValue(0);
 
-    Animated.parallel([
-      Animated.spring(translateY, { toValue: 0, friction: 8, tension: 60, useNativeDriver: true }),
-      Animated.timing(opacity, { toValue: 1, duration: 250, useNativeDriver: true }),
-    ]).start();
+    if (isError) {
+      // Instant snappy entry for error toasts with tactile micro-shake
+      Animated.parallel([
+        Animated.spring(translateY, { toValue: 0, friction: 6, tension: 180, useNativeDriver: true }),
+        Animated.timing(opacity, { toValue: 1, duration: 100, useNativeDriver: true }),
+      ]).start(() => {
+        // Quick subtle shake
+        Animated.sequence([
+          Animated.timing(translateX, { toValue: -6, duration: 35, useNativeDriver: true }),
+          Animated.timing(translateX, { toValue: 6, duration: 35, useNativeDriver: true }),
+          Animated.timing(translateX, { toValue: -3, duration: 30, useNativeDriver: true }),
+          Animated.timing(translateX, { toValue: 3, duration: 30, useNativeDriver: true }),
+          Animated.timing(translateX, { toValue: 0, duration: 25, useNativeDriver: true }),
+        ]).start();
+      });
+    } else {
+      Animated.parallel([
+        Animated.spring(translateY, { toValue: 0, friction: 8, tension: 120, useNativeDriver: true }),
+        Animated.timing(opacity, { toValue: 1, duration: 160, useNativeDriver: true }),
+      ]).start();
+    }
 
     timerRef.current = setTimeout(hide, msg.duration || 2500);
-  }, [translateY, opacity, hide]);
+  }, [translateY, translateX, opacity, hide]);
 
   useEffect(() => {
     globalShowToast = show;
@@ -92,6 +114,12 @@ export default function CustomToast() {
   }, [show]);
 
   if (!message) return null;
+
+  // On login and register screens (unauthenticated) or when forceTheme is set,
+  // ensure the toast is always light. When authenticated, reflect the active user theme.
+  const isDarkMode = message.forceTheme
+    ? message.forceTheme === 'dark'
+    : (!user ? false : contextDarkMode);
 
   const isSuccess = message.type === 'success';
   const isInfo = message.type === 'info';

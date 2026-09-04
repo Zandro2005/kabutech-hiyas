@@ -79,6 +79,10 @@ export default function App() {
             require('./assets/mushroom_bg.png'),
             require('./assets/mushroom_feed.png'),
             require('./assets/icon.png'),
+            require('./assets/sounds/success_fast.wav'),
+            require('./assets/sounds/engk.wav'),
+            require('./assets/sounds/ting.wav'),
+            require('./assets/sounds/welcome.mp3'),
           ]),
           SoundManager.init(),
         ]);

@@ -3,8 +3,6 @@ import { NavigationContainer } from '@react-navigation/native';
 import * as SplashScreen from 'expo-splash-screen';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import BootScreen from '../screens/BootScreen';
-import WelcomeScreen from '../screens/WelcomeScreen';
-import OnboardingScreen from '../screens/OnboardingScreen';
 import LoginScreen from '../screens/LoginScreen';
 import RegisterScreen from '../screens/RegisterScreen';
 import MainTabNavigator from './MainTabNavigator';
@@ -48,14 +46,20 @@ export default function AppNavigator() {
 
   return (
     <NavigationContainer>
-      <Stack.Navigator screenOptions={{ headerShown: false }}>
+      <Stack.Navigator 
+        screenOptions={{ 
+          headerShown: false,
+          gestureEnabled: true,
+          fullScreenGestureEnabled: true,
+          animation: 'slide_from_right',
+        }}
+      >
         {!isAuthenticated ? (
           // Authentication Stack
           <>
-            <Stack.Screen name="Boot" component={BootScreen} />
-            <Stack.Screen name="Welcome" component={WelcomeScreen} />
-            <Stack.Screen name="Login" component={LoginScreen} />
-            <Stack.Screen name="Register" component={RegisterScreen} />
+            <Stack.Screen name="Boot" component={BootScreen} options={{ animation: 'fade' }} />
+            <Stack.Screen name="Login" component={LoginScreen} options={{ animation: 'fade' }} />
+            <Stack.Screen name="Register" component={RegisterScreen} options={{ animation: 'fade' }} />
           </>
         ) : !isApproved ? (
           // Pending Approval

@@ -1,6 +1,6 @@
 import React, { createContext, useState, useEffect, useContext } from 'react';
 import { onAuthStateChanged, User } from 'firebase/auth';
-import { ref, onValue } from 'firebase/database';
+import { ref, onValue, set } from 'firebase/database';
 import { auth, db } from '../services/firebase';
 import { UserProfile } from '../types/firebase';
 import { registerForPushNotificationsAsync } from '../utils/PushNotifications';
@@ -64,14 +64,30 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             }
             AsyncStorage.setItem(`cached_profile_${firebaseUser.uid}`, JSON.stringify(userProfile)).catch(() => {});
           } else {
-            setProfile(null);
-            AsyncStorage.removeItem(`cached_profile_${firebaseUser.uid}`).catch(() => {});
+            // Auto-heal missing profile for valid Firebase Auth users (e.g. created via console)
+            const fallbackProfile: UserProfile = {
+              name: firebaseUser.displayName || firebaseUser.email?.split('@')[0] || 'User',
+              email: firebaseUser.email || '',
+              role: 'staff',
+              approved: false,
+              createdAt: new Date().toISOString(),
+            };
+            setProfile(fallbackProfile);
+            set(profileRef, fallbackProfile).catch(() => {});
           }
           setIsLoading(false);
         }, (error) => {
           console.error("Error fetching user profile:", error);
-          setUser(null);
-          setProfile(null);
+          // If error reading database (network or permissions), set fallback profile so app doesn't freeze on login
+          const fallbackProfile: UserProfile = {
+            name: firebaseUser.displayName || firebaseUser.email?.split('@')[0] || 'User',
+            email: firebaseUser.email || '',
+            role: 'staff',
+            approved: false,
+            createdAt: new Date().toISOString(),
+          };
+          setUser(firebaseUser);
+          setProfile(fallbackProfile);
           setIsLoading(false);
         });
       } else {

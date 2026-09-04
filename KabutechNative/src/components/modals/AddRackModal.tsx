@@ -69,7 +69,6 @@ export default function AddRackModal({ visible, onClose, racks }: AddRackModalPr
       setSlotsCount('');
       onClose();
       setTimeout(() => {
-        SoundManager.playSuccess();
         showToast({ type: 'success', text1: 'Success', text2: `Rack "${rackName}" added with ${slots} empty slots.` });
       }, 600);
     } catch (error) {

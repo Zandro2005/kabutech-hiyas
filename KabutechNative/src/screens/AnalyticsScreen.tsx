@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useRef, useEffect } from 'react';
-import { View, Text, ScrollView, TouchableOpacity, StatusBar } from 'react-native';
+import { View, Text, ScrollView, TouchableOpacity, StatusBar, PanResponder } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { MaterialCommunityIcons, Ionicons } from '@expo/vector-icons';
 import Svg, { Path, Defs, LinearGradient as SvgGradient, Stop, Line, Circle, Text as SvgText, G, Rect } from 'react-native-svg';
@@ -7,6 +7,7 @@ import { useTheme } from '../context/ThemeContext';
 import tw from '../tailwind';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import { useSensors } from '../hooks/useFirebaseData';
+import { useAuth } from '../context/AuthContext';
 import { hapticLight, hapticSelection } from '../utils/haptics';
 import AnalyticsScreenSkeleton from '../components/skeletons/AnalyticsScreenSkeleton';
 import { useResponsive } from '../utils/responsive';
@@ -59,11 +60,13 @@ const getBezierPath = (pts: { x: number; y: number }[]) => {
 
 export default function AnalyticsScreen() {
   const { isDarkMode } = useTheme();
+  const { profile } = useAuth();
   const insets = useSafeAreaInsets();
   const navigation = useNavigation<any>();
   const route = useRoute<any>();
   const sensors = useSensors();
   const { width, isSmallDevice } = useResponsive();
+  const isAdmin = profile?.role === 'admin' || profile?.role === 'operator';
 
   const [isReady, setIsReady] = useState(false);
   useEffect(() => {
@@ -226,6 +229,32 @@ export default function AnalyticsScreen() {
     setSelectedPointIndex(null);
   };
 
+  const metricKeys: MetricType[] = ['temp', 'hum', 'light', 'co2'];
+  const switchMetricRelative = (direction: 'next' | 'prev') => {
+    const currentIndex = metricKeys.indexOf(activeMetric);
+    if (currentIndex === -1) return;
+    let nextIndex = direction === 'next' ? currentIndex + 1 : currentIndex - 1;
+    if (nextIndex < 0) nextIndex = metricKeys.length - 1;
+    if (nextIndex >= metricKeys.length) nextIndex = 0;
+    const nextMetric = metricKeys[nextIndex];
+    handleSelectMetric(nextMetric);
+  };
+
+  const swipePanResponder = useRef(
+    PanResponder.create({
+      onMoveShouldSetPanResponder: (_, gestureState) => {
+        return Math.abs(gestureState.dx) > 30 && Math.abs(gestureState.dx) > Math.abs(gestureState.dy) * 1.5;
+      },
+      onPanResponderRelease: (_, gestureState) => {
+        if (gestureState.dx < -40) {
+          switchMetricRelative('next');
+        } else if (gestureState.dx > 40) {
+          switchMetricRelative('prev');
+        }
+      },
+    })
+  ).current;
+
   return (
     <View style={[tw`flex-1 bg-[#f0f9f4] dark:bg-[#020617]`, { paddingTop: insets.top }]}>
       <StatusBar barStyle="dark-content" backgroundColor="transparent" translucent />
@@ -237,7 +266,7 @@ export default function AnalyticsScreen() {
         
         {/* Header */}
         <View style={tw`px-6 mb-6 flex-row items-center`}>
-          <View style={tw`flex-row items-center gap-3.5`}>
+          <View style={tw`flex-row items-center gap-3.5 flex-1`}>
             <TouchableOpacity 
               hitSlop={{ top: 15, bottom: 15, left: 15, right: 15 }}
               onPress={() => navigation.goBack()}
@@ -245,11 +274,11 @@ export default function AnalyticsScreen() {
             >
               <Ionicons name="arrow-back" size={20} color={isDarkMode ? '#ffffff' : '#1e293b'} />
             </TouchableOpacity>
-            <View>
-              <Text style={[tw`text-2xl text-slate-900 dark:text-white tracking-wide`, { fontFamily: 'PlusJakartaSans_800ExtraBold' }]}>
+            <View style={tw`flex-1`}>
+              <Text numberOfLines={1} style={[tw`text-2xl text-slate-900 dark:text-white tracking-wide`, { fontFamily: 'PlusJakartaSans_800ExtraBold' }]}>
                 Climate Analytics
               </Text>
-              <Text style={[tw`text-xs text-slate-400 dark:text-slate-500 mt-0.5`, { fontFamily: 'PlusJakartaSans_600SemiBold' }]}>
+              <Text numberOfLines={1} style={[tw`text-xs text-slate-400 dark:text-slate-500 mt-0.5`, { fontFamily: 'PlusJakartaSans_600SemiBold' }]}>
                 Environmental trends & telemetry
               </Text>
             </View>
@@ -306,6 +335,65 @@ export default function AnalyticsScreen() {
                 </TouchableOpacity>
               );
             })}
+
+            {/* Quick Link to Schedule Config */}
+            <TouchableOpacity 
+              activeOpacity={0.75}
+              delayPressIn={50}
+              onPress={() => {
+                hapticSelection();
+                navigation.navigate('DeviceSchedules' as any);
+              }}
+              style={tw`px-3.5 py-2.5 rounded-2xl border border-dashed border-purple-300 dark:border-purple-700 bg-purple-50/50 dark:bg-purple-950/30 flex-row items-center gap-2`}
+            >
+              <View style={tw`w-7 h-7 rounded-xl items-center justify-center bg-purple-500/10`}>
+                <MaterialCommunityIcons 
+                  name="calendar-clock" 
+                  size={16} 
+                  color="#a855f7" 
+                />
+              </View>
+              <View>
+                <Text style={[tw`text-[10px] uppercase tracking-wider text-purple-600 dark:text-purple-400`, { fontFamily: 'PlusJakartaSans_700Bold' }]}>
+                  Timer
+                </Text>
+                <Text style={[tw`text-[12px] text-slate-700 dark:text-slate-300`, { fontFamily: 'PlusJakartaSans_800ExtraBold' }]}>
+                  Schedule
+                </Text>
+              </View>
+            </TouchableOpacity>
+
+            {/* Quick Link to Controls Config (for Admin/Operator) */}
+            {isAdmin && (
+              <TouchableOpacity 
+                activeOpacity={0.75}
+                delayPressIn={50}
+                onPress={() => {
+                  hapticSelection();
+                  navigation.navigate('Main' as any, {
+                    screen: 'Controls',
+                    params: { tab: activeMetric }
+                  });
+                }}
+                style={tw`px-3.5 py-2.5 rounded-2xl border border-dashed border-emerald-300 dark:border-emerald-700 bg-emerald-50/50 dark:bg-emerald-950/30 flex-row items-center gap-2`}
+              >
+                <View style={tw`w-7 h-7 rounded-xl items-center justify-center bg-emerald-500/10`}>
+                  <MaterialCommunityIcons 
+                    name="tune" 
+                    size={16} 
+                    color="#10b981" 
+                  />
+                </View>
+                <View>
+                  <Text style={[tw`text-[10px] uppercase tracking-wider text-emerald-600 dark:text-emerald-400`, { fontFamily: 'PlusJakartaSans_700Bold' }]}>
+                    Adjust
+                  </Text>
+                  <Text style={[tw`text-[12px] text-slate-700 dark:text-slate-300`, { fontFamily: 'PlusJakartaSans_800ExtraBold' }]}>
+                    Controls
+                  </Text>
+                </View>
+              </TouchableOpacity>
+            )}
           </ScrollView>
         </View>
 
@@ -518,8 +606,11 @@ export default function AnalyticsScreen() {
             </ScrollView>
           </View>
 
-          {/* Bottom Selected Telemetry Strip */}
-          <View style={tw`mt-4 pt-3.5 border-t border-slate-100 dark:border-slate-800/80 flex-row items-center justify-between`}>
+          {/* Bottom Selected Telemetry Strip (Swipable) */}
+          <View 
+            {...swipePanResponder.panHandlers}
+            style={tw`mt-4 pt-3.5 border-t border-slate-100 dark:border-slate-800/80 flex-row items-center justify-between`}
+          >
             <View style={tw`flex-row items-center gap-2`}>
               <View style={[tw`w-2 h-2 rounded-full`, { backgroundColor: currentMetric.color }]} />
               <Text style={[tw`text-[11.5px] text-slate-600 dark:text-slate-300`, { fontFamily: 'PlusJakartaSans_700Bold' }]}>
@@ -537,8 +628,24 @@ export default function AnalyticsScreen() {
           </View>
         </View>
 
-        {/* 4-Column Metric Telemetry Summary Cards */}
-        <View style={tw`px-5 flex-row flex-wrap justify-between gap-y-3 mb-6`}>
+        {/* 4-Column Metric Telemetry Summary Cards (Swipable) */}
+        <View 
+          {...swipePanResponder.panHandlers}
+          style={tw`px-5 mb-6`}
+        >
+          <View style={tw`flex-row items-center justify-between mb-2.5 px-1`}>
+            <Text style={[tw`text-[11px] text-slate-400 uppercase tracking-wider`, { fontFamily: 'PlusJakartaSans_700Bold' }]}>
+              {currentMetric.label} Telemetry
+            </Text>
+            <View style={tw`flex-row items-center gap-1`}>
+              <MaterialCommunityIcons name="gesture-swipe-horizontal" size={12} color={isDarkMode ? '#64748b' : '#94a3b8'} />
+              <Text style={[tw`text-[10px] text-slate-400 dark:text-slate-500`, { fontFamily: 'PlusJakartaSans_600SemiBold' }]}>
+                Swipe cards to cycle
+              </Text>
+            </View>
+          </View>
+
+          <View style={tw`flex-row flex-wrap justify-between gap-y-3`}>
           
           {/* Minimum */}
           <View style={[tw`bg-white dark:bg-slate-900 rounded-2xl p-4 border border-slate-200/70 dark:border-slate-800 shadow-sm justify-between`, { width: '48%' }]}>
@@ -606,6 +713,7 @@ export default function AnalyticsScreen() {
             </Text>
           </View>
         </View>
+      </View>
 
         {/* AI Prediction Hub Link Card */}
         <View style={tw`px-5`}>

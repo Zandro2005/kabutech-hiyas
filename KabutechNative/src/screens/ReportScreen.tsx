@@ -12,8 +12,6 @@ import {
   DeviceEventEmitter,
   ActivityIndicator,
   Platform,
-  UIManager,
-  LayoutAnimation,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import Svg, {
@@ -45,10 +43,6 @@ import {
   hapticSuccess,
 } from '../utils/haptics';
 import { useResponsive } from '../utils/responsive';
-
-if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
-  UIManager.setLayoutAnimationEnabledExperimental(true);
-}
 
 const globalTimeouts: ReturnType<typeof setTimeout>[] = [];
 let isGlobalProcessing: string | false = false;
@@ -778,7 +772,7 @@ export default function ReportScreen() {
                   }}
                   style={[
                     tw`flex-1 py-1.5 items-center justify-center rounded-lg`,
-                    active && tw`bg-white dark:bg-slate-800 shadow-xs`,
+                    active && tw`bg-white dark:bg-slate-800 shadow-sm`,
                   ]}
                 >
                   <Text
@@ -816,7 +810,7 @@ export default function ReportScreen() {
                     }}
                     style={[
                       tw`py-1 px-2.5 rounded-lg`,
-                      active && tw`bg-white dark:bg-slate-800 shadow-xs`,
+                      active && tw`bg-white dark:bg-slate-800 shadow-sm`,
                     ]}
                   >
                     <Text
@@ -961,7 +955,7 @@ export default function ReportScreen() {
                 <View
                   key={device.key}
                   style={[
-                    tw`w-[48.5%] bg-white dark:bg-slate-800 rounded-2xl p-3 shadow-xs border`,
+                    tw`w-[48.5%] bg-white dark:bg-slate-800 rounded-2xl p-3 shadow-sm border`,
                     active ? tw`border-blue-400 dark:border-blue-500` : tw`border-slate-200/60 dark:border-slate-700/50`,
                   ]}
                 >

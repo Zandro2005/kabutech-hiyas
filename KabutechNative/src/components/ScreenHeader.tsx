@@ -105,19 +105,21 @@ export default React.memo(function ScreenHeader({ title, subtitle, rightComponen
             )}
           </TouchableOpacity>
 
-          {/* More Button */}
+          {/* User Profile & Settings Avatar Button */}
           <TouchableOpacity hitSlop={{ top: 15, bottom: 15, left: 15, right: 15 }}  
             onPress={() => {
+              hapticSelection();
               if (profile?.role === 'staff') {
                 navigation.navigate('StaffMain' as any, { screen: 'Profile' } as any);
               } else {
                 navigation.navigate('Main' as any, { screen: 'Profile' } as any);
               }
             }}
-            
-            style={tw`w-8 h-8 rounded-full bg-white dark:bg-slate-800 items-center justify-center border border-gray-200 dark:border-slate-700 shadow-sm`}
+            style={tw`w-8 h-8 rounded-full bg-emerald-600 dark:bg-emerald-500 items-center justify-center border border-emerald-700/20 shadow-sm`}
           >
-            <MaterialCommunityIcons name="dots-vertical" size={16} color={isDarkMode ? "#cbd5e1" : "#334155"} />
+            <Text style={[tw`text-white text-xs`, { fontFamily: 'PlusJakartaSans_800ExtraBold' }]}>
+              {profile?.name ? profile.name.charAt(0).toUpperCase() : 'U'}
+            </Text>
             {notificationCount > 0 && (
               <View style={tw`absolute -top-1 -right-1 w-3.5 h-3.5 bg-red-500 rounded-full border-2 border-white dark:border-slate-800 items-center justify-center`}>
               </View>

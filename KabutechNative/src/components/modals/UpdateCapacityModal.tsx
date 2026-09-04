@@ -109,7 +109,6 @@ export default function UpdateCapacityModal({ visible, onClose, selectedRack }: 
         bags: updatedBags,
         historicalHarvests: updatedHistorical
       });
-      SoundManager.playSuccess();
       showToast({ type: 'success', text1: 'Success', text2: `Capacity updated. Total: ${updatedBags.length}` });
       onClose();
     } catch (error) {

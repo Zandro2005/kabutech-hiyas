@@ -1,6 +1,5 @@
 export type AuthStackParamList = {
   Boot: undefined;
-  Welcome: undefined;
   Login: undefined;
   Register: undefined;
 };

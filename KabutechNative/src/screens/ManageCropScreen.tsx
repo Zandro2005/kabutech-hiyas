@@ -119,7 +119,6 @@ export default function ManageCropScreen() {
       await remove(ref(db, `kabutech/batches/${archiveTarget.firebaseKey}`));
       const rackName = archiveTarget.rackName;
       setArchiveTarget(null);
-      SoundManager.playSuccess();
       showToast({ type: 'success', text1: 'Removed', text2: `"${rackName}" has been removed.` });
     } catch (error) {
       console.error(error);

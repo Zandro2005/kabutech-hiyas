@@ -15,11 +15,13 @@ import LiveFarmCard from '../../components/LiveFarmCard';
 import EnvironmentMetricsGrid from '../../components/EnvironmentMetricsGrid';
 import ScoreArch from '../../components/ScoreArch';
 import HomeScreenSkeleton from '../../components/skeletons/HomeScreenSkeleton';
+import { computeScheduledDevicesState } from '../../utils/scheduleLogic';
 
 export default function StaffHomeScreen() {
   const navigation = useNavigation<NativeStackNavigationProp<GlobalNavigationParamList>>();
   const { isDarkMode } = useTheme();
   const sensors = useSensors();
+  const settings = useSettings();
   const alerts = useAlerts();
 
   const [isReady, setIsReady] = useState(false);
@@ -38,6 +40,29 @@ export default function StaffHomeScreen() {
   const light = typeof sensors.light === 'number' ? sensors.light : 490;
   const co2 = typeof sensors.co2 === 'number' ? sensors.co2 : 650;
 
+  // Real-time system mode configured by Admin
+  const isAuto = String(settings?.setpoints?.mode).toLowerCase() === 'auto';
+  const isScheduled = String(settings?.setpoints?.mode).toLowerCase() === 'scheduled';
+
+  const rawDevices = settings?.setpoints?.devices || { fans: false, misters: false, lights: false };
+  const [devices, setDevices] = useState(rawDevices);
+
+  useEffect(() => {
+    if (isScheduled) {
+      const interval = setInterval(() => {
+        setDevices({ ...rawDevices, ...computeScheduledDevicesState(settings?.schedules) });
+      }, 5000);
+      setDevices({ ...rawDevices, ...computeScheduledDevicesState(settings?.schedules) });
+      return () => clearInterval(interval);
+    } else {
+      setDevices(rawDevices);
+    }
+  }, [isScheduled, settings?.schedules, rawDevices]);
+
+  const fansActive = devices.fans;
+  const misterActive = devices.misters;
+  const lightActive = devices.lights;
+
   const envScore = calculateEnvironmentScore(temp, hum, light, co2);
 
   return (
@@ -55,12 +80,12 @@ export default function StaffHomeScreen() {
         {/* Top Arch and Score (Staff view - Read Only) */}
         <ScoreArch 
           envScore={envScore}
-          isAuto={false}
-          isScheduled={false}
+          isAuto={isAuto}
+          isScheduled={isScheduled}
           isDarkMode={isDarkMode}
-          fansActive={false}
-          misterActive={false}
-          lightActive={false}
+          fansActive={fansActive}
+          misterActive={misterActive}
+          lightActive={lightActive}
           toggleDevice={() => { }} // No-op for staff
           navigation={navigation}
           readOnly={true}

@@ -30,7 +30,14 @@ const HomeStack = createNativeStackNavigator();
 
 function StaffHomeStackNavigator() {
   return (
-    <HomeStack.Navigator screenOptions={{ headerShown: false }}>
+    <HomeStack.Navigator 
+      screenOptions={{ 
+        headerShown: false,
+        animation: 'slide_from_right',
+        gestureEnabled: true,
+        fullScreenGestureEnabled: true,
+      }}
+    >
       <HomeStack.Screen name="HomeScreen" component={StaffHomeScreen} />
       <HomeStack.Screen name="LiveFarm" component={LiveFarmScreen} />
       <HomeStack.Screen name="Analytics" component={AnalyticsScreen} />
@@ -48,6 +55,7 @@ export default function StaffTabNavigator() {
 
   return (
     <Tab.Navigator
+      backBehavior="history"
       screenListeners={{ tabPress: () => hapticLight() }}
       screenOptions={{
         headerShown: false,

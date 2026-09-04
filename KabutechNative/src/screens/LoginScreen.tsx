@@ -1,5 +1,5 @@
 import React, { useState, useRef } from 'react';
-import { View, Text, TextInput, TouchableOpacity, KeyboardAvoidingView, Platform, ScrollView, Image, StatusBar } from 'react-native';
+import { View, Text, TextInput, TouchableOpacity, KeyboardAvoidingView, Platform, ScrollView, Image, StatusBar, Keyboard } from 'react-native';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 // @ts-ignore
 import { signInWithEmailAndPassword, sendPasswordResetEmail, setPersistence, inMemoryPersistence, getReactNativePersistence } from 'firebase/auth';
@@ -19,63 +19,119 @@ import { useResponsive } from '../utils/responsive';
 
 export default function LoginScreen() {
   const { height, isShortScreen, isSmallDevice } = useResponsive();
-  const headerHeight = Math.min(300, Math.max(180, isShortScreen ? height * 0.28 : height * 0.35));
+  const headerHeight = Math.min(420, Math.max(260, isShortScreen ? height * 0.38 : height * 0.45));
 
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [rememberMe, setRememberMe] = useState(false);
-
   const [loading, setLoading] = useState(false);
-  const [errorMsg, _setErrorMsg] = useState('');
-  const setErrorMsg = (msg: string) => {
-    if (msg) SoundManager.playError();
-    _setErrorMsg(msg);
+  const [loadingText, setLoadingText] = useState('Logging in...');
+  const showNotification = (title: string, message?: string, type: 'error' | 'success' | 'info' = 'error') => {
+    showToast({
+      type,
+      text1: title,
+      text2: message,
+      duration: 3500,
+      forceTheme: 'light',
+    });
   };
 
   const passwordRef = useRef<TextInput>(null);
   const navigation = useNavigation<NativeStackNavigationProp<GlobalNavigationParamList>>();
 
   const handleLogin = async () => {
-    if (!email || !password) {
-      setErrorMsg('Please enter your email and password.');
+    if (!email.trim() || !password) {
+      showNotification('Missing Information', 'Please enter your email and password.');
       return;
     }
+    Keyboard.dismiss();
     setLoading(true);
-    setErrorMsg('');
-    try {
-      if (rememberMe) {
-        await setPersistence(auth, getReactNativePersistence(AsyncStorage));
-      } else {
-        await setPersistence(auth, inMemoryPersistence);
-      }
-      const userCredential = await signInWithEmailAndPassword(auth, email.trim(), password);
-      
-      // Fetch user data for personalized greeting
-      const userRef = ref(db, `kabutech/users/${userCredential.user.uid}`);
-      const snapshot = await get(userRef);
-      let firstName = 'User';
-      let role = 'Admin';
-      if (snapshot.exists()) {
-        const data = snapshot.val();
-        const fullName = data.name || 'User';
-        firstName = fullName.split(' ')[0] || 'User';
-        role = data.role || 'Admin';
-      }
+    setLoadingText('Logging in...');
 
-      // Modern Interactive Welcome HUD (appears smoothly over the dashboard)
-      setTimeout(() => {
-        showWelcomeHud({ name: firstName, role });
-      }, 450);
-    } catch (error: any) {
-      setLoading(false);
-      setErrorMsg('Invalid email or password.');
+    const maxRetries = 3;
+    let attempt = 0;
+    let success = false;
+
+    while (attempt < maxRetries && !success) {
+      try {
+        if (attempt > 0) {
+          setLoadingText(`Retrying... (${attempt}/${maxRetries})`);
+          // Wait 2 seconds before retrying to let the network stabilize
+          await new Promise(resolve => setTimeout(resolve, 2000));
+        }
+
+        if (rememberMe) {
+          try {
+            await setPersistence(auth, getReactNativePersistence(AsyncStorage));
+          } catch {}
+        }
+
+        const userCredential = await signInWithEmailAndPassword(auth, email.trim(), password);
+        success = true;
+        Keyboard.dismiss();
+
+        // Non-blocking greeting fetch with 1.5s timeout race so database delay never blocks transition
+        (async () => {
+          try {
+            const userRef = ref(db, `kabutech/users/${userCredential.user.uid}`);
+            const timeoutPromise = new Promise((resolve) => setTimeout(resolve, 1500));
+            const snapshotPromise = get(userRef);
+            const snapshot: any = await Promise.race([snapshotPromise, timeoutPromise]);
+
+            let firstName = userCredential.user.displayName?.split(' ')[0] || 'User';
+            let role = 'Admin';
+            if (snapshot && typeof snapshot.exists === 'function' && snapshot.exists()) {
+              const data = snapshot.val();
+              const fullName = data.name || userCredential.user.displayName || 'User';
+              firstName = fullName.split(' ')[0] || 'User';
+              role = data.role || 'Admin';
+            }
+
+            setTimeout(() => {
+              showWelcomeHud({ name: firstName, role, duration: 4000 });
+            }, 450);
+          } catch {
+            setTimeout(() => {
+              showWelcomeHud({ name: 'User', role: 'Admin', duration: 4000 });
+            }, 450);
+          }
+        })();
+      } catch (error: any) {
+        attempt++;
+        
+        if (error.code === 'auth/network-request-failed') {
+          if (attempt >= maxRetries) {
+            setLoading(false);
+            showNotification('Network Error', 'Unable to connect. Please check your connection and try again.');
+            return;
+          }
+          // Continue to next loop iteration to retry
+        } else {
+          setLoading(false);
+          if (
+            error.code === 'auth/wrong-password' ||
+            error.code === 'auth/user-not-found' ||
+            error.code === 'auth/invalid-credential' ||
+            error.code === 'auth/invalid-email'
+          ) {
+            showNotification('Login Failed', 'Invalid email or password.');
+          } else if (error.code === 'auth/too-many-requests') {
+            showNotification('Too Many Attempts', 'Too many failed attempts. Please try again later.');
+          } else {
+            const msg = error.message ? error.message.replace(/^Firebase:\s*/, '') : 'Login failed. Please try again.';
+            showNotification('Login Failed', msg);
+          }
+          return;
+        }
+      }
     }
   };
 
   const handleForgotPassword = async () => {
+    Keyboard.dismiss();
     if (!email) {
-      setErrorMsg('Please enter your email address first.');
+      showNotification('Missing Email', 'Please enter your email address first.');
       return;
     }
     try {
@@ -84,11 +140,11 @@ export default function LoginScreen() {
         type: 'success', 
         text1: 'Email Sent', 
         text2: 'If an account exists, a password reset link has been sent to your inbox.',
-        duration: 5000
+        duration: 5000,
+        forceTheme: 'light',
       });
-      setErrorMsg('');
     } catch (error: any) {
-      setErrorMsg('Failed to send reset email. Ensure your email is correct.');
+      showNotification('Reset Failed', 'Failed to send reset email. Ensure your email is correct.');
     }
   };
 
@@ -115,7 +171,7 @@ export default function LoginScreen() {
             />
 
             {/* SVG White Wave overlayed at the bottom of the image */}
-            <View style={[tw`absolute bottom-0 w-full`, { height: Math.min(120, headerHeight * 0.4) }]}>
+            <View style={[tw`absolute bottom-0 w-full`, { height: Math.min(100, headerHeight * 0.3) }]}>
               <Svg height="100%" width="100%" viewBox="0 0 1440 320" preserveAspectRatio="none">
                 <Path
                   fill="#ffffff"
@@ -126,10 +182,10 @@ export default function LoginScreen() {
           </View>
 
           {/* Form Area */}
-          <View style={tw`flex-1 px-6 sm:px-8 pt-4 sm:pt-6 pb-6 relative`}>
+          <View style={tw`flex-1 px-6 sm:px-8 -mt-2 sm:-mt-3 pt-1 sm:pt-2 pb-6 relative`}>
 
             <View style={tw`mb-5 sm:mb-7`}>
-              <Text style={[tw`text-2xl sm:text-3xl text-slate-800 text-center`, { fontFamily: 'PlusJakartaSans_800ExtraBold' }]}>
+              <Text style={[tw`text-[28px] sm:text-[34px] text-slate-800 text-center tracking-tight`, { fontFamily: 'PlusJakartaSans_800ExtraBold' }]}>
                 Welcome back
               </Text>
               <Text style={[tw`text-xs sm:text-sm text-slate-400 text-center mt-1.5`, { fontFamily: 'PlusJakartaSans_700Bold' }]}>
@@ -200,10 +256,6 @@ export default function LoginScreen() {
               </TouchableOpacity>
             </View>
 
-            {errorMsg ? (
-              <Text style={tw`text-red-500 text-center mb-4 text-xs font-bold`}>{errorMsg}</Text>
-            ) : null}
-
             {/* Submit Button */}
             <TouchableOpacity hitSlop={{ top: 15, bottom: 15, left: 15, right: 15 }} 
               onPress={handleLogin}
@@ -211,7 +263,7 @@ export default function LoginScreen() {
               style={tw`w-full bg-[#3d8c63] py-4 rounded-full flex-row items-center justify-center shadow-lg mb-6 ${loading ? 'opacity-70' : ''}`}
             >
               <Text style={[tw`text-white text-[15px] mr-2`, { fontFamily: 'PlusJakartaSans_700Bold' }]}>
-                {loading ? 'Logging in...' : 'Login'}
+                {loading ? loadingText : 'Login'}
               </Text>
               {!loading && <Ionicons name="arrow-forward-circle" size={20} color="#ffffff" />}
             </TouchableOpacity>

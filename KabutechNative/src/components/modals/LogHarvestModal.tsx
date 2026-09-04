@@ -81,7 +81,6 @@ export default function LogHarvestModal({ visible, onClose, selectedRack }: LogH
         bags: updatedBags
       });
 
-      SoundManager.playSuccess();
       showToast({ type: 'success', text1: 'Success', text2: `Logged ${totalYield}g harvest across ${activeBags.length} bags.` });
       
       setYieldGrams('');
