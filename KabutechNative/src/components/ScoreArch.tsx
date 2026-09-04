@@ -8,19 +8,6 @@ import { hapticMedium, hapticSelection } from '../utils/haptics';
 import { useResponsive } from '../utils/responsive';
 import { showToast } from './CustomToast';
 
-const getAvatarColor = (name: string) => {
-  const colors = [
-    '#ef4444', '#f97316', '#eab308', '#22c55e',
-    '#06b6d4', '#3b82f6', '#8b5cf6', '#d946ef', '#f43f5e'
-  ];
-  if (!name) return colors[0];
-  let hash = 0;
-  for (let i = 0; i < name.length; i++) {
-    hash = name.charCodeAt(i) + ((hash << 5) - hash);
-  }
-  return colors[Math.abs(hash) % colors.length];
-};
-
 interface Props {
   envScore: string;
   isAuto: boolean;
@@ -86,51 +73,28 @@ export default React.memo(function ScoreArch({
 
   return (
     <View style={tw`px-5 sm:px-6 pt-2 pb-1`}>
-      {/* 1. Header Row: User Info & Interactive Mode Badge */}
+      {/* 1. Header Row: User Greetings & Interactive Mode Badge */}
       <View style={tw`flex-row justify-between items-center mb-4`}>
-        <TouchableOpacity
-          hitSlop={{ top: 15, bottom: 15, left: 15, right: 15 }}
-          activeOpacity={0.8}
-          style={tw`flex-row items-center gap-3 flex-1 mr-2`}
-          onPress={() => navigation.navigate('Profile' as never)}
-        >
-          <View
+        <View style={tw`flex-1 mr-2`}>
+          <Text
+            numberOfLines={1}
             style={[
-              tw`w-10 h-10 sm:w-11 sm:h-11 rounded-full overflow-hidden items-center justify-center border shadow-sm shrink-0`,
-              isDarkMode ? tw`bg-slate-800 border-slate-700` : tw`bg-white border-emerald-200/80`
+              tw`text-xl sm:text-[22px] text-slate-800 dark:text-white tracking-tight leading-tight`,
+              { fontFamily: 'PlusJakartaSans_800ExtraBold' }
             ]}
           >
-            <Text
-              style={[
-                tw`text-base sm:text-lg`,
-                { color: getAvatarColor(profile?.name || 'User'), fontFamily: 'PlusJakartaSans_800ExtraBold' }
-              ]}
-            >
-              {profile?.name ? profile.name.charAt(0).toUpperCase() : '?'}
-            </Text>
-          </View>
-
-          <View style={tw`flex-1`}>
-            <Text
-              numberOfLines={1}
-              style={[
-                tw`text-base sm:text-[17px] text-slate-800 dark:text-white tracking-tight`,
-                { fontFamily: 'PlusJakartaSans_800ExtraBold' }
-              ]}
-            >
-              Hi, {profile?.name ? profile.name.split(' ')[0] : 'Operator'} 👋
-            </Text>
-            <Text
-              numberOfLines={1}
-              style={[
-                tw`text-[11px] text-slate-500 dark:text-slate-400 mt-0.5`,
-                { fontFamily: 'PlusJakartaSans_500Medium' }
-              ]}
-            >
-              Chamber A • All Systems Active
-            </Text>
-          </View>
-        </TouchableOpacity>
+            Hi, {profile?.name ? profile.name.split(' ')[0] : 'Operator'}
+          </Text>
+          <Text
+            numberOfLines={1}
+            style={[
+              tw`text-xs text-slate-500 dark:text-slate-400 mt-0.5`,
+              { fontFamily: 'PlusJakartaSans_500Medium' }
+            ]}
+          >
+            Chamber A • All Systems Active
+          </Text>
+        </View>
 
         {/* Interactive Mode Badge */}
         <TouchableOpacity

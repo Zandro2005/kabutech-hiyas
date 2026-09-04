@@ -6,6 +6,7 @@ import { useNavigation } from '@react-navigation/native';
 import tw from '../tailwind';
 import { useTheme } from '../context/ThemeContext';
 import { useStaffTasks, useAllUsers } from '../hooks/useFirebaseData';
+import { getAvatarTheme } from '../utils/avatarColor';
 
 export default function StaffTaskHistoryScreen() {
   const navigation = useNavigation();
@@ -101,15 +102,26 @@ export default function StaffTaskHistoryScreen() {
               </Text>
             </View>
           ) : (
-            staffGroups.map(staff => (
+            staffGroups.map(staff => {
+              const staffTheme = getAvatarTheme(staff.name || staff.uid);
+              return (
               <TouchableOpacity
                 key={staff.uid}
                 onPress={() => setSelectedStaffId(staff.uid)}
                 style={tw`flex-row items-center justify-between bg-white dark:bg-slate-800 p-4 rounded-2xl mb-3 shadow-sm border border-gray-100 dark:border-slate-700`}
               >
                 <View style={tw`flex-row items-center gap-3`}>
-                  <View style={tw`w-12 h-12 rounded-full bg-emerald-100 dark:bg-emerald-900/30 items-center justify-center`}>
-                    <Text style={tw`text-emerald-700 dark:text-emerald-400 font-bold text-lg`}>
+                  <View style={[
+                    tw`w-12 h-12 rounded-full items-center justify-center border`,
+                    {
+                      backgroundColor: isDarkMode ? staffTheme.bgDark : staffTheme.bgLight,
+                      borderColor: staffTheme.border,
+                    }
+                  ]}>
+                    <Text style={[
+                      tw`font-bold text-lg`,
+                      { color: isDarkMode ? staffTheme.textDark : staffTheme.textLight }
+                    ]}>
                       {staff.name.charAt(0).toUpperCase()}
                     </Text>
                   </View>
@@ -124,7 +136,8 @@ export default function StaffTaskHistoryScreen() {
                 </View>
                 <MaterialCommunityIcons name="chevron-right" size={24} color={tw.color('gray-400')} />
               </TouchableOpacity>
-            ))
+              );
+            })
           )}
         </ScrollView>
       ) : (

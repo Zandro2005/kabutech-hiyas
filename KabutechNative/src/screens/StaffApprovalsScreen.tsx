@@ -9,6 +9,7 @@ import { useTheme } from '../context/ThemeContext';
 import { ref, update } from 'firebase/database';
 import { db } from '../services/firebase';
 import { showToast } from '../components/CustomToast';
+import { getAvatarTheme } from '../utils/avatarColor';
 
 export default function StaffApprovalsScreen() {
   const navigation = useNavigation();
@@ -104,12 +105,24 @@ export default function StaffApprovalsScreen() {
         ) : (
           displayedStaff.map(staff => {
             const date = new Date(staff.createdAt);
+            const staffTheme = getAvatarTheme(staff.name || staff.uid || staff.email);
             
             return (
               <View key={staff.uid} style={tw`bg-white dark:bg-slate-800 rounded-2xl p-4 shadow-sm border border-gray-100 dark:border-slate-700 mb-3 flex-row items-center justify-between`}>
                 <View style={tw`flex-row items-center gap-3 flex-1`}>
-                  <View style={tw`w-12 h-12 rounded-full bg-slate-100 dark:bg-slate-700 items-center justify-center`}>
-                    <Text style={tw`text-slate-500 dark:text-slate-300 font-bold text-lg`}>{staff.name?.charAt(0).toUpperCase() || 'S'}</Text>
+                  <View style={[
+                    tw`w-12 h-12 rounded-full items-center justify-center border`,
+                    {
+                      backgroundColor: isDarkMode ? staffTheme.bgDark : staffTheme.bgLight,
+                      borderColor: staffTheme.border,
+                    }
+                  ]}>
+                    <Text style={[
+                      tw`font-bold text-lg`,
+                      { color: isDarkMode ? staffTheme.textDark : staffTheme.textLight }
+                    ]}>
+                      {staff.name?.charAt(0).toUpperCase() || 'S'}
+                    </Text>
                   </View>
                   <View style={tw`flex-1`}>
                     <Text style={[tw`text-[15px] text-gray-900 dark:text-slate-100`, {fontFamily: 'PlusJakartaSans_800ExtraBold'}]}>{staff.name}</Text>

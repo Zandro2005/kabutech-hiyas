@@ -15,14 +15,11 @@ export default function HomeScreenSkeleton() {
     >
       {/* Smart Halo Gauge Skeleton */}
       <View style={tw`px-5 sm:px-6 pt-2 pb-1`}>
-        {/* Top Row: User Avatar + Name & Mode Pill */}
+        {/* Top Row: Greetings & Mode Pill */}
         <View style={tw`w-full flex-row justify-between items-center mb-5`}>
-          <View style={tw`flex-row items-center gap-3`}>
-            <Skeleton width={44} height={44} borderRadius={22} />
-            <View style={tw`gap-1.5`}>
-              <Skeleton width={110} height={16} borderRadius={6} />
-              <Skeleton width={130} height={12} borderRadius={4} />
-            </View>
+          <View style={tw`gap-1.5 flex-1 mr-2`}>
+            <Skeleton width={130} height={20} borderRadius={6} />
+            <Skeleton width={140} height={14} borderRadius={4} />
           </View>
           <Skeleton width={84} height={28} borderRadius={14} />
         </View>

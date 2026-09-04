@@ -22,6 +22,7 @@ import Svg, {
   Line,
   Circle,
   Text as SvgText,
+  Rect,
 } from 'react-native-svg';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { MaterialCommunityIcons, Ionicons } from '@expo/vector-icons';
@@ -104,6 +105,7 @@ export default function ReportScreen() {
   const [activeHorizon, setActiveHorizon] = useState<ForecastHorizon>('2H');
 
   const [scrubIndex, setScrubIndex] = useState<number | null>(null);
+  const chartScrollRef = useRef<ScrollView>(null);
 
   // Modal
   const [showSuggestionsModal, setShowSuggestionsModal] = useState(false);
@@ -170,10 +172,10 @@ export default function ReportScreen() {
   const liveLight = typeof sensors.light === 'number' && sensors.light >= 0 ? sensors.light : 430;
   const liveCo2 = typeof sensors.co2 === 'number' && sensors.co2 > 0 ? sensors.co2 : 760;
 
-  const targetTemp = settings?.setpoints?.temperature ?? 24.0;
-  const targetHum = settings?.setpoints?.humidity ?? 75;
-  const targetLight = settings?.setpoints?.light ?? 400;
-  const targetCo2 = settings?.setpoints?.co2 ?? 800;
+  const targetTemp = settings?.setpoints?.temperature ?? 28.0;
+  const targetHum = settings?.setpoints?.humidity ?? 85;
+  const targetLight = settings?.setpoints?.light ?? 580;
+  const targetCo2 = settings?.setpoints?.co2 ?? 690;
 
   const tempVariance = Number((liveTemp - targetTemp).toFixed(1));
   const humVariance = Number((liveHum - targetHum).toFixed(1));
@@ -411,6 +413,11 @@ export default function ReportScreen() {
     }, 600);
   };
 
+  // Reset horizontal scroll when changing metric or horizon
+  useEffect(() => {
+    chartScrollRef.current?.scrollTo({ x: 0, animated: true });
+  }, [activeMetric, activeHorizon]);
+
   // Forecast Chart calculations
   const chartData = useMemo(() => {
     const pointCount = activeHorizon === '2H' ? 9 : activeHorizon === '6H' ? 13 : 13;
@@ -453,24 +460,24 @@ export default function ReportScreen() {
       const relLabel = i === 0 ? 'Now' : `+${minutesOffset >= 60 ? `${(minutesOffset / 60).toFixed(0)}h` : `${minutesOffset}m`}`;
 
       let rawVal = baseVal;
-      let fixVal = baseVal;
 
       if (activeMetric === 'temp') {
-        const drift = Math.sin((i / (pointCount - 1)) * Math.PI) * 1.8 + (i / pointCount) * 0.4;
-        rawVal = Number((baseVal + drift).toFixed(1));
-        fixVal = i <= 1 ? baseVal : Number((targetVal + (Math.random() * 0.2 - 0.1)).toFixed(1));
+        const diff = baseVal - targetVal;
+        const trend = diff >= 0 ? 1 : -0.4;
+        const drift = (i / (pointCount - 1)) * (activeHorizon === '2H' ? 1.2 : activeHorizon === '6H' ? 2.2 : 3.4);
+        const osc = Math.sin((i / (pointCount - 1)) * Math.PI) * 0.3;
+        rawVal = Number((baseVal + trend * drift + osc).toFixed(1));
       } else if (activeMetric === 'hum') {
-        const drift = Math.sin((i / (pointCount - 1)) * Math.PI) * -14 - (i / pointCount) * 4;
-        rawVal = Math.round(Math.max(45, baseVal + drift));
-        fixVal = i <= 1 ? baseVal : Math.round(targetVal + (Math.random() * 2 - 1));
+        const drift = (i / (pointCount - 1)) * (activeHorizon === '2H' ? 8 : activeHorizon === '6H' ? 15 : 22);
+        const osc = Math.sin((i / (pointCount - 1)) * Math.PI) * 1.5;
+        rawVal = Math.round(Math.max(35, baseVal - drift + osc));
       } else if (activeMetric === 'light') {
-        const drift = Math.sin((i / (pointCount - 1)) * Math.PI) * 40 - (i / pointCount) * 15;
+        const drift = Math.sin((i / (pointCount - 1)) * Math.PI) * 25;
         rawVal = Math.max(0, Math.round(baseVal + drift));
-        fixVal = i <= 1 ? baseVal : Math.round(targetVal);
       } else {
-        const drift = (i / (pointCount - 1)) * 240;
-        rawVal = Math.round(baseVal + drift);
-        fixVal = i <= 1 ? baseVal : Math.round(targetVal - 40);
+        const drift = (i / (pointCount - 1)) * (activeHorizon === '2H' ? 140 : activeHorizon === '6H' ? 260 : 420);
+        const osc = Math.sin((i / (pointCount - 1)) * Math.PI) * 20;
+        rawVal = Math.round(baseVal + drift + osc);
       }
 
       return {
@@ -486,40 +493,66 @@ export default function ReportScreen() {
     return { points, unit, targetVal };
   }, [activeHorizon, activeMetric, liveTemp, liveHum, liveLight, liveCo2, targetTemp, targetHum, targetLight, targetCo2]);
 
-  const chartWidth = Math.max(300, width - 40);
-  const chartHeight = 150;
-  const paddingLeft = 14;
-  const paddingRight = 14;
-  const paddingTop = 16;
-  const paddingBottom = 26;
-  const plotW = chartWidth - paddingLeft - paddingRight;
+  const yAxisWidth = 46;
+  const chartHeight = 220;
+  const paddingTop = 22;
+  const paddingBottom = 32;
   const plotH = chartHeight - paddingTop - paddingBottom;
 
-  const minChartVal = useMemo(() => {
-    const vals = chartData.points.map((p) => p.rawVal);
-    vals.push(chartData.targetVal);
-    const min = Math.min(...vals);
-    return activeMetric === 'temp'
-      ? Math.floor(min - 0.5)
-      : activeMetric === 'hum'
-      ? Math.floor(min - 4)
-      : activeMetric === 'light'
-      ? Math.max(0, Math.floor(min - 40))
-      : Math.floor(min - 40);
-  }, [chartData, activeMetric]);
+  const pointSpacing = 56;
+  const scrollableChartWidth = useMemo(() => {
+    return Math.max(width - 50 - yAxisWidth, (chartData.points.length - 1) * pointSpacing + 50);
+  }, [width, yAxisWidth, chartData.points.length, pointSpacing]);
 
-  const maxChartVal = useMemo(() => {
+  const paddingLeft = 24;
+  const paddingRight = 24;
+  const plotW = scrollableChartWidth - paddingLeft - paddingRight;
+
+  // Allowed Y-axis steps: 5, 10, or 100 only (whole numbers only)
+  const yAxisStep: 5 | 10 | 100 = useMemo(() => {
+    if (activeMetric === 'temp') return 5;
+    if (activeMetric === 'hum') {
+      const vals = chartData.points.map((p) => p.rawVal).concat(chartData.targetVal);
+      const span = Math.max(...vals) - Math.min(...vals);
+      return span <= 20 ? 5 : 10;
+    }
+    if (activeMetric === 'light') {
+      const vals = chartData.points.map((p) => p.rawVal).concat(chartData.targetVal);
+      const span = Math.max(...vals) - Math.min(...vals);
+      return span <= 40 ? 10 : 100;
+    }
+    return 100; // CO2
+  }, [activeMetric, chartData]);
+
+  const { minChartVal, maxChartVal, yTicks } = useMemo(() => {
     const vals = chartData.points.map((p) => p.rawVal);
     vals.push(chartData.targetVal);
-    const max = Math.max(...vals);
-    return activeMetric === 'temp'
-      ? Math.ceil(max + 0.5)
-      : activeMetric === 'hum'
-      ? Math.ceil(max + 4)
-      : activeMetric === 'light'
-      ? Math.ceil(max + 40)
-      : Math.ceil(max + 40);
-  }, [chartData, activeMetric]);
+    const rawMin = Math.min(...vals);
+    const rawMax = Math.max(...vals);
+
+    let minVal = Math.floor(rawMin / yAxisStep) * yAxisStep;
+    let maxVal = Math.ceil(rawMax / yAxisStep) * yAxisStep;
+
+    // Ensure at least 2 steps (3 ticks) for proper proportional height
+    while (maxVal - minVal < yAxisStep * 2) {
+      minVal = Math.max(0, minVal - yAxisStep);
+      maxVal = maxVal + yAxisStep;
+    }
+
+    if (activeMetric === 'hum' && maxVal > 100) {
+      maxVal = 100;
+      if (maxVal - minVal < yAxisStep * 2) {
+        minVal = Math.max(0, 100 - yAxisStep * 2);
+      }
+    }
+
+    const ticks: number[] = [];
+    for (let v = maxVal; v >= minVal; v -= yAxisStep) {
+      ticks.push(Math.round(v));
+    }
+
+    return { minChartVal: minVal, maxChartVal: maxVal, yTicks: ticks };
+  }, [chartData, activeMetric, yAxisStep]);
 
   const getY = (val: number) => {
     const range = maxChartVal - minChartVal || 1;
@@ -530,7 +563,7 @@ export default function ReportScreen() {
     return paddingLeft + (idx / (chartData.points.length - 1)) * plotW;
   };
 
-  const rawPts = useMemo(() => chartData.points.map((p) => ({ x: getX(p.index), y: getY(p.rawVal) })), [chartData, minChartVal, maxChartVal]);
+  const rawPts = useMemo(() => chartData.points.map((p) => ({ x: getX(p.index), y: getY(p.rawVal) })), [chartData, minChartVal, maxChartVal, plotW, plotH]);
   const bezierPath = useMemo(() => getBezierPath(rawPts), [rawPts]);
   const areaPath = useMemo(() => getAreaPath(rawPts, chartHeight - paddingBottom), [rawPts, chartHeight, paddingBottom]);
   const targetY = getY(chartData.targetVal);
@@ -745,7 +778,7 @@ export default function ReportScreen() {
                 Forecast Trajectory
               </Text>
               <Text style={[tw`text-[10px] text-slate-400 dark:text-slate-500`, { fontFamily: 'PlusJakartaSans_500Medium' }]}>
-                Predictive model · tap dots to inspect
+                24h Environmental Model
               </Text>
             </View>
             <View style={tw`bg-blue-50 dark:bg-blue-950/40 px-2.5 py-1 rounded-full flex-row items-center gap-1`}>
@@ -830,106 +863,178 @@ export default function ReportScreen() {
             </View>
           </View>
 
-          {/* Minimal Scrubber Line */}
-          <View style={tw`flex-row items-center justify-between mb-2 px-1`}>
-            <Text style={[tw`text-[11px] text-slate-500 dark:text-slate-400`, { fontFamily: 'PlusJakartaSans_600SemiBold' }]}>
-              {activeScrubPoint.fullTimeLabel} ({activeScrubPoint.relLabel}):{' '}
-              <Text style={[tw`text-slate-900 dark:text-white`, { fontFamily: 'PlusJakartaSans_800ExtraBold' }]}>
+          {/* Minimal Current Point & Target Readout */}
+          <View style={tw`flex-row items-center justify-between px-1`}>
+            <Text style={[tw`text-xs text-slate-500 dark:text-slate-400`, { fontFamily: 'PlusJakartaSans_600SemiBold' }]}>
+              {activeScrubPoint.timeLabel} ·{' '}
+              <Text style={[tw`text-slate-900 dark:text-white font-bold`, { fontFamily: 'PlusJakartaSans_800ExtraBold' }]}>
                 {activeScrubPoint.val} {chartData.unit}
               </Text>
             </Text>
-            <Text style={[tw`text-[10px] text-slate-400`, { fontFamily: 'PlusJakartaSans_600SemiBold' }]}>
-              Target: {chartData.targetVal} {chartData.unit}
-            </Text>
+            <View style={tw`flex-row items-center gap-1.5`}>
+              <View style={[tw`w-3 h-0.5 border-b border-dashed`, { borderColor: isDarkMode ? '#94a3b8' : '#64748b' }]} />
+              <Text style={[tw`text-[11px] text-slate-400 dark:text-slate-500`, { fontFamily: 'PlusJakartaSans_600SemiBold' }]}>
+                Target: {chartData.targetVal} {chartData.unit}
+              </Text>
+            </View>
           </View>
 
-          {/* SVG Smooth Curve */}
-          <View style={{ height: chartHeight, width: chartWidth, alignSelf: 'center' }}>
-            <Svg width={chartWidth} height={chartHeight}>
-              <Defs>
-                <SvgGradient id="chartGradient" x1="0" y1="0" x2="0" y2="1">
-                  <Stop offset="0%" stopColor={metricColor} stopOpacity={0.3} />
-                  <Stop offset="100%" stopColor={metricColor} stopOpacity={0.0} />
-                </SvgGradient>
-              </Defs>
-
-              {/* Target guideline */}
-              <Line
-                x1={paddingLeft}
-                y1={targetY}
-                x2={chartWidth - paddingRight}
-                y2={targetY}
-                stroke={isDarkMode ? '#475569' : '#cbd5e1'}
-                strokeWidth={1.5}
-                strokeDasharray="4 4"
-              />
-
-              {/* Gradient Area Fill */}
-              {areaPath ? <Path d={areaPath} fill="url(#chartGradient)" /> : null}
-
-              {/* Main predictive curve */}
-              {bezierPath ? (
-                <Path
-                  d={bezierPath}
-                  fill="none"
-                  stroke={metricColor}
-                  strokeWidth={2.5}
-                />
-              ) : null}
-
-              {/* Dot indicators */}
-              {chartData.points.map((p, idx) => {
-                const cx = getX(idx);
-                const cy = getY(p.val);
-                const isSelected = scrubIndex === idx;
-
-                return (
-                  <Circle
-                    key={`dot-${idx}`}
-                    cx={cx}
-                    cy={cy}
-                    r={isSelected ? 5 : 3.5}
-                    fill={metricColor}
-                    stroke={isDarkMode ? '#0f172a' : '#ffffff'}
-                    strokeWidth={1.5}
-                  />
-                );
-              })}
-
-              {/* Time tick labels */}
-              {chartData.points.map((p, idx) => {
-                if (idx % 2 !== 0 && idx !== chartData.points.length - 1) return null;
-                const cx = getX(idx);
-                return (
-                  <SvgText
-                    key={`label-${idx}`}
-                    x={cx}
-                    y={chartHeight - 8}
-                    fill={isDarkMode ? '#64748b' : '#94a3b8'}
-                    fontSize="9"
-                    fontWeight="600"
-                    textAnchor="middle"
-                  >
-                    {p.timeLabel}
-                  </SvgText>
-                );
-              })}
-            </Svg>
-
-            {/* Invisible scrubber tap overlay */}
-            <View style={tw`absolute inset-0 flex-row`}>
-              {chartData.points.map((_, idx) => (
-                <TouchableOpacity
-                  key={`touch-${idx}`}
-                  activeOpacity={1}
-                  onPress={() => {
-                    hapticSelection();
-                    setScrubIndex(idx);
+          {/* Main Chart Container with Fixed Y-Axis and Swipable Plot */}
+          <View style={tw`flex-row items-start mt-4 pt-1`}>
+            {/* Fixed Left Y-Axis */}
+            <View style={{ width: yAxisWidth, height: chartHeight, position: 'relative' }}>
+              {yTicks.map((val, idx) => (
+                <View
+                  key={`ytick-${idx}`}
+                  style={{
+                    position: 'absolute',
+                    top: Math.round(getY(val) - 8),
+                    right: 8,
+                    alignItems: 'flex-end',
                   }}
-                  style={tw`flex-1`}
-                />
+                >
+                  <Text
+                    style={[
+                      tw`text-[11px] text-slate-400 dark:text-slate-500 font-bold`,
+                      { fontFamily: 'PlusJakartaSans_700Bold' },
+                    ]}
+                  >
+                    {val}
+                  </Text>
+                </View>
               ))}
             </View>
+
+            {/* Swipable Chart Timeline */}
+            <ScrollView
+              ref={chartScrollRef}
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              nestedScrollEnabled
+              contentContainerStyle={{ paddingRight: 16 }}
+              style={tw`flex-1`}
+            >
+              <View style={{ height: chartHeight, width: scrollableChartWidth }}>
+                <Svg width={scrollableChartWidth} height={chartHeight}>
+                  <Defs>
+                    <SvgGradient id="chartGradient" x1="0" y1="0" x2="0" y2="1">
+                      <Stop offset="0%" stopColor={metricColor} stopOpacity={0.3} />
+                      <Stop offset="100%" stopColor={metricColor} stopOpacity={0.0} />
+                    </SvgGradient>
+                  </Defs>
+
+                  {/* Horizontal grid lines */}
+                  {yTicks.map((val, idx) => (
+                    <Line
+                      key={`grid-${idx}`}
+                      x1={0}
+                      y1={getY(val)}
+                      x2={scrollableChartWidth}
+                      y2={getY(val)}
+                      stroke={isDarkMode ? 'rgba(51, 65, 85, 0.45)' : 'rgba(226, 232, 240, 0.85)'}
+                      strokeWidth={1}
+                    />
+                  ))}
+
+                  {/* Target guideline (gray broken / dashed line) */}
+                  <Line
+                    x1={0}
+                    y1={targetY}
+                    x2={scrollableChartWidth}
+                    y2={targetY}
+                    stroke={isDarkMode ? '#64748b' : '#94a3b8'}
+                    strokeWidth={1.5}
+                    strokeDasharray="6 4"
+                  />
+
+
+                  {/* Gradient Area Fill */}
+                  {areaPath ? <Path d={areaPath} fill="url(#chartGradient)" /> : null}
+
+                  {/* Main predictive curve */}
+                  {bezierPath ? (
+                    <Path
+                      d={bezierPath}
+                      fill="none"
+                      stroke={metricColor}
+                      strokeWidth={2.5}
+                    />
+                  ) : null}
+
+                  {/* Dot indicators and scrub guidelines */}
+                  {chartData.points.map((p, idx) => {
+                    const cx = getX(idx);
+                    const cy = getY(p.val);
+                    const isSelected = scrubIndex === idx;
+
+                    return (
+                      <React.Fragment key={`dot-${idx}`}>
+                        {isSelected && (
+                          <Line
+                            x1={cx}
+                            y1={paddingTop}
+                            x2={cx}
+                            y2={chartHeight - paddingBottom}
+                            stroke={metricColor}
+                            strokeWidth={1}
+                            strokeDasharray="3 3"
+                            opacity={0.6}
+                          />
+                        )}
+                        <Circle
+                          cx={cx}
+                          cy={cy}
+                          r={isSelected ? 5.5 : 3.5}
+                          fill={isSelected ? metricColor : isDarkMode ? '#0f172a' : '#ffffff'}
+                          stroke={metricColor}
+                          strokeWidth={1.5}
+                        />
+                      </React.Fragment>
+                    );
+                  })}
+
+                  {/* Time tick labels - simplified to prevent text clutter */}
+                  {chartData.points.map((p, idx) => {
+                    const isSelected = scrubIndex === idx;
+                    const step = chartData.points.length > 8 ? 2 : 1;
+                    const isTick = idx % step === 0;
+                    const isLast = idx === chartData.points.length - 1;
+
+                    if (!isSelected && !isTick && !isLast) return null;
+
+                    const cx = getX(idx);
+                    return (
+                      <SvgText
+                        key={`label-${idx}`}
+                        x={cx}
+                        y={chartHeight - 8}
+                        fill={isSelected ? (isDarkMode ? '#38bdf8' : '#0284c7') : isDarkMode ? '#64748b' : '#94a3b8'}
+                        fontSize="9"
+                        fontWeight={isSelected ? '800' : '600'}
+                        textAnchor="middle"
+                      >
+                        {p.timeLabel}
+                      </SvgText>
+                    );
+                  })}
+                </Svg>
+
+                {/* Scrubber tap overlay */}
+                <View style={[tw`absolute inset-0 flex-row`, { paddingLeft, paddingRight }]}>
+                  {chartData.points.map((_, idx) => (
+                    <TouchableOpacity
+                      key={`touch-${idx}`}
+                      activeOpacity={0.7}
+                      onPress={() => {
+                        hapticSelection();
+                        setScrubIndex(idx);
+                      }}
+                      style={tw`flex-1 h-full`}
+                    />
+                  ))}
+                </View>
+              </View>
+            </ScrollView>
           </View>
         </View>
 

@@ -15,6 +15,7 @@ import { useAuth } from '../context/AuthContext';
 import { useActivityLogs, useAllUsers } from '../hooks/useFirebaseData';
 import { ref, update } from 'firebase/database';
 import { db } from '../services/firebase';
+import { getAvatarColor } from '../utils/avatarColor';
 
 interface ScreenHeaderProps {
   title?: string;
@@ -115,7 +116,13 @@ export default React.memo(function ScreenHeader({ title, subtitle, rightComponen
                 navigation.navigate('Main' as any, { screen: 'Profile' } as any);
               }
             }}
-            style={tw`w-8 h-8 rounded-full bg-emerald-600 dark:bg-emerald-500 items-center justify-center border border-emerald-700/20 shadow-sm`}
+            style={[
+              tw`w-8 h-8 rounded-full items-center justify-center border shadow-sm`,
+              {
+                backgroundColor: getAvatarColor(profile?.name || user?.email || 'User'),
+                borderColor: 'rgba(255,255,255,0.3)',
+              }
+            ]}
           >
             <Text style={[tw`text-white text-xs`, { fontFamily: 'PlusJakartaSans_800ExtraBold' }]}>
               {profile?.name ? profile.name.charAt(0).toUpperCase() : 'U'}

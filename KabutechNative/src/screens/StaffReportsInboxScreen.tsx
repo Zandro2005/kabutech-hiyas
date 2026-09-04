@@ -10,6 +10,7 @@ import { ref, update } from 'firebase/database';
 import { db } from '../services/firebase';
 import { showToast } from '../components/CustomToast';
 import { useAuth } from '../context/AuthContext';
+import { getAvatarTheme } from '../utils/avatarColor';
 
 const ACTION_TYPES = [
   { id: 'harvest', label: 'Harvest', icon: 'leaf', color: '#10b981' },
@@ -142,42 +143,55 @@ export default function StaffReportsInboxScreen() {
               </Text>
             </View>
           ) : (
-            staffGroups.map(staff => (
-              <TouchableOpacity
-                key={staff.name}
-                onPress={() => {
-                  setSelectedStaffName(staff.name);
-                  setFilter(staff.pendingCount > 0 ? 'pending' : 'reviewed');
-                  setSelectedDate(null);
-                }}
-                style={tw`flex-row items-center justify-between bg-white dark:bg-slate-800 p-4 rounded-2xl mb-3 shadow-sm border border-gray-100 dark:border-slate-700`}
-              >
-                <View style={tw`flex-row items-center gap-3`}>
-                  <View style={tw`w-12 h-12 rounded-full bg-emerald-100 dark:bg-emerald-900/30 items-center justify-center`}>
-                    <Text style={tw`text-emerald-700 dark:text-emerald-400 font-bold text-lg`}>
-                      {staff.name.charAt(0).toUpperCase()}
-                    </Text>
+            staffGroups.map(staff => {
+              const staffTheme = getAvatarTheme(staff.name);
+              return (
+                <TouchableOpacity
+                  hitSlop={{ top: 15, bottom: 15, left: 15, right: 15 }}
+                  key={staff.name}
+                  onPress={() => {
+                    setSelectedStaffName(staff.name);
+                    setFilter(staff.pendingCount > 0 ? 'pending' : 'reviewed');
+                    setSelectedDate(null);
+                  }}
+                  style={tw`flex-row items-center justify-between bg-white dark:bg-slate-800 p-4 rounded-2xl mb-3 shadow-sm border border-gray-100 dark:border-slate-700`}
+                >
+                  <View style={tw`flex-row items-center gap-3`}>
+                    <View style={[
+                      tw`w-12 h-12 rounded-full items-center justify-center border`,
+                      {
+                        backgroundColor: isDarkMode ? staffTheme.bgDark : staffTheme.bgLight,
+                        borderColor: staffTheme.border,
+                      }
+                    ]}>
+                      <Text style={[
+                        tw`font-bold text-lg`,
+                        { color: isDarkMode ? staffTheme.textDark : staffTheme.textLight }
+                      ]}>
+                        {staff.name.charAt(0).toUpperCase()}
+                      </Text>
+                    </View>
+                    <View>
+                      <Text style={[tw`text-base text-gray-900 dark:text-white`, {fontFamily: 'PlusJakartaSans_800ExtraBold'}]}>
+                        {staff.name}
+                      </Text>
+                      <Text style={[tw`text-xs text-gray-500 dark:text-slate-400 mt-0.5`, {fontFamily: 'PlusJakartaSans_500Medium'}]}>
+                        {staff.logs.length} total reports
+                      </Text>
+                    </View>
                   </View>
-                  <View>
-                    <Text style={[tw`text-base text-gray-900 dark:text-white`, {fontFamily: 'PlusJakartaSans_800ExtraBold'}]}>
-                      {staff.name}
-                    </Text>
-                    <Text style={[tw`text-xs text-gray-500 dark:text-slate-400 mt-0.5`, {fontFamily: 'PlusJakartaSans_500Medium'}]}>
-                      {staff.logs.length} total reports
-                    </Text>
-                  </View>
-                </View>
-                {staff.pendingCount > 0 ? (
-                  <View style={tw`bg-rose-500 px-2.5 py-1 rounded-full`}>
-                    <Text style={[tw`text-white text-xs font-bold`, {fontFamily: 'PlusJakartaSans_800ExtraBold'}]}>
-                      {staff.pendingCount} new
-                    </Text>
-                  </View>
-                ) : (
-                  <MaterialCommunityIcons name="chevron-right" size={24} color={tw.color('gray-400')} />
-                )}
-              </TouchableOpacity>
-            ))
+                  {staff.pendingCount > 0 ? (
+                    <View style={tw`bg-rose-500 px-2.5 py-1 rounded-full`}>
+                      <Text style={[tw`text-white text-xs font-bold`, {fontFamily: 'PlusJakartaSans_800ExtraBold'}]}>
+                        {staff.pendingCount} new
+                      </Text>
+                    </View>
+                  ) : (
+                    <MaterialCommunityIcons name="chevron-right" size={24} color={tw.color('gray-400')} />
+                  )}
+                </TouchableOpacity>
+              );
+            })
           )}
         </ScrollView>
       ) : (
@@ -265,8 +279,9 @@ export default function StaffReportsInboxScreen() {
               </View>
             ) : (
               displayedLogs.map(log => {
-                const actionDef = ACTION_TYPES.find(t => t.id === log.action) || ACTION_TYPES[6];
                 const logDate = new Date(log.timestamp);
+                const actionDef = ACTION_TYPES.find(t => t.id === log.action) || ACTION_TYPES[6];
+                const authorTheme = getAvatarTheme(log.staffName);
                 
                 return (
                   <View key={log.id} style={tw`bg-white dark:bg-slate-800 rounded-xl p-3 shadow-sm border border-gray-100 dark:border-slate-700 mb-2.5`}>
@@ -274,8 +289,19 @@ export default function StaffReportsInboxScreen() {
                     {/* Header: Avatar, Name, Date, Status */}
                     <View style={tw`flex-row justify-between items-center mb-2.5`}>
                       <View style={tw`flex-row items-center gap-2.5`}>
-                        <View style={tw`w-9 h-9 rounded-full bg-slate-100 dark:bg-slate-700 items-center justify-center`}>
-                          <Text style={tw`text-[15px] text-slate-500 dark:text-slate-300 font-bold`}>{log.staffName?.charAt(0).toUpperCase() || 'S'}</Text>
+                        <View style={[
+                          tw`w-9 h-9 rounded-full items-center justify-center border`,
+                          {
+                            backgroundColor: isDarkMode ? authorTheme.bgDark : authorTheme.bgLight,
+                            borderColor: authorTheme.border,
+                          }
+                        ]}>
+                          <Text style={[
+                            tw`text-[15px] font-bold`,
+                            { color: isDarkMode ? authorTheme.textDark : authorTheme.textLight }
+                          ]}>
+                            {log.staffName?.charAt(0).toUpperCase() || 'S'}
+                          </Text>
                         </View>
                         <View>
                           <Text style={[tw`text-[14px] text-gray-900 dark:text-slate-100 leading-tight`, {fontFamily: 'PlusJakartaSans_800ExtraBold'}]}>{log.staffName}</Text>

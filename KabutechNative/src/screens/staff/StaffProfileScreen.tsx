@@ -14,6 +14,7 @@ import { useTheme } from '../../context/ThemeContext';
 import { useStaffTasks } from '../../hooks/useFirebaseData';
 import { hapticLight, hapticMedium } from '../../utils/haptics';
 import ProfileScreenSkeleton from '../../components/skeletons/ProfileScreenSkeleton';
+import { getAvatarTheme } from '../../utils/avatarColor';
 
 export default function StaffProfileScreen() {
   const { isDarkMode } = useTheme();
@@ -48,6 +49,7 @@ export default function StaffProfileScreen() {
   const name = profile?.name || user?.displayName || 'Unknown User';
   const role = profile?.role ? profile.role.toUpperCase() : 'STAFF';
   const email = profile?.email || user?.email || 'No email';
+  const avatarTheme = getAvatarTheme(profile?.name || user?.email || 'User');
   const initials = name.split(' ').map((n: string) => n[0]).join('').substring(0, 2).toUpperCase();
 
   return (
@@ -74,8 +76,20 @@ export default function StaffProfileScreen() {
         <View style={tw`bg-white dark:bg-slate-900 rounded-[26px] p-4.5 border border-slate-200/70 dark:border-slate-800 shadow-sm mb-4`}>
           <View style={tw`flex-row items-center justify-between`}>
             <View style={tw`flex-row items-center gap-3.5 flex-1 mr-2`}>
-              <View style={tw`w-13 h-13 rounded-2xl bg-emerald-500/10 border border-emerald-500/20 items-center justify-center`}>
-                <Text style={[tw`text-emerald-600 dark:text-emerald-400 text-lg`, { fontFamily: 'PlusJakartaSans_800ExtraBold' }]}>
+              <View style={[
+                tw`w-13 h-13 rounded-2xl border items-center justify-center`,
+                {
+                  backgroundColor: isDarkMode ? avatarTheme.bgDark : avatarTheme.bgLight,
+                  borderColor: avatarTheme.border,
+                }
+              ]}>
+                <Text style={[
+                  tw`text-lg`,
+                  {
+                    color: isDarkMode ? avatarTheme.textDark : avatarTheme.textLight,
+                    fontFamily: 'PlusJakartaSans_800ExtraBold'
+                  }
+                ]}>
                   {initials}
                 </Text>
               </View>
