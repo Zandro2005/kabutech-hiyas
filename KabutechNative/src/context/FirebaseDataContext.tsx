@@ -10,6 +10,7 @@ const defaultSensors: SensorData = {
   humidity: 0,
   light: 0,
   co2: 0,
+  waterLevel: 75,
   esp32_status: 'offline'
 };
 

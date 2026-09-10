@@ -14,6 +14,7 @@ import AiInsightModal from '../components/AiInsightModal';
 import CriticalSystemAlerts from '../components/CriticalSystemAlerts';
 import LiveFarmCard from '../components/LiveFarmCard';
 import EnvironmentMetricsGrid from '../components/EnvironmentMetricsGrid';
+import WaterLevelCard from '../components/WaterLevelCard';
 import ScoreArch from '../components/ScoreArch';
 import HomeScreenSkeleton from '../components/skeletons/HomeScreenSkeleton';
 import { ref, update } from 'firebase/database';
@@ -46,6 +47,7 @@ export default function HomeScreen() {
   const hum = typeof sensors.humidity === 'number' ? sensors.humidity : 55.2;
   const co2 = typeof sensors.co2 === 'number' ? sensors.co2 : 450;
   const light = typeof sensors.light === 'number' ? sensors.light : 490;
+  const waterLevel = typeof sensors.waterLevel === 'number' ? sensors.waterLevel : 75;
 
   const isAuto = String(settings?.setpoints?.mode).toLowerCase() === 'auto';
   const isScheduled = String(settings?.setpoints?.mode).toLowerCase() === 'scheduled';
@@ -115,6 +117,9 @@ export default function HomeScreen() {
 
         {/* Health Metrics (2x2 Grid) */}
         <EnvironmentMetricsGrid temp={temp} hum={hum} light={light} co2={co2} navigation={navigation} />
+
+        {/* Water Reservoir Level Indicator */}
+        <WaterLevelCard waterLevel={waterLevel} navigation={navigation} />
 
         {/* Critical System Alerts */}
         <CriticalSystemAlerts alerts={alerts} onAlertPress={() => navigation.navigate('Analytics' as never)} />

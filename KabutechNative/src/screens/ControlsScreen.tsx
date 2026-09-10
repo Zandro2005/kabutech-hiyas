@@ -43,6 +43,7 @@ export default function ControlsScreen() {
   const hum = typeof sensors.humidity === 'number' ? sensors.humidity : 51;
   const light = typeof sensors.light === 'number' ? sensors.light : 71;
   const co2 = typeof sensors.co2 === 'number' ? sensors.co2 : 583;
+  const waterLevel = typeof sensors.waterLevel === 'number' ? sensors.waterLevel : 75;
 
   const targetTemp = settings?.setpoints?.temperature || 28.0;
   const targetHum = settings?.setpoints?.humidity || 85;
@@ -478,6 +479,16 @@ export default function ControlsScreen() {
             </View>
           </View>
 
+          {/* Low Water Warning Banner */}
+          {waterLevel <= 20 && (
+            <View style={tw`mb-2.5 bg-rose-500/10 border border-rose-500/30 rounded-2xl px-3.5 py-2 flex-row items-center gap-2.5`}>
+              <MaterialCommunityIcons name="alert-circle-outline" size={16} color="#ef4444" />
+              <Text style={[tw`text-[11px] text-rose-700 dark:text-rose-300 flex-1`, { fontFamily: 'PlusJakartaSans_600SemiBold' }]}>
+                Water reservoir low ({Math.round(waterLevel)}%). Refill container to protect pump.
+              </Text>
+            </View>
+          )}
+
           {/* Unified Single Widget Bar */}
           <View style={[
             tw`bg-white dark:bg-slate-900 rounded-[24px] py-3.5 px-2 border border-slate-200/70 dark:border-slate-800 shadow-sm flex-row items-center justify-between`,
@@ -525,6 +536,16 @@ export default function ControlsScreen() {
                       {showActive ? 'ON' : 'OFF'}
                     </Text>
                   </View>
+
+                  {/* Water level badge for misters */}
+                  {device.key === 'misters' && (
+                    <View style={tw`flex-row items-center gap-0.5 mt-0.5`}>
+                      <MaterialCommunityIcons name="water" size={10} color={waterLevel <= 20 ? '#ef4444' : '#0ea5e9'} />
+                      <Text style={[tw`text-[8.5px]`, { color: waterLevel <= 20 ? '#ef4444' : (isDarkMode ? '#38bdf8' : '#0284c7'), fontFamily: 'PlusJakartaSans_700Bold' }]}>
+                        {Math.round(waterLevel)}%
+                      </Text>
+                    </View>
+                  )}
                 </TouchableOpacity>
               );
             })}

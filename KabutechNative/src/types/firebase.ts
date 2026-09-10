@@ -3,6 +3,7 @@ export interface SensorData {
   humidity: number;
   light: number;
   co2: number;
+  waterLevel?: number;
   esp32_status: 'online' | 'offline';
 }
 

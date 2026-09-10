@@ -13,6 +13,7 @@ import ScreenHeader from '../../components/ScreenHeader';
 import CriticalSystemAlerts from '../../components/CriticalSystemAlerts';
 import LiveFarmCard from '../../components/LiveFarmCard';
 import EnvironmentMetricsGrid from '../../components/EnvironmentMetricsGrid';
+import WaterLevelCard from '../../components/WaterLevelCard';
 import ScoreArch from '../../components/ScoreArch';
 import HomeScreenSkeleton from '../../components/skeletons/HomeScreenSkeleton';
 import { computeScheduledDevicesState } from '../../utils/scheduleLogic';
@@ -39,6 +40,7 @@ export default function StaffHomeScreen() {
   const hum = typeof sensors.humidity === 'number' ? sensors.humidity : 55.2;
   const light = typeof sensors.light === 'number' ? sensors.light : 490;
   const co2 = typeof sensors.co2 === 'number' ? sensors.co2 : 650;
+  const waterLevel = typeof sensors.waterLevel === 'number' ? sensors.waterLevel : 75;
 
   // Real-time system mode configured by Admin
   const isAuto = String(settings?.setpoints?.mode).toLowerCase() === 'auto';
@@ -93,6 +95,9 @@ export default function StaffHomeScreen() {
 
         {/* Health Metrics (2x2 Grid) */}
         <EnvironmentMetricsGrid temp={temp} hum={hum} light={light} co2={co2} navigation={navigation} />
+
+        {/* Water Reservoir Level Indicator */}
+        <WaterLevelCard waterLevel={waterLevel} navigation={navigation} />
 
         {/* Critical System Alerts */}
         <CriticalSystemAlerts alerts={alerts} onAlertPress={() => navigation.navigate('Analytics' as never)} />

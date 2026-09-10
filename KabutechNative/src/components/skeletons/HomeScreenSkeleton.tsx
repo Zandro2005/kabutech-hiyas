@@ -83,6 +83,22 @@ export default function HomeScreenSkeleton() {
         </View>
       </View>
 
+      {/* Water Level Card Skeleton */}
+      <View style={tw`px-6 pt-5`}>
+        <View
+          style={[
+            tw`bg-white dark:bg-slate-900 rounded-[28px] p-5 border border-slate-100 dark:border-slate-800/80 shadow-sm flex-row items-center gap-4`,
+          ]}
+        >
+          <Skeleton width={80} height={130} borderRadius={18} />
+          <View style={tw`flex-1 gap-2.5`}>
+            <Skeleton width={110} height={14} borderRadius={4} />
+            <Skeleton width={80} height={36} borderRadius={8} />
+            <Skeleton width="100%" height={24} borderRadius={8} />
+          </View>
+        </View>
+      </View>
+
       {/* Critical System Alerts Card Skeleton */}
       <View style={tw`px-6 pt-5`}>
         <View
