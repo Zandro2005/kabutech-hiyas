@@ -47,8 +47,8 @@
 // ═══════════════════════════════════════════════
 
 // WiFi Credentials
-#define WIFI_SSID       "YOUR_WIFI_SSID"
-#define WIFI_PASSWORD   "YOUR_WIFI_PASSWORD"
+#define WIFI_SSID       "Abad_Fam"
+#define WIFI_PASSWORD   "Connecting123"
 
 // Firebase Project Config
 #define API_KEY         "AIzaSyA3rB7rKIrfdJzCnFdnGvk25n0rd_hHI7M"
@@ -65,6 +65,12 @@
 #define MQ135_PIN       6       // MQ-135 analog output (ADC)
 #define WATER_SIG_PIN   7       // Water level signal (ADC)
 #define WATER_PWR_PIN   8       // Water level power (GPIO to prevent corrosion)
+
+// Actuator LEDs
+#define PIN_FAN_EXHAUST 9
+#define PIN_FAN_INTAKE  10
+#define PIN_MISTER      11
+#define PIN_LIGHT       12
 
 // ═══════════════════════════════════════════════
 //  TIMING CONFIG
@@ -91,6 +97,7 @@
 DHT dht(DHT_PIN, DHT_TYPE);
 
 FirebaseData fbdo;
+FirebaseData streamDO; // For listening to actuator changes
 FirebaseAuth auth;
 FirebaseConfig config;
 
@@ -99,6 +106,40 @@ unsigned long lastHeartbeat   = 0;
 unsigned long bootTime        = 0;
 bool firebaseReady            = false;
 bool mq135WarmedUp            = false;
+
+// ═══════════════════════════════════════════════
+//  FIREBASE STREAM CALLBACKS
+// ═══════════════════════════════════════════════
+
+void streamCallback(FirebaseStream data) {
+  String path = data.dataPath();
+  
+  if (data.dataType() == "boolean") {
+    bool state = data.boolData();
+    if (path == "/fans") digitalWrite(PIN_FAN_EXHAUST, state ? HIGH : LOW);
+    else if (path == "/co2") digitalWrite(PIN_FAN_INTAKE, state ? HIGH : LOW);
+    else if (path == "/misters") digitalWrite(PIN_MISTER, state ? HIGH : LOW);
+    else if (path == "/lights") digitalWrite(PIN_LIGHT, state ? HIGH : LOW);
+    
+    Serial.printf("   [Actuator] %s set to %s\n", path.c_str(), state ? "ON" : "OFF");
+  } 
+  else if (data.dataType() == "json") {
+    // When the whole devices object is updated
+    FirebaseJson *json = data.jsonObjectPtr();
+    FirebaseJsonData result;
+    
+    if (json->get(result, "fans")) digitalWrite(PIN_FAN_EXHAUST, result.to<bool>() ? HIGH : LOW);
+    if (json->get(result, "co2")) digitalWrite(PIN_FAN_INTAKE, result.to<bool>() ? HIGH : LOW);
+    if (json->get(result, "misters")) digitalWrite(PIN_MISTER, result.to<bool>() ? HIGH : LOW);
+    if (json->get(result, "lights")) digitalWrite(PIN_LIGHT, result.to<bool>() ? HIGH : LOW);
+    
+    Serial.println("   [Actuator] Initial states loaded from Firebase.");
+  }
+}
+
+void streamTimeoutCallback(bool timeout) {
+  if (timeout) Serial.println("   [Stream] Firebase connection timeout, resuming...");
+}
 
 // ═══════════════════════════════════════════════
 //  SETUP
@@ -116,6 +157,18 @@ void setup() {
   dht.begin();
   pinMode(WATER_PWR_PIN, OUTPUT);
   digitalWrite(WATER_PWR_PIN, LOW);  // Keep water sensor powered off by default
+  
+  // ── Initialize Actuator LEDs ──
+  pinMode(PIN_FAN_EXHAUST, OUTPUT);
+  pinMode(PIN_FAN_INTAKE, OUTPUT);
+  pinMode(PIN_MISTER, OUTPUT);
+  pinMode(PIN_LIGHT, OUTPUT);
+  
+  // Start with LEDs off
+  digitalWrite(PIN_FAN_EXHAUST, LOW);
+  digitalWrite(PIN_FAN_INTAKE, LOW);
+  digitalWrite(PIN_MISTER, LOW);
+  digitalWrite(PIN_LIGHT, LOW);
   
   // ADC resolution (ESP32-S3 supports 12-bit)
   analogReadResolution(12);
@@ -146,9 +199,13 @@ void setup() {
   config.api_key = API_KEY;
   config.database_url = DATABASE_URL;
 
-  // Use anonymous authentication
-  auth.user.email = "";
-  auth.user.password = "";
+  // Sign up / log in anonymously
+  if (Firebase.signUp(&config, &auth, "", "")) {
+    Serial.println("✅ Firebase anonymous sign-in successful!");
+    firebaseReady = true;
+  } else {
+    Serial.printf("❌ Firebase sign-in failed: %s\n", config.signer.signupError.message.c_str());
+  }
 
   // Token status callback
   config.token_status_callback = tokenStatusCallback;  // from TokenHelper.h
@@ -159,6 +216,13 @@ void setup() {
 
   // Allow large payloads
   fbdo.setBSSLBufferSize(4096, 1024);
+  streamDO.setBSSLBufferSize(4096, 1024);
+
+  // Start stream for actuator settings
+  if (!Firebase.RTDB.beginStream(&streamDO, "/kabutech/settings/setpoints/devices")) {
+    Serial.printf("❌ Stream begin error: %s\n", streamDO.errorReason().c_str());
+  }
+  Firebase.RTDB.setStreamCallback(&streamDO, streamCallback, streamTimeoutCallback);
 
   bootTime = millis();
 
@@ -182,6 +246,9 @@ struct DHTReading {
   float humidity;
   bool valid;
 };
+
+// Manually declare prototype to fix Arduino IDE preprocessor bug
+DHTReading readDHT();
 
 DHTReading readDHT() {
   DHTReading r;

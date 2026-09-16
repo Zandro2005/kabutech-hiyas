@@ -60,6 +60,10 @@ Open `kabutech_prototype.ino` and update your WiFi credentials:
 | **GPIO 7** | Water Level S | Analog signal |
 | **GPIO 8** | Water Level + | Digital power (toggled to prevent electrolysis corrosion) |
 | **GND** | Water Level - | Ground |
+| **GPIO 9** | FANS LED | Connect LED anode (long leg) to GPIO 9. Connect cathode (short leg) to a 220Ω resistor, then to GND. |
+| **GPIO 10**| VALVE (CO2) LED | Connect LED anode to GPIO 10. Connect cathode to a 220Ω resistor, then to GND. |
+| **GPIO 11**| MISTERS LED | Connect LED anode to GPIO 11. Connect cathode to a 220Ω resistor, then to GND. |
+| **GPIO 12**| LIGHTS LED | Connect LED anode to GPIO 12. Connect cathode to a 220Ω resistor, then to GND. |
 
 ---
 
@@ -77,3 +81,20 @@ Open `kabutech_prototype.ino` and update your WiFi credentials:
 ### LDR Light Sensor
 - Configured for 0–1000 lux estimation.
 - Adjust `map()` calibration range in `readLight()` if using different ambient lighting.
+
+---
+
+## 4. Running the Mobile App
+
+Once the ESP32 is powered on and successfully pushing data to Firebase, you can monitor and control the prototype using your React Native (Expo) app!
+
+### 1. Start the App
+Open a terminal in the `KabutechNative` directory and run:
+```bash
+npm install
+npx expo start
+```
+
+### 2. Test the Integration
+- **Monitoring**: Open the **Controls** or **Live Farm** screen in the app. You should see the Temperature, Humidity, Light, CO2, and Water Level updating in real-time.
+- **Actuators**: Tap the **FANS**, **MISTERS**, **LIGHTS**, or **VALVE** buttons in the app. The corresponding LED on your breadboard should instantly turn ON or OFF!

@@ -53,39 +53,34 @@ The ESP32 and the mobile app communicate via Firebase Cloud Realtime Database. T
 
 ---
 
-## 4. Canopy Sensor Probe Fabrication Guide
+## 4. Professional DIY Hanging Sensor Probe (The "PVC Bell Reducer Probe")
 
-![Sensor Probe Exploded Diagram](firmware/assets/sensor_probe_exploded.jpg)
-*Figure 3: Technical exploded view of the waterproof canopy sensor probe assembly.*
+To ensure the hanging probe is compact, lightweight, and streamlined (rather than a bulky square box), the design uses a standard **2" to 1" PVC Bell Reducer** or conduit coupling. It looks like an industrial commercial sensor capsule, hangs unobtrusively between grow racks, and requires zero 3D printing.
 
-### 4-Layer Moisture Defense System
-1. **Physical Separation**: Probe hangs at canopy height (1–3m away from wall controller box).
-2. **Louvered Weather Shield**: Angled louvers deflect direct high-pressure mist droplets while allowing natural airflow.
-3. **PTFE Sintered Membrane (20µm)**: Allows humidity vapor and CO₂ gases to pass freely while completely blocking liquid water droplets.
-4. **Conformal Coating**: Silicone conformal resin seals PCB traces and solder joints against internal condensation.
+### Hanging Probe Design Concept
+![Kabutech Hiyas Hanging Sensor Probe](firmware/assets/sensor_probe_hanging.jpg)
+*Figure 3: Compact suspended PVC bell probe hanging among mushroom grow bags, featuring a top IP68 cable gland and bottom breathable micro-mesh barrier.*
 
-### Electrical Wiring (Shared 4-Wire I2C Bus)
-All three canopy sensors communicate over I2C, requiring only 4 conductors:
+### The 10-Minute Build Steps
+1. **The Bell Body**: Get a **2-inch to 1-inch PVC Reducer** (white or industrial gray). It stands only ~3.5 to 4 inches tall and weighs under 100 grams.
+2. **Top Cable Gland (Suspension)**: Screw an **M16/M20 waterproof cable gland** into the 1-inch top opening. The gland grips the CAT5/CAT6 umbilical cable tightly, acting as both the water seal and the hanging anchor.
+3. **Internal Sensor Mounting**: 
+   - Solder/wire the DHT11, MQ-135, and LDR onto a small perfboard strip (or mount them back-to-back).
+   - Slide the sensor assembly up inside the bell cavity.
+4. **Bottom Micro-Mesh Screen**:
+   - Cut a small circular piece of fine stainless steel or nylon mesh (window screen / fine filter mesh).
+   - Secure it across the 2-inch bottom rim using PVC solvent or adhesive.
+   - This prevents mist splashes from entering upward while allowing free ambient air circulation and CO₂ diffusion.
 
-| Wire Color | GX16 Pin | Signal | Destination |
-|---|---|---|---|
-| **Red** | Pin 1 | 3.3V VCC | VCC on SHT31, BH1750, SCD41 |
-| **Black** | Pin 2 | GND | GND on all 3 sensors |
-| **Yellow** | Pin 3 | SDA | GPIO 8 on ESP32 + 4.7kΩ pull-up |
-| **White** | Pin 4 | SCL | GPIO 9 on ESP32 + 4.7kΩ pull-up |
+### Why this design excels for the Thesis Defense:
+- **Streamlined & Compact**: Unlike a bulky square junction box, this slim cylindrical profile won't obstruct walkways or bump into fruiting mushroom bags.
+- **Natural Umbrella Shielding**: The bell's solid dome naturally sheds water droplets falling from overhead misting nozzles.
+- **Commercial Polish**: With a clean printed label (e.g., "KABUTECH HIYAS - Environmental Probe SN-01"), it looks indistinguishable from commercial greenhouse sensors costing thousands of pesos.
+- **Ultra-Low Cost**: Built entirely with ~₱60–₱100 worth of standard plumbing/electrical parts available at any hardware store.
 
-> **I2C Addresses (Zero Conflict):**
-> * SHT31 (Temp/Humidity): `0x44`
-> * BH1750 (Light): `0x23`
-> * SCD41 (CO₂): `0x62`
-
-### Step-by-Step Probe Assembly
-1. **Cap Preparation**: Drill a 12mm hole in a 50mm PVC top cap for the PG7 cable gland and stainless carabiner hook. Drill three 2.5mm weep holes in the bottom cap for gravity drainage.
-2. **Carrier Board**: Solder SHT31, BH1750, and SCD41 on a 35mm perfboard. Wire VCC, GND, SDA, and SCL in parallel with two 4.7kΩ pull-up resistors.
-3. **Conformal Coating**: Mask the sensor sensing apertures with tape, spray 2 coats of silicone conformal coating over all solder joints and traces, cure for 30 minutes, and remove tape.
-4. **PTFE Filter**: Install the 20µm sintered PTFE membrane disc over the sensor window with neutral-cure RTV silicone.
-5. **Housing Integration**: Slide carrier into the louvered shield, tighten the PG7 cable gland, and secure end caps.
-6. **Connector Termination**: Solder the 4-core cable to the GX16 male aviation plug with heat shrink tubing on each pin.
+> [!TIP]
+> **Thesis Defense Script**
+> *"We engineered a streamlined, suspended cylindrical sensor capsule using a modified industrial PVC reducer. The upper conical geometry naturally deflects falling mist condensation, while the bottom aperture features a hydrophobic micro-mesh barrier that facilitates unhindered gaseous exchange for precise CO₂ and humidity monitoring without risking water pooling on sensor electronics."*
 
 ---
 
