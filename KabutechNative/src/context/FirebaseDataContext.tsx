@@ -1,9 +1,10 @@
 import React, { createContext, useState, useEffect, useContext } from 'react';
-import { ref, onValue } from 'firebase/database';
+import { ref, onValue, update } from 'firebase/database';
 import { db } from '../services/firebase';
 import { useAuth } from './AuthContext';
 import { SensorData, SettingsData, BatchData, AlertData, StaffTask, ActivityLogEntry, UserProfile } from '../types/firebase';
 import { showToast } from '../components/CustomToast';
+import { computeScheduledDevicesState, computeAutoDevicesState } from '../utils/scheduleLogic';
 
 const defaultSensors: SensorData = {
   temperature: 0,
@@ -144,6 +145,38 @@ export const FirebaseDataProvider: React.FC<{ children: React.ReactNode }> = ({ 
       unsubscribeUsers();
     };
   }, [user?.uid]);
+
+  // Continuous Active Mode & Actuator Sync Loop (Auto and Scheduled)
+  useEffect(() => {
+    if (!user) return;
+    const mode = settings?.setpoints?.mode;
+    if (!mode || mode === 'manual') return;
+
+    const syncActuators = () => {
+      const currentDevices = settings?.setpoints?.devices || { fans: false, misters: false, lights: false, co2: false };
+      let desiredDevices = { ...currentDevices };
+
+      if (mode === 'scheduled') {
+        desiredDevices = computeScheduledDevicesState(settings?.schedules);
+      } else if (mode === 'auto') {
+        desiredDevices = computeAutoDevicesState(sensors, settings?.setpoints);
+      }
+
+      const changed =
+        desiredDevices.fans !== currentDevices.fans ||
+        desiredDevices.misters !== currentDevices.misters ||
+        desiredDevices.lights !== currentDevices.lights ||
+        desiredDevices.co2 !== currentDevices.co2;
+
+      if (changed) {
+        update(ref(db, 'kabutech/settings/setpoints/devices'), desiredDevices).catch(() => {});
+      }
+    };
+
+    syncActuators();
+    const interval = setInterval(syncActuators, 2500);
+    return () => clearInterval(interval);
+  }, [user?.uid, settings?.setpoints?.mode, settings?.setpoints, settings?.schedules, sensors]);
 
   return (
     <ConnectionContext.Provider value={isConnected}>

@@ -76,9 +76,10 @@
 //  TIMING CONFIG
 // ═══════════════════════════════════════════════
 
-#define SENSOR_INTERVAL     5000    // Read sensors every 5 seconds
-#define HEARTBEAT_INTERVAL  30000   // Send "online" heartbeat every 30 seconds
-#define MQ135_WARMUP_MS     30000   // MQ-135 warm-up time (30s for prototype, 3min ideally)
+#define SERIAL_PRINT_INTERVAL   1000   // Print to Serial Monitor every 1s (100% local, ZERO delay)
+#define FIREBASE_PUSH_INTERVAL  2500   // Push to cloud every 2.5s (fast updates without choking network)
+#define HEARTBEAT_INTERVAL      30000  // Send "online" heartbeat every 30 seconds
+#define MQ135_WARMUP_MS         10000  // MQ-135 warm-up time (10s)
 
 // ═══════════════════════════════════════════════
 //  WATER LEVEL CALIBRATION
@@ -86,9 +87,8 @@
 //  Hold sensor in air and note the ADC reading   → WATER_DRY_VALUE
 // ═══════════════════════════════════════════════
 
-#define WATER_DRY_VALUE     0       // ADC reading when sensor is completely dry
-#define WATER_WET_VALUE     2800    // ADC reading when sensor is fully submerged
-                                    // ↑ Calibrate these with YOUR sensor!
+#define WATER_DRY_VALUE     20      // Typical ADC reading when sensor is completely dry
+#define WATER_WET_VALUE     1500    // Typical ADC reading when sensor is submerged in water
 
 // ═══════════════════════════════════════════════
 //  GLOBAL OBJECTS
@@ -101,11 +101,24 @@ FirebaseData streamDO; // For listening to actuator changes
 FirebaseAuth auth;
 FirebaseConfig config;
 
-unsigned long lastSensorRead  = 0;
-unsigned long lastHeartbeat   = 0;
-unsigned long bootTime        = 0;
-bool firebaseReady            = false;
-bool mq135WarmedUp            = false;
+unsigned long lastSerialPrint  = 0;
+unsigned long lastFirebasePush = 0;
+unsigned long lastHeartbeat    = 0;
+unsigned long bootTime         = 0;
+bool firebaseReady             = false;
+bool mq135WarmedUp             = false;
+
+// Live readings & health flags (-999 indicates disconnected/error)
+float currentTemp   = -999.0;
+float currentHum    = -999.0;
+int currentLight    = -999;
+int currentCO2      = -999;
+int currentWater    = -999;
+
+bool dhtFault       = false;
+bool lightFault     = false;
+bool co2Fault       = false;
+bool waterFault     = false;
 
 // ═══════════════════════════════════════════════
 //  FIREBASE STREAM CALLBACKS
@@ -189,6 +202,8 @@ void setup() {
     Serial.println();
     Serial.print("✅ WiFi connected! IP: ");
     Serial.println(WiFi.localIP());
+    // Disable WiFi sleep mode for near-instant (10-20ms) packet latency
+    WiFi.setSleep(false);
   } else {
     Serial.println();
     Serial.println("❌ WiFi connection FAILED. Check SSID/password.");
@@ -237,7 +252,7 @@ void setup() {
 }
 
 // ═══════════════════════════════════════════════
-//  SENSOR READING FUNCTIONS
+//  SENSOR READING FUNCTIONS (WITH DISCONNECT DETECTION)
 // ═══════════════════════════════════════════════
 
 // ── Read DHT11: Temperature (°C) and Humidity (%) ──
@@ -247,7 +262,6 @@ struct DHTReading {
   bool valid;
 };
 
-// Manually declare prototype to fix Arduino IDE preprocessor bug
 DHTReading readDHT();
 
 DHTReading readDHT() {
@@ -255,9 +269,11 @@ DHTReading readDHT() {
   r.humidity = dht.readHumidity();
   r.temperature = dht.readTemperature();  // Celsius
 
-  if (isnan(r.humidity) || isnan(r.temperature)) {
+  if (isnan(r.humidity) || isnan(r.temperature) || r.humidity <= 0.0 || r.temperature <= 0.0) {
     r.valid = false;
-    Serial.println("   ⚠️  DHT11 read failed! Check wiring.");
+    r.temperature = -999.0;
+    r.humidity = -999.0;
+    Serial.println("   ⚠️  DHT11 read failed / disconnected! Check GPIO 4 wiring.");
   } else {
     r.valid = true;
   }
@@ -265,48 +281,93 @@ DHTReading readDHT() {
 }
 
 // ── Read LDR: Light Level (estimated lux) ──
-int readLight() {
+struct LightReading {
+  int lux;
+  bool valid;
+};
+
+LightReading readLight();
+
+LightReading readLight() {
+  LightReading r;
   int raw = analogRead(LDR_PIN);
-  // LDR in voltage divider: high ADC = bright, low ADC = dark
-  // Map to approximate lux range (0–1000 for mushroom growing)
-  int lux = map(raw, 0, 4095, 0, 1000);
-  return constrain(lux, 0, 1000);
+  // Unplugged detection:
+  // With LDR to 3.3V and 10k pulldown to GND, pulling LDR drops GPIO 5 to 0V (ADC < 35).
+  if (raw < 35) {
+    r.lux = -999;
+    r.valid = false;
+    Serial.println("   ⚠️  LDR Light Sensor disconnected! Check GPIO 5 wiring.");
+  } else {
+    r.valid = true;
+    int lux = map(raw, 400, 3000, 0, 1000);
+    r.lux = constrain(lux, 0, 1000);
+  }
+  return r;
 }
 
 // ── Read MQ-135: CO₂ estimate (ppm) ──
-int readCO2() {
-  if (!mq135WarmedUp) {
-    return 400;  // Return baseline until warmed up
-  }
+struct CO2Reading {
+  int ppm;
+  bool valid;
+};
+
+CO2Reading readCO2();
+
+CO2Reading readCO2() {
+  CO2Reading r;
   int raw = analogRead(MQ135_PIN);
-  // Rough linear mapping for prototype
-  // Clean air ≈ 400ppm, high pollution ≈ 2000ppm
-  // Calibrate by comparing with known CO₂ meter if available
-  int ppm = map(raw, 0, 4095, 400, 2000);
-  return constrain(ppm, 300, 3000);
+  // Unplugged / unpowered detection:
+  // Operating MQ-135 produces at least 0.3V-0.5V (ADC ~350-600). Unplugged pin drops to ~0 (ADC < 150).
+  if (raw < 150) {
+    r.ppm = -999;
+    r.valid = false;
+    Serial.println("   ⚠️  MQ-135 Gas Sensor disconnected! Check GPIO 6 wiring & power.");
+  } else {
+    r.valid = true;
+    int ppm = map(raw, 350, 2400, 400, 2200);
+    r.ppm = constrain(ppm, 400, 3000);
+  }
+  return r;
 }
 
 // ── Read Water Level Sensor: Percentage (0–100%) ──
-int readWaterLevel() {
+struct WaterReading {
+  int percent;
+  bool valid;
+};
+
+WaterReading readWaterLevel();
+
+WaterReading readWaterLevel() {
+  WaterReading r;
   // Power ON the sensor briefly to prevent electrode corrosion
   digitalWrite(WATER_PWR_PIN, HIGH);
-  delay(100);  // Let it stabilize
+  delay(30);
 
-  int raw = analogRead(WATER_SIG_PIN);
+  // Take 3 quick samples for smooth and fast reading
+  int raw = 0;
+  for (int i = 0; i < 3; i++) {
+    raw += analogRead(WATER_SIG_PIN);
+    delay(5);
+  }
+  raw /= 3;
 
   // Power OFF immediately
   digitalWrite(WATER_PWR_PIN, LOW);
 
+  r.valid = true;
   // Map raw ADC to percentage using calibration values
   int percent = map(raw, WATER_DRY_VALUE, WATER_WET_VALUE, 0, 100);
-  return constrain(percent, 0, 100);
+  r.percent = constrain(percent, 0, 100);
+  return r;
 }
 
 // ═══════════════════════════════════════════════
 //  FIREBASE PUSH FUNCTION
 // ═══════════════════════════════════════════════
 
-void pushToFirebase(float temp, float hum, int light, int co2, int waterLevel) {
+void pushToFirebase(float temp, float hum, int light, int co2, int waterLevel,
+                    bool dhtErr, bool lightErr, bool co2Err, bool waterErr) {
   if (!Firebase.ready()) {
     Serial.println("   ⏳ Firebase not ready yet...");
     return;
@@ -321,11 +382,24 @@ void pushToFirebase(float temp, float hum, int light, int co2, int waterLevel) {
   json.set("waterLevel", waterLevel);
   json.set("esp32_status", "online");
 
+  // Granular individual error flags
+  json.set("dht_error", dhtErr);
+  json.set("temp_error", dhtErr);
+  json.set("hum_error", dhtErr);
+  json.set("light_error", lightErr);
+  json.set("co2_error", co2Err);
+  json.set("water_error", waterErr);
+
+  // Real-time server timestamp from Firebase
+  FirebaseJson ts;
+  ts.set(".sv", "timestamp");
+  json.set("last_seen", ts);
+
   // Push all values at once (atomic update)
   if (Firebase.RTDB.updateNode(&fbdo, "/kabutech/sensors/live", &json)) {
-    Serial.println("   ☁️  Firebase updated ✓");
+    Serial.println("   ☁️  Firebase synced ✓");
   } else {
-    Serial.print("   ❌ Firebase error: ");
+    Serial.print("   ❌ Firebase sync error: ");
     Serial.println(fbdo.errorReason().c_str());
   }
 }
@@ -337,7 +411,13 @@ void pushToFirebase(float temp, float hum, int light, int co2, int waterLevel) {
 void sendHeartbeat() {
   if (!Firebase.ready()) return;
 
-  if (Firebase.RTDB.setString(&fbdo, "/kabutech/sensors/live/esp32_status", "online")) {
+  FirebaseJson json;
+  json.set("esp32_status", "online");
+  FirebaseJson ts;
+  ts.set(".sv", "timestamp");
+  json.set("last_seen", ts);
+
+  if (Firebase.RTDB.updateNode(&fbdo, "/kabutech/sensors/live", &json)) {
     Serial.println("   💓 Heartbeat sent");
   }
 }
@@ -352,58 +432,70 @@ void loop() {
   // ── Check MQ-135 warm-up status ──
   if (!mq135WarmedUp && (now - bootTime >= MQ135_WARMUP_MS)) {
     mq135WarmedUp = true;
-    Serial.println("✅ MQ-135 warm-up complete! CO₂ readings are now active.");
+    Serial.println("✅ MQ-135 warm-up complete! CO₂ readings active.");
+  }
+
+  // ── Read sensors and print to Serial Monitor every 1s (LOCAL, ZERO DELAY) ──
+  if (now - lastSerialPrint >= SERIAL_PRINT_INTERVAL) {
+    lastSerialPrint = now;
+
+    // Read DHT11
+    DHTReading dhtData = readDHT();
+    dhtFault    = !dhtData.valid;
+    currentTemp = dhtData.temperature;
+    currentHum  = dhtData.humidity;
+
+    // Read LDR
+    LightReading lightData = readLight();
+    lightFault   = !lightData.valid;
+    currentLight = lightData.lux;
+
+    // Read MQ-135
+    CO2Reading co2Data = readCO2();
+    co2Fault   = !co2Data.valid;
+    currentCO2 = co2Data.ppm;
+
+    // Read Water Level
+    WaterReading waterData = readWaterLevel();
+    waterFault   = !waterData.valid;
+    currentWater = waterData.percent;
+
+    // ── Instant Local Serial Monitor Output ──
+    Serial.println("📊 ── Live Sensor Readings ─────────────");
+    if (dhtFault) {
+      Serial.println("   🌡️  Temperature:  [⚠️ UNPLUGGED / DISCONNECTED]");
+      Serial.println("   💧 Humidity:     [⚠️ UNPLUGGED / DISCONNECTED]");
+    } else {
+      Serial.printf("   🌡️  Temperature:  %.1f °C\n", currentTemp);
+      Serial.printf("   💧 Humidity:     %.1f %%\n", currentHum);
+    }
+
+    if (lightFault) {
+      Serial.println("   ☀️  Light Level:  [⚠️ UNPLUGGED / DISCONNECTED]");
+    } else {
+      Serial.printf("   ☀️  Light Level:  %d lux (est.)\n", currentLight);
+    }
+
+    if (co2Fault) {
+      Serial.println("   🌬️  CO₂ Level:    [⚠️ UNPLUGGED / DISCONNECTED]");
+    } else {
+      Serial.printf("   🌬️  CO₂ Level:    %d ppm\n", currentCO2);
+    }
+
+    if (waterFault) {
+      Serial.println("   🫧 Water Level:  [⚠️ UNPLUGGED / DISCONNECTED]");
+    } else {
+      Serial.printf("   🫧 Water Level:  %d %%\n", currentWater);
+    }
     Serial.println("────────────────────────────────────────");
   }
 
-  // ── Read sensors at interval ──
-  if (now - lastSensorRead >= SENSOR_INTERVAL) {
-    lastSensorRead = now;
-
-    // Read all sensors
-    DHTReading dhtData = readDHT();
-    int light      = readLight();
-    int co2        = readCO2();
-    int waterLevel = readWaterLevel();
-
-    float temp = dhtData.valid ? dhtData.temperature : -1;
-    float hum  = dhtData.valid ? dhtData.humidity    : -1;
-
-    // ── Print to Serial Monitor ──
-    Serial.println("📊 ── Sensor Readings ──────────────────");
-    
-    if (dhtData.valid) {
-      Serial.print("   🌡️  Temperature:  ");
-      Serial.print(temp, 1);
-      Serial.println(" °C");
-
-      Serial.print("   💧 Humidity:      ");
-      Serial.print(hum, 1);
-      Serial.println(" %");
-    } else {
-      Serial.println("   🌡️  Temperature:  ERROR");
-      Serial.println("   💧 Humidity:      ERROR");
-    }
-
-    Serial.print("   ☀️  Light Level:   ");
-    Serial.print(light);
-    Serial.println(" lux (est.)");
-
-    Serial.print("   🌬️  CO₂ Level:     ");
-    Serial.print(co2);
-    Serial.print(" ppm");
-    if (!mq135WarmedUp) Serial.print(" (warming up...)");
-    Serial.println();
-
-    Serial.print("   🫧 Water Level:   ");
-    Serial.print(waterLevel);
-    Serial.println(" %");
-
-    Serial.println("────────────────────────────────────────");
-
-    // ── Push to Firebase ──
-    if (dhtData.valid && WiFi.status() == WL_CONNECTED) {
-      pushToFirebase(temp, hum, light, co2, waterLevel);
+  // ── Push to Cloud every 2.5 seconds (gives network room so LEDs react instantly) ──
+  if (now - lastFirebasePush >= FIREBASE_PUSH_INTERVAL) {
+    lastFirebasePush = now;
+    if (WiFi.status() == WL_CONNECTED) {
+      pushToFirebase(currentTemp, currentHum, currentLight, currentCO2, currentWater,
+                     dhtFault, lightFault, co2Fault, waterFault);
     }
   }
 
@@ -413,6 +505,6 @@ void loop() {
     sendHeartbeat();
   }
 
-  // Small delay to prevent watchdog reset
+  // Small delay to allow ESP32 background network tasks & stream callbacks to execute immediately
   delay(10);
 }

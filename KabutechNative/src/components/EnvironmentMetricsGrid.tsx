@@ -8,6 +8,8 @@ import { hapticSelection } from '../utils/haptics';
 import { useResponsive } from '../utils/responsive';
 import { useAuth } from '../context/AuthContext';
 
+import { useSensorHealth } from '../hooks/useSensorHealth';
+
 interface Props {
   temp: number;
   hum: number;
@@ -21,35 +23,64 @@ export default React.memo(function EnvironmentMetricsGrid({ temp, hum, light, co
   const { isSmallDevice } = useResponsive();
   const { profile } = useAuth();
   const isStaff = profile?.role === 'staff';
+  const health = useSensorHealth();
 
   // Metric status & percentage calculations
   const tempStatus = React.useMemo(() => {
+    if (health.tempError) {
+      return { 
+        label: !health.isControllerOnline ? 'Offline' : 'Not Connected', 
+        color: '#f43f5e', 
+        lightBg: '#fff1f2' 
+      };
+    }
     if (temp >= 22 && temp <= 28.5) return { label: 'Optimal', color: '#10b981', lightBg: '#ecfdf5' };
     if (temp > 28.5) return { label: 'Warm', color: '#f97316', lightBg: '#fff7ed' };
     return { label: 'Cool', color: '#3b82f6', lightBg: '#eff6ff' };
-  }, [temp]);
-  const tempPercent = Math.min(100, Math.max(8, ((temp - 15) / (35 - 15)) * 100));
+  }, [temp, health.tempError, health.isControllerOnline]);
+  const tempPercent = health.tempError ? 0 : Math.min(100, Math.max(8, ((temp - 15) / (35 - 15)) * 100));
 
   const humStatus = React.useMemo(() => {
+    if (health.humError) {
+      return { 
+        label: !health.isControllerOnline ? 'Offline' : 'Not Connected', 
+        color: '#f43f5e', 
+        lightBg: '#fff1f2' 
+      };
+    }
     if (hum >= 75 && hum <= 92) return { label: 'Optimal', color: '#10b981', lightBg: '#ecfdf5' };
     if (hum < 75) return { label: 'Low', color: '#f59e0b', lightBg: '#fffbeb' };
     return { label: 'High', color: '#0ea5e9', lightBg: '#f0f9ff' };
-  }, [hum]);
-  const humPercent = Math.min(100, Math.max(8, ((hum - 30) / (100 - 30)) * 100));
+  }, [hum, health.humError, health.isControllerOnline]);
+  const humPercent = health.humError ? 0 : Math.min(100, Math.max(8, ((hum - 30) / (100 - 30)) * 100));
 
   const lightStatus = React.useMemo(() => {
+    if (health.lightError) {
+      return { 
+        label: !health.isControllerOnline ? 'Offline' : 'Not Connected', 
+        color: '#f43f5e', 
+        lightBg: '#fff1f2' 
+      };
+    }
     if (light >= 400 && light <= 850) return { label: 'Optimal', color: '#10b981', lightBg: '#ecfdf5' };
     if (light < 400) return { label: 'Dim', color: '#f59e0b', lightBg: '#fffbeb' };
     return { label: 'Bright', color: '#eab308', lightBg: '#fefce8' };
-  }, [light]);
-  const lightPercent = Math.min(100, Math.max(8, (light / 1000) * 100));
+  }, [light, health.lightError, health.isControllerOnline]);
+  const lightPercent = health.lightError ? 0 : Math.min(100, Math.max(8, (light / 1000) * 100));
 
   const co2Status = React.useMemo(() => {
+    if (health.co2Error) {
+      return { 
+        label: !health.isControllerOnline ? 'Offline' : 'Not Connected', 
+        color: '#f43f5e', 
+        lightBg: '#fff1f2' 
+      };
+    }
     if (co2 <= 750) return { label: 'Good', color: '#10b981', lightBg: '#ecfdf5' };
     if (co2 <= 950) return { label: 'Moderate', color: '#f59e0b', lightBg: '#fffbeb' };
     return { label: 'Elevated', color: '#ef4444', lightBg: '#fef2f2' };
-  }, [co2]);
-  const co2Percent = Math.min(100, Math.max(8, ((co2 - 300) / (1200 - 300)) * 100));
+  }, [co2, health.co2Error, health.isControllerOnline]);
+  const co2Percent = health.co2Error ? 0 : Math.min(100, Math.max(8, ((co2 - 300) / (1200 - 300)) * 100));
 
   const handleCardPress = (tabKey: 'temp' | 'hum' | 'light' | 'co2') => {
     hapticSelection();
@@ -63,54 +94,60 @@ export default React.memo(function EnvironmentMetricsGrid({ temp, hum, light, co
     }
   };
 
+  const activeCount = [!health.tempError, !health.humError, !health.lightError, !health.co2Error].filter(Boolean).length;
+
   const metrics = [
     {
       id: 'temp' as const,
       name: 'Temperature',
-      value: temp,
+      value: health.tempError ? '--' : temp,
       unit: '°C',
-      icon: 'thermometer' as const,
-      iconColor: '#f97316',
-      iconBg: 'bg-orange-50 dark:bg-orange-500/15',
-      accentColor: '#f97316',
+      icon: (health.tempError ? 'alert-circle-outline' : 'thermometer') as any,
+      iconColor: health.tempError ? '#f43f5e' : '#f97316',
+      iconBg: health.tempError ? 'bg-rose-50 dark:bg-rose-500/15' : 'bg-orange-50 dark:bg-orange-500/15',
+      accentColor: health.tempError ? '#f43f5e' : '#f97316',
       status: tempStatus,
       percent: tempPercent,
+      hasError: health.tempError,
     },
     {
       id: 'hum' as const,
       name: 'Humidity',
-      value: hum,
+      value: health.humError ? '--' : hum,
       unit: '%',
-      icon: 'water-percent' as const,
-      iconColor: '#0ea5e9',
-      iconBg: 'bg-sky-50 dark:bg-sky-500/15',
-      accentColor: '#0ea5e9',
+      icon: (health.humError ? 'alert-circle-outline' : 'water-percent') as any,
+      iconColor: health.humError ? '#f43f5e' : '#0ea5e9',
+      iconBg: health.humError ? 'bg-rose-50 dark:bg-rose-500/15' : 'bg-sky-50 dark:bg-sky-500/15',
+      accentColor: health.humError ? '#f43f5e' : '#0ea5e9',
       status: humStatus,
       percent: humPercent,
+      hasError: health.humError,
     },
     {
       id: 'light' as const,
       name: 'Light Level',
-      value: light,
+      value: health.lightError ? '--' : light,
       unit: 'lx',
-      icon: 'white-balance-sunny' as const,
-      iconColor: '#f59e0b',
-      iconBg: 'bg-amber-50 dark:bg-amber-500/15',
-      accentColor: '#f59e0b',
+      icon: (health.lightError ? 'alert-circle-outline' : 'white-balance-sunny') as any,
+      iconColor: health.lightError ? '#f43f5e' : '#f59e0b',
+      iconBg: health.lightError ? 'bg-rose-50 dark:bg-rose-500/15' : 'bg-amber-50 dark:bg-amber-500/15',
+      accentColor: health.lightError ? '#f43f5e' : '#f59e0b',
       status: lightStatus,
       percent: lightPercent,
+      hasError: health.lightError,
     },
     {
       id: 'co2' as const,
       name: 'CO2 Level',
-      value: co2,
+      value: health.co2Error ? '--' : co2,
       unit: 'ppm',
-      icon: 'molecule-co2' as const,
-      iconColor: '#10b981',
-      iconBg: 'bg-emerald-50 dark:bg-emerald-500/15',
-      accentColor: '#10b981',
+      icon: (health.co2Error ? 'alert-circle-outline' : 'molecule-co2') as any,
+      iconColor: health.co2Error ? '#f43f5e' : '#10b981',
+      iconBg: health.co2Error ? 'bg-rose-50 dark:bg-rose-500/15' : 'bg-emerald-50 dark:bg-emerald-500/15',
+      accentColor: health.co2Error ? '#f43f5e' : '#10b981',
       status: co2Status,
       percent: co2Percent,
+      hasError: health.co2Error,
     },
   ];
 
@@ -122,8 +159,10 @@ export default React.memo(function EnvironmentMetricsGrid({ temp, hum, light, co
           <Text style={[tw`text-base sm:text-lg tracking-tight`, { fontFamily: 'PlusJakartaSans_800ExtraBold', color: isDarkMode ? '#f8fafc' : '#0f172a' }]}>
             Environment Metrics
           </Text>
-          <View style={tw`bg-emerald-100/70 dark:bg-emerald-950/60 px-2 py-0.5 rounded-full border border-emerald-200/60 dark:border-emerald-800/60`}>
-            <Text style={[tw`text-[10px] text-emerald-700 dark:text-emerald-400`, { fontFamily: 'PlusJakartaSans_700Bold' }]}>4 Active</Text>
+          <View style={tw`${activeCount === 4 ? 'bg-emerald-100/70 dark:bg-emerald-950/60 border-emerald-200/60 dark:border-emerald-800/60' : 'bg-rose-100/70 dark:bg-rose-950/60 border-rose-200/60 dark:border-rose-800/60'} px-2 py-0.5 rounded-full border`}>
+            <Text style={[tw`text-[10px] ${activeCount === 4 ? 'text-emerald-700 dark:text-emerald-400' : 'text-rose-700 dark:text-rose-400'}`, { fontFamily: 'PlusJakartaSans_700Bold' }]}>
+              {activeCount === 4 ? '4 Active' : (activeCount === 0 ? 'Disconnected' : `${activeCount}/4 Active`)}
+            </Text>
           </View>
         </View>
 
@@ -148,7 +187,11 @@ export default React.memo(function EnvironmentMetricsGrid({ temp, hum, light, co
             activeOpacity={0.75}
             onPress={() => handleCardPress(item.id)}
             style={[
-              tw`bg-white dark:bg-slate-900 rounded-[24px] p-4 border border-slate-200/70 dark:border-slate-800 shadow-sm justify-between`,
+              tw`rounded-[24px] p-4 border shadow-sm justify-between ${
+                item.hasError 
+                  ? 'bg-rose-50/30 dark:bg-rose-950/20 border-rose-300 dark:border-rose-800' 
+                  : 'bg-white dark:bg-slate-900 border-slate-200/70 dark:border-slate-800'
+              }`,
               { width: '48.5%', minHeight: isSmallDevice ? 132 : 142 }
             ]}
           >
@@ -184,12 +227,18 @@ export default React.memo(function EnvironmentMetricsGrid({ temp, hum, light, co
                 {item.name}
               </Text>
               <View style={tw`flex-row items-baseline mt-1`}>
-                <Text style={[tw`text-slate-900 dark:text-white`, { fontSize: isSmallDevice ? 27 : 31, fontFamily: 'PlusJakartaSans_800ExtraBold', letterSpacing: -0.6 }]}>
+                <Text style={[tw`${item.hasError ? 'text-rose-600 dark:text-rose-400' : 'text-slate-900 dark:text-white'}`, { fontSize: isSmallDevice ? 27 : 31, fontFamily: 'PlusJakartaSans_800ExtraBold', letterSpacing: -0.6 }]}>
                   {item.value}
                 </Text>
-                <Text style={[tw`text-sm text-slate-400 dark:text-slate-500 ml-1.5`, { fontFamily: 'PlusJakartaSans_700Bold' }]}>
-                  {item.unit}
-                </Text>
+                {item.hasError ? (
+                  <Text style={[tw`text-xs text-rose-500 dark:text-rose-400 ml-1.5`, { fontFamily: 'PlusJakartaSans_700Bold' }]}>
+                    Fault
+                  </Text>
+                ) : (
+                  <Text style={[tw`text-sm text-slate-400 dark:text-slate-500 ml-1.5`, { fontFamily: 'PlusJakartaSans_700Bold' }]}>
+                    {item.unit}
+                  </Text>
+                )}
               </View>
             </View>
 

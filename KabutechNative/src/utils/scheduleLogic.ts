@@ -66,3 +66,36 @@ export const computeScheduledDevicesState = (schedules?: ScheduleSettings | null
 
   return state;
 };
+
+/**
+ * Computes automatic device states based on live sensor readings and environmental setpoints.
+ */
+export const computeAutoDevicesState = (
+  sensors?: { temperature?: number; humidity?: number; light?: number; co2?: number } | null,
+  setpoints?: { temperature?: number; humidity?: number; light?: number; co2?: number } | null
+) => {
+  const targetTemp = setpoints?.temperature ?? 28.0;
+  const targetHum = setpoints?.humidity ?? 85.0;
+  const targetLight = setpoints?.light ?? 580;
+  const targetCO2 = setpoints?.co2 ?? 690;
+
+  const currentTemp = typeof sensors?.temperature === 'number' ? sensors.temperature : 0;
+  const currentHum = typeof sensors?.humidity === 'number' ? sensors.humidity : 0;
+  const currentLight = typeof sensors?.light === 'number' ? sensors.light : 0;
+  const currentCO2 = typeof sensors?.co2 === 'number' ? sensors.co2 : 0;
+
+  // Temperature / Exhaust: Fans turn ON if hotter than setpoint + 0.5°C or CO2 is high (> target + 50 ppm)
+  const fans = currentTemp > (targetTemp + 0.5) || currentCO2 > (targetCO2 + 50);
+
+  // Humidity: Misters turn ON if humidity drops below target - 3%
+  const misters = currentHum < (targetHum - 3.0);
+
+  // Light: Lights turn ON if ambient light is below target - 50 lx
+  const lights = currentLight < (targetLight - 50);
+
+  // CO2 Valve / Intake: Turns ON if CO2 is above setpoint
+  const co2 = currentCO2 > targetCO2;
+
+  return { fans, misters, lights, co2 };
+};
+

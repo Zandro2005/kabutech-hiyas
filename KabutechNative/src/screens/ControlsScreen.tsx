@@ -5,6 +5,7 @@ import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { GlobalNavigationParamList } from '../types/navigation';
 import tw from '../tailwind';
 import { useSensors, useSettings } from '../hooks/useFirebaseData';
+import { useSensorHealth } from '../hooks/useSensorHealth';
 import { ref, update } from 'firebase/database';
 import { db } from '../services/firebase';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
@@ -14,7 +15,7 @@ import ControlsScreenSkeleton from '../components/skeletons/ControlsScreenSkelet
 import { useTheme } from '../context/ThemeContext';
 import { showToast } from '../components/CustomToast';
 import { hapticLight, hapticMedium, hapticSelection } from '../utils/haptics';
-import { computeScheduledDevicesState } from '../utils/scheduleLogic';
+import { computeScheduledDevicesState, computeAutoDevicesState } from '../utils/scheduleLogic';
 import { useResponsive } from '../utils/responsive';
 
 type TabId = 'temp' | 'hum' | 'light' | 'co2';
@@ -26,6 +27,7 @@ export default function ControlsScreen() {
   const { width, isSmallDevice } = useResponsive();
   const sensors = useSensors();
   const settings = useSettings();
+  const health = useSensorHealth();
   
   const [isReady, setIsReady] = useState(false);
   const [showStopAiModal, setShowStopAiModal] = useState(false);
@@ -59,14 +61,20 @@ export default function ControlsScreen() {
   useEffect(() => {
     if (isScheduled) {
       const interval = setInterval(() => {
-        setDevices({ ...rawDevices, ...computeScheduledDevicesState(settings?.schedules) });
-      }, 5000);
-      setDevices({ ...rawDevices, ...computeScheduledDevicesState(settings?.schedules) });
+        setDevices(computeScheduledDevicesState(settings?.schedules));
+      }, 3000);
+      setDevices(computeScheduledDevicesState(settings?.schedules));
+      return () => clearInterval(interval);
+    } else if (isAuto) {
+      const interval = setInterval(() => {
+        setDevices(computeAutoDevicesState(sensors, settings?.setpoints));
+      }, 3000);
+      setDevices(computeAutoDevicesState(sensors, settings?.setpoints));
       return () => clearInterval(interval);
     } else {
       setDevices(rawDevices);
     }
-  }, [isScheduled, settings?.schedules, rawDevices]);
+  }, [isScheduled, isAuto, settings?.schedules, settings?.setpoints, sensors, rawDevices]);
 
   const isAiOverride = settings?.setpoints?.aiOverride === true;
   const isLocked = isAuto || isScheduled || isAiOverride;
@@ -79,20 +87,69 @@ export default function ControlsScreen() {
     }).catch(err => Alert.alert("Error Saving", err.message));
   };
 
-  const toggleDevice = (key: string, state: boolean) => {
+  const toggleDevice = async (key: string, state: boolean) => {
     if (isLocked) return;
     hapticMedium();
-    update(ref(db, `kabutech/settings/setpoints/devices`), {
-      [key]: state
-    }).then(() => {
-      showToast({ type: 'success', text1: `${key.charAt(0).toUpperCase() + key.slice(1)} turned ${state ? 'ON' : 'OFF'}` });
-    }).catch(err => Alert.alert("Error Saving", err.message));
+
+    const previousState = devices[key as keyof typeof devices];
+
+    // ⚡ 0ms Optimistic UI update for instant touch response
+    setDevices(prev => ({ ...prev, [key]: state }));
+
+    const startTime = Date.now();
+    let delayTimer: ReturnType<typeof setTimeout> | null = null;
+
+    // Notify user if command takes longer than 2.5 seconds to reach controller
+    delayTimer = setTimeout(() => {
+      showToast({
+        type: 'info',
+        text1: 'Slow Controller Response',
+        text2: `The ${key} command is taking longer than usual to reach the ESP32. High network latency or weak Wi-Fi signal.`,
+        duration: 4500,
+      });
+    }, 2500);
+
+    try {
+      await update(ref(db, `kabutech/settings/setpoints/devices`), {
+        [key]: state
+      });
+      if (delayTimer) clearTimeout(delayTimer);
+
+      const elapsed = Date.now() - startTime;
+      if (elapsed > 2500) {
+        showToast({
+          type: 'success',
+          text1: `${key.charAt(0).toUpperCase() + key.slice(1)} turned ${state ? 'ON' : 'OFF'} (${(elapsed / 1000).toFixed(1)}s)`,
+          text2: 'Delivered after network delay.',
+        });
+      } else {
+        showToast({ type: 'success', text1: `${key.charAt(0).toUpperCase() + key.slice(1)} turned ${state ? 'ON' : 'OFF'}` });
+      }
+    } catch (err: any) {
+      if (delayTimer) clearTimeout(delayTimer);
+      // Revert if network error
+      setDevices(prev => ({ ...prev, [key]: previousState }));
+      showToast({
+        type: 'error',
+        text1: 'Command Timed Out / Failed',
+        text2: `Failed to turn ${state ? 'ON' : 'OFF'} ${key}. Check ESP32 power and Wi-Fi connection.`,
+        duration: 5000,
+      });
+    }
   };
 
   const executeSetMode = (mode: 'auto' | 'manual' | 'scheduled') => {
+    let nextDevices = settings?.setpoints?.devices || { fans: false, misters: false, lights: false, co2: false };
+    if (mode === 'scheduled') {
+      nextDevices = computeScheduledDevicesState(settings?.schedules);
+    } else if (mode === 'auto') {
+      nextDevices = computeAutoDevicesState(sensors, settings?.setpoints);
+    }
+
     update(ref(db, 'kabutech/settings/setpoints'), {
       mode,
-      aiOverride: false
+      aiOverride: false,
+      devices: nextDevices
     }).then(() => {
       showToast({ type: 'success', text1: `Switched to ${mode.toUpperCase()} Mode` });
     }).catch(err => Alert.alert("Error Saving", err.message));
@@ -248,6 +305,29 @@ export default function ControlsScreen() {
       ) : (
       <ScrollView contentContainerStyle={tw`pb-28 pt-2`} showsVerticalScrollIndicator={false}>
         
+        {/* Sensor / Controller Health Warning Banner */}
+        {(!health.isControllerOnline || health.dhtError) && (
+          <View style={tw`mx-5 mb-4 p-3.5 rounded-2xl bg-amber-500/10 dark:bg-amber-500/15 border border-amber-500/30 flex-row items-center gap-3`}>
+            <MaterialCommunityIcons 
+              name={!health.isControllerOnline ? "wifi-alert" : "alert-rhombus-outline"} 
+              size={22} 
+              color="#f59e0b" 
+            />
+            <View style={tw`flex-1`}>
+              <Text style={[tw`text-xs text-amber-800 dark:text-amber-300`, { fontFamily: 'PlusJakartaSans_700Bold' }]}>
+                {!health.isControllerOnline 
+                  ? "Grow House Controller Offline" 
+                  : "Sensor Malfunction Detected"}
+              </Text>
+              <Text style={[tw`text-[11px] text-amber-700/80 dark:text-amber-400/80 mt-0.5`, { fontFamily: 'PlusJakartaSans_500Medium' }]}>
+                {!health.isControllerOnline
+                  ? `No signal from ESP32 for ${health.offlineSeconds}s. Actuator switches may not respond immediately.`
+                  : "DHT sensor is returning error signals. Target auto-adjustments may be affected."}
+              </Text>
+            </View>
+          </View>
+        )}
+
         {/* Horizontal Environmental Parameter Selector */}
         <View style={tw`mb-5`}>
           <ScrollView 

@@ -5,6 +5,13 @@ export interface SensorData {
   co2: number;
   waterLevel?: number;
   esp32_status: 'online' | 'offline';
+  last_seen?: number;
+  dht_error?: boolean | string | number;
+  temp_error?: boolean | string | number;
+  hum_error?: boolean | string | number;
+  light_error?: boolean | string | number;
+  co2_error?: boolean | string | number;
+  water_error?: boolean | string | number;
 }
 
 export interface DeviceStates {

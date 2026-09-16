@@ -8,6 +8,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import tw from '../../tailwind';
 import { useSensors, useSettings, useAlerts, calculateEnvironmentScore } from '../../hooks/useFirebaseData';
+import { useSensorHealth } from '../../hooks/useSensorHealth';
 import { useTheme } from '../../context/ThemeContext';
 import ScreenHeader from '../../components/ScreenHeader';
 import CriticalSystemAlerts from '../../components/CriticalSystemAlerts';
@@ -16,7 +17,7 @@ import EnvironmentMetricsGrid from '../../components/EnvironmentMetricsGrid';
 import WaterLevelCard from '../../components/WaterLevelCard';
 import ScoreArch from '../../components/ScoreArch';
 import HomeScreenSkeleton from '../../components/skeletons/HomeScreenSkeleton';
-import { computeScheduledDevicesState } from '../../utils/scheduleLogic';
+import { computeScheduledDevicesState, computeAutoDevicesState } from '../../utils/scheduleLogic';
 
 export default function StaffHomeScreen() {
   const navigation = useNavigation<NativeStackNavigationProp<GlobalNavigationParamList>>();
@@ -24,6 +25,7 @@ export default function StaffHomeScreen() {
   const sensors = useSensors();
   const settings = useSettings();
   const alerts = useAlerts();
+  const health = useSensorHealth();
 
   const [isReady, setIsReady] = useState(false);
   useEffect(() => {
@@ -52,14 +54,20 @@ export default function StaffHomeScreen() {
   useEffect(() => {
     if (isScheduled) {
       const interval = setInterval(() => {
-        setDevices({ ...rawDevices, ...computeScheduledDevicesState(settings?.schedules) });
-      }, 5000);
-      setDevices({ ...rawDevices, ...computeScheduledDevicesState(settings?.schedules) });
+        setDevices(computeScheduledDevicesState(settings?.schedules));
+      }, 3000);
+      setDevices(computeScheduledDevicesState(settings?.schedules));
+      return () => clearInterval(interval);
+    } else if (isAuto) {
+      const interval = setInterval(() => {
+        setDevices(computeAutoDevicesState(sensors, settings?.setpoints));
+      }, 3000);
+      setDevices(computeAutoDevicesState(sensors, settings?.setpoints));
       return () => clearInterval(interval);
     } else {
       setDevices(rawDevices);
     }
-  }, [isScheduled, settings?.schedules, rawDevices]);
+  }, [isScheduled, isAuto, settings?.schedules, settings?.setpoints, sensors, rawDevices]);
 
   const fansActive = devices.fans;
   const misterActive = devices.misters;
@@ -92,6 +100,31 @@ export default function StaffHomeScreen() {
           navigation={navigation}
           readOnly={true}
         />
+
+        {/* Sensor / Controller Health Banner */}
+        {health.hasAnyError && (
+          <View style={tw`mx-5 sm:mx-6 mt-4 p-3.5 rounded-2xl bg-amber-500/10 dark:bg-amber-500/15 border border-amber-500/30 flex-row items-center gap-3`}>
+            <MaterialCommunityIcons 
+              name={!health.isControllerOnline ? "wifi-alert" : "alert-rhombus-outline"} 
+              size={22} 
+              color="#f59e0b" 
+            />
+            <View style={tw`flex-1`}>
+              <Text style={[tw`text-xs text-amber-800 dark:text-amber-300`, { fontFamily: 'PlusJakartaSans_700Bold' }]}>
+                {!health.isControllerOnline 
+                  ? "Grow House Controller Offline" 
+                  : "Sensor Disconnected / Malfunction"}
+              </Text>
+              <Text style={[tw`text-[11px] text-amber-700/80 dark:text-amber-400/80 mt-0.5`, { fontFamily: 'PlusJakartaSans_500Medium' }]}>
+                {!health.isControllerOnline
+                  ? `No signal from ESP32 for ${health.offlineSeconds}s. Check controller power and Wi-Fi.`
+                  : health.faultySensorsList.length > 0 
+                    ? `Sensor disconnected: ${health.faultySensorsList.join(', ')}. Please check wiring.`
+                    : "One or more sensors are returning invalid readings. Check sensor wiring."}
+              </Text>
+            </View>
+          </View>
+        )}
 
         {/* Health Metrics (2x2 Grid) */}
         <EnvironmentMetricsGrid temp={temp} hum={hum} light={light} co2={co2} navigation={navigation} />

@@ -20,7 +20,9 @@ import HomeScreenSkeleton from '../components/skeletons/HomeScreenSkeleton';
 import { ref, update } from 'firebase/database';
 import { db } from '../services/firebase';
 import { showToast } from '../components/CustomToast';
-import { computeScheduledDevicesState } from '../utils/scheduleLogic';
+import { computeScheduledDevicesState, computeAutoDevicesState } from '../utils/scheduleLogic';
+import { useSensorHealth } from '../hooks/useSensorHealth';
+import { hapticMedium } from '../utils/haptics';
 
 export default function HomeScreen() {
   const navigation = useNavigation<NativeStackNavigationProp<GlobalNavigationParamList>>();
@@ -31,6 +33,7 @@ export default function HomeScreen() {
   const isConnected = useFirebaseConnection();
   const alerts = useAlerts();
   const [isInsightModalVisible, setIsInsightModalVisible] = useState(false);
+  const health = useSensorHealth();
   
   const [isReady, setIsReady] = useState(false);
   useEffect(() => {
@@ -59,14 +62,20 @@ export default function HomeScreen() {
   useEffect(() => {
     if (isScheduled) {
       const interval = setInterval(() => {
-        setDevices({ ...rawDevices, ...computeScheduledDevicesState(settings?.schedules) });
-      }, 5000);
-      setDevices({ ...rawDevices, ...computeScheduledDevicesState(settings?.schedules) });
+        setDevices(computeScheduledDevicesState(settings?.schedules));
+      }, 3000);
+      setDevices(computeScheduledDevicesState(settings?.schedules));
+      return () => clearInterval(interval);
+    } else if (isAuto) {
+      const interval = setInterval(() => {
+        setDevices(computeAutoDevicesState(sensors, settings?.setpoints));
+      }, 3000);
+      setDevices(computeAutoDevicesState(sensors, settings?.setpoints));
       return () => clearInterval(interval);
     } else {
       setDevices(rawDevices);
     }
-  }, [isScheduled, settings?.schedules, rawDevices]);
+  }, [isScheduled, isAuto, settings?.schedules, settings?.setpoints, sensors, rawDevices]);
   
   const fansActive = devices.fans;
   const misterActive = devices.misters;
@@ -75,14 +84,50 @@ export default function HomeScreen() {
   const toggleDevice = async (key: string, currentState: boolean) => {
     if (isLocked) return; // User cannot toggle while in auto or scheduled mode
     const newState = !currentState;
+    hapticMedium();
+
+    // ⚡ 0ms Optimistic UI update
+    setDevices(prev => ({ ...prev, [key]: newState }));
+
+    const startTime = Date.now();
+    let delayTimer: ReturnType<typeof setTimeout> | null = null;
+
+    // Notify user if command takes longer than 2.5 seconds to reach controller
+    delayTimer = setTimeout(() => {
+      showToast({
+        type: 'info',
+        text1: 'Slow Controller Response',
+        text2: `The ${key} command is taking longer than usual to reach the ESP32. High network latency or weak Wi-Fi signal.`,
+        duration: 4500,
+      });
+    }, 2500);
+
     try {
       await update(ref(db, `kabutech/settings/setpoints/devices`), {
         [key]: newState
       });
-      showToast({ type: 'success', text1: `${key.charAt(0).toUpperCase() + key.slice(1)} turned ${newState ? 'ON' : 'OFF'}` });
+      if (delayTimer) clearTimeout(delayTimer);
+
+      const elapsed = Date.now() - startTime;
+      if (elapsed > 2500) {
+        showToast({
+          type: 'success',
+          text1: `${key.charAt(0).toUpperCase() + key.slice(1)} turned ${newState ? 'ON' : 'OFF'} (${(elapsed / 1000).toFixed(1)}s)`,
+          text2: 'Delivered after network delay.',
+        });
+      } else {
+        showToast({ type: 'success', text1: `${key.charAt(0).toUpperCase() + key.slice(1)} turned ${newState ? 'ON' : 'OFF'}` });
+      }
     } catch (error) {
+      if (delayTimer) clearTimeout(delayTimer);
+      setDevices(prev => ({ ...prev, [key]: currentState }));
       console.error(error);
-      showToast({ type: 'error', text1: 'Error', text2: `Failed to turn ${newState ? 'ON' : 'OFF'} ${key}.` });
+      showToast({ 
+        type: 'error', 
+        text1: 'Command Timed Out / Failed', 
+        text2: `Failed to turn ${newState ? 'ON' : 'OFF'} ${key}. The controller did not respond. Check ESP32 power and Wi-Fi.`,
+        duration: 5000,
+      });
     }
   };
 
@@ -114,6 +159,31 @@ export default function HomeScreen() {
           toggleDevice={toggleDevice} 
           navigation={navigation} 
         />
+
+        {/* Sensor / Controller Health Banner */}
+        {health.hasAnyError && (
+          <View style={tw`mx-5 sm:mx-6 mt-4 p-3.5 rounded-2xl bg-amber-500/10 dark:bg-amber-500/15 border border-amber-500/30 flex-row items-center gap-3`}>
+            <MaterialCommunityIcons 
+              name={!health.isControllerOnline ? "wifi-alert" : "alert-rhombus-outline"} 
+              size={22} 
+              color="#f59e0b" 
+            />
+            <View style={tw`flex-1`}>
+              <Text style={[tw`text-xs text-amber-800 dark:text-amber-300`, { fontFamily: 'PlusJakartaSans_700Bold' }]}>
+                {!health.isControllerOnline 
+                  ? "Grow House Controller Offline" 
+                  : "Sensor Disconnected / Malfunction"}
+              </Text>
+              <Text style={[tw`text-[11px] text-amber-700/80 dark:text-amber-400/80 mt-0.5`, { fontFamily: 'PlusJakartaSans_500Medium' }]}>
+                {!health.isControllerOnline
+                  ? `No signal from ESP32 for ${health.offlineSeconds}s. Check controller power and Wi-Fi.`
+                  : health.faultySensorsList.length > 0 
+                    ? `Sensor disconnected: ${health.faultySensorsList.join(', ')}. Please check wiring.`
+                    : "One or more sensors are returning invalid readings. Check sensor wiring."}
+              </Text>
+            </View>
+          </View>
+        )}
 
         {/* Health Metrics (2x2 Grid) */}
         <EnvironmentMetricsGrid temp={temp} hum={hum} light={light} co2={co2} navigation={navigation} />

@@ -8,6 +8,8 @@ import { useTheme } from '../context/ThemeContext';
 import { hapticSelection } from '../utils/haptics';
 import { useResponsive } from '../utils/responsive';
 
+import { useSensorHealth } from '../hooks/useSensorHealth';
+
 interface Props {
   waterLevel?: number; // 0 to 100 percentage
   capacityLiters?: number; // Default 20 Liters
@@ -21,13 +23,30 @@ export default React.memo(function WaterLevelCard({
 }: Props) {
   const { isDarkMode } = useTheme();
   const { isSmallDevice } = useResponsive();
+  const health = useSensorHealth();
+
+  const isFaulty = health.waterError || !health.isControllerOnline;
 
   // Clamp percentage between 0 and 100
-  const clampedLevel = Math.max(0, Math.min(100, typeof waterLevel === 'number' && !isNaN(waterLevel) ? waterLevel : 75));
-  const estimatedLiters = ((clampedLevel / 100) * capacityLiters).toFixed(1);
+  const clampedLevel = isFaulty ? 0 : Math.max(0, Math.min(100, typeof waterLevel === 'number' && !isNaN(waterLevel) ? waterLevel : 75));
+  const estimatedLiters = isFaulty ? '--' : ((clampedLevel / 100) * capacityLiters).toFixed(1);
 
   // Status configuration
   const statusConfig = React.useMemo(() => {
+    if (isFaulty) {
+      return {
+        label: !health.isControllerOnline ? 'Offline' : 'Sensor Fault',
+        color: '#f43f5e',
+        badgeBg: isDarkMode ? 'bg-rose-500/15' : 'bg-rose-50',
+        badgeBorder: isDarkMode ? 'border-rose-500/30' : 'border-rose-200',
+        badgeText: isDarkMode ? 'text-rose-400' : 'text-rose-600',
+        dotColor: '#f43f5e',
+        gradientColors: ['#64748b', '#475569', '#334155'] as [string, string, string],
+        desc: !health.isControllerOnline ? 'Controller is unreachable' : 'Water sensor returning invalid reading',
+        isCritical: false,
+        isWarning: true,
+      };
+    }
     if (clampedLevel > 50) {
       return {
         label: 'Optimal',
@@ -58,17 +77,17 @@ export default React.memo(function WaterLevelCard({
     }
     return {
       label: 'Refill Now',
-      color: '#ef4444',
-      badgeBg: isDarkMode ? 'bg-rose-500/20' : 'bg-rose-50',
-      badgeBorder: isDarkMode ? 'border-rose-500/40' : 'border-rose-200',
+      color: '#f43f5e',
+      badgeBg: isDarkMode ? 'bg-rose-500/15' : 'bg-rose-50',
+      badgeBorder: isDarkMode ? 'border-rose-500/30' : 'border-rose-200',
       badgeText: isDarkMode ? 'text-rose-400' : 'text-rose-600',
-      dotColor: '#ef4444',
-      gradientColors: ['#f87171', '#ef4444', '#b91c1c'] as [string, string, string],
-      desc: 'Critical! Risk of pump dry-running',
+      dotColor: '#f43f5e',
+      gradientColors: ['#f43f5e', '#e11d48', '#be123c'] as [string, string, string],
+      desc: 'Critical: Water reservoir nearly empty',
       isCritical: true,
       isWarning: true,
     };
-  }, [clampedLevel, isDarkMode]);
+  }, [clampedLevel, isDarkMode, isFaulty, health.isControllerOnline]);
 
   // Smooth animation for liquid height
   const animatedFill = useRef(new Animated.Value(clampedLevel)).current;
@@ -376,19 +395,21 @@ export default React.memo(function WaterLevelCard({
                     },
                   ]}
                 >
-                  {Math.round(clampedLevel)}
+                  {isFaulty ? '--' : Math.round(clampedLevel)}
                 </Text>
-                <Text
-                  style={[
-                    tw`text-lg`,
-                    {
-                      fontFamily: 'PlusJakartaSans_800ExtraBold',
-                      color: statusConfig.color,
-                    },
-                  ]}
-                >
-                  %
-                </Text>
+                {!isFaulty && (
+                  <Text
+                    style={[
+                      tw`text-lg`,
+                      {
+                        fontFamily: 'PlusJakartaSans_800ExtraBold',
+                        color: statusConfig.color,
+                      },
+                    ]}
+                  >
+                    %
+                  </Text>
+                )}
               </View>
             </View>
 
@@ -414,11 +435,11 @@ export default React.memo(function WaterLevelCard({
                 <Text
                   style={[
                     tw`text-[12px]`,
-                    isDarkMode ? tw`text-slate-200` : tw`text-slate-800`,
-                    { fontFamily: 'PlusJakartaSans_800ExtraBold' },
+                    isDarkMode ? tw`text-white` : tw`text-slate-800`,
+                    { fontFamily: 'PlusJakartaSans_700Bold' },
                   ]}
                 >
-                  {estimatedLiters} / {capacityLiters} L
+                  {isFaulty ? '--' : `${estimatedLiters} L`}
                 </Text>
               </View>
 
