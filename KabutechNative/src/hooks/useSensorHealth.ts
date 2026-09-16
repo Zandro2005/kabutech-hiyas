@@ -52,27 +52,30 @@ export function useSensorHealth(): SensorHealthStatus {
   const tempError = dhtError || 
     typeof sensors?.temperature !== 'number' || 
     isNaN(sensors.temperature) || 
-    sensors.temperature <= -10 || 
+    sensors.temperature < 15 || 
+    sensors.temperature > 50 || 
     sensors.temperature === -999;
 
   const humError = dhtError || 
     typeof sensors?.humidity !== 'number' || 
     isNaN(sensors.humidity) || 
-    sensors.humidity <= 0 || 
+    sensors.humidity < 20 || 
+    sensors.humidity > 99.5 || 
     sensors.humidity === -999;
 
   const lightError = !isControllerOnline || 
     isErr(sensors?.light_error) || 
     typeof sensors?.light !== 'number' || 
     isNaN(sensors.light) || 
-    sensors.light < 0 || 
+    sensors.light <= 0 || 
     sensors.light === -999;
 
   const co2Error = !isControllerOnline || 
     isErr(sensors?.co2_error) || 
     typeof sensors?.co2 !== 'number' || 
     isNaN(sensors.co2) || 
-    sensors.co2 <= 0 || 
+    sensors.co2 < 350 || 
+    sensors.co2 > 5000 || 
     sensors.co2 === -999;
 
   const waterError = !isControllerOnline || 
