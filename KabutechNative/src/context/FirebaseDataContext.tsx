@@ -149,8 +149,9 @@ export const FirebaseDataProvider: React.FC<{ children: React.ReactNode }> = ({ 
   // Continuous Active Mode & Actuator Sync Loop (Auto and Scheduled)
   useEffect(() => {
     if (!user) return;
-    const mode = settings?.setpoints?.mode;
-    if (!mode || mode === 'manual') return;
+    const rawMode = settings?.setpoints?.mode;
+    const mode = String(rawMode || '').trim().toLowerCase();
+    if (mode !== 'auto' && mode !== 'scheduled') return;
 
     const syncActuators = () => {
       const currentDevices = settings?.setpoints?.devices || { fans: false, misters: false, lights: false, co2: false };
@@ -174,7 +175,7 @@ export const FirebaseDataProvider: React.FC<{ children: React.ReactNode }> = ({ 
     };
 
     syncActuators();
-    const interval = setInterval(syncActuators, 2500);
+    const interval = setInterval(syncActuators, 2000);
     return () => clearInterval(interval);
   }, [user?.uid, settings?.setpoints?.mode, settings?.setpoints, settings?.schedules, sensors]);
 

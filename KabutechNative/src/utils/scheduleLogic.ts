@@ -69,38 +69,113 @@ export const computeScheduledDevicesState = (schedules?: ScheduleSettings | null
 
 /**
  * Computes automatic device states based on live sensor readings and environmental setpoints.
+ * Actuators actively mitigate detected environmental deviations:
+ * - High Humidity -> Fans turn ON to exhaust moisture
+ * - Low Temperature -> Fans turn OFF to retain heat
+ * - High Temperature -> Fans turn ON to cool chamber
+ * - High CO2 -> Fans turn ON to flush stale air
+ * - Low Humidity -> Misters turn ON to raise moisture (with low-water safety cutoff)
+ * - Low Light -> Lights turn ON to support mushroom photomorphogenesis
  */
 export const computeAutoDevicesState = (
-  sensors?: { temperature?: number; humidity?: number; light?: number; co2?: number } | null,
+  sensors?: { temperature?: number; humidity?: number; light?: number; co2?: number; waterLevel?: number } | null,
   setpoints?: { temperature?: number; humidity?: number; light?: number; co2?: number } | null
 ) => {
-  const targetTemp = setpoints?.temperature ?? 28.0;
-  const targetHum = setpoints?.humidity ?? 85.0;
-  const targetLight = setpoints?.light ?? 580;
-  const targetCO2 = setpoints?.co2 ?? 690;
+  const targetTemp = typeof setpoints?.temperature === 'number'
+    ? setpoints.temperature
+    : parseFloat(setpoints?.temperature as any) || 28.0;
+  const targetHum = typeof setpoints?.humidity === 'number'
+    ? setpoints.humidity
+    : parseFloat(setpoints?.humidity as any) || 85.0;
+  const targetLight = typeof setpoints?.light === 'number'
+    ? setpoints.light
+    : parseFloat(setpoints?.light as any) || 580;
+  const targetCO2 = typeof setpoints?.co2 === 'number'
+    ? setpoints.co2
+    : parseFloat(setpoints?.co2 as any) || 690;
 
-  const currentTemp = typeof sensors?.temperature === 'number' ? sensors.temperature : 0;
-  const currentHum = typeof sensors?.humidity === 'number' ? sensors.humidity : 0;
-  const currentLight = typeof sensors?.light === 'number' ? sensors.light : 0;
-  const currentCO2 = typeof sensors?.co2 === 'number' ? sensors.co2 : 0;
+  const currentTemp = typeof sensors?.temperature === 'number'
+    ? sensors.temperature
+    : parseFloat(sensors?.temperature as any) || 0;
+  const currentHum = typeof sensors?.humidity === 'number'
+    ? sensors.humidity
+    : parseFloat(sensors?.humidity as any) || 0;
+  const currentLight = typeof sensors?.light === 'number'
+    ? sensors.light
+    : parseFloat(sensors?.light as any) || 0;
+  const currentCO2 = typeof sensors?.co2 === 'number'
+    ? sensors.co2
+    : parseFloat(sensors?.co2 as any) || 0;
+  const currentWater = typeof sensors?.waterLevel === 'number'
+    ? sensors.waterLevel
+    : parseFloat(sensors?.waterLevel as any) || 75;
 
   // Sensor validity checks (ignore disconnect / -999 / 0 fault values)
   const isTempValid = currentTemp > -50 && currentTemp !== -999 && currentTemp !== 0;
   const isHumValid = currentHum > 0 && currentHum !== -999;
   const isLightValid = currentLight >= 0 && currentLight !== -999;
   const isCo2Valid = currentCO2 > 0 && currentCO2 !== -999;
+  const isWaterSafe = currentWater > 15; // Low water safety threshold to protect mister pump
 
-  // Temperature / Exhaust: Fans turn ON if hotter than setpoint + 0.5°C or CO2 is high (> target + 50 ppm)
-  // High CO2 venting is handled strictly by exhaust fans only
-  const fans = (isTempValid && currentTemp > (targetTemp + 0.5)) || (isCo2Valid && currentCO2 > (targetCO2 + 50));
+  // ══════════════════════════════════════════════════════════════
+  //  1. CO₂ PURGING & AIR VENTILATION (Exhaust Fans)
+  // ══════════════════════════════════════════════════════════════
+  // Action in alerts: "Run exhaust fans to ventilate"
+  // When CO2 is elevated above setpoint, fans MUST turn ON to pull in fresh air.
+  const needFansForCo2 = isCo2Valid && currentCO2 > (targetCO2 + 25);
 
-  // Humidity: Misters turn ON if humidity drops below target - 3%
-  const misters = isHumValid && currentHum < (targetHum - 3.0);
+  // ══════════════════════════════════════════════════════════════
+  //  2. HUMIDITY REGULATION (Exhaust Fans & Misters)
+  // ══════════════════════════════════════════════════════════════
+  // HIGH Humidity Action: "Run exhaust fans to reduce moisture"
+  // When humidity is above setpoint (+2.5%), exhaust fans turn ON to vent moisture
+  const needFansForHum = isHumValid && currentHum > (targetHum + 2.5);
 
-  // Light: Lights turn ON if ambient light is below target - 50 lx
+  // LOW Humidity Action: "Run misters to raise humidity to target"
+  // When humidity is below setpoint (-2.0%), misters turn ON to raise moisture (if water safe)
+  // Misters turn OFF when target is reached or if water is depleted
+  const misters = isHumValid && isWaterSafe && currentHum < (targetHum - 2.0);
+
+  // ══════════════════════════════════════════════════════════════
+  //  3. TEMPERATURE REGULATION (Exhaust Fans)
+  // ══════════════════════════════════════════════════════════════
+  // HIGH Temperature Action: "Run exhaust fans to cool chamber"
+  // When temperature is above setpoint (+0.5°C), exhaust fans turn ON
+  const needFansForTemp = isTempValid && currentTemp > (targetTemp + 0.5);
+
+  // LOW Temperature Action: "Reduce fan ventilation to retain heat"
+  // If temperature is cold, we do not run fans for cooling.
+  const isTempCold = isTempValid && currentTemp < (targetTemp - 2.0);
+
+  // ══════════════════════════════════════════════════════════════
+  //  4. UNIFIED EXHAUST FAN STATE
+  // ══════════════════════════════════════════════════════════════
+  // Fans turn ON if:
+  // - CO2 is elevated (ventilate stale air)
+  // - Humidity is high (exhaust moisture)
+  // - Temperature is hot (cool chamber)
+  //
+  // Low temp suppresses fan cooling, but NEVER suppresses CO2 ventilation
+  let fans = false;
+  if (needFansForCo2) {
+    fans = true; // CO2 air exchange is top priority
+  } else if (needFansForHum) {
+    fans = true; // Moisture reduction
+  } else if (needFansForTemp && !isTempCold) {
+    fans = true; // Active cooling
+  }
+
+  // ══════════════════════════════════════════════════════════════
+  //  5. GROW LIGHT REGULATION
+  // ══════════════════════════════════════════════════════════════
+  // Action in alerts: "Turn on grow lights" when ambient light is dim
+  // Turn OFF when light level satisfies the setpoint
   const lights = isLightValid && currentLight < (targetLight - 50);
 
-  // Valve: Flushed strictly by fans only; valve remains closed (false) when CO2 is high
+  // ══════════════════════════════════════════════════════════════
+  //  6. CO₂ VALVE
+  // ══════════════════════════════════════════════════════════════
+  // Stays closed during automated mushroom fruiting (CO2 flushing handled by exhaust fans)
   const co2 = false;
 
   return { fans, misters, lights, co2 };

@@ -130,3 +130,59 @@ export async function notifyUser(userId: string, title: string, body: string, da
     console.error(`Error notifying user ${userId}:`, error);
   }
 }
+
+/**
+ * Schedules an immediate native notification banner on the user's phone.
+ */
+export async function scheduleLocalNotification(title: string, body: string, data = {}) {
+  try {
+    const { status: existingStatus } = await Notifications.getPermissionsAsync();
+    if (existingStatus !== 'granted') {
+      const { status } = await Notifications.requestPermissionsAsync();
+      if (status !== 'granted') return;
+    }
+
+    await Notifications.scheduleNotificationAsync({
+      content: {
+        title,
+        body,
+        sound: 'default',
+        priority: Notifications.AndroidNotificationPriority.HIGH,
+        data,
+      },
+      trigger: null, // immediate trigger
+    });
+  } catch (err) {
+    console.log('Error scheduling local notification:', err);
+  }
+}
+
+/**
+ * Notifies all registered users with an environmental alert push notification,
+ * and schedules an immediate local notification banner on this device.
+ */
+export async function notifyEnvironmentalAlert(title: string, body: string, data = {}) {
+  // 1. Immediately trigger native banner on current device
+  await scheduleLocalNotification(title, body, data);
+
+  // 2. Broadcast push notification to all users registered in the database
+  try {
+    const usersSnap = await get(ref(db, 'kabutech/users'));
+    if (!usersSnap.exists()) return;
+
+    const users = usersSnap.val();
+    const tokens = new Set<string>();
+
+    Object.values(users).forEach((u: any) => {
+      if (u && u.pushToken) {
+        tokens.add(u.pushToken);
+      }
+    });
+
+    for (const token of tokens) {
+      await sendPushNotification(token, title, body, data);
+    }
+  } catch (error) {
+    console.error('Error broadcasting environmental alert:', error);
+  }
+}

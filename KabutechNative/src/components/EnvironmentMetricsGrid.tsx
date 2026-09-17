@@ -9,6 +9,7 @@ import { useResponsive } from '../utils/responsive';
 import { useAuth } from '../context/AuthContext';
 
 import { useSensorHealth } from '../hooks/useSensorHealth';
+import { useSettings } from '../hooks/useFirebaseData';
 
 interface Props {
   temp: number;
@@ -24,6 +25,23 @@ export default React.memo(function EnvironmentMetricsGrid({ temp, hum, light, co
   const { profile } = useAuth();
   const isStaff = profile?.role === 'staff';
   const health = useSensorHealth();
+  const settings = useSettings();
+
+  const targetTemp = typeof settings?.setpoints?.temperature === 'number'
+    ? settings.setpoints.temperature
+    : parseFloat(settings?.setpoints?.temperature as any) || 28.0;
+
+  const targetHum = typeof settings?.setpoints?.humidity === 'number'
+    ? settings.setpoints.humidity
+    : parseFloat(settings?.setpoints?.humidity as any) || 85;
+
+  const targetLight = typeof settings?.setpoints?.light === 'number'
+    ? settings.setpoints.light
+    : parseFloat(settings?.setpoints?.light as any) || 580;
+
+  const targetCO2 = typeof settings?.setpoints?.co2 === 'number'
+    ? settings.setpoints.co2
+    : parseFloat(settings?.setpoints?.co2 as any) || 690;
 
   // Metric status & percentage calculations
   const tempStatus = React.useMemo(() => {
@@ -34,10 +52,12 @@ export default React.memo(function EnvironmentMetricsGrid({ temp, hum, light, co
         lightBg: '#fff1f2' 
       };
     }
-    if (temp >= 22 && temp <= 28.5) return { label: 'Optimal', color: '#10b981', lightBg: '#ecfdf5' };
-    if (temp > 28.5) return { label: 'Warm', color: '#f97316', lightBg: '#fff7ed' };
-    return { label: 'Cool', color: '#3b82f6', lightBg: '#eff6ff' };
-  }, [temp, health.tempError, health.isControllerOnline]);
+    if (temp > targetTemp + 4.0) return { label: 'Critical', color: '#ef4444', lightBg: '#fef2f2' };
+    if (temp > targetTemp + 2.5) return { label: 'Warm', color: '#f97316', lightBg: '#fff7ed' };
+    if (temp < targetTemp - 4.0) return { label: 'Cold', color: '#3b82f6', lightBg: '#eff6ff' };
+    if (temp < targetTemp - 2.5) return { label: 'Cool', color: '#0ea5e9', lightBg: '#f0f9ff' };
+    return { label: 'Optimal', color: '#10b981', lightBg: '#ecfdf5' };
+  }, [temp, targetTemp, health.tempError, health.isControllerOnline]);
   const tempPercent = health.tempError ? 0 : Math.min(100, Math.max(8, ((temp - 15) / (35 - 15)) * 100));
 
   const humStatus = React.useMemo(() => {
@@ -48,10 +68,22 @@ export default React.memo(function EnvironmentMetricsGrid({ temp, hum, light, co
         lightBg: '#fff1f2' 
       };
     }
-    if (hum >= 75 && hum <= 92) return { label: 'Optimal', color: '#10b981', lightBg: '#ecfdf5' };
-    if (hum < 75) return { label: 'Low', color: '#f59e0b', lightBg: '#fffbeb' };
-    return { label: 'High', color: '#0ea5e9', lightBg: '#f0f9ff' };
-  }, [hum, health.humError, health.isControllerOnline]);
+    // Deviations strictly relative to user's configured target setpoint
+    if (hum > targetHum + 10) {
+      return { label: 'Excessive', color: '#ef4444', lightBg: '#fef2f2' };
+    }
+    if (hum > targetHum + 5) {
+      return { label: 'High', color: '#f97316', lightBg: '#fff7ed' };
+    }
+    if (hum < targetHum - 12) {
+      return { label: 'Very Low', color: '#ef4444', lightBg: '#fef2f2' };
+    }
+    if (hum < targetHum - 6) {
+      return { label: 'Low', color: '#f59e0b', lightBg: '#fffbeb' };
+    }
+    // 1-2% drift (up to ±5%) is completely Optimal
+    return { label: 'Optimal', color: '#10b981', lightBg: '#ecfdf5' };
+  }, [hum, targetHum, health.humError, health.isControllerOnline]);
   const humPercent = health.humError ? 0 : Math.min(100, Math.max(8, ((hum - 30) / (100 - 30)) * 100));
 
   const lightStatus = React.useMemo(() => {
@@ -62,10 +94,10 @@ export default React.memo(function EnvironmentMetricsGrid({ temp, hum, light, co
         lightBg: '#fff1f2' 
       };
     }
-    if (light >= 400 && light <= 850) return { label: 'Optimal', color: '#10b981', lightBg: '#ecfdf5' };
-    if (light < 400) return { label: 'Dim', color: '#f59e0b', lightBg: '#fffbeb' };
-    return { label: 'Bright', color: '#eab308', lightBg: '#fefce8' };
-  }, [light, health.lightError, health.isControllerOnline]);
+    if (light > targetLight + 300) return { label: 'Bright', color: '#f97316', lightBg: '#fff7ed' };
+    if (light < targetLight - 200) return { label: 'Dim', color: '#f59e0b', lightBg: '#fffbeb' };
+    return { label: 'Optimal', color: '#10b981', lightBg: '#ecfdf5' };
+  }, [light, targetLight, health.lightError, health.isControllerOnline]);
   const lightPercent = health.lightError ? 0 : Math.min(100, Math.max(8, (light / 1000) * 100));
 
   const co2Status = React.useMemo(() => {
@@ -76,10 +108,10 @@ export default React.memo(function EnvironmentMetricsGrid({ temp, hum, light, co
         lightBg: '#fff1f2' 
       };
     }
-    if (co2 <= 750) return { label: 'Good', color: '#10b981', lightBg: '#ecfdf5' };
-    if (co2 <= 950) return { label: 'Moderate', color: '#f59e0b', lightBg: '#fffbeb' };
-    return { label: 'Elevated', color: '#ef4444', lightBg: '#fef2f2' };
-  }, [co2, health.co2Error, health.isControllerOnline]);
+    if (co2 > targetCO2 + 350) return { label: 'High', color: '#ef4444', lightBg: '#fef2f2' };
+    if (co2 > targetCO2 + 150) return { label: 'Elevated', color: '#f97316', lightBg: '#fff7ed' };
+    return { label: 'Good', color: '#10b981', lightBg: '#ecfdf5' };
+  }, [co2, targetCO2, health.co2Error, health.isControllerOnline]);
   const co2Percent = health.co2Error ? 0 : Math.min(100, Math.max(8, ((co2 - 300) / (1200 - 300)) * 100));
 
   const handleCardPress = (tabKey: 'temp' | 'hum' | 'light' | 'co2') => {
@@ -95,6 +127,10 @@ export default React.memo(function EnvironmentMetricsGrid({ temp, hum, light, co
   };
 
   const activeCount = [!health.tempError, !health.humError, !health.lightError, !health.co2Error].filter(Boolean).length;
+
+  // Alert highlight only when deviating beyond target setpoint tolerance (1-2% drift is not an alert)
+  const isHumAlert = hum > targetHum + 5 || hum < targetHum - 6;
+  const humAlertColor = hum > targetHum + 10 || hum < targetHum - 12 ? '#ef4444' : (hum > targetHum + 5 ? '#f97316' : '#f59e0b');
 
   const metrics = [
     {
@@ -116,9 +152,9 @@ export default React.memo(function EnvironmentMetricsGrid({ temp, hum, light, co
       value: health.humError ? '--' : hum,
       unit: '%',
       icon: (health.humError ? 'alert-circle-outline' : 'water-percent') as any,
-      iconColor: health.humError ? '#f43f5e' : '#0ea5e9',
-      iconBg: health.humError ? 'bg-rose-50 dark:bg-rose-500/15' : 'bg-sky-50 dark:bg-sky-500/15',
-      accentColor: health.humError ? '#f43f5e' : '#0ea5e9',
+      iconColor: health.humError ? '#f43f5e' : (isHumAlert ? humAlertColor : '#0ea5e9'),
+      iconBg: health.humError ? 'bg-rose-50 dark:bg-rose-500/15' : (isHumAlert ? 'bg-orange-50 dark:bg-orange-500/15' : 'bg-sky-50 dark:bg-sky-500/15'),
+      accentColor: health.humError ? '#f43f5e' : (isHumAlert ? humAlertColor : '#0ea5e9'),
       status: humStatus,
       percent: humPercent,
       hasError: health.humError,

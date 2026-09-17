@@ -57,6 +57,7 @@ RNAlert.alert = (title, message, buttons, options) => {
 import ErrorBoundary from './src/components/ErrorBoundary';
 import GlobalAlarmModal from './src/components/GlobalAlarmModal';
 import InteractiveWelcomeHud from './src/components/InteractiveWelcomeHud';
+import EnvironmentalAlertNotifier from './src/components/EnvironmentalAlertNotifier';
 
 export default function App() {
   const [fontsLoaded, setFontsLoaded] = useState(false);
@@ -118,6 +119,7 @@ export default function App() {
           <SafeAreaProvider>
             <StatusBar style="auto" />
             <NavigationBar hidden={true} />
+            <EnvironmentalAlertNotifier />
             <ErrorBoundary>
               <AppNavigator />
               <GlobalAlarmModal />

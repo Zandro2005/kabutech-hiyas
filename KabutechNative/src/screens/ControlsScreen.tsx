@@ -45,10 +45,18 @@ export default function ControlsScreen() {
   const co2 = typeof sensors.co2 === 'number' ? sensors.co2 : 583;
   const waterLevel = typeof sensors.waterLevel === 'number' ? sensors.waterLevel : 75;
 
-  const targetTemp = settings?.setpoints?.temperature || 28.0;
-  const targetHum = settings?.setpoints?.humidity || 85;
-  const targetLight = settings?.setpoints?.light || 580;
-  const targetCO2 = settings?.setpoints?.co2 || 690;
+  const targetTemp = typeof settings?.setpoints?.temperature === 'number'
+    ? settings.setpoints.temperature
+    : parseFloat(settings?.setpoints?.temperature as any) || 28.0;
+  const targetHum = typeof settings?.setpoints?.humidity === 'number'
+    ? settings.setpoints.humidity
+    : parseFloat(settings?.setpoints?.humidity as any) || 85;
+  const targetLight = typeof settings?.setpoints?.light === 'number'
+    ? settings.setpoints.light
+    : parseFloat(settings?.setpoints?.light as any) || 580;
+  const targetCO2 = typeof settings?.setpoints?.co2 === 'number'
+    ? settings.setpoints.co2
+    : parseFloat(settings?.setpoints?.co2 as any) || 690;
 
   const isAuto = String(settings?.setpoints?.mode).toLowerCase() === 'auto';
   const isScheduled = String(settings?.setpoints?.mode).toLowerCase() === 'scheduled';
@@ -82,7 +90,13 @@ export default function ControlsScreen() {
       [key]: value
     }).then(() => {
       showToast({ type: 'success', text1: `${label || 'Target'} updated to ${value}${unit || ''}` });
-    }).catch(err => Alert.alert("Error Saving", err.message));
+    }).catch(err => {
+      Alert.alert("Error Saving", err.message);
+      if (pendingTargetRef.current !== null) {
+        pendingTargetRef.current = null;
+        setLocalTarget(activeTabDataRef.current.target);
+      }
+    });
   };
 
   const toggleDevice = async (key: string, state: boolean) => {
@@ -143,6 +157,8 @@ export default function ControlsScreen() {
     } else if (mode === 'auto') {
       nextDevices = computeAutoDevicesState(sensors, settings?.setpoints);
     }
+
+    setDevices(nextDevices);
 
     update(ref(db, 'kabutech/settings/setpoints'), {
       mode,
@@ -226,22 +242,65 @@ export default function ControlsScreen() {
   }, [activeTabData]);
 
   const [localTarget, setLocalTarget] = useState<number>(activeTabData.target);
+  const pendingTargetRef = useRef<number | null>(null);
+  const isInteractingRef = useRef<boolean>(false);
+  const lastActiveTabRef = useRef<TabId>(activeTab);
 
+  // Sync from Firebase only when active tab changes, or when not currently interacting/pending
   useEffect(() => {
+    // Tab switched: always reset and display new tab's target
+    if (lastActiveTabRef.current !== activeTab) {
+      lastActiveTabRef.current = activeTab;
+      pendingTargetRef.current = null;
+      isInteractingRef.current = false;
+      setLocalTarget(activeTabData.target);
+      return;
+    }
+
+    // If incoming Firebase target matches our pending target, it has been confirmed by the server
+    if (pendingTargetRef.current !== null) {
+      if (Math.abs(activeTabData.target - pendingTargetRef.current) < 0.01) {
+        pendingTargetRef.current = null;
+      }
+      return; // Ignore stale intermediate snapshots while pending
+    }
+
+    // Do not let background snapshots override while user is actively pressing buttons
+    if (isInteractingRef.current) {
+      return;
+    }
+
+    // Otherwise keep localTarget in sync with remote target
     setLocalTarget(activeTabData.target);
   }, [activeTabData.target, activeTab]);
 
+  // Debounced save to Firebase
   useEffect(() => {
-    if (localTarget === activeTabData.target) return;
+    if (Math.abs(localTarget - activeTabData.target) < 0.01 && pendingTargetRef.current === null) {
+      return;
+    }
+
+    pendingTargetRef.current = localTarget;
+    const dbKey = activeTabData.dbKey;
+    const label = activeTabData.label;
+    const unit = activeTabData.unit;
+
     const timeout = setTimeout(() => {
-      updateSetpoint(activeTabData.dbKey, localTarget, activeTabData.label, activeTabData.unit);
+      updateSetpoint(dbKey, localTarget, label, unit);
     }, 500);
+
     return () => clearTimeout(timeout);
   }, [localTarget]);
 
+  const repeatTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const stopTimer = () => {
+    isInteractingRef.current = false;
+    if (repeatTimeoutRef.current) {
+      clearTimeout(repeatTimeoutRef.current);
+      repeatTimeoutRef.current = null;
+    }
     if (timerRef.current) {
       clearInterval(timerRef.current);
       timerRef.current = null;
@@ -249,35 +308,47 @@ export default function ControlsScreen() {
   };
 
   const startIncrement = () => {
+    stopTimer();
+    isInteractingRef.current = true;
     hapticSelection();
     setLocalTarget(prev => {
-      const next = Number((prev + activeTabDataRef.current.step).toFixed(1));
-      return next <= activeTabDataRef.current.max ? next : prev;
+      const current = Number(prev) || activeTabDataRef.current.min;
+      const next = Number((current + activeTabDataRef.current.step).toFixed(1));
+      return next <= activeTabDataRef.current.max ? next : current;
     });
 
-    timerRef.current = setInterval(() => {
-      hapticLight();
-      setLocalTarget(prev => {
-        const next = Number((prev + activeTabDataRef.current.step).toFixed(1));
-        return next <= activeTabDataRef.current.max ? next : prev;
-      });
-    }, 120);
+    repeatTimeoutRef.current = setTimeout(() => {
+      timerRef.current = setInterval(() => {
+        hapticLight();
+        setLocalTarget(prev => {
+          const current = Number(prev) || activeTabDataRef.current.min;
+          const next = Number((current + activeTabDataRef.current.step).toFixed(1));
+          return next <= activeTabDataRef.current.max ? next : current;
+        });
+      }, 100);
+    }, 380);
   };
 
   const startDecrement = () => {
+    stopTimer();
+    isInteractingRef.current = true;
     hapticSelection();
     setLocalTarget(prev => {
-      const next = Number((prev - activeTabDataRef.current.step).toFixed(1));
-      return next >= activeTabDataRef.current.min ? next : prev;
+      const current = Number(prev) || activeTabDataRef.current.min;
+      const next = Number((current - activeTabDataRef.current.step).toFixed(1));
+      return next >= activeTabDataRef.current.min ? next : current;
     });
 
-    timerRef.current = setInterval(() => {
-      hapticLight();
-      setLocalTarget(prev => {
-        const next = Number((prev - activeTabDataRef.current.step).toFixed(1));
-        return next >= activeTabDataRef.current.min ? next : prev;
-      });
-    }, 120);
+    repeatTimeoutRef.current = setTimeout(() => {
+      timerRef.current = setInterval(() => {
+        hapticLight();
+        setLocalTarget(prev => {
+          const current = Number(prev) || activeTabDataRef.current.min;
+          const next = Number((current - activeTabDataRef.current.step).toFixed(1));
+          return next >= activeTabDataRef.current.min ? next : current;
+        });
+      }, 100);
+    }, 380);
   };
 
   useEffect(() => {
@@ -353,7 +424,7 @@ export default function ControlsScreen() {
                       {tab.label}
                     </Text>
                     <Text style={[tw`text-[13px] ${isActive ? 'text-slate-900 dark:text-white' : 'text-slate-700 dark:text-slate-300'}`, { fontFamily: 'PlusJakartaSans_800ExtraBold' }]}>
-                      {tab.target}{tab.unit}
+                      {isActive ? localTarget : tab.target}{tab.unit}
                     </Text>
                   </View>
                 </TouchableOpacity>

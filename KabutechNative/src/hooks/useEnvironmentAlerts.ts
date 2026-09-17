@@ -243,14 +243,41 @@ export function useEnvironmentAlerts(): EnvironmentAlertsResult {
       }
     }
 
-    // 6. Humidity Environmental Alerts (Unambiguous text; Warns only on significant deviation)
+    // 6. Humidity Environmental Alerts (Strictly relative to target setpoint; 1-2% drift is normal)
     if (!health.humError && hum > 0 && hum !== -999) {
-      const isHumCriticalLow = hum < targetHum - 25;
-      const isHumLow = hum < targetHum - 12; // Minor drift ignored; warns when humidity is genuinely deficient
-      const isHumCriticalHigh = hum > 98;
-      const isHumHigh = hum > targetHum + 10 && hum > 95;
+      // 1-2% drift is ignored; warns only on genuine, significant deviations from user's setpoint
+      const isHumCriticalHigh = hum > targetHum + 12 && hum >= 98;
+      const isHumHigh = hum > targetHum + 6;
+      const isHumCriticalLow = hum < targetHum - 18;
+      const isHumLow = hum < targetHum - 8;
 
-      if (isHumCriticalLow) {
+      if (isHumCriticalHigh) {
+        list.push({
+          id: 'hum-critical-high',
+          type: 'critical',
+          title: 'Excessive Humidity Alert',
+          shortLabel: `Saturated • ${Math.round(hum)}%`,
+          currentValue: `${Math.round(hum)}%`,
+          targetValue: `${targetHum}%`,
+          action: 'Run exhaust fans to reduce moisture',
+          message: `Humidity reached ${Math.round(hum)}% (Target: ${targetHum}%). Ventilate chamber immediately.`,
+          icon: 'water-plus',
+          metric: 'hum',
+        });
+      } else if (isHumHigh) {
+        list.push({
+          id: 'hum-high',
+          type: 'warning',
+          title: 'High Humidity Warning',
+          shortLabel: `High Hum • ${Math.round(hum)}%`,
+          currentValue: `${Math.round(hum)}%`,
+          targetValue: `${targetHum}%`,
+          action: 'Run exhaust fans to reduce moisture',
+          message: `Humidity is at ${Math.round(hum)}% (Target: ${targetHum}%). Run exhaust fans to ventilate.`,
+          icon: 'water-plus',
+          metric: 'hum',
+        });
+      } else if (isHumCriticalLow) {
         list.push({
           id: 'hum-critical-low',
           type: 'critical',
@@ -259,7 +286,7 @@ export function useEnvironmentAlerts(): EnvironmentAlertsResult {
           currentValue: `${Math.round(hum)}%`,
           targetValue: `${targetHum}%`,
           action: `Run misters to raise humidity to ${targetHum}%`,
-          message: `Run misters to raise humidity to ${targetHum}%`,
+          message: `Humidity is critically low at ${Math.round(hum)}% (Target: ${targetHum}%). Activate misters.`,
           icon: 'water-percent-alert',
           metric: 'hum',
         });
@@ -268,38 +295,12 @@ export function useEnvironmentAlerts(): EnvironmentAlertsResult {
           id: 'hum-low',
           type: 'warning',
           title: 'Humidity Below Target',
-          shortLabel: `Low Humidity • ${Math.round(hum)}%`,
+          shortLabel: `Low Hum • ${Math.round(hum)}%`,
           currentValue: `${Math.round(hum)}%`,
           targetValue: `${targetHum}%`,
           action: `Run misters to raise humidity to ${targetHum}%`,
-          message: `Run misters to raise humidity to ${targetHum}%`,
+          message: `Humidity dropped to ${Math.round(hum)}% (Target: ${targetHum}%). Run misters to balance.`,
           icon: 'water-minus',
-          metric: 'hum',
-        });
-      } else if (isHumCriticalHigh) {
-        list.push({
-          id: 'hum-critical-high',
-          type: 'critical',
-          title: 'Excessive Humidity',
-          shortLabel: `Saturated • ${Math.round(hum)}%`,
-          currentValue: `${Math.round(hum)}%`,
-          targetValue: `${targetHum}%`,
-          action: 'Run exhaust fans to reduce moisture',
-          message: 'Run exhaust fans to reduce moisture',
-          icon: 'water-plus',
-          metric: 'hum',
-        });
-      } else if (isHumHigh) {
-        list.push({
-          id: 'hum-high',
-          type: 'warning',
-          title: 'Humidity Above Target',
-          shortLabel: `High Humidity • ${Math.round(hum)}%`,
-          currentValue: `${Math.round(hum)}%`,
-          targetValue: `${targetHum}%`,
-          action: 'Run exhaust fans to reduce moisture',
-          message: 'Run exhaust fans to reduce moisture',
-          icon: 'water-plus',
           metric: 'hum',
         });
       }

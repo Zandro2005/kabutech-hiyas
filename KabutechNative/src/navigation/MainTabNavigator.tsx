@@ -25,6 +25,7 @@ import { db } from '../services/firebase';
 import { showToast } from '../components/CustomToast';
 import { ref, update } from 'firebase/database';
 import { hapticLight } from '../utils/haptics';
+import FloatingCapsuleTabBar from '../components/FloatingCapsuleTabBar';
 
 const DummyScreen = () => null;
 
@@ -78,95 +79,30 @@ export default function MainTabNavigator() {
     <>
     <Tab.Navigator
       backBehavior="history"
-      screenListeners={{ tabPress: () => hapticLight() }}
+      tabBar={(props) => <FloatingCapsuleTabBar {...props} />}
       screenOptions={{
         headerShown: false,
-        tabBarButton: (props) => <TouchableOpacity {...(props as any)} activeOpacity={1} />,
-        tabBarActiveTintColor: isDarkMode ? '#6ee7b7' : (tw.color('brand-deep') || '#032514'),
-        tabBarInactiveTintColor: isDarkMode ? '#64748b' : '#94a3b8',
-        tabBarShowLabel: true,
-        tabBarLabelStyle: {
-          fontSize: 10,
-          fontWeight: '700',
-          marginTop: 6,
-          marginBottom: 0,
-          fontFamily: 'PlusJakartaSans_700Bold',
-        },
-        tabBarStyle: {
-          backgroundColor: isDarkMode ? '#0f172a' : '#ffffff',
-          borderTopWidth: 0,
-          height: (Platform.OS === 'ios' ? 85 : 90) + insets.bottom,
-          paddingBottom: insets.bottom > 0 ? insets.bottom : 24,
-          paddingHorizontal: 8,
-          paddingTop: 8,
-          elevation: 0,
-          position: 'absolute',
-          bottom: 0,
-          left: 0,
-          right: 0,
-        },
       }}
     >
       <Tab.Screen 
         name="Home" 
         component={HomeStackNavigator} 
-        options={{ 
-          tabBarIcon: ({ color }) => (
-            <View style={{ width: 28, height: 28, alignItems: 'center', justifyContent: 'center' }}>
-              <MaterialCommunityIcons name="home-outline" size={28} color={color} />
-              {hasWarning && (
-                <View style={[
-                  tw`absolute -top-0.5 -right-0.5 w-2.5 h-2.5 rounded-full ${hasCritical ? 'bg-rose-500' : 'bg-amber-500'}`,
-                  { borderWidth: 1.5, borderColor: isDarkMode ? '#0f172a' : '#ffffff' }
-                ]} />
-              )}
-            </View>
-          )
-        }}
       />
       <Tab.Screen 
         name="Controls" 
         component={ControlsScreen} 
-        options={{ tabBarIcon: ({ color }) => <MaterialCommunityIcons name="tune-vertical" size={28} color={color} /> }}
       />
       <Tab.Screen 
         name="AddAction" 
         component={DummyScreen} 
-        listeners={{
-          tabPress: e => {
-            e.preventDefault();
-            navigation.navigate('Report' as never);
-          }
-        }}
-        options={{ 
-          tabBarLabel: 'AI Insights',
-          tabBarIcon: () => <View style={{ width: 24, height: 24 }} />,
-          tabBarButton: (props) => (
-            <TouchableOpacity 
-              {...(props as any)}
-              activeOpacity={0.8}
-              style={[props.style, tw`items-center justify-center`]}
-            >
-              <View style={[
-                tw`absolute -top-6 w-[56px] h-[56px] bg-[#166534] dark:bg-emerald-600 rounded-full items-center justify-center shadow-lg`,
-                { borderWidth: 4, borderColor: isDarkMode ? '#0f172a' : '#ffffff' }
-              ]}>
-                <MaterialCommunityIcons name="chart-box-outline" size={32} color="white" />
-              </View>
-              {props.children}
-            </TouchableOpacity>
-          )
-        }}
       />
       <Tab.Screen 
         name="ManageCrop" 
         component={ManageCropScreen} 
-        options={{ tabBarLabel: 'Crop', tabBarIcon: ({ color }) => <MaterialCommunityIcons name="leaf" size={28} color={color} /> }}
       />
       <Tab.Screen 
         name="Yield" 
         component={YieldScreen} 
-        options={{ tabBarIcon: ({ color }) => <MaterialCommunityIcons name="chart-bar" size={28} color={color} /> }}
       />
       <Tab.Screen 
         name="Profile" 
