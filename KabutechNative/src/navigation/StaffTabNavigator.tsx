@@ -10,7 +10,9 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import tw from '../tailwind';
 import { useTheme } from '../context/ThemeContext';
 import { useAuth } from '../context/AuthContext';
-import { useStaffTasks } from '../hooks/useFirebaseData';
+import { useStaffTasks, useSensors } from '../hooks/useFirebaseData';
+import { useSensorHealth } from '../hooks/useSensorHealth';
+import { useEnvironmentAlerts } from '../hooks/useEnvironmentAlerts';
 import { hapticLight } from '../utils/haptics';
 
 // Import staff screens (to be created next)
@@ -50,6 +52,9 @@ export default function StaffTabNavigator() {
   const { isDarkMode } = useTheme();
   const { user } = useAuth();
   const allTasks = useStaffTasks();
+  const envAlerts = useEnvironmentAlerts();
+  const hasWarning = envAlerts.hasWarning;
+  const hasCritical = envAlerts.hasCritical;
   const insets = useSafeAreaInsets();
   const pendingTasks = allTasks.filter(t => t.assignedTo === user?.uid && t.status === 'assigned').length;
 
@@ -87,7 +92,19 @@ export default function StaffTabNavigator() {
       <Tab.Screen 
         name="Home" 
         component={StaffHomeStackNavigator} 
-        options={{ tabBarIcon: ({ color }) => <MaterialCommunityIcons name="home-outline" size={28} color={color} /> }}
+        options={{ 
+          tabBarIcon: ({ color }) => (
+            <View style={{ width: 28, height: 28, alignItems: 'center', justifyContent: 'center' }}>
+              <MaterialCommunityIcons name="home-outline" size={28} color={color} />
+              {hasWarning && (
+                <View style={[
+                  tw`absolute -top-0.5 -right-0.5 w-2.5 h-2.5 rounded-full ${hasCritical ? 'bg-rose-500' : 'bg-amber-500'}`,
+                  { borderWidth: 1.5, borderColor: isDarkMode ? '#0f172a' : '#ffffff' }
+                ]} />
+              )}
+            </View>
+          )
+        }}
       />
       <Tab.Screen 
         name="Crop" 

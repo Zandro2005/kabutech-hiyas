@@ -73,14 +73,14 @@ export default function AssignTaskScreen() {
         if (staffUser.pushToken) {
           await sendPushNotification(
             staffUser.pushToken,
-            'New Task Assigned 📋',
-            `${profile?.name || user?.displayName || 'Admin'} assigned you a new task: ${title.trim()}`
+            'New Task Assigned',
+            `${profile?.name || user?.displayName || 'Admin'} assigned you a task: ${title.trim()}`
           );
         } else {
           await notifyUser(
             selectedStaffId,
-            'New Task Assigned 📋',
-            `${profile?.name || user?.displayName || 'Admin'} assigned you a new task: ${title.trim()}`
+            'New Task Assigned',
+            `${profile?.name || user?.displayName || 'Admin'} assigned you a task: ${title.trim()}`
           );
         }
       } catch (e) {

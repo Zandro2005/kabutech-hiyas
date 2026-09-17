@@ -18,7 +18,9 @@ import AnalyticsScreen from '../screens/AnalyticsScreen';
 import AddBatchModal from '../components/modals/AddBatchModal';
 import tw from '../tailwind';
 import { useTheme } from '../context/ThemeContext';
-// useFirebaseData removed as it is not used in this file
+import { useSensorHealth } from '../hooks/useSensorHealth';
+import { useEnvironmentAlerts } from '../hooks/useEnvironmentAlerts';
+import { useSensors } from '../hooks/useFirebaseData';
 import { db } from '../services/firebase';
 import { showToast } from '../components/CustomToast';
 import { ref, update } from 'firebase/database';
@@ -52,6 +54,9 @@ export default function MainTabNavigator() {
   const [overrideModalVisible, setOverrideModalVisible] = useState(false);
   const { isDarkMode } = useTheme();
   const insets = useSafeAreaInsets();
+  const envAlerts = useEnvironmentAlerts();
+  const hasWarning = envAlerts.hasWarning;
+  const hasCritical = envAlerts.hasCritical;
 
   useEffect(() => {
     const sub = DeviceEventEmitter.addListener('showManualOverrideModal', () => {
@@ -105,7 +110,19 @@ export default function MainTabNavigator() {
       <Tab.Screen 
         name="Home" 
         component={HomeStackNavigator} 
-        options={{ tabBarIcon: ({ color }) => <MaterialCommunityIcons name="home-outline" size={28} color={color} /> }}
+        options={{ 
+          tabBarIcon: ({ color }) => (
+            <View style={{ width: 28, height: 28, alignItems: 'center', justifyContent: 'center' }}>
+              <MaterialCommunityIcons name="home-outline" size={28} color={color} />
+              {hasWarning && (
+                <View style={[
+                  tw`absolute -top-0.5 -right-0.5 w-2.5 h-2.5 rounded-full ${hasCritical ? 'bg-rose-500' : 'bg-amber-500'}`,
+                  { borderWidth: 1.5, borderColor: isDarkMode ? '#0f172a' : '#ffffff' }
+                ]} />
+              )}
+            </View>
+          )
+        }}
       />
       <Tab.Screen 
         name="Controls" 

@@ -76,8 +76,8 @@ export default function ActivityLogScreen() {
       // Notify all admins
       try {
         await notifyAdmins(
-          'New Activity Log 📝',
-          `${profile?.name || user?.displayName || 'A staff member'} logged: ${description.trim()}`
+          'New Activity Log',
+          `${profile?.name || user?.displayName || 'Staff'} logged: ${description.trim()}`
         );
       } catch (e) {
         console.log('Push error', e);

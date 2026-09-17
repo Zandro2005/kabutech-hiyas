@@ -78,14 +78,14 @@ export default function MyTasksScreen() {
       // Trigger Push Notification to all Admin devices
       try {
         await notifyAdmins(
-          'Task Completed! ✅',
-          `${profile?.name || user?.displayName || 'Staff'} has completed: ${task.title}`
+          'Task Completed',
+          `${profile?.name || user?.displayName || 'Staff'} completed: ${task.title}`
         );
       } catch(e) {
         console.log('Failed to send push notification to admins', e);
       }
 
-      showToast({ type: 'success', text1: 'Task Completed', text2: 'Great job!' });
+      showToast({ type: 'success', text1: 'Task Completed', text2: 'Task status updated.' });
       setCompleteModalVisible(false);
       setCompletionNotes('');
     } catch (error) {

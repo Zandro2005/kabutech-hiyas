@@ -18,6 +18,10 @@ import WaterLevelCard from '../../components/WaterLevelCard';
 import ScoreArch from '../../components/ScoreArch';
 import HomeScreenSkeleton from '../../components/skeletons/HomeScreenSkeleton';
 import { computeScheduledDevicesState, computeAutoDevicesState } from '../../utils/scheduleLogic';
+import { showToast } from '../../components/CustomToast';
+import { hapticSelection } from '../../utils/haptics';
+import { useEnvironmentAlerts } from '../../hooks/useEnvironmentAlerts';
+import DashboardWarningBadges from '../../components/DashboardWarningBadges';
 
 export default function StaffHomeScreen() {
   const navigation = useNavigation<NativeStackNavigationProp<GlobalNavigationParamList>>();
@@ -26,6 +30,7 @@ export default function StaffHomeScreen() {
   const settings = useSettings();
   const alerts = useAlerts();
   const health = useSensorHealth();
+  const envAlerts = useEnvironmentAlerts();
 
   const [isReady, setIsReady] = useState(false);
   useEffect(() => {
@@ -48,7 +53,7 @@ export default function StaffHomeScreen() {
   const isAuto = String(settings?.setpoints?.mode).toLowerCase() === 'auto';
   const isScheduled = String(settings?.setpoints?.mode).toLowerCase() === 'scheduled';
 
-  const rawDevices = settings?.setpoints?.devices || { fans: false, misters: false, lights: false };
+  const rawDevices = settings?.setpoints?.devices || { fans: false, misters: false, lights: false, co2: false };
   const [devices, setDevices] = useState(rawDevices);
 
   useEffect(() => {
@@ -72,6 +77,7 @@ export default function StaffHomeScreen() {
   const fansActive = devices.fans;
   const misterActive = devices.misters;
   const lightActive = devices.lights;
+  const valveActive = devices.co2;
 
   const envScore = calculateEnvironmentScore(temp, hum, light, co2);
 
@@ -96,35 +102,13 @@ export default function StaffHomeScreen() {
           fansActive={fansActive}
           misterActive={misterActive}
           lightActive={lightActive}
+          valveActive={valveActive}
           toggleDevice={() => { }} // No-op for staff
           navigation={navigation}
           readOnly={true}
+          hasWarning={envAlerts.hasWarning}
+          warningBanner={envAlerts.hasWarning ? <DashboardWarningBadges alerts={envAlerts.activeAlerts} /> : null}
         />
-
-        {/* Sensor / Controller Health Banner */}
-        {health.hasAnyError && (
-          <View style={tw`mx-5 sm:mx-6 mt-4 p-3.5 rounded-2xl bg-amber-500/10 dark:bg-amber-500/15 border border-amber-500/30 flex-row items-center gap-3`}>
-            <MaterialCommunityIcons 
-              name={!health.isControllerOnline ? "wifi-alert" : "alert-rhombus-outline"} 
-              size={22} 
-              color="#f59e0b" 
-            />
-            <View style={tw`flex-1`}>
-              <Text style={[tw`text-xs text-amber-800 dark:text-amber-300`, { fontFamily: 'PlusJakartaSans_700Bold' }]}>
-                {!health.isControllerOnline 
-                  ? "Grow House Controller Offline" 
-                  : "Sensor Disconnected / Malfunction"}
-              </Text>
-              <Text style={[tw`text-[11px] text-amber-700/80 dark:text-amber-400/80 mt-0.5`, { fontFamily: 'PlusJakartaSans_500Medium' }]}>
-                {!health.isControllerOnline
-                  ? `No signal from ESP32 for ${health.offlineSeconds}s. Check controller power and Wi-Fi.`
-                  : health.faultySensorsList.length > 0 
-                    ? `Sensor disconnected: ${health.faultySensorsList.join(', ')}. Please check wiring.`
-                    : "One or more sensors are returning invalid readings. Check sensor wiring."}
-              </Text>
-            </View>
-          </View>
-        )}
 
         {/* Health Metrics (2x2 Grid) */}
         <EnvironmentMetricsGrid temp={temp} hum={hum} light={light} co2={co2} navigation={navigation} />

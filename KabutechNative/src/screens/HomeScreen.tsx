@@ -22,7 +22,9 @@ import { db } from '../services/firebase';
 import { showToast } from '../components/CustomToast';
 import { computeScheduledDevicesState, computeAutoDevicesState } from '../utils/scheduleLogic';
 import { useSensorHealth } from '../hooks/useSensorHealth';
-import { hapticMedium } from '../utils/haptics';
+import { useEnvironmentAlerts } from '../hooks/useEnvironmentAlerts';
+import DashboardWarningBadges from '../components/DashboardWarningBadges';
+import { hapticMedium, hapticSelection } from '../utils/haptics';
 
 export default function HomeScreen() {
   const navigation = useNavigation<NativeStackNavigationProp<GlobalNavigationParamList>>();
@@ -34,6 +36,7 @@ export default function HomeScreen() {
   const alerts = useAlerts();
   const [isInsightModalVisible, setIsInsightModalVisible] = useState(false);
   const health = useSensorHealth();
+  const envAlerts = useEnvironmentAlerts();
   
   const [isReady, setIsReady] = useState(false);
   useEffect(() => {
@@ -56,7 +59,7 @@ export default function HomeScreen() {
   const isScheduled = String(settings?.setpoints?.mode).toLowerCase() === 'scheduled';
   const isLocked = isAuto || isScheduled;
   
-  const rawDevices = settings?.setpoints?.devices || { fans: false, misters: false, lights: false };
+  const rawDevices = settings?.setpoints?.devices || { fans: false, misters: false, lights: false, co2: false };
   const [devices, setDevices] = useState(rawDevices);
 
   useEffect(() => {
@@ -80,11 +83,14 @@ export default function HomeScreen() {
   const fansActive = devices.fans;
   const misterActive = devices.misters;
   const lightActive = devices.lights;
+  const valveActive = devices.co2;
 
   const toggleDevice = async (key: string, currentState: boolean) => {
     if (isLocked) return; // User cannot toggle while in auto or scheduled mode
     const newState = !currentState;
     hapticMedium();
+
+    const deviceName = key === 'co2' ? 'Valve' : key.charAt(0).toUpperCase() + key.slice(1);
 
     // ⚡ 0ms Optimistic UI update
     setDevices(prev => ({ ...prev, [key]: newState }));
@@ -96,9 +102,9 @@ export default function HomeScreen() {
     delayTimer = setTimeout(() => {
       showToast({
         type: 'info',
-        text1: 'Slow Controller Response',
-        text2: `The ${key} command is taking longer than usual to reach the ESP32. High network latency or weak Wi-Fi signal.`,
-        duration: 4500,
+        text1: 'Slow Response',
+        text2: `Sending command to ${deviceName}...`,
+        duration: 3500,
       });
     }, 2500);
 
@@ -112,11 +118,11 @@ export default function HomeScreen() {
       if (elapsed > 2500) {
         showToast({
           type: 'success',
-          text1: `${key.charAt(0).toUpperCase() + key.slice(1)} turned ${newState ? 'ON' : 'OFF'} (${(elapsed / 1000).toFixed(1)}s)`,
-          text2: 'Delivered after network delay.',
+          text1: `${deviceName} Switched ${newState ? 'ON' : 'OFF'}`,
+          text2: `Delivered in ${(elapsed / 1000).toFixed(1)}s`,
         });
       } else {
-        showToast({ type: 'success', text1: `${key.charAt(0).toUpperCase() + key.slice(1)} turned ${newState ? 'ON' : 'OFF'}` });
+        showToast({ type: 'success', text1: `${deviceName} Switched ${newState ? 'ON' : 'OFF'}` });
       }
     } catch (error) {
       if (delayTimer) clearTimeout(delayTimer);
@@ -124,9 +130,9 @@ export default function HomeScreen() {
       console.error(error);
       showToast({ 
         type: 'error', 
-        text1: 'Command Timed Out / Failed', 
-        text2: `Failed to turn ${newState ? 'ON' : 'OFF'} ${key}. The controller did not respond. Check ESP32 power and Wi-Fi.`,
-        duration: 5000,
+        text1: 'Command Failed', 
+        text2: `Unable to switch ${deviceName}. Check connection.`,
+        duration: 4000,
       });
     }
   };
@@ -142,7 +148,7 @@ export default function HomeScreen() {
       {!isReady ? (
         <HomeScreenSkeleton />
       ) : (
-      <ScrollView style={tw`flex-1 bg-[#f0f9f4] dark:bg-[#020617]`} contentContainerStyle={tw`pb-36`} showsVerticalScrollIndicator={false}>
+        <ScrollView style={tw`flex-1 bg-[#f0f9f4] dark:bg-[#020617]`} contentContainerStyle={tw`pb-36`} showsVerticalScrollIndicator={false}>
         {/* Overscroll Filler to prevent white gap when bouncing */}
         <View style={[tw`absolute left-0 right-0 bg-[#f0f9f4] dark:bg-[#020617]`, { top: -500, height: 500 }]} />
 
@@ -156,34 +162,12 @@ export default function HomeScreen() {
           fansActive={fansActive} 
           misterActive={misterActive} 
           lightActive={lightActive} 
+          valveActive={valveActive}
           toggleDevice={toggleDevice} 
           navigation={navigation} 
+          hasWarning={envAlerts.hasWarning}
+          warningBanner={envAlerts.hasWarning ? <DashboardWarningBadges alerts={envAlerts.activeAlerts} /> : null}
         />
-
-        {/* Sensor / Controller Health Banner */}
-        {health.hasAnyError && (
-          <View style={tw`mx-5 sm:mx-6 mt-4 p-3.5 rounded-2xl bg-amber-500/10 dark:bg-amber-500/15 border border-amber-500/30 flex-row items-center gap-3`}>
-            <MaterialCommunityIcons 
-              name={!health.isControllerOnline ? "wifi-alert" : "alert-rhombus-outline"} 
-              size={22} 
-              color="#f59e0b" 
-            />
-            <View style={tw`flex-1`}>
-              <Text style={[tw`text-xs text-amber-800 dark:text-amber-300`, { fontFamily: 'PlusJakartaSans_700Bold' }]}>
-                {!health.isControllerOnline 
-                  ? "Grow House Controller Offline" 
-                  : "Sensor Disconnected / Malfunction"}
-              </Text>
-              <Text style={[tw`text-[11px] text-amber-700/80 dark:text-amber-400/80 mt-0.5`, { fontFamily: 'PlusJakartaSans_500Medium' }]}>
-                {!health.isControllerOnline
-                  ? `No signal from ESP32 for ${health.offlineSeconds}s. Check controller power and Wi-Fi.`
-                  : health.faultySensorsList.length > 0 
-                    ? `Sensor disconnected: ${health.faultySensorsList.join(', ')}. Please check wiring.`
-                    : "One or more sensors are returning invalid readings. Check sensor wiring."}
-              </Text>
-            </View>
-          </View>
-        )}
 
         {/* Health Metrics (2x2 Grid) */}
         <EnvironmentMetricsGrid temp={temp} hum={hum} light={light} co2={co2} navigation={navigation} />

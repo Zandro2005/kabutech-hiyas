@@ -84,17 +84,24 @@ export const computeAutoDevicesState = (
   const currentLight = typeof sensors?.light === 'number' ? sensors.light : 0;
   const currentCO2 = typeof sensors?.co2 === 'number' ? sensors.co2 : 0;
 
+  // Sensor validity checks (ignore disconnect / -999 / 0 fault values)
+  const isTempValid = currentTemp > -50 && currentTemp !== -999 && currentTemp !== 0;
+  const isHumValid = currentHum > 0 && currentHum !== -999;
+  const isLightValid = currentLight >= 0 && currentLight !== -999;
+  const isCo2Valid = currentCO2 > 0 && currentCO2 !== -999;
+
   // Temperature / Exhaust: Fans turn ON if hotter than setpoint + 0.5°C or CO2 is high (> target + 50 ppm)
-  const fans = currentTemp > (targetTemp + 0.5) || currentCO2 > (targetCO2 + 50);
+  // High CO2 venting is handled strictly by exhaust fans only
+  const fans = (isTempValid && currentTemp > (targetTemp + 0.5)) || (isCo2Valid && currentCO2 > (targetCO2 + 50));
 
   // Humidity: Misters turn ON if humidity drops below target - 3%
-  const misters = currentHum < (targetHum - 3.0);
+  const misters = isHumValid && currentHum < (targetHum - 3.0);
 
   // Light: Lights turn ON if ambient light is below target - 50 lx
-  const lights = currentLight < (targetLight - 50);
+  const lights = isLightValid && currentLight < (targetLight - 50);
 
-  // CO2 Valve / Intake: Turns ON if CO2 is above setpoint
-  const co2 = currentCO2 > targetCO2;
+  // Valve: Flushed strictly by fans only; valve remains closed (false) when CO2 is high
+  const co2 = false;
 
   return { fans, misters, lights, co2 };
 };

@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { View, Text, TouchableOpacity, Image, ActivityIndicator } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
-import { useNavigation } from '@react-navigation/native';
+import { useNavigation, useRoute } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { GlobalNavigationParamList } from '../types/navigation';
 import tw from '../tailwind';
@@ -12,7 +12,9 @@ import { showToast } from './CustomToast';
 import HelpModal from './modals/HelpModal';
 import InfoModal from './modals/InfoModal';
 import { useAuth } from '../context/AuthContext';
-import { useActivityLogs, useAllUsers } from '../hooks/useFirebaseData';
+import { useActivityLogs, useAllUsers, useSensors } from '../hooks/useFirebaseData';
+import { useSensorHealth } from '../hooks/useSensorHealth';
+import { useEnvironmentAlerts } from '../hooks/useEnvironmentAlerts';
 import { ref, update } from 'firebase/database';
 import { db } from '../services/firebase';
 import { getAvatarColor } from '../utils/avatarColor';
@@ -53,6 +55,18 @@ export default React.memo(function ScreenHeader({ title, subtitle, rightComponen
 
   const activityLogs = useActivityLogs();
   const allUsers = useAllUsers();
+  const envAlerts = useEnvironmentAlerts();
+  const hasWarning = envAlerts.hasWarning;
+  const hasCritical = envAlerts.hasCritical;
+
+  let currentRouteName = '';
+  try {
+    const route = useRoute();
+    currentRouteName = route?.name || '';
+  } catch (_) {}
+
+  const isHomeScreen = currentRouteName === 'HomeScreen' || currentRouteName === 'Home' || currentRouteName === 'StaffHomeScreen' || currentRouteName === 'StaffHome';
+
   const isAdmin = profile?.role === 'admin' || profile?.role === 'operator';
   const isStaff = profile?.role === 'staff';
 
@@ -68,15 +82,62 @@ export default React.memo(function ScreenHeader({ title, subtitle, rightComponen
       
       <View style={tw`flex-row justify-between items-center`}>
         
-        {/* Brand Logo & Name */}
+        {/* Brand Logo & Name with Warning Icon */}
         <View style={tw`flex-row items-center gap-1.5 flex-1`}>
           <MaterialCommunityIcons name="leaf" size={28} color={isDarkMode ? "#6ee7b7" : "#166534"} />
           <Text style={[tw`text-[24px] text-[#166534] dark:text-[#6ee7b7] tracking-tight leading-none`, {fontFamily: 'PlusJakartaSans_800ExtraBold'}]}>
             KabuTech
           </Text>
+
+          {/* Warning indicator on the KabuTech side for other pages */}
+          {hasWarning && !isHomeScreen && (
+            <TouchableOpacity
+              activeOpacity={0.75}
+              hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
+              onPress={() => {
+                hapticSelection();
+                const primary = envAlerts.primaryAlert;
+                if (envAlerts.count > 1) {
+                  const metricNames = Array.from(new Set(envAlerts.activeAlerts.map(a => a.shortLabel.split(' • ')[0]))).slice(0, 3).join(', ');
+                  showToast({
+                    type: hasCritical ? 'error' : 'info',
+                    text1: `${envAlerts.count} Chamber Warnings`,
+                    text2: `${metricNames} out of range. Check dashboard.`,
+                    duration: 4000,
+                  });
+                } else if (primary) {
+                  showToast({
+                    type: hasCritical ? 'error' : 'info',
+                    text1: primary.title,
+                    text2: `${primary.currentValue ? `${primary.currentValue} • ` : ''}${primary.action}`,
+                    duration: 4000,
+                  });
+                } else {
+                  showToast({
+                    type: 'info',
+                    text1: 'Environment Nominal',
+                    text2: 'All chamber parameters are within target setpoints.',
+                    duration: 3000,
+                  });
+                }
+              }}
+              style={[
+                tw`ml-1 px-1.5 py-0.5 rounded-full flex-row items-center border`,
+                hasCritical
+                  ? (isDarkMode ? tw`bg-rose-500/15 border-rose-500/30` : tw`bg-rose-50 border-rose-200`)
+                  : (isDarkMode ? tw`bg-amber-500/15 border-amber-500/30` : tw`bg-amber-50 border-amber-200`),
+              ]}
+            >
+              <MaterialCommunityIcons
+                name={hasCritical ? "alert-circle" : "alert"}
+                size={14}
+                color={hasCritical ? "#f43f5e" : "#f59e0b"}
+              />
+            </TouchableOpacity>
+          )}
         </View>
         
-        <View style={tw`flex-row items-center gap-2 ml-4`}>
+        <View style={tw`flex-row items-center gap-2 ml-2`}>
           {rightComponent}
           
           {/* Help Icon */}

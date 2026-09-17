@@ -1,6 +1,5 @@
 import React, { useEffect, useRef, useState, useCallback } from 'react';
 import { View, Text, Animated, StyleSheet, PanResponder } from 'react-native';
-import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTheme } from '../context/ThemeContext';
 import { useAuth } from '../context/AuthContext';
@@ -124,9 +123,7 @@ export default function CustomToast() {
   const isSuccess = message.type === 'success';
   const isInfo = message.type === 'info';
   
-  const iconName = isSuccess ? 'check-circle' : isInfo ? 'information' : 'alert-circle';
   const borderColor = isSuccess ? '#10b981' : isInfo ? '#3b82f6' : '#ef4444';
-  const iconColor = isSuccess ? (isDarkMode ? '#34d399' : '#10b981') : isInfo ? (isDarkMode ? '#60a5fa' : '#3b82f6') : (isDarkMode ? '#f87171' : '#ef4444');
 
   // Dark Mode vs Light Mode Color Palettes
   const bgColor = isDarkMode 
@@ -157,9 +154,6 @@ export default function CustomToast() {
         },
       ]}
     >
-      <View style={styles.iconWrap}>
-        <MaterialCommunityIcons name={iconName as any} size={24} color={iconColor} />
-      </View>
       <View style={styles.textWrap}>
         <Text style={[styles.title, { color: titleColor }]}>{message.text1}</Text>
         {message.text2 ? (
@@ -177,32 +171,31 @@ const styles = StyleSheet.create({
     right: 16,
     flexDirection: 'row',
     alignItems: 'center',
-    borderRadius: 16,
-    borderLeftWidth: 6,
-    paddingVertical: 14,
+    borderRadius: 14,
+    borderLeftWidth: 4,
+    paddingVertical: 12,
     paddingHorizontal: 16,
     zIndex: 99999,
     elevation: 20,
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.2,
-    shadowRadius: 16,
-  },
-  iconWrap: {
-    marginRight: 12,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.16,
+    shadowRadius: 12,
   },
   textWrap: {
     flex: 1,
   },
   title: {
-    fontSize: 14,
-    fontWeight: '800',
-    fontFamily: 'PlusJakartaSans_800ExtraBold',
+    fontSize: 13.5,
+    fontWeight: '700',
+    fontFamily: 'PlusJakartaSans_700Bold',
+    letterSpacing: -0.2,
   },
   body: {
     fontSize: 12,
-    fontWeight: '600',
-    fontFamily: 'PlusJakartaSans_700Bold',
+    fontWeight: '500',
+    fontFamily: 'PlusJakartaSans_500Medium',
     marginTop: 2,
+    lineHeight: 16,
   },
 });

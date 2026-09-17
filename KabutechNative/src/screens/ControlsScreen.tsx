@@ -5,7 +5,6 @@ import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { GlobalNavigationParamList } from '../types/navigation';
 import tw from '../tailwind';
 import { useSensors, useSettings } from '../hooks/useFirebaseData';
-import { useSensorHealth } from '../hooks/useSensorHealth';
 import { ref, update } from 'firebase/database';
 import { db } from '../services/firebase';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
@@ -27,7 +26,6 @@ export default function ControlsScreen() {
   const { width, isSmallDevice } = useResponsive();
   const sensors = useSensors();
   const settings = useSettings();
-  const health = useSensorHealth();
   
   const [isReady, setIsReady] = useState(false);
   const [showStopAiModal, setShowStopAiModal] = useState(false);
@@ -305,28 +303,6 @@ export default function ControlsScreen() {
       ) : (
       <ScrollView contentContainerStyle={tw`pb-28 pt-2`} showsVerticalScrollIndicator={false}>
         
-        {/* Sensor / Controller Health Warning Banner */}
-        {(!health.isControllerOnline || health.dhtError) && (
-          <View style={tw`mx-5 mb-4 p-3.5 rounded-2xl bg-amber-500/10 dark:bg-amber-500/15 border border-amber-500/30 flex-row items-center gap-3`}>
-            <MaterialCommunityIcons 
-              name={!health.isControllerOnline ? "wifi-alert" : "alert-rhombus-outline"} 
-              size={22} 
-              color="#f59e0b" 
-            />
-            <View style={tw`flex-1`}>
-              <Text style={[tw`text-xs text-amber-800 dark:text-amber-300`, { fontFamily: 'PlusJakartaSans_700Bold' }]}>
-                {!health.isControllerOnline 
-                  ? "Grow House Controller Offline" 
-                  : "Sensor Malfunction Detected"}
-              </Text>
-              <Text style={[tw`text-[11px] text-amber-700/80 dark:text-amber-400/80 mt-0.5`, { fontFamily: 'PlusJakartaSans_500Medium' }]}>
-                {!health.isControllerOnline
-                  ? `No signal from ESP32 for ${health.offlineSeconds}s. Actuator switches may not respond immediately.`
-                  : "DHT sensor is returning error signals. Target auto-adjustments may be affected."}
-              </Text>
-            </View>
-          </View>
-        )}
 
         {/* Horizontal Environmental Parameter Selector */}
         <View style={tw`mb-5`}>
@@ -559,15 +535,6 @@ export default function ControlsScreen() {
             </View>
           </View>
 
-          {/* Low Water Warning Banner */}
-          {waterLevel <= 20 && (
-            <View style={tw`mb-2.5 bg-rose-500/10 border border-rose-500/30 rounded-2xl px-3.5 py-2 flex-row items-center gap-2.5`}>
-              <MaterialCommunityIcons name="alert-circle-outline" size={16} color="#ef4444" />
-              <Text style={[tw`text-[11px] text-rose-700 dark:text-rose-300 flex-1`, { fontFamily: 'PlusJakartaSans_600SemiBold' }]}>
-                Water reservoir low ({Math.round(waterLevel)}%). Refill container to protect pump.
-              </Text>
-            </View>
-          )}
 
           {/* Unified Single Widget Bar */}
           <View style={[

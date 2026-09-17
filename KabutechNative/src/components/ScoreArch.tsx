@@ -16,9 +16,12 @@ interface Props {
   fansActive: boolean;
   misterActive: boolean;
   lightActive: boolean;
+  valveActive?: boolean;
   toggleDevice: (device: 'fans' | 'misters' | 'lights' | 'co2', currentState: boolean) => void;
   navigation: any;
   readOnly?: boolean;
+  warningBanner?: React.ReactNode;
+  hasWarning?: boolean;
 }
 
 export default React.memo(function ScoreArch({
@@ -29,9 +32,12 @@ export default React.memo(function ScoreArch({
   fansActive,
   misterActive,
   lightActive,
+  valveActive = false,
   toggleDevice,
   navigation,
-  readOnly = false
+  readOnly = false,
+  warningBanner,
+  hasWarning = false,
 }: Props) {
   const { profile } = useAuth();
   const { isSmallDevice } = useResponsive();
@@ -43,8 +49,8 @@ export default React.memo(function ScoreArch({
   const scoreBadgeColor = isOptimal ? '#10b981' : isWarning ? '#f59e0b' : '#ef4444';
 
   // Smart Halo Ring dimensions (Enlarged Hero Dial)
-  const ringSize = isSmallDevice ? 200 : 224;
-  const strokeWidth = 13;
+  const ringSize = isSmallDevice ? 224 : 252;
+  const strokeWidth = 14;
   const radius = (ringSize - strokeWidth) / 2;
   const circumference = 2 * Math.PI * radius;
   const progress = Math.min(1, Math.max(0.05, numScore / 10));
@@ -69,6 +75,7 @@ export default React.memo(function ScoreArch({
     { key: 'fans' as const, label: 'Fans', active: fansActive, icon: 'fan' as const },
     { key: 'misters' as const, label: 'Mister', active: misterActive, icon: 'water' as const },
     { key: 'lights' as const, label: 'Lights', active: lightActive, icon: 'lightbulb-on' as const },
+    { key: 'co2' as const, label: 'Valve', active: valveActive, icon: 'weather-windy' as const },
   ];
 
   return (
@@ -92,7 +99,7 @@ export default React.memo(function ScoreArch({
               { fontFamily: 'PlusJakartaSans_500Medium' }
             ]}
           >
-            Chamber A • All Systems Active
+            {hasWarning ? 'Chamber A • Attention Required' : 'Chamber A • All Systems Active'}
           </Text>
         </View>
 
@@ -190,7 +197,7 @@ export default React.memo(function ScoreArch({
           <View style={tw`absolute items-center justify-center`}>
             <Text
               style={[
-                tw`text-[10px] sm:text-[11px] uppercase tracking-widest text-slate-500 dark:text-slate-400 mb-0.5`,
+                tw`text-[11px] sm:text-xs uppercase tracking-widest text-slate-500 dark:text-slate-400 mb-1`,
                 { fontFamily: 'PlusJakartaSans_700Bold' }
               ]}
             >
@@ -202,10 +209,10 @@ export default React.memo(function ScoreArch({
                 style={[
                   tw`text-slate-900 dark:text-white`,
                   {
-                    fontSize: isSmallDevice ? 44 : 50,
+                    fontSize: isSmallDevice ? 50 : 58,
                     fontFamily: 'PlusJakartaSans_800ExtraBold',
                     letterSpacing: -1.5,
-                    lineHeight: isSmallDevice ? 48 : 54
+                    lineHeight: isSmallDevice ? 54 : 62
                   }
                 ]}
               >
@@ -213,7 +220,7 @@ export default React.memo(function ScoreArch({
               </Text>
               <Text
                 style={[
-                  tw`text-base sm:text-lg text-slate-400 dark:text-slate-500 ml-1`,
+                  tw`text-lg sm:text-xl text-slate-400 dark:text-slate-500 ml-1`,
                   { fontFamily: 'PlusJakartaSans_700Bold' }
                 ]}
               >
@@ -224,7 +231,7 @@ export default React.memo(function ScoreArch({
             {/* Condition Micro-Badge */}
             <View
               style={[
-                tw`flex-row items-center px-2.5 py-0.5 rounded-full border mt-1`,
+                tw`flex-row items-center px-3 py-1 rounded-full border mt-1.5`,
                 isDarkMode
                   ? tw`bg-slate-900/80 border-slate-700`
                   : tw`bg-emerald-50/90 border-emerald-200/90`
@@ -233,7 +240,7 @@ export default React.memo(function ScoreArch({
               <View style={[tw`w-2 h-2 rounded-full mr-1.5`, { backgroundColor: scoreBadgeColor }]} />
               <Text
                 style={[
-                  tw`text-[10.5px]`,
+                  tw`text-[11px]`,
                   {
                     fontFamily: 'PlusJakartaSans_700Bold',
                     color: isDarkMode ? '#e2e8f0' : '#065f46'
@@ -268,9 +275,16 @@ export default React.memo(function ScoreArch({
         </View>
       </View>
 
-      {/* 3. Three Interactive Circular Device Pucks (Docked Symmetrically Below) */}
+      {/* ⚠️ Warning Banners (Positioned Under the Environment Score / Above the Quick Device Toggles) */}
+      {hasWarning && warningBanner ? (
+        <View style={tw`mt-2 mb-1 px-4 sm:px-6 w-full items-center`}>
+          {warningBanner}
+        </View>
+      ) : null}
+
+      {/* 3. Four Interactive Circular Device Pucks (Docked Symmetrically Below) */}
       {!readOnly && (
-        <View style={tw`flex-row justify-center gap-6 sm:gap-8 pt-3 pb-1`}>
+        <View style={tw`flex-row justify-center gap-4 sm:gap-7 pt-1.5 pb-1`}>
           {devices.map((item) => {
             const showActive = item.active;
             const isLocked = isAuto || isScheduled;
@@ -287,8 +301,8 @@ export default React.memo(function ScoreArch({
                     tw`w-13 h-13 sm:w-14 sm:h-14 rounded-full items-center justify-center border`,
                     showActive
                       ? (isDarkMode
-                          ? tw`bg-emerald-950/80 border-emerald-500`
-                          : tw`bg-emerald-50 border-emerald-500`)
+                          ? tw`bg-emerald-500/20 border-emerald-400 shadow-sm`
+                          : tw`bg-emerald-600 border-emerald-600 shadow-md`)
                       : (isDarkMode
                           ? tw`bg-slate-900 border-slate-800`
                           : tw`bg-white border-slate-200/80`),
@@ -298,7 +312,7 @@ export default React.memo(function ScoreArch({
                   <MaterialCommunityIcons
                     name={item.icon as any}
                     size={22}
-                    color={showActive ? '#10b981' : (isDarkMode ? '#94a3b8' : '#64748b')}
+                    color={showActive ? (isDarkMode ? '#34d399' : '#ffffff') : (isDarkMode ? '#94a3b8' : '#64748b')}
                   />
                 </View>
 
@@ -316,7 +330,7 @@ export default React.memo(function ScoreArch({
                   <View
                     style={[
                       tw`w-1.5 h-1.5 rounded-full`,
-                      { backgroundColor: showActive ? '#10b981' : (isDarkMode ? '#475569' : '#cbd5e1') }
+                      { backgroundColor: showActive ? (isDarkMode ? '#34d399' : '#059669') : (isDarkMode ? '#475569' : '#cbd5e1') }
                     ]}
                   />
                   <Text
@@ -324,7 +338,7 @@ export default React.memo(function ScoreArch({
                       tw`text-[9px] uppercase tracking-wider`,
                       {
                         fontFamily: 'PlusJakartaSans_800ExtraBold',
-                        color: showActive ? '#10b981' : (isDarkMode ? '#64748b' : '#94a3b8')
+                        color: showActive ? (isDarkMode ? '#34d399' : '#059669') : (isDarkMode ? '#64748b' : '#94a3b8')
                       }
                     ]}
                   >
