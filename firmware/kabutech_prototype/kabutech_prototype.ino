@@ -47,8 +47,8 @@
 // ═══════════════════════════════════════════════
 
 // WiFi Credentials
-#define WIFI_SSID       "Abad_Fam"
-#define WIFI_PASSWORD   "Connecting123"
+#define WIFI_SSID       "denden"
+#define WIFI_PASSWORD   "jocsing121415"
 
 // Firebase Project Config
 #define API_KEY         "AIzaSyA3rB7rKIrfdJzCnFdnGvk25n0rd_hHI7M"
