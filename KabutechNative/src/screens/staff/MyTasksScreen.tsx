@@ -12,9 +12,11 @@ import { db } from '../../services/firebase';
 import { showToast } from '../../components/CustomToast';
 import { notifyAdmins } from '../../utils/PushNotifications';
 import TasksScreenSkeleton from '../../components/skeletons/TasksScreenSkeleton';
+import { useTabBarScroll } from '../../context/TabBarContext';
 
 export default function MyTasksScreen() {
   const navigation = useNavigation();
+  const { onScroll: handleTabBarScroll } = useTabBarScroll();
   const { isDarkMode } = useTheme();
   const { user, profile } = useAuth();
   const allTasks = useStaffTasks();
@@ -217,6 +219,8 @@ export default function MyTasksScreen() {
         keyExtractor={(item) => item.id}
         contentContainerStyle={tw`p-4 pb-36`}
         showsVerticalScrollIndicator={false}
+        onScroll={handleTabBarScroll}
+        scrollEventThrottle={16}
         ListEmptyComponent={
           <View style={tw`py-10 items-center justify-center`}>
             <MaterialCommunityIcons name={filter === 'active' ? 'check-all' : 'clipboard-text-off'} size={48} color={isDarkMode ? '#334155' : '#d1d5db'} />

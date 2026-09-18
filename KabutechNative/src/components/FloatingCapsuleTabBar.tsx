@@ -1,19 +1,22 @@
-import React from 'react';
-import { View, Text, TouchableOpacity, Platform } from 'react-native';
+import React, { useRef, useEffect } from 'react';
+import { View, Text, TouchableOpacity, Platform, Animated } from 'react-native';
 import { BottomTabBarProps } from '@react-navigation/bottom-tabs';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { LinearGradient } from 'expo-linear-gradient';
 import tw from '../tailwind';
 import { useTheme } from '../context/ThemeContext';
 import { useEnvironmentAlerts } from '../hooks/useEnvironmentAlerts';
 import { useStaffTasks } from '../hooks/useFirebaseData';
 import { useAuth } from '../context/AuthContext';
+import { useTabBar } from '../context/TabBarContext';
 import { hapticLight } from '../utils/haptics';
 
 interface TabConfig {
   label: string;
   activeIcon: keyof typeof MaterialCommunityIcons.glyphMap;
   inactiveIcon: keyof typeof MaterialCommunityIcons.glyphMap;
+  isFab?: boolean;
 }
 
 const TAB_CONFIGS: Record<string, TabConfig> = {
@@ -30,7 +33,8 @@ const TAB_CONFIGS: Record<string, TabConfig> = {
   AddAction: {
     label: 'Insights',
     activeIcon: 'chart-box',
-    inactiveIcon: 'chart-box-outline',
+    inactiveIcon: 'chart-box',
+    isFab: true,
   },
   ManageCrop: {
     label: 'Crop',
@@ -69,6 +73,52 @@ export default function FloatingCapsuleTabBar({
   const envAlerts = useEnvironmentAlerts();
   const { user } = useAuth();
   const allTasks = useStaffTasks();
+  const { isTabBarVisible, showTabBar } = useTabBar();
+
+  const translateY = useRef(new Animated.Value(0)).current;
+  const opacity = useRef(new Animated.Value(1)).current;
+
+  // Whenever user switches tab, ensure tab bar is visible
+  useEffect(() => {
+    showTabBar();
+  }, [state.index, showTabBar]);
+
+  // Hyper-responsive, ultra-snappy spring animation on visibility toggle
+  useEffect(() => {
+    if (isTabBarVisible) {
+      Animated.parallel([
+        Animated.spring(translateY, {
+          toValue: 0,
+          useNativeDriver: true,
+          damping: 26,
+          stiffness: 450,
+          mass: 0.3,
+          overshootClamping: true,
+        }),
+        Animated.timing(opacity, {
+          toValue: 1,
+          duration: 80,
+          useNativeDriver: true,
+        }),
+      ]).start();
+    } else {
+      Animated.parallel([
+        Animated.spring(translateY, {
+          toValue: 130, // push capsule completely offscreen below viewport
+          useNativeDriver: true,
+          damping: 30,
+          stiffness: 500,
+          mass: 0.3,
+          overshootClamping: true,
+        }),
+        Animated.timing(opacity, {
+          toValue: 0,
+          duration: 75,
+          useNativeDriver: true,
+        }),
+      ]).start();
+    }
+  }, [isTabBarVisible]);
 
   const hasWarning = envAlerts.hasWarning;
   const hasCritical = envAlerts.hasCritical;
@@ -77,17 +127,20 @@ export default function FloatingCapsuleTabBar({
   ).length;
 
   return (
-    <View
-      pointerEvents="box-none"
+    <Animated.View
+      pointerEvents={isTabBarVisible ? 'box-none' : 'none'}
       style={[
         tw`absolute left-0 right-0 items-center`,
         {
           bottom: Platform.OS === 'ios' ? Math.max(insets.bottom + 18, 36) : 38,
           zIndex: 50,
+          transform: [{ translateY }],
+          opacity,
         },
       ]}
     >
       <View
+        pointerEvents={isTabBarVisible ? 'auto' : 'none'}
         style={[
           tw`flex-row items-center justify-between rounded-[40px] border px-2.5`,
           {
@@ -126,6 +179,7 @@ export default function FloatingCapsuleTabBar({
 
           const onPress = () => {
             hapticLight();
+            showTabBar();
 
             if (route.name === 'AddAction') {
               navigation.navigate('Report' as never);
@@ -146,6 +200,66 @@ export default function FloatingCapsuleTabBar({
               navigation.navigate(route.name);
             }
           };
+
+          if (config.isFab) {
+            return (
+              <TouchableOpacity
+                key={route.key}
+                activeOpacity={0.85}
+                onPress={onPress}
+                hitSlop={{ top: 15, bottom: 8, left: 10, right: 10 }}
+                style={tw`flex-1 items-center justify-center`}
+              >
+                <View style={tw`items-center justify-center -mt-6`}>
+                  {/* Glowing Raised Gradient FAB */}
+                  <View
+                    style={[
+                      tw`rounded-full items-center justify-center`,
+                      {
+                        shadowColor: isDarkMode ? '#34d399' : '#059669',
+                        shadowOffset: { width: 0, height: 6 },
+                        shadowOpacity: isDarkMode ? 0.55 : 0.38,
+                        shadowRadius: 10,
+                        elevation: 10,
+                      },
+                    ]}
+                  >
+                    <LinearGradient
+                      colors={isDarkMode ? ['#34d399', '#059669'] : ['#10b981', '#047857']}
+                      start={{ x: 0, y: 0 }}
+                      end={{ x: 1, y: 1 }}
+                      style={[
+                        tw`w-14 h-14 rounded-full items-center justify-center border-[3.5px]`,
+                        {
+                          borderColor: isDarkMode ? '#0f172a' : '#ffffff',
+                        },
+                      ]}
+                    >
+                      <MaterialCommunityIcons
+                        name={config.activeIcon}
+                        size={26}
+                        color="#ffffff"
+                      />
+                    </LinearGradient>
+                  </View>
+
+                  {/* Tab Label */}
+                  <Text
+                    numberOfLines={1}
+                    style={[
+                      tw`text-[11px] mt-1 tracking-tight font-extrabold`,
+                      {
+                        fontFamily: 'PlusJakartaSans_800ExtraBold',
+                        color: isDarkMode ? '#34d399' : '#047857',
+                      },
+                    ]}
+                  >
+                    {config.label}
+                  </Text>
+                </View>
+              </TouchableOpacity>
+            );
+          }
 
           return (
             <TouchableOpacity
@@ -236,6 +350,6 @@ export default function FloatingCapsuleTabBar({
           );
         })}
       </View>
-    </View>
+    </Animated.View>
   );
 }

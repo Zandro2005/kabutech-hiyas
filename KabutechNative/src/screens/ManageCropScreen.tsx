@@ -18,9 +18,11 @@ import ConfirmModal from '../components/ConfirmModal';
 import CustomToast, { showToast } from '../components/CustomToast';
 import { SoundManager } from '../utils/SoundManager';
 import CropsScreenSkeleton from '../components/skeletons/CropsScreenSkeleton';
+import { useTabBarScroll } from '../context/TabBarContext';
 
 export default function ManageCropScreen() {
   const insets = useSafeAreaInsets();
+  const { onScroll: handleTabBarScroll } = useTabBarScroll();
   const { isDarkMode } = useTheme();
   const batches = useBatches();
 
@@ -146,6 +148,8 @@ export default function ManageCropScreen() {
           keyExtractor={(item) => String(item.id || item.firebaseKey)}
           contentContainerStyle={tw`px-5 pt-2 pb-36`}
           showsVerticalScrollIndicator={false}
+          onScroll={handleTabBarScroll}
+          scrollEventThrottle={16}
           ListHeaderComponent={
             <View>
               {/* Page Title */}

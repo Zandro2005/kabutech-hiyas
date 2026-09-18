@@ -11,9 +11,11 @@ import { BatchData } from '../../types/firebase';
 import LogHarvestModal from '../../components/modals/LogHarvestModal';
 import FlagContaminationModal from '../../components/modals/FlagContaminationModal';
 import CropsScreenSkeleton from '../../components/skeletons/CropsScreenSkeleton';
+import { useTabBarScroll } from '../../context/TabBarContext';
 
 export default function StaffCropScreen() {
   const insets = useSafeAreaInsets();
+  const { onScroll: handleTabBarScroll } = useTabBarScroll();
   const { isDarkMode } = useTheme();
   const batches = useBatches();
 
@@ -105,6 +107,8 @@ export default function StaffCropScreen() {
         keyExtractor={(item) => String(item.id || item.firebaseKey)}
         contentContainerStyle={tw`px-5 pt-2 pb-36`}
         showsVerticalScrollIndicator={false}
+        onScroll={handleTabBarScroll}
+        scrollEventThrottle={16}
         ListHeaderComponent={
           <View>
             {/* Page Title */}

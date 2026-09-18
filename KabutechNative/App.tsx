@@ -19,6 +19,7 @@ import {
 import { ThemeProvider } from './src/context/ThemeContext';
 import { AuthProvider } from './src/context/AuthContext';
 import { FirebaseDataProvider } from './src/context/FirebaseDataContext';
+import { TabBarProvider } from './src/context/TabBarContext';
 import { useDeviceContext } from 'twrnc';
 import tw from './src/tailwind';
 import CustomToast from './src/components/CustomToast';
@@ -116,17 +117,19 @@ export default function App() {
     <ThemeProvider>
       <AuthProvider>
         <FirebaseDataProvider>
-          <SafeAreaProvider>
-            <StatusBar style="auto" />
-            <NavigationBar hidden={true} />
-            <EnvironmentalAlertNotifier />
-            <ErrorBoundary>
-              <AppNavigator />
-              <GlobalAlarmModal />
-            </ErrorBoundary>
-            <CustomToast />
-            <InteractiveWelcomeHud />
-          </SafeAreaProvider>
+          <TabBarProvider>
+            <SafeAreaProvider>
+              <StatusBar style="auto" />
+              <NavigationBar hidden={true} />
+              <EnvironmentalAlertNotifier />
+              <ErrorBoundary>
+                <AppNavigator />
+                <GlobalAlarmModal />
+              </ErrorBoundary>
+              <CustomToast />
+              <InteractiveWelcomeHud />
+            </SafeAreaProvider>
+          </TabBarProvider>
         </FirebaseDataProvider>
       </AuthProvider>
     </ThemeProvider>

@@ -7,10 +7,12 @@ import { useTheme } from '../context/ThemeContext';
 import tw from '../tailwind';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import { useSensors } from '../hooks/useFirebaseData';
+import { useSensorHealth } from '../hooks/useSensorHealth';
 import { useAuth } from '../context/AuthContext';
 import { hapticLight, hapticSelection } from '../utils/haptics';
 import AnalyticsScreenSkeleton from '../components/skeletons/AnalyticsScreenSkeleton';
 import { useResponsive } from '../utils/responsive';
+import { useTabBarScroll } from '../context/TabBarContext';
 
 type MetricType = 'temp' | 'hum' | 'light' | 'co2';
 type TimeRange = '24H' | '7D' | '30D';
@@ -59,12 +61,14 @@ const getBezierPath = (pts: { x: number; y: number }[]) => {
 };
 
 export default function AnalyticsScreen() {
+  const { onScroll: handleTabBarScroll } = useTabBarScroll();
   const { isDarkMode } = useTheme();
   const { profile } = useAuth();
   const insets = useSafeAreaInsets();
   const navigation = useNavigation<any>();
   const route = useRoute<any>();
   const sensors = useSensors();
+  const health = useSensorHealth();
   const { width, isSmallDevice } = useResponsive();
   const isAdmin = profile?.role === 'admin' || profile?.role === 'operator';
 
@@ -94,11 +98,16 @@ export default function AnalyticsScreen() {
     }
   }, [route.params?.metric, route.params?.tab]);
 
+  const isTempDisconnected = health.tempError || sensors.temperature === -999 || sensors.temperature <= 0;
+  const isHumDisconnected = health.humError || sensors.humidity === -999 || sensors.humidity <= 0;
+  const isLightDisconnected = health.lightError || sensors.light === -999 || sensors.light < 0;
+  const isCo2Disconnected = health.co2Error || sensors.co2 === -999 || sensors.co2 < 0;
+
   const currentLiveValues = {
-    temp: typeof sensors.temperature === 'number' ? sensors.temperature : 26.5,
-    hum: typeof sensors.humidity === 'number' ? sensors.humidity : 82,
-    light: typeof sensors.light === 'number' ? sensors.light : 640,
-    co2: typeof sensors.co2 === 'number' ? sensors.co2 : 680,
+    temp: isTempDisconnected ? '--' : (typeof sensors.temperature === 'number' ? sensors.temperature : 26.5),
+    hum: isHumDisconnected ? '--' : (typeof sensors.humidity === 'number' ? sensors.humidity : 82),
+    light: isLightDisconnected ? '--' : (typeof sensors.light === 'number' ? sensors.light : 640),
+    co2: isCo2Disconnected ? '--' : (typeof sensors.co2 === 'number' ? sensors.co2 : 680),
   };
 
   const metricsInfo = {
@@ -262,7 +271,12 @@ export default function AnalyticsScreen() {
       {!isReady ? (
         <AnalyticsScreenSkeleton />
       ) : (
-      <ScrollView contentContainerStyle={tw`pb-32 pt-4`} showsVerticalScrollIndicator={false}>
+      <ScrollView
+        contentContainerStyle={tw`pb-32 pt-4`}
+        showsVerticalScrollIndicator={false}
+        onScroll={handleTabBarScroll}
+        scrollEventThrottle={16}
+      >
         
         {/* Header */}
         <View style={tw`px-6 mb-6 flex-row items-center`}>
@@ -329,7 +343,7 @@ export default function AnalyticsScreen() {
                       {info.shortLabel}
                     </Text>
                     <Text style={[tw`text-[13px] text-slate-800 dark:text-white`, { fontFamily: 'PlusJakartaSans_800ExtraBold' }]}>
-                      {liveVal}{info.unit}
+                      {liveVal}{liveVal === '--' ? '' : info.unit}
                     </Text>
                   </View>
                 </TouchableOpacity>

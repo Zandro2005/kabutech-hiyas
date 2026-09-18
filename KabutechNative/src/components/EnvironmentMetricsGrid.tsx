@@ -43,9 +43,15 @@ export default React.memo(function EnvironmentMetricsGrid({ temp, hum, light, co
     ? settings.setpoints.co2
     : parseFloat(settings?.setpoints?.co2 as any) || 690;
 
+  // Explicit disconnected checks: covers both health flags and direct -999 sentinel
+  const isTempDisconnected = health.tempError || temp === -999 || temp <= 0;
+  const isHumDisconnected = health.humError || hum === -999 || hum <= 0;
+  const isLightDisconnected = health.lightError || light === -999 || light < 0;
+  const isCo2Disconnected = health.co2Error || co2 === -999 || co2 < 0;
+
   // Metric status & percentage calculations
   const tempStatus = React.useMemo(() => {
-    if (health.tempError) {
+    if (isTempDisconnected) {
       return { 
         label: !health.isControllerOnline ? 'Offline' : 'Not Connected', 
         color: '#f43f5e', 
@@ -57,11 +63,11 @@ export default React.memo(function EnvironmentMetricsGrid({ temp, hum, light, co
     if (temp < targetTemp - 4.0) return { label: 'Cold', color: '#3b82f6', lightBg: '#eff6ff' };
     if (temp < targetTemp - 2.5) return { label: 'Cool', color: '#0ea5e9', lightBg: '#f0f9ff' };
     return { label: 'Optimal', color: '#10b981', lightBg: '#ecfdf5' };
-  }, [temp, targetTemp, health.tempError, health.isControllerOnline]);
-  const tempPercent = health.tempError ? 0 : Math.min(100, Math.max(8, ((temp - 15) / (35 - 15)) * 100));
+  }, [temp, targetTemp, isTempDisconnected, health.isControllerOnline]);
+  const tempPercent = isTempDisconnected ? 0 : Math.min(100, Math.max(8, ((temp - 15) / (35 - 15)) * 100));
 
   const humStatus = React.useMemo(() => {
-    if (health.humError) {
+    if (isHumDisconnected) {
       return { 
         label: !health.isControllerOnline ? 'Offline' : 'Not Connected', 
         color: '#f43f5e', 
@@ -83,11 +89,11 @@ export default React.memo(function EnvironmentMetricsGrid({ temp, hum, light, co
     }
     // 1-2% drift (up to ±5%) is completely Optimal
     return { label: 'Optimal', color: '#10b981', lightBg: '#ecfdf5' };
-  }, [hum, targetHum, health.humError, health.isControllerOnline]);
-  const humPercent = health.humError ? 0 : Math.min(100, Math.max(8, ((hum - 30) / (100 - 30)) * 100));
+  }, [hum, targetHum, isHumDisconnected, health.isControllerOnline]);
+  const humPercent = isHumDisconnected ? 0 : Math.min(100, Math.max(8, ((hum - 30) / (100 - 30)) * 100));
 
   const lightStatus = React.useMemo(() => {
-    if (health.lightError) {
+    if (isLightDisconnected) {
       return { 
         label: !health.isControllerOnline ? 'Offline' : 'Not Connected', 
         color: '#f43f5e', 
@@ -97,11 +103,11 @@ export default React.memo(function EnvironmentMetricsGrid({ temp, hum, light, co
     if (light > targetLight + 300) return { label: 'Bright', color: '#f97316', lightBg: '#fff7ed' };
     if (light < targetLight - 200) return { label: 'Dim', color: '#f59e0b', lightBg: '#fffbeb' };
     return { label: 'Optimal', color: '#10b981', lightBg: '#ecfdf5' };
-  }, [light, targetLight, health.lightError, health.isControllerOnline]);
-  const lightPercent = health.lightError ? 0 : Math.min(100, Math.max(8, (light / 1000) * 100));
+  }, [light, targetLight, isLightDisconnected, health.isControllerOnline]);
+  const lightPercent = isLightDisconnected ? 0 : Math.min(100, Math.max(8, (light / 1000) * 100));
 
   const co2Status = React.useMemo(() => {
-    if (health.co2Error) {
+    if (isCo2Disconnected) {
       return { 
         label: !health.isControllerOnline ? 'Offline' : 'Not Connected', 
         color: '#f43f5e', 
@@ -111,8 +117,8 @@ export default React.memo(function EnvironmentMetricsGrid({ temp, hum, light, co
     if (co2 > targetCO2 + 350) return { label: 'High', color: '#ef4444', lightBg: '#fef2f2' };
     if (co2 > targetCO2 + 150) return { label: 'Elevated', color: '#f97316', lightBg: '#fff7ed' };
     return { label: 'Good', color: '#10b981', lightBg: '#ecfdf5' };
-  }, [co2, targetCO2, health.co2Error, health.isControllerOnline]);
-  const co2Percent = health.co2Error ? 0 : Math.min(100, Math.max(8, ((co2 - 300) / (1200 - 300)) * 100));
+  }, [co2, targetCO2, isCo2Disconnected, health.isControllerOnline]);
+  const co2Percent = isCo2Disconnected ? 0 : Math.min(100, Math.max(8, ((co2 - 300) / (1200 - 300)) * 100));
 
   const handleCardPress = (tabKey: 'temp' | 'hum' | 'light' | 'co2') => {
     hapticSelection();
@@ -126,7 +132,7 @@ export default React.memo(function EnvironmentMetricsGrid({ temp, hum, light, co
     }
   };
 
-  const activeCount = [!health.tempError, !health.humError, !health.lightError, !health.co2Error].filter(Boolean).length;
+  const activeCount = [!isTempDisconnected, !isHumDisconnected, !isLightDisconnected, !isCo2Disconnected].filter(Boolean).length;
 
   // Alert highlight only when deviating beyond target setpoint tolerance (1-2% drift is not an alert)
   const isHumAlert = hum > targetHum + 5 || hum < targetHum - 6;
@@ -136,54 +142,54 @@ export default React.memo(function EnvironmentMetricsGrid({ temp, hum, light, co
     {
       id: 'temp' as const,
       name: 'Temperature',
-      value: health.tempError ? '--' : temp,
+      value: isTempDisconnected ? '--' : temp,
       unit: '°C',
-      icon: (health.tempError ? 'alert-circle-outline' : 'thermometer') as any,
-      iconColor: health.tempError ? '#f43f5e' : '#f97316',
-      iconBg: health.tempError ? 'bg-rose-50 dark:bg-rose-500/15' : 'bg-orange-50 dark:bg-orange-500/15',
-      accentColor: health.tempError ? '#f43f5e' : '#f97316',
+      icon: (isTempDisconnected ? 'alert-circle-outline' : 'thermometer') as any,
+      iconColor: isTempDisconnected ? '#f43f5e' : '#f97316',
+      iconBg: isTempDisconnected ? 'bg-rose-50 dark:bg-rose-500/15' : 'bg-orange-50 dark:bg-orange-500/15',
+      accentColor: isTempDisconnected ? '#f43f5e' : '#f97316',
       status: tempStatus,
       percent: tempPercent,
-      hasError: health.tempError,
+      hasError: isTempDisconnected,
     },
     {
       id: 'hum' as const,
       name: 'Humidity',
-      value: health.humError ? '--' : hum,
+      value: isHumDisconnected ? '--' : hum,
       unit: '%',
-      icon: (health.humError ? 'alert-circle-outline' : 'water-percent') as any,
-      iconColor: health.humError ? '#f43f5e' : (isHumAlert ? humAlertColor : '#0ea5e9'),
-      iconBg: health.humError ? 'bg-rose-50 dark:bg-rose-500/15' : (isHumAlert ? 'bg-orange-50 dark:bg-orange-500/15' : 'bg-sky-50 dark:bg-sky-500/15'),
-      accentColor: health.humError ? '#f43f5e' : (isHumAlert ? humAlertColor : '#0ea5e9'),
+      icon: (isHumDisconnected ? 'alert-circle-outline' : 'water-percent') as any,
+      iconColor: isHumDisconnected ? '#f43f5e' : (isHumAlert ? humAlertColor : '#0ea5e9'),
+      iconBg: isHumDisconnected ? 'bg-rose-50 dark:bg-rose-500/15' : (isHumAlert ? 'bg-orange-50 dark:bg-orange-500/15' : 'bg-sky-50 dark:bg-sky-500/15'),
+      accentColor: isHumDisconnected ? '#f43f5e' : (isHumAlert ? humAlertColor : '#0ea5e9'),
       status: humStatus,
       percent: humPercent,
-      hasError: health.humError,
+      hasError: isHumDisconnected,
     },
     {
       id: 'light' as const,
       name: 'Light Level',
-      value: health.lightError ? '--' : light,
+      value: isLightDisconnected ? '--' : light,
       unit: 'lx',
-      icon: (health.lightError ? 'alert-circle-outline' : 'white-balance-sunny') as any,
-      iconColor: health.lightError ? '#f43f5e' : '#f59e0b',
-      iconBg: health.lightError ? 'bg-rose-50 dark:bg-rose-500/15' : 'bg-amber-50 dark:bg-amber-500/15',
-      accentColor: health.lightError ? '#f43f5e' : '#f59e0b',
+      icon: (isLightDisconnected ? 'alert-circle-outline' : 'white-balance-sunny') as any,
+      iconColor: isLightDisconnected ? '#f43f5e' : '#f59e0b',
+      iconBg: isLightDisconnected ? 'bg-rose-50 dark:bg-rose-500/15' : 'bg-amber-50 dark:bg-amber-500/15',
+      accentColor: isLightDisconnected ? '#f43f5e' : '#f59e0b',
       status: lightStatus,
       percent: lightPercent,
-      hasError: health.lightError,
+      hasError: isLightDisconnected,
     },
     {
       id: 'co2' as const,
       name: 'CO2 Level',
-      value: health.co2Error ? '--' : co2,
+      value: isCo2Disconnected ? '--' : co2,
       unit: 'ppm',
-      icon: (health.co2Error ? 'alert-circle-outline' : 'molecule-co2') as any,
-      iconColor: health.co2Error ? '#f43f5e' : '#10b981',
-      iconBg: health.co2Error ? 'bg-rose-50 dark:bg-rose-500/15' : 'bg-emerald-50 dark:bg-emerald-500/15',
-      accentColor: health.co2Error ? '#f43f5e' : '#10b981',
+      icon: (isCo2Disconnected ? 'alert-circle-outline' : 'molecule-co2') as any,
+      iconColor: isCo2Disconnected ? '#f43f5e' : '#10b981',
+      iconBg: isCo2Disconnected ? 'bg-rose-50 dark:bg-rose-500/15' : 'bg-emerald-50 dark:bg-emerald-500/15',
+      accentColor: isCo2Disconnected ? '#f43f5e' : '#10b981',
       status: co2Status,
       percent: co2Percent,
-      hasError: health.co2Error,
+      hasError: isCo2Disconnected,
     },
   ];
 

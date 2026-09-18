@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useSensors } from './useFirebaseData';
 
 export interface SensorHealthStatus {
@@ -19,6 +19,14 @@ export function useSensorHealth(): SensorHealthStatus {
   const sensors = useSensors();
   const [offlineSeconds, setOfflineSeconds] = useState(0);
 
+  // Track the local time when the last snapshot arrived through the WebSocket stream
+  const lastPacketReceivedAt = useRef<number>(Date.now());
+  useEffect(() => {
+    if (sensors && (sensors.temperature != null || sensors.last_seen != null)) {
+      lastPacketReceivedAt.current = Date.now();
+    }
+  }, [sensors?.last_seen, sensors?.temperature, sensors?.humidity, sensors?.light, sensors?.co2, sensors?.waterLevel]);
+
   useEffect(() => {
     const checkInterval = setInterval(() => {
       if (sensors?.last_seen) {
@@ -32,8 +40,15 @@ export function useSensorHealth(): SensorHealthStatus {
   }, [sensors?.last_seen]);
 
   const hasTimestamp = typeof sensors?.last_seen === 'number' && sensors.last_seen > 0;
-  // Consider stale if no update has arrived in > 12 seconds
-  const isStale = hasTimestamp ? (Date.now() - (sensors.last_seen || 0)) > 12000 : false;
+  
+  // Stale detection:
+  // 1. Buffer (45s) accommodates ESP32 heartbeat (30s) + Wi-Fi retry delays.
+  // 2. Also checks local snapshot arrival time to eliminate client clock skew.
+  const timeSinceServerTs = hasTimestamp ? Date.now() - (sensors.last_seen || 0) : Infinity;
+  const timeSinceLocalPacket = Date.now() - lastPacketReceivedAt.current;
+
+  // Controller is considered stale ONLY if BOTH the server timestamp is > 45s AND no local packet arrived in 35s
+  const isStale = timeSinceServerTs > 45000 && timeSinceLocalPacket > 35000;
   
   const isExplicitOffline = sensors?.esp32_status === 'offline';
   const isControllerOnline = !isExplicitOffline && !isStale;
@@ -41,49 +56,51 @@ export function useSensorHealth(): SensorHealthStatus {
   // Helper to check for error flags (handles boolean, string "true", number 1)
   const isErr = (val: any) => val === true || val === 'true' || val === 1;
 
-  // Individual sensor error checks with -999 disconnected sentinel
+  // Individual sensor error checks:
+  // Synchronous and immediate detection when an unplugged sensor reports -999 or error flag:
   const dhtError = !isControllerOnline || 
     isErr(sensors?.dht_error) || 
     isErr(sensors?.temp_error) || 
     isErr(sensors?.hum_error) ||
     sensors?.temperature === -999 ||
-    sensors?.humidity === -999;
+    sensors?.humidity === -999 ||
+    typeof sensors?.temperature !== 'number' ||
+    typeof sensors?.humidity !== 'number';
 
   const tempError = dhtError || 
-    typeof sensors?.temperature !== 'number' || 
     isNaN(sensors.temperature) || 
-    sensors.temperature < 15 || 
-    sensors.temperature > 50 || 
+    sensors.temperature <= 0 || 
+    sensors.temperature > 60 || 
     sensors.temperature === -999;
 
   const humError = dhtError || 
-    typeof sensors?.humidity !== 'number' || 
     isNaN(sensors.humidity) || 
-    sensors.humidity < 20 || 
-    sensors.humidity > 99.5 || 
+    sensors.humidity <= 0 || 
+    sensors.humidity > 100 || 
     sensors.humidity === -999;
 
   const lightError = !isControllerOnline || 
     isErr(sensors?.light_error) || 
     typeof sensors?.light !== 'number' || 
     isNaN(sensors.light) || 
-    sensors.light <= 0 || 
-    sensors.light === -999;
+    sensors.light === -999 || 
+    sensors.light < 0;
 
   const co2Error = !isControllerOnline || 
     isErr(sensors?.co2_error) || 
     typeof sensors?.co2 !== 'number' || 
     isNaN(sensors.co2) || 
-    sensors.co2 < 350 || 
+    sensors.co2 < 300 || 
     sensors.co2 > 5000 || 
     sensors.co2 === -999;
 
   const waterError = !isControllerOnline || 
     isErr(sensors?.water_error) || 
     sensors?.waterLevel == null || 
+    typeof sensors?.waterLevel !== 'number' || 
     isNaN(sensors.waterLevel) || 
-    sensors.waterLevel < 0 || 
-    sensors.waterLevel === -999;
+    sensors.waterLevel === -999 || 
+    sensors.waterLevel < 0;
 
   // Generate list of disconnected / faulty sensors for alert banners
   const faultySensorsList: string[] = [];

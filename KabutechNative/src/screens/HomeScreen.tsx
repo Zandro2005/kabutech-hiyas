@@ -25,9 +25,11 @@ import { useSensorHealth } from '../hooks/useSensorHealth';
 import { useEnvironmentAlerts } from '../hooks/useEnvironmentAlerts';
 import DashboardWarningBadges from '../components/DashboardWarningBadges';
 import { hapticMedium, hapticSelection } from '../utils/haptics';
+import { useTabBarScroll } from '../context/TabBarContext';
 
 export default function HomeScreen() {
   const navigation = useNavigation<NativeStackNavigationProp<GlobalNavigationParamList>>();
+  const { onScroll: handleTabBarScroll } = useTabBarScroll();
   const { isDarkMode } = useTheme();
   const insets = useSafeAreaInsets();
   const sensors = useSensors();
@@ -148,7 +150,13 @@ export default function HomeScreen() {
       {!isReady ? (
         <HomeScreenSkeleton />
       ) : (
-        <ScrollView style={tw`flex-1 bg-[#f0f9f4] dark:bg-[#020617]`} contentContainerStyle={tw`pb-36`} showsVerticalScrollIndicator={false}>
+        <ScrollView
+          style={tw`flex-1 bg-[#f0f9f4] dark:bg-[#020617]`}
+          contentContainerStyle={tw`pb-36`}
+          showsVerticalScrollIndicator={false}
+          onScroll={handleTabBarScroll}
+          scrollEventThrottle={16}
+        >
         {/* Overscroll Filler to prevent white gap when bouncing */}
         <View style={[tw`absolute left-0 right-0 bg-[#f0f9f4] dark:bg-[#020617]`, { top: -500, height: 500 }]} />
 

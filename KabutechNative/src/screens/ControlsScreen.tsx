@@ -5,6 +5,7 @@ import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { GlobalNavigationParamList } from '../types/navigation';
 import tw from '../tailwind';
 import { useSensors, useSettings } from '../hooks/useFirebaseData';
+import { useSensorHealth } from '../hooks/useSensorHealth';
 import { ref, update } from 'firebase/database';
 import { db } from '../services/firebase';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
@@ -16,16 +17,19 @@ import { showToast } from '../components/CustomToast';
 import { hapticLight, hapticMedium, hapticSelection } from '../utils/haptics';
 import { computeScheduledDevicesState, computeAutoDevicesState } from '../utils/scheduleLogic';
 import { useResponsive } from '../utils/responsive';
+import { useTabBarScroll } from '../context/TabBarContext';
 
 type TabId = 'temp' | 'hum' | 'light' | 'co2';
 
 export default function ControlsScreen() {
   const navigation = useNavigation<NativeStackNavigationProp<GlobalNavigationParamList>>();
+  const { onScroll: handleTabBarScroll } = useTabBarScroll();
   const route = useRoute<any>();
   const { isDarkMode } = useTheme();
   const { width, isSmallDevice } = useResponsive();
   const sensors = useSensors();
   const settings = useSettings();
+  const health = useSensorHealth();
   
   const [isReady, setIsReady] = useState(false);
   const [showStopAiModal, setShowStopAiModal] = useState(false);
@@ -44,6 +48,11 @@ export default function ControlsScreen() {
   const light = typeof sensors.light === 'number' ? sensors.light : 71;
   const co2 = typeof sensors.co2 === 'number' ? sensors.co2 : 583;
   const waterLevel = typeof sensors.waterLevel === 'number' ? sensors.waterLevel : 75;
+
+  const isTempDisconnected = health.tempError || temp === -999 || temp <= 0;
+  const isHumDisconnected = health.humError || hum === -999 || hum <= 0;
+  const isLightDisconnected = health.lightError || light === -999 || light < 0;
+  const isCo2Disconnected = health.co2Error || co2 === -999 || co2 < 0;
 
   const targetTemp = typeof settings?.setpoints?.temperature === 'number'
     ? settings.setpoints.temperature
@@ -86,10 +95,9 @@ export default function ControlsScreen() {
   const isLocked = isAuto || isScheduled || isAiOverride;
 
   const updateSetpoint = (key: string, value: number, label?: string, unit?: string) => {
+    showToast({ type: 'success', text1: `${label || 'Target'} updated to ${value}${unit || ''}` });
     update(ref(db, 'kabutech/settings/setpoints'), {
       [key]: value
-    }).then(() => {
-      showToast({ type: 'success', text1: `${label || 'Target'} updated to ${value}${unit || ''}` });
     }).catch(err => {
       Alert.alert("Error Saving", err.message);
       if (pendingTargetRef.current !== null) {
@@ -180,10 +188,10 @@ export default function ControlsScreen() {
   };
 
   const tabs = [
-    { id: 'temp' as TabId, label: 'Temperature', icon: 'thermometer', color: '#f97316', unit: '°C', min: 18, max: 35, step: 0.5, current: temp, target: targetTemp, optimal: '24-28', dbKey: 'temperature' },
-    { id: 'hum' as TabId, label: 'Humidity', icon: 'water-opacity', color: '#3b82f6', unit: '%', min: 50, max: 95, step: 1, current: hum, target: targetHum, optimal: '80-90', dbKey: 'humidity' },
-    { id: 'light' as TabId, label: 'Light Level', icon: 'white-balance-sunny', color: '#eab308', unit: 'Lx', min: 200, max: 800, step: 10, current: light, target: targetLight, optimal: '500-800', dbKey: 'light' },
-    { id: 'co2' as TabId, label: 'CO2 Level', icon: 'molecule-co2', color: '#10b981', unit: 'ppm', min: 300, max: 1200, step: 10, current: co2, target: targetCO2, optimal: '< 800', dbKey: 'co2' },
+    { id: 'temp' as TabId, label: 'Temperature', icon: 'thermometer', color: '#f97316', unit: '°C', min: 18, max: 35, step: 0.5, current: isTempDisconnected ? '--' : temp, isDisconnected: isTempDisconnected, target: targetTemp, optimal: '24-28', dbKey: 'temperature' },
+    { id: 'hum' as TabId, label: 'Humidity', icon: 'water-opacity', color: '#3b82f6', unit: '%', min: 50, max: 95, step: 1, current: isHumDisconnected ? '--' : hum, isDisconnected: isHumDisconnected, target: targetHum, optimal: '80-90', dbKey: 'humidity' },
+    { id: 'light' as TabId, label: 'Light Level', icon: 'white-balance-sunny', color: '#eab308', unit: 'Lx', min: 200, max: 800, step: 10, current: isLightDisconnected ? '--' : light, isDisconnected: isLightDisconnected, target: targetLight, optimal: '500-800', dbKey: 'light' },
+    { id: 'co2' as TabId, label: 'CO2 Level', icon: 'molecule-co2', color: '#10b981', unit: 'ppm', min: 300, max: 1200, step: 10, current: isCo2Disconnected ? '--' : co2, isDisconnected: isCo2Disconnected, target: targetCO2, optimal: '< 800', dbKey: 'co2' },
   ];
   const tabScrollRef = useRef<ScrollView>(null);
   const tabLayouts = useRef<Record<string, { x: number; width: number }>>({});
@@ -242,6 +250,8 @@ export default function ControlsScreen() {
   }, [activeTabData]);
 
   const [localTarget, setLocalTarget] = useState<number>(activeTabData.target);
+  const localTargetRef = useRef<number>(activeTabData.target);
+  localTargetRef.current = localTarget;
   const pendingTargetRef = useRef<number | null>(null);
   const isInteractingRef = useRef<boolean>(false);
   const lastActiveTabRef = useRef<TabId>(activeTab);
@@ -254,6 +264,7 @@ export default function ControlsScreen() {
       pendingTargetRef.current = null;
       isInteractingRef.current = false;
       setLocalTarget(activeTabData.target);
+      localTargetRef.current = activeTabData.target;
       return;
     }
 
@@ -265,37 +276,31 @@ export default function ControlsScreen() {
       return; // Ignore stale intermediate snapshots while pending
     }
 
-    // Do not let background snapshots override while user is actively pressing buttons
+    // Do not let background snapshots override while user is actively pressing buttons or dragging
     if (isInteractingRef.current) {
       return;
     }
 
     // Otherwise keep localTarget in sync with remote target
     setLocalTarget(activeTabData.target);
+    localTargetRef.current = activeTabData.target;
   }, [activeTabData.target, activeTab]);
 
-  // Debounced save to Firebase
-  useEffect(() => {
-    if (Math.abs(localTarget - activeTabData.target) < 0.01 && pendingTargetRef.current === null) {
-      return;
-    }
-
-    pendingTargetRef.current = localTarget;
-    const dbKey = activeTabData.dbKey;
-    const label = activeTabData.label;
-    const unit = activeTabData.unit;
-
-    const timeout = setTimeout(() => {
-      updateSetpoint(dbKey, localTarget, label, unit);
-    }, 500);
-
-    return () => clearTimeout(timeout);
-  }, [localTarget]);
+  // Commit target to Firebase only when user finishes interacting (touch released)
+  const commitTarget = (val: number) => {
+    isInteractingRef.current = false;
+    pendingTargetRef.current = val;
+    const dbKey = activeTabDataRef.current.dbKey;
+    const label = activeTabDataRef.current.label;
+    const unit = activeTabDataRef.current.unit;
+    updateSetpoint(dbKey, val, label, unit);
+  };
 
   const repeatTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const stopTimer = () => {
+    const wasInteracting = isInteractingRef.current;
     isInteractingRef.current = false;
     if (repeatTimeoutRef.current) {
       clearTimeout(repeatTimeoutRef.current);
@@ -304,6 +309,9 @@ export default function ControlsScreen() {
     if (timerRef.current) {
       clearInterval(timerRef.current);
       timerRef.current = null;
+    }
+    if (wasInteracting) {
+      commitTarget(localTargetRef.current);
     }
   };
 
@@ -314,7 +322,9 @@ export default function ControlsScreen() {
     setLocalTarget(prev => {
       const current = Number(prev) || activeTabDataRef.current.min;
       const next = Number((current + activeTabDataRef.current.step).toFixed(1));
-      return next <= activeTabDataRef.current.max ? next : current;
+      const finalVal = next <= activeTabDataRef.current.max ? next : current;
+      localTargetRef.current = finalVal;
+      return finalVal;
     });
 
     repeatTimeoutRef.current = setTimeout(() => {
@@ -323,7 +333,9 @@ export default function ControlsScreen() {
         setLocalTarget(prev => {
           const current = Number(prev) || activeTabDataRef.current.min;
           const next = Number((current + activeTabDataRef.current.step).toFixed(1));
-          return next <= activeTabDataRef.current.max ? next : current;
+          const finalVal = next <= activeTabDataRef.current.max ? next : current;
+          localTargetRef.current = finalVal;
+          return finalVal;
         });
       }, 100);
     }, 380);
@@ -336,7 +348,9 @@ export default function ControlsScreen() {
     setLocalTarget(prev => {
       const current = Number(prev) || activeTabDataRef.current.min;
       const next = Number((current - activeTabDataRef.current.step).toFixed(1));
-      return next >= activeTabDataRef.current.min ? next : current;
+      const finalVal = next >= activeTabDataRef.current.min ? next : current;
+      localTargetRef.current = finalVal;
+      return finalVal;
     });
 
     repeatTimeoutRef.current = setTimeout(() => {
@@ -345,7 +359,9 @@ export default function ControlsScreen() {
         setLocalTarget(prev => {
           const current = Number(prev) || activeTabDataRef.current.min;
           const next = Number((current - activeTabDataRef.current.step).toFixed(1));
-          return next >= activeTabDataRef.current.min ? next : current;
+          const finalVal = next >= activeTabDataRef.current.min ? next : current;
+          localTargetRef.current = finalVal;
+          return finalVal;
         });
       }, 100);
     }, 380);
@@ -372,7 +388,12 @@ export default function ControlsScreen() {
       {!isReady ? (
         <ControlsScreenSkeleton />
       ) : (
-      <ScrollView contentContainerStyle={tw`pb-28 pt-2`} showsVerticalScrollIndicator={false}>
+      <ScrollView
+        contentContainerStyle={tw`pb-40 pt-2`}
+        showsVerticalScrollIndicator={false}
+        onScroll={handleTabBarScroll}
+        scrollEventThrottle={16}
+      >
         
 
         {/* Horizontal Environmental Parameter Selector */}
@@ -491,11 +512,22 @@ export default function ControlsScreen() {
           </ScrollView>
         </View>
 
-        {/* Central Dial Area */}
+        {/* Central Interactive Dial Area */}
         <CircularSlider 
           localTarget={localTarget} 
           activeTabData={activeTabData} 
           isDarkMode={isDarkMode} 
+          onValueChange={(val) => {
+            isInteractingRef.current = true;
+            localTargetRef.current = val;
+            setLocalTarget(val);
+          }}
+          onSlidingStart={() => {
+            isInteractingRef.current = true;
+          }}
+          onSlidingComplete={(val) => {
+            commitTarget(val);
+          }}
         />
 
         {/* Precision Stepper & Mode Switcher Row (Swipe left/right to change parameter) */}

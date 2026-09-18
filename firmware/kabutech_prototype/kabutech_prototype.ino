@@ -120,13 +120,21 @@ bool lightFault     = false;
 bool co2Fault       = false;
 bool waterFault     = false;
 
-// Hysteresis: requires 4 consecutive solid valid reads (~4s) to unlatch a fault
-// Single noise spikes when unplugged will NEVER clear the fault
+// Hysteresis & Debouncing:
+// Requires 2 consecutive valid reads to clear a fault,
+// and 2 consecutive failed reads to latch a fault.
+// This completely eliminates fluctuating "connected/not connected" false alarms from single dropped bits,
+// while latching faults within 2 seconds when unplugged.
 int dhtValidStreak   = 0;
+int dhtFailStreak    = 0;
 int lightValidStreak = 0;
+int lightFailStreak  = 0;
 int co2ValidStreak   = 0;
+int co2FailStreak    = 0;
 int waterValidStreak = 0;
-const int STREAK_TO_CLEAR_FAULT = 4;
+int waterFailStreak  = 0;
+const int STREAK_TO_CLEAR_FAULT = 2;
+const int STREAK_TO_LATCH_FAULT = 2;
 
 // ═══════════════════════════════════════════════
 //  FIREBASE STREAM CALLBACKS
@@ -266,24 +274,54 @@ void setup() {
 //  SENSOR READING FUNCTIONS (ACTIVE ANTI-FLOAT & DISCONNECT DETECTION)
 // ═══════════════════════════════════════════════
 
-// ── Read Analog Pin with Active Stray Charge Bleed (Prevents Floating Random Numbers) ──
-int readBleedADC(int pin) {
-  // Step 1: Strongly discharge floating static charge on the wire to GND
+// ── Active Dynamic Impedance Interrogation (Definitive Disconnect & Anti-Float Detection) ──
+// Returns the valid ADC reading (0–4095) if a real sensor is connected, or -999 if unplugged/open.
+// Uses active charge injection to test if a physical low-impedance sensor is connected.
+// An unplugged/floating pin has zero restoring force: when driven LOW it stays near 0, and
+// when driven HIGH it stays near 4095. The delta |sampleHigh - sampleLow| is massive (> 350 counts).
+// A real sensor has low source impedance and instantly restores its voltage (< 250 counts delta).
+int probeAnalogPin(int pin) {
+  // Step 1: Force discharge pin to 0V (GND)
   pinMode(pin, OUTPUT);
   digitalWrite(pin, LOW);
-  delayMicroseconds(80);
+  delayMicroseconds(100);
 
-  // Step 2: Set pin to INPUT with internal pull-down resistor active
-  pinMode(pin, INPUT_PULLDOWN);
-  delayMicroseconds(160); // Allows a connected sensor's voltage to recharge the pin
+  // Step 2: Release to high-impedance INPUT
+  pinMode(pin, INPUT);
+  delay(3); // 3ms settle time: allows real sensor with 1k-50k ohm to recharge/drive the wire
+  int sampleLow = analogRead(pin);
 
-  // Step 3: Take 8 quick samples for rock-solid stability
-  int sum = 0;
-  for (int i = 0; i < 8; i++) {
-    sum += analogRead(pin);
-    delayMicroseconds(20);
+  // Step 3: Force charge pin to 3.3V (VCC)
+  pinMode(pin, OUTPUT);
+  digitalWrite(pin, HIGH);
+  delayMicroseconds(100);
+
+  // Step 4: Release to high-impedance INPUT
+  pinMode(pin, INPUT);
+  delay(3); // 3ms settle time: allows real sensor to pull back down to its actual voltage
+  int sampleHigh = analogRead(pin);
+
+  // Return pin to clean INPUT
+  pinMode(pin, INPUT);
+
+  // EVALUATION:
+  // - Open / Unplugged Wire:
+  //   Has no restoring impedance. After being forced LOW it stays near 0 (sampleLow < 350).
+  //   After being forced HIGH it stays near 4095 (sampleHigh > 3500).
+  //   The difference |sampleHigh - sampleLow| is HUGE (typically > 1500 counts).
+  //
+  // - Connected Sensor:
+  //   The sensor drives the line continuously back to its analog voltage.
+  //   Both sampleLow and sampleHigh settle to the same sensor voltage (|sampleHigh - sampleLow| < 250 counts).
+  int diff = abs(sampleHigh - sampleLow);
+
+  if (diff > 350 || (sampleHigh > 3800 && sampleLow < 300)) {
+    // Definitive open circuit / unplugged wire!
+    return -999;
   }
-  return sum / 8;
+
+  // Real physical sensor connected: return average of settled samples
+  return (sampleLow + sampleHigh) / 2;
 }
 
 // ── Read DHT11: Temperature (°C) and Humidity (%) ──
@@ -297,18 +335,18 @@ DHTReading readDHT();
 
 DHTReading readDHT() {
   DHTReading r;
+  pinMode(DHT_PIN, INPUT_PULLUP);
   r.humidity = dht.readHumidity(false);
   r.temperature = dht.readTemperature(false);  // Celsius
 
   // Plausibility check: In Philippine ambient / mushroom chamber, 
-  // valid range is 15°C - 50°C and 20% - 99%. Floating / unplugged pins return NaN, 0, or corrupt numbers.
+  // valid range is 12°C - 55°C and 15% - 99.5%. Floating / unplugged pins return NaN, 0, or corrupt numbers.
   if (isnan(r.humidity) || isnan(r.temperature) || 
-      r.humidity < 20.0 || r.humidity > 99.5 || 
-      r.temperature < 15.0 || r.temperature > 50.0) {
+      r.humidity < 15.0 || r.humidity > 99.5 || 
+      r.temperature < 12.0 || r.temperature > 55.0) {
     r.valid = false;
     r.temperature = -999.0;
     r.humidity = -999.0;
-    Serial.println("   ⚠️  DHT11 read failed / disconnected! Check GPIO 4 wiring.");
   } else {
     r.valid = true;
   }
@@ -325,20 +363,15 @@ LightReading readLight();
 
 LightReading readLight() {
   LightReading r;
-  int raw = readBleedADC(LDR_PIN);
+  int raw = probeAnalogPin(LDR_PIN);
 
-  // Unplugged detection:
-  // A connected LDR to 3.3V in a room produces > 600 ADC.
-  // An unplugged floating wire with bleed sits below 350 ADC.
-  // If raw < 380, it is 100% DISCONNECTED.
-  if (raw < 380) {
+  if (raw == -999 || raw < 100) {
     r.lux = -999;
     r.valid = false;
-    Serial.println("   ⚠️  LDR Light Sensor disconnected! Check GPIO 5 wiring.");
   } else {
     r.valid = true;
-    int lux = map(raw, 400, 3000, 10, 1000);
-    r.lux = constrain(lux, 10, 1000); // Connected light is at least 10 lux
+    int lux = map(raw, 150, 3200, 10, 1000);
+    r.lux = constrain(lux, 10, 1000);
   }
   return r;
 }
@@ -353,18 +386,15 @@ CO2Reading readCO2();
 
 CO2Reading readCO2() {
   CO2Reading r;
-  int raw = readBleedADC(MQ135_PIN);
+  int raw = probeAnalogPin(MQ135_PIN);
 
-  // Unplugged / unpowered detection:
-  // An active MQ-135 produces >= 450 ADC. Unplugged floating pin is < 400.
-  if (raw < 400) {
+  if (raw == -999 || raw < 120) {
     r.ppm = -999;
     r.valid = false;
-    Serial.println("   ⚠️  MQ-135 Gas Sensor disconnected! Check GPIO 6 wiring & power.");
   } else {
     r.valid = true;
-    int ppm = map(raw, 400, 2400, 400, 2200);
-    r.ppm = constrain(ppm, 400, 3000);
+    int ppm = map(raw, 250, 2400, 350, 2200);
+    r.ppm = constrain(ppm, 350, 3000);
   }
   return r;
 }
@@ -381,17 +411,21 @@ WaterReading readWaterLevel() {
   WaterReading r;
   // Power ON the sensor briefly to prevent electrode corrosion
   digitalWrite(WATER_PWR_PIN, HIGH);
-  delay(30);
+  delay(15); // Allow water power trace to stabilize
 
-  int raw = readBleedADC(WATER_SIG_PIN);
+  int raw = probeAnalogPin(WATER_SIG_PIN);
 
   // Power OFF immediately
   digitalWrite(WATER_PWR_PIN, LOW);
 
-  r.valid = true;
-  if (raw < 10) {
-    r.percent = 0;
+  if (raw == -999) {
+    r.percent = -999;
+    r.valid = false;
+  } else if (raw < WATER_DRY_VALUE) {
+    r.percent = 0; // Connected, but sensor is dry
+    r.valid = true;
   } else {
+    r.valid = true;
     int percent = map(raw, WATER_DRY_VALUE, WATER_WET_VALUE, 0, 100);
     r.percent = constrain(percent, 0, 100);
   }
@@ -409,13 +443,20 @@ void pushToFirebase(float temp, float hum, int light, int co2, int waterLevel,
     return;
   }
 
+  // Strictly push -999 whenever a sensor is faulted or unplugged
+  float sendTemp = dhtErr ? -999.0 : temp;
+  float sendHum  = dhtErr ? -999.0 : hum;
+  int sendLight  = lightErr ? -999 : light;
+  int sendCO2    = co2Err ? -999 : co2;
+  int sendWater  = waterErr ? -999 : waterLevel;
+
   // Build a JSON object with all sensor values
   FirebaseJson json;
-  json.set("temperature", temp);
-  json.set("humidity", hum);
-  json.set("light", light);
-  json.set("co2", co2);
-  json.set("waterLevel", waterLevel);
+  json.set("temperature", sendTemp);
+  json.set("humidity", sendHum);
+  json.set("light", sendLight);
+  json.set("co2", sendCO2);
+  json.set("waterLevel", sendWater);
   json.set("esp32_status", "online");
 
   // Granular individual error flags
@@ -475,25 +516,30 @@ void loop() {
   if (now - lastSerialPrint >= SERIAL_PRINT_INTERVAL) {
     lastSerialPrint = now;
 
-    // Read DHT11 with Fault Latching
+    // Read DHT11 with 2-strike Fault Debouncing
     DHTReading dhtData = readDHT();
     if (dhtData.valid) {
+      dhtFailStreak = 0;
       dhtValidStreak++;
       if (dhtValidStreak >= STREAK_TO_CLEAR_FAULT) {
-        dhtFault = false; // Requires 4 consecutive valid reads to recover
+        dhtFault = false;
         currentTemp = dhtData.temperature;
         currentHum  = dhtData.humidity;
       }
     } else {
       dhtValidStreak = 0;
-      dhtFault = true;   // Immediate latch on failure
-      currentTemp = -999.0;
-      currentHum  = -999.0;
+      dhtFailStreak++;
+      if (dhtFailStreak >= STREAK_TO_LATCH_FAULT) {
+        dhtFault = true;
+        currentTemp = -999.0;
+        currentHum  = -999.0;
+      }
     }
 
-    // Read LDR with Fault Latching
+    // Read LDR with 2-strike Fault Debouncing
     LightReading lightData = readLight();
     if (lightData.valid) {
+      lightFailStreak = 0;
       lightValidStreak++;
       if (lightValidStreak >= STREAK_TO_CLEAR_FAULT) {
         lightFault = false;
@@ -501,13 +547,17 @@ void loop() {
       }
     } else {
       lightValidStreak = 0;
-      lightFault = true;
-      currentLight = -999;
+      lightFailStreak++;
+      if (lightFailStreak >= STREAK_TO_LATCH_FAULT) {
+        lightFault = true;
+        currentLight = -999;
+      }
     }
 
-    // Read MQ-135 with Fault Latching
+    // Read MQ-135 with 2-strike Fault Debouncing
     CO2Reading co2Data = readCO2();
     if (co2Data.valid) {
+      co2FailStreak = 0;
       co2ValidStreak++;
       if (co2ValidStreak >= STREAK_TO_CLEAR_FAULT) {
         co2Fault = false;
@@ -515,13 +565,17 @@ void loop() {
       }
     } else {
       co2ValidStreak = 0;
-      co2Fault = true;
-      currentCO2 = -999;
+      co2FailStreak++;
+      if (co2FailStreak >= STREAK_TO_LATCH_FAULT) {
+        co2Fault = true;
+        currentCO2 = -999;
+      }
     }
 
-    // Read Water Level with Fault Latching
+    // Read Water Level with 2-strike Fault Debouncing
     WaterReading waterData = readWaterLevel();
     if (waterData.valid) {
+      waterFailStreak = 0;
       waterValidStreak++;
       if (waterValidStreak >= STREAK_TO_CLEAR_FAULT) {
         waterFault = false;
@@ -529,8 +583,11 @@ void loop() {
       }
     } else {
       waterValidStreak = 0;
-      waterFault = true;
-      currentWater = -999;
+      waterFailStreak++;
+      if (waterFailStreak >= STREAK_TO_LATCH_FAULT) {
+        waterFault = true;
+        currentWater = -999;
+      }
     }
 
     // ── Instant Local Serial Monitor Output ──

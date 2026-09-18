@@ -10,8 +10,10 @@ import DailyHarvestList from '../../components/yield/DailyHarvestList';
 import { getRackStats } from '../../utils/dataHelpers';
 import { useTheme } from '../../context/ThemeContext';
 import YieldScreenSkeleton from '../../components/skeletons/YieldScreenSkeleton';
+import { useTabBarScroll } from '../../context/TabBarContext';
 
 export default function StaffYieldScreen() {
+  const { onScroll: handleTabBarScroll } = useTabBarScroll();
   const { isDarkMode } = useTheme();
   const [filterDays, setFilterDays] = useState<number | 'All'>('All');
   const [showFilterDropdown, setShowFilterDropdown] = useState(false);
@@ -113,7 +115,12 @@ export default function StaffYieldScreen() {
       {!isReady ? (
         <YieldScreenSkeleton />
       ) : (
-      <ScrollView contentContainerStyle={tw`px-5 pt-2 pb-36`} showsVerticalScrollIndicator={false}>
+      <ScrollView
+        contentContainerStyle={tw`px-5 pt-2 pb-36`}
+        showsVerticalScrollIndicator={false}
+        onScroll={handleTabBarScroll}
+        scrollEventThrottle={16}
+      >
 
         {/* Page Title & Subtitle */}
         <View style={tw`mb-6`}>

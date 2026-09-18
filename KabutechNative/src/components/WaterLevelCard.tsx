@@ -25,7 +25,7 @@ export default React.memo(function WaterLevelCard({
   const { isSmallDevice } = useResponsive();
   const health = useSensorHealth();
 
-  const isFaulty = health.waterError || !health.isControllerOnline;
+  const isFaulty = health.waterError || !health.isControllerOnline || waterLevel === -999 || waterLevel < 0;
 
   // Clamp percentage between 0 and 100
   const clampedLevel = isFaulty ? 0 : Math.max(0, Math.min(100, typeof waterLevel === 'number' && !isNaN(waterLevel) ? waterLevel : 75));
@@ -35,14 +35,14 @@ export default React.memo(function WaterLevelCard({
   const statusConfig = React.useMemo(() => {
     if (isFaulty) {
       return {
-        label: !health.isControllerOnline ? 'Offline' : 'Sensor Fault',
+        label: !health.isControllerOnline ? 'Offline' : 'Not Connected',
         color: '#f43f5e',
         badgeBg: isDarkMode ? 'bg-rose-500/15' : 'bg-rose-50',
         badgeBorder: isDarkMode ? 'border-rose-500/30' : 'border-rose-200',
         badgeText: isDarkMode ? 'text-rose-400' : 'text-rose-600',
         dotColor: '#f43f5e',
         gradientColors: ['#64748b', '#475569', '#334155'] as [string, string, string],
-        desc: !health.isControllerOnline ? 'Controller is unreachable' : 'Water sensor returning invalid reading',
+        desc: !health.isControllerOnline ? 'Controller is unreachable' : 'Water sensor is unplugged or disconnected',
         isCritical: false,
         isWarning: true,
       };
