@@ -9,12 +9,21 @@ import tw from '../tailwind';
 import { useSensors } from '../hooks/useFirebaseData';
 import { hapticLight, hapticSelection } from '../utils/haptics';
 import { showToast } from '../components/CustomToast';
+import { useTabBar } from '../context/TabBarContext';
 
 export default function LiveFarmScreen() {
   const navigation = useNavigation<NativeStackNavigationProp<GlobalNavigationParamList>>();
   const insets = useSafeAreaInsets();
   const sensors = useSensors();
+  const { hideTabBar, showTabBar } = useTabBar();
   
+  useEffect(() => {
+    hideTabBar();
+    return () => {
+      showTabBar();
+    };
+  }, [hideTabBar, showTabBar]);
+
   const [currentTime, setCurrentTime] = useState('');
   const [isNightVision, setIsNightVision] = useState(false);
   const [showGrid, setShowGrid] = useState(true);

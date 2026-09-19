@@ -9,7 +9,6 @@ import { View, Platform, TouchableOpacity, Text, DeviceEventEmitter } from 'reac
 import { BlurView } from 'expo-blur';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import HomeScreen from '../screens/HomeScreen';
-import LiveFarmScreen from '../screens/LiveFarmScreen';
 import ControlsScreen from '../screens/ControlsScreen';
 import YieldScreen from '../screens/YieldScreen';
 import ProfileScreen from '../screens/ProfileScreen';
@@ -43,7 +42,6 @@ function HomeStackNavigator() {
       }}
     >
       <HomeStack.Screen name="HomeScreen" component={HomeScreen} />
-      <HomeStack.Screen name="LiveFarm" component={LiveFarmScreen} />
       <HomeStack.Screen name="Analytics" component={AnalyticsScreen} />
     </HomeStack.Navigator>
   );

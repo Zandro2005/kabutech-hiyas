@@ -104,7 +104,7 @@ export default function FloatingCapsuleTabBar({
     } else {
       Animated.parallel([
         Animated.spring(translateY, {
-          toValue: 130, // push capsule completely offscreen below viewport
+          toValue: 160, // push bar completely offscreen below viewport
           useNativeDriver: true,
           damping: 30,
           stiffness: 500,
@@ -126,13 +126,21 @@ export default function FloatingCapsuleTabBar({
     (t) => t.assignedTo === user?.uid && t.status === 'assigned'
   ).length;
 
+  const currentRoute = state.routes[state.index];
+  const currentOptions = descriptors[currentRoute?.key]?.options;
+  if (
+    currentOptions?.tabBarStyle &&
+    (currentOptions.tabBarStyle as any).display === 'none'
+  ) {
+    return null;
+  }
+
   return (
     <Animated.View
       pointerEvents={isTabBarVisible ? 'box-none' : 'none'}
       style={[
-        tw`absolute left-0 right-0 items-center`,
+        tw`absolute left-0 right-0 bottom-0 w-full`,
         {
-          bottom: Platform.OS === 'ios' ? Math.max(insets.bottom + 18, 36) : 38,
           zIndex: 50,
           transform: [{ translateY }],
           opacity,
@@ -142,20 +150,20 @@ export default function FloatingCapsuleTabBar({
       <View
         pointerEvents={isTabBarVisible ? 'auto' : 'none'}
         style={[
-          tw`flex-row items-center justify-between rounded-[40px] border px-2.5`,
+          tw`w-full flex-row items-center justify-between px-2`,
           {
-            width: '92%',
-            maxWidth: 420,
-            height: 78,
             backgroundColor: isDarkMode ? '#0f172a' : '#ffffff',
-            borderColor: isDarkMode
+            borderTopWidth: 1,
+            borderTopColor: isDarkMode
               ? 'rgba(51, 65, 85, 0.45)'
-              : 'rgba(226, 232, 240, 0.85)',
+              : 'rgba(226, 232, 240, 0.9)',
+            paddingTop: 10,
+            paddingBottom: Math.max(insets.bottom + 12, 28),
             shadowColor: '#000',
-            shadowOffset: { width: 0, height: 8 },
-            shadowOpacity: isDarkMode ? 0.4 : 0.09,
-            shadowRadius: 18,
-            elevation: 12,
+            shadowOffset: { width: 0, height: -3 },
+            shadowOpacity: isDarkMode ? 0.35 : 0.06,
+            shadowRadius: 8,
+            elevation: 10,
           },
         ]}
       >

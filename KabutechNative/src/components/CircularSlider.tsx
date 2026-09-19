@@ -65,10 +65,26 @@ export default function CircularSlider({
 
   // Passive Orbiting Rotation Animation
   const rotateAnim = useRef(new Animated.Value(0)).current;
+  const propsRef = useRef({
+    activeTabData,
+    onValueChange,
+    onSlidingStart,
+    onSlidingComplete,
+  });
+  propsRef.current = {
+    activeTabData,
+    onValueChange,
+    onSlidingStart,
+    onSlidingComplete,
+  };
+
   const isInteractingWithDial = useRef(false);
   const touchStartRef = useRef({ x: size / 2, y: size / 2 });
   const lastValueRef = useRef(localTarget);
-  lastValueRef.current = localTarget;
+
+  useEffect(() => {
+    lastValueRef.current = localTarget;
+  }, [localTarget]);
 
   const [isDragging, setIsDragging] = useState(false);
 
@@ -94,7 +110,9 @@ export default function CircularSlider({
     outputRange: ['0deg', '360deg'],
   });
 
-  const processAngle = (curX: number, curY: number) => {
+  const processAngle = (curX: number, curY: number, isInitialTouch: boolean = false) => {
+    const currentTab = propsRef.current.activeTabData;
+    const onValChange = propsRef.current.onValueChange;
     const dx = curX - size / 2;
     const dy = curY - size / 2;
 
@@ -107,39 +125,48 @@ export default function CircularSlider({
       angleFromTop += 2 * Math.PI;
     }
 
-    const rawProgress = angleFromTop / (2 * Math.PI);
-    const currentProgress = (lastValueRef.current - activeTabData.min) / (activeTabData.max - activeTabData.min);
+    const rawProgress = Math.max(0, Math.min(1, angleFromTop / (2 * Math.PI)));
+    const range = currentTab.max - currentTab.min;
+    if (range <= 0) return;
 
-    // Prevent wrap-around jumping when dragging past 12 o'clock
-    if (currentProgress > 0.75 && rawProgress < 0.25) {
-      if (lastValueRef.current !== activeTabData.max) {
-        hapticSelection();
-        lastValueRef.current = activeTabData.max;
-        onValueChange?.(activeTabData.max);
+    const currentProgress = Math.max(
+      0,
+      Math.min(1, (lastValueRef.current - currentTab.min) / range)
+    );
+
+    // Prevent wrap-around jumping when dragging past 12 o'clock (only during continuous drag, not initial tap)
+    if (!isInitialTouch) {
+      if (currentProgress > 0.75 && rawProgress < 0.25) {
+        if (lastValueRef.current !== currentTab.max) {
+          hapticSelection();
+          lastValueRef.current = currentTab.max;
+          onValChange?.(currentTab.max);
+        }
+        return;
       }
-      return;
-    }
-    if (currentProgress < 0.25 && rawProgress > 0.75) {
-      if (lastValueRef.current !== activeTabData.min) {
-        hapticSelection();
-        lastValueRef.current = activeTabData.min;
-        onValueChange?.(activeTabData.min);
+      if (currentProgress < 0.25 && rawProgress > 0.75) {
+        if (lastValueRef.current !== currentTab.min) {
+          hapticSelection();
+          lastValueRef.current = currentTab.min;
+          onValChange?.(currentTab.min);
+        }
+        return;
       }
-      return;
     }
 
-    const step = activeTabData.step ?? 1;
-    const rawVal = activeTabData.min + rawProgress * (activeTabData.max - activeTabData.min);
+    const step = currentTab.step ?? 1;
+    const rawVal = currentTab.min + rawProgress * range;
     const steppedVal = Math.round(rawVal / step) * step;
+    const decimals = step < 1 ? 1 : 0;
     const clampedVal = Math.max(
-      activeTabData.min,
-      Math.min(activeTabData.max, Number(steppedVal.toFixed(1)))
+      currentTab.min,
+      Math.min(currentTab.max, Number(steppedVal.toFixed(decimals)))
     );
 
     if (clampedVal !== lastValueRef.current) {
       hapticSelection();
       lastValueRef.current = clampedVal;
-      onValueChange?.(clampedVal);
+      onValChange?.(clampedVal);
     }
   };
 
@@ -157,35 +184,47 @@ export default function CircularSlider({
         const dist = Math.sqrt(dx * dx + dy * dy);
         return dist >= radius - 55 && dist <= radius + 65;
       },
-      onMoveShouldSetPanResponder: () => isInteractingWithDial.current,
-      onMoveShouldSetPanResponderCapture: () => isInteractingWithDial.current,
+      onMoveShouldSetPanResponder: (evt, gestureState) => {
+        if (isInteractingWithDial.current) return true;
+        const dx = evt.nativeEvent.locationX - size / 2;
+        const dy = evt.nativeEvent.locationY - size / 2;
+        const dist = Math.sqrt(dx * dx + dy * dy);
+        return dist >= radius - 55 && dist <= radius + 65 && (Math.abs(gestureState.dx) > 3 || Math.abs(gestureState.dy) > 3);
+      },
+      onMoveShouldSetPanResponderCapture: (evt, gestureState) => {
+        if (isInteractingWithDial.current) return true;
+        const dx = evt.nativeEvent.locationX - size / 2;
+        const dy = evt.nativeEvent.locationY - size / 2;
+        const dist = Math.sqrt(dx * dx + dy * dy);
+        return dist >= radius - 55 && dist <= radius + 65 && (Math.abs(gestureState.dx) > 3 || Math.abs(gestureState.dy) > 3);
+      },
       onPanResponderGrant: (evt) => {
         isInteractingWithDial.current = true;
         setIsDragging(true);
-        onSlidingStart?.();
+        propsRef.current.onSlidingStart?.();
         const startX = evt.nativeEvent.locationX;
         const startY = evt.nativeEvent.locationY;
         touchStartRef.current = { x: startX, y: startY };
-        processAngle(startX, startY);
+        processAngle(startX, startY, true);
       },
       onPanResponderMove: (_, gestureState) => {
         if (!isInteractingWithDial.current) return;
         const curX = touchStartRef.current.x + gestureState.dx;
         const curY = touchStartRef.current.y + gestureState.dy;
-        processAngle(curX, curY);
+        processAngle(curX, curY, false);
       },
       onPanResponderRelease: () => {
         if (isInteractingWithDial.current) {
           isInteractingWithDial.current = false;
           setIsDragging(false);
-          onSlidingComplete?.(lastValueRef.current);
+          propsRef.current.onSlidingComplete?.(lastValueRef.current);
         }
       },
       onPanResponderTerminate: () => {
         if (isInteractingWithDial.current) {
           isInteractingWithDial.current = false;
           setIsDragging(false);
-          onSlidingComplete?.(lastValueRef.current);
+          propsRef.current.onSlidingComplete?.(lastValueRef.current);
         }
       },
       onPanResponderTerminationRequest: () => false,
@@ -268,7 +307,7 @@ export default function CircularSlider({
           ]}
         />
 
-        <Svg width={size} height={size} viewBox={`0 0 ${size} ${size}`}>
+        <Svg pointerEvents="none" width={size} height={size} viewBox={`0 0 ${size} ${size}`}>
           <Defs>
             <SvgGradient id="dialGrad" x1="0%" y1="0%" x2="100%" y2="100%">
               <Stop offset="0%" stopColor={activeTabData.color} stopOpacity="1" />

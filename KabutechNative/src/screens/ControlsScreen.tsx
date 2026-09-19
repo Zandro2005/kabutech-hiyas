@@ -54,18 +54,25 @@ export default function ControlsScreen() {
   const isLightDisconnected = health.lightError || light === -999 || light < 0;
   const isCo2Disconnected = health.co2Error || co2 === -999 || co2 < 0;
 
-  const targetTemp = typeof settings?.setpoints?.temperature === 'number'
+  const rawTargetTemp = typeof settings?.setpoints?.temperature === 'number'
     ? settings.setpoints.temperature
     : parseFloat(settings?.setpoints?.temperature as any) || 28.0;
-  const targetHum = typeof settings?.setpoints?.humidity === 'number'
+  const targetTemp = Math.max(18, Math.min(35, rawTargetTemp));
+
+  const rawTargetHum = typeof settings?.setpoints?.humidity === 'number'
     ? settings.setpoints.humidity
     : parseFloat(settings?.setpoints?.humidity as any) || 85;
-  const targetLight = typeof settings?.setpoints?.light === 'number'
+  const targetHum = Math.max(50, Math.min(95, rawTargetHum));
+
+  const rawTargetLight = typeof settings?.setpoints?.light === 'number'
     ? settings.setpoints.light
     : parseFloat(settings?.setpoints?.light as any) || 580;
-  const targetCO2 = typeof settings?.setpoints?.co2 === 'number'
+  const targetLight = Math.max(200, Math.min(800, rawTargetLight));
+
+  const rawTargetCO2 = typeof settings?.setpoints?.co2 === 'number'
     ? settings.setpoints.co2
     : parseFloat(settings?.setpoints?.co2 as any) || 690;
+  const targetCO2 = Math.max(300, Math.min(1200, rawTargetCO2));
 
   const isAuto = String(settings?.setpoints?.mode).toLowerCase() === 'auto';
   const isScheduled = String(settings?.setpoints?.mode).toLowerCase() === 'scheduled';
@@ -204,25 +211,41 @@ export default function ControlsScreen() {
     }
   };
 
+  const [isSliding, setIsSliding] = useState(false);
   const [activeTab, setActiveTab] = useState<TabId>(route.params?.tab || 'temp');
+  const activeTabRef = useRef<TabId>(activeTab);
+  activeTabRef.current = activeTab;
+
+  const tabIds: TabId[] = ['temp', 'hum', 'light', 'co2'];
+
+  const selectTab = (tabId: TabId) => {
+    activeTabRef.current = tabId;
+    setActiveTab(tabId);
+    scrollToTab(tabId);
+    const targetTab = tabs.find(t => t.id === tabId);
+    if (targetTab) {
+      pendingTargetRef.current = null;
+      isInteractingRef.current = false;
+      setLocalTarget(targetTab.target);
+      localTargetRef.current = targetTab.target;
+    }
+  };
+
   useEffect(() => {
     if (route.params?.tab) {
-      setActiveTab(route.params.tab);
-      setTimeout(() => scrollToTab(route.params.tab), 250);
+      selectTab(route.params.tab);
     }
   }, [route.params?.tab]);
-  const tabIds: TabId[] = ['temp', 'hum', 'light', 'co2'];
+
   const switchTabRelative = (direction: 'next' | 'prev') => {
-    const currentIndex = tabIds.indexOf(activeTab);
+    const currentIndex = tabIds.indexOf(activeTabRef.current);
     if (direction === 'next' && currentIndex < tabIds.length - 1) {
       const nextTab = tabIds[currentIndex + 1];
-      setActiveTab(nextTab);
-      scrollToTab(nextTab);
+      selectTab(nextTab);
       hapticSelection();
     } else if (direction === 'prev' && currentIndex > 0) {
       const prevTab = tabIds[currentIndex - 1];
-      setActiveTab(prevTab);
-      scrollToTab(prevTab);
+      selectTab(prevTab);
       hapticSelection();
     }
   };
@@ -294,6 +317,12 @@ export default function ControlsScreen() {
     const label = activeTabDataRef.current.label;
     const unit = activeTabDataRef.current.unit;
     updateSetpoint(dbKey, val, label, unit);
+
+    setTimeout(() => {
+      if (pendingTargetRef.current === val) {
+        pendingTargetRef.current = null;
+      }
+    }, 2500);
   };
 
   const repeatTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -319,24 +348,20 @@ export default function ControlsScreen() {
     stopTimer();
     isInteractingRef.current = true;
     hapticSelection();
-    setLocalTarget(prev => {
-      const current = Number(prev) || activeTabDataRef.current.min;
-      const next = Number((current + activeTabDataRef.current.step).toFixed(1));
-      const finalVal = next <= activeTabDataRef.current.max ? next : current;
-      localTargetRef.current = finalVal;
-      return finalVal;
-    });
+    const current = Number(localTargetRef.current) || activeTabDataRef.current.min;
+    const step = activeTabDataRef.current.step ?? 1;
+    const decimals = step < 1 ? 1 : 0;
+    const next = Math.min(activeTabDataRef.current.max, Number((current + step).toFixed(decimals)));
+    localTargetRef.current = next;
+    setLocalTarget(next);
 
     repeatTimeoutRef.current = setTimeout(() => {
       timerRef.current = setInterval(() => {
         hapticLight();
-        setLocalTarget(prev => {
-          const current = Number(prev) || activeTabDataRef.current.min;
-          const next = Number((current + activeTabDataRef.current.step).toFixed(1));
-          const finalVal = next <= activeTabDataRef.current.max ? next : current;
-          localTargetRef.current = finalVal;
-          return finalVal;
-        });
+        const cur = Number(localTargetRef.current) || activeTabDataRef.current.min;
+        const nxt = Math.min(activeTabDataRef.current.max, Number((cur + step).toFixed(decimals)));
+        localTargetRef.current = nxt;
+        setLocalTarget(nxt);
       }, 100);
     }, 380);
   };
@@ -345,24 +370,20 @@ export default function ControlsScreen() {
     stopTimer();
     isInteractingRef.current = true;
     hapticSelection();
-    setLocalTarget(prev => {
-      const current = Number(prev) || activeTabDataRef.current.min;
-      const next = Number((current - activeTabDataRef.current.step).toFixed(1));
-      const finalVal = next >= activeTabDataRef.current.min ? next : current;
-      localTargetRef.current = finalVal;
-      return finalVal;
-    });
+    const current = Number(localTargetRef.current) || activeTabDataRef.current.min;
+    const step = activeTabDataRef.current.step ?? 1;
+    const decimals = step < 1 ? 1 : 0;
+    const next = Math.max(activeTabDataRef.current.min, Number((current - step).toFixed(decimals)));
+    localTargetRef.current = next;
+    setLocalTarget(next);
 
     repeatTimeoutRef.current = setTimeout(() => {
       timerRef.current = setInterval(() => {
         hapticLight();
-        setLocalTarget(prev => {
-          const current = Number(prev) || activeTabDataRef.current.min;
-          const next = Number((current - activeTabDataRef.current.step).toFixed(1));
-          const finalVal = next >= activeTabDataRef.current.min ? next : current;
-          localTargetRef.current = finalVal;
-          return finalVal;
-        });
+        const cur = Number(localTargetRef.current) || activeTabDataRef.current.min;
+        const nxt = Math.max(activeTabDataRef.current.min, Number((cur - step).toFixed(decimals)));
+        localTargetRef.current = nxt;
+        setLocalTarget(nxt);
       }, 100);
     }, 380);
   };
@@ -389,6 +410,7 @@ export default function ControlsScreen() {
         <ControlsScreenSkeleton />
       ) : (
       <ScrollView
+        scrollEnabled={!isSliding}
         contentContainerStyle={tw`pb-40 pt-2`}
         showsVerticalScrollIndicator={false}
         onScroll={handleTabBarScroll}
@@ -423,8 +445,7 @@ export default function ControlsScreen() {
                   }}
                   onPress={() => {
                     hapticSelection();
-                    setActiveTab(tab.id);
-                    scrollToTab(tab.id);
+                    selectTab(tab.id);
                   }}
                   style={[
                     tw`px-3.5 py-2.5 rounded-2xl border flex-row items-center gap-2.5 shadow-sm`,
@@ -524,8 +545,10 @@ export default function ControlsScreen() {
           }}
           onSlidingStart={() => {
             isInteractingRef.current = true;
+            setIsSliding(true);
           }}
           onSlidingComplete={(val) => {
+            setIsSliding(false);
             commitTarget(val);
           }}
         />
