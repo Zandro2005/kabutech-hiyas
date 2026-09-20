@@ -50,13 +50,18 @@ export default React.memo(function EnvironmentMetricsGrid({ temp, hum, light, co
 
   const isControllerOff = !health.isControllerOnline;
 
-  // Status badge styling helper
+  // Dedicated constant theme colors for each environmental metric
+  const TEMP_COLOR = '#f97316'; // Constant Warm Orange
+  const HUM_COLOR = '#0ea5e9';  // Constant Water Blue
+  const LIGHT_COLOR = '#f59e0b'; // Constant Solar Amber
+  const CO2_COLOR = '#10b981';  // Constant Botanical Emerald
+
+  // Status badge styling helper for offline/fault states
   const offlineStatus = {
     label: 'Offline',
     dotColor: '#94a3b8',
     badgeBg: isDarkMode ? 'rgba(148, 163, 184, 0.12)' : '#f1f5f9',
     badgeText: isDarkMode ? '#94a3b8' : '#64748b',
-    accentColor: '#94a3b8',
   };
 
   const faultStatus = {
@@ -64,132 +69,73 @@ export default React.memo(function EnvironmentMetricsGrid({ temp, hum, light, co
     dotColor: '#f59e0b',
     badgeBg: isDarkMode ? 'rgba(245, 158, 11, 0.12)' : '#fffbeb',
     badgeText: isDarkMode ? '#fbbf24' : '#b45309',
-    accentColor: '#f59e0b',
   };
 
-  // Temperature: 15°C to 35°C
+  // Temperature: 15°C to 35°C (Permanent Orange Theme)
   const tempMin = 15;
   const tempMax = 35;
   const tempDiff = isTempDisconnected ? 0 : Number((temp - targetTemp).toFixed(1));
   const tempStatus = React.useMemo(() => {
     if (isTempDisconnected) return isControllerOff ? offlineStatus : faultStatus;
-    if (Math.abs(tempDiff) <= 0.5) {
-      return {
-        label: 'Optimal',
-        dotColor: '#10b981',
-        badgeBg: isDarkMode ? 'rgba(16, 185, 129, 0.12)' : '#ecfdf5',
-        badgeText: isDarkMode ? '#34d399' : '#059669',
-        accentColor: '#10b981',
-      };
-    }
+    const isOptimal = Math.abs(tempDiff) <= 0.5;
     const isHigh = tempDiff > 0.5;
-    const isSevere = Math.abs(tempDiff) > 4.0;
-    const color = isSevere ? '#ea580c' : (isHigh ? '#f97316' : '#0ea5e9');
     return {
-      label: isHigh ? `+${tempDiff.toFixed(1)}°` : `-${Math.abs(tempDiff).toFixed(1)}°`,
-      dotColor: color,
-      badgeBg: isDarkMode ? `${color}20` : (isHigh ? '#fff7ed' : '#f0f9ff'),
-      badgeText: color,
-      accentColor: color,
+      label: isOptimal ? 'Optimal' : (isHigh ? `+${tempDiff.toFixed(1)}°` : `-${Math.abs(tempDiff).toFixed(1)}°`),
+      dotColor: isOptimal ? '#10b981' : TEMP_COLOR,
+      badgeBg: isDarkMode ? 'rgba(249, 115, 22, 0.16)' : '#fff7ed',
+      badgeText: isDarkMode ? '#fb923c' : '#ea580c',
     };
   }, [tempDiff, isTempDisconnected, isControllerOff, isDarkMode]);
   const tempTargetPercent = Math.min(95, Math.max(5, ((targetTemp - tempMin) / (tempMax - tempMin)) * 100));
   const tempPercent = isTempDisconnected ? 0 : Math.min(100, Math.max(4, ((temp - tempMin) / (tempMax - tempMin)) * 100));
 
-  // Humidity: 40% to 100%
+  // Humidity: 40% to 100% (Permanent Blue Theme)
   const humMin = 40;
   const humMax = 100;
   const humDiff = isHumDisconnected ? 0 : Math.round(hum - targetHum);
   const humStatus = React.useMemo(() => {
     if (isHumDisconnected) return isControllerOff ? offlineStatus : faultStatus;
-    if (Math.abs(humDiff) <= 2) {
-      return {
-        label: 'Optimal',
-        dotColor: '#10b981',
-        badgeBg: isDarkMode ? 'rgba(16, 185, 129, 0.12)' : '#ecfdf5',
-        badgeText: isDarkMode ? '#34d399' : '#059669',
-        accentColor: '#10b981',
-      };
-    }
+    const isOptimal = Math.abs(humDiff) <= 2;
     const isHigh = humDiff > 2;
-    const isSevere = Math.abs(humDiff) > 10;
-    const color = isSevere ? '#ea580c' : '#f59e0b';
     return {
-      label: isHigh ? `+${humDiff}%` : `-${Math.abs(humDiff)}%`,
-      dotColor: color,
-      badgeBg: isDarkMode ? `${color}20` : '#fffbeb',
-      badgeText: color,
-      accentColor: color,
+      label: isOptimal ? 'Optimal' : (isHigh ? `+${humDiff}%` : `-${Math.abs(humDiff)}%`),
+      dotColor: isOptimal ? '#10b981' : HUM_COLOR,
+      badgeBg: isDarkMode ? 'rgba(14, 165, 233, 0.16)' : '#f0f9ff',
+      badgeText: isDarkMode ? '#38bdf8' : '#0284c7',
     };
   }, [humDiff, isHumDisconnected, isControllerOff, isDarkMode]);
   const humTargetPercent = Math.min(95, Math.max(5, ((targetHum - humMin) / (humMax - humMin)) * 100));
   const humPercent = isHumDisconnected ? 0 : Math.min(100, Math.max(4, ((hum - humMin) / (humMax - humMin)) * 100));
 
-  // Light: 100 to 1000 lx
+  // Light: 100 to 1000 lx (Permanent Amber Theme)
   const lightMin = 100;
   const lightMax = 1000;
   const lightDiff = isLightDisconnected ? 0 : Math.round(light - targetLight);
   const lightStatus = React.useMemo(() => {
     if (isLightDisconnected) return isControllerOff ? offlineStatus : faultStatus;
-    if (lightDiff > 300) {
-      return {
-        label: 'High',
-        dotColor: '#f59e0b',
-        badgeBg: isDarkMode ? 'rgba(245, 158, 11, 0.12)' : '#fffbeb',
-        badgeText: isDarkMode ? '#fbbf24' : '#b45309',
-        accentColor: '#f59e0b',
-      };
-    }
-    if (lightDiff < -200) {
-      return {
-        label: 'Low',
-        dotColor: '#f59e0b',
-        badgeBg: isDarkMode ? 'rgba(245, 158, 11, 0.12)' : '#fffbeb',
-        badgeText: isDarkMode ? '#fbbf24' : '#b45309',
-        accentColor: '#f59e0b',
-      };
-    }
+    const isOptimal = lightDiff <= 300 && lightDiff >= -200;
     return {
-      label: 'Optimal',
-      dotColor: '#10b981',
-      badgeBg: isDarkMode ? 'rgba(16, 185, 129, 0.12)' : '#ecfdf5',
-      badgeText: isDarkMode ? '#34d399' : '#059669',
-      accentColor: '#10b981',
+      label: isOptimal ? 'Optimal' : (lightDiff > 300 ? 'High' : 'Low'),
+      dotColor: isOptimal ? '#10b981' : LIGHT_COLOR,
+      badgeBg: isDarkMode ? 'rgba(245, 158, 11, 0.16)' : '#fffbeb',
+      badgeText: isDarkMode ? '#fbbf24' : '#b45309',
     };
   }, [lightDiff, isLightDisconnected, isControllerOff, isDarkMode]);
   const lightTargetPercent = Math.min(95, Math.max(5, ((targetLight - lightMin) / (lightMax - lightMin)) * 100));
   const lightPercent = isLightDisconnected ? 0 : Math.min(100, Math.max(4, ((light - lightMin) / (lightMax - lightMin)) * 100));
 
-  // CO2: 300 to 1200 ppm
+  // CO2: 300 to 1200 ppm (Permanent Emerald Theme)
   const co2Min = 300;
   const co2Max = 1200;
   const co2Diff = isCo2Disconnected ? 0 : Math.round(co2 - targetCO2);
   const co2Status = React.useMemo(() => {
     if (isCo2Disconnected) return isControllerOff ? offlineStatus : faultStatus;
-    if (co2Diff > 350) {
-      return {
-        label: 'High',
-        dotColor: '#ea580c',
-        badgeBg: isDarkMode ? 'rgba(234, 88, 12, 0.15)' : '#fff7ed',
-        badgeText: isDarkMode ? '#fdba74' : '#ea580c',
-        accentColor: '#ea580c',
-      };
-    }
-    if (co2Diff > 150) {
-      return {
-        label: 'Elevated',
-        dotColor: '#f59e0b',
-        badgeBg: isDarkMode ? 'rgba(245, 158, 11, 0.12)' : '#fffbeb',
-        badgeText: isDarkMode ? '#fbbf24' : '#b45309',
-        accentColor: '#f59e0b',
-      };
-    }
+    const isOptimal = co2Diff <= 150;
     return {
-      label: 'Optimal',
-      dotColor: '#10b981',
-      badgeBg: isDarkMode ? 'rgba(16, 185, 129, 0.12)' : '#ecfdf5',
+      label: isOptimal ? 'Optimal' : (co2Diff > 350 ? 'High' : 'Elevated'),
+      dotColor: isOptimal ? '#10b981' : CO2_COLOR,
+      badgeBg: isDarkMode ? 'rgba(16, 185, 129, 0.16)' : '#ecfdf5',
       badgeText: isDarkMode ? '#34d399' : '#059669',
-      accentColor: '#10b981',
     };
   }, [co2Diff, isCo2Disconnected, isControllerOff, isDarkMode]);
   const co2TargetPercent = Math.min(95, Math.max(5, ((targetCO2 - co2Min) / (co2Max - co2Min)) * 100));
@@ -216,11 +162,11 @@ export default React.memo(function EnvironmentMetricsGrid({ temp, hum, light, co
       value: isTempDisconnected ? '--' : temp,
       unit: '°C',
       icon: (isTempDisconnected ? (isControllerOff ? 'cloud-off-outline' : 'alert-circle-outline') : 'thermometer') as any,
-      iconColor: isTempDisconnected ? '#94a3b8' : tempStatus.accentColor,
+      iconColor: isTempDisconnected ? '#94a3b8' : TEMP_COLOR,
       iconBgColor: isTempDisconnected 
         ? (isDarkMode ? 'rgba(148, 163, 184, 0.1)' : '#f1f5f9') 
-        : (isDarkMode ? `${tempStatus.accentColor}22` : tempStatus.badgeBg),
-      accentColor: tempStatus.accentColor,
+        : (isDarkMode ? 'rgba(249, 115, 22, 0.16)' : '#fff7ed'),
+      accentColor: TEMP_COLOR,
       status: tempStatus,
       percent: tempPercent,
       targetPercent: tempTargetPercent,
@@ -233,11 +179,11 @@ export default React.memo(function EnvironmentMetricsGrid({ temp, hum, light, co
       value: isHumDisconnected ? '--' : hum,
       unit: '%',
       icon: (isHumDisconnected ? (isControllerOff ? 'cloud-off-outline' : 'alert-circle-outline') : 'water-percent') as any,
-      iconColor: isHumDisconnected ? '#94a3b8' : (humStatus.label === 'Optimal' ? '#0ea5e9' : humStatus.accentColor),
+      iconColor: isHumDisconnected ? '#94a3b8' : HUM_COLOR,
       iconBgColor: isHumDisconnected 
         ? (isDarkMode ? 'rgba(148, 163, 184, 0.1)' : '#f1f5f9') 
-        : (isDarkMode ? (humStatus.label === 'Optimal' ? 'rgba(14, 165, 233, 0.18)' : `${humStatus.accentColor}22`) : (humStatus.label === 'Optimal' ? '#f0f9ff' : humStatus.badgeBg)),
-      accentColor: humStatus.accentColor,
+        : (isDarkMode ? 'rgba(14, 165, 233, 0.16)' : '#f0f9ff'),
+      accentColor: HUM_COLOR,
       status: humStatus,
       percent: humPercent,
       targetPercent: humTargetPercent,
@@ -250,11 +196,11 @@ export default React.memo(function EnvironmentMetricsGrid({ temp, hum, light, co
       value: isLightDisconnected ? '--' : light,
       unit: 'lx',
       icon: (isLightDisconnected ? (isControllerOff ? 'cloud-off-outline' : 'alert-circle-outline') : 'white-balance-sunny') as any,
-      iconColor: isLightDisconnected ? '#94a3b8' : '#f59e0b',
+      iconColor: isLightDisconnected ? '#94a3b8' : LIGHT_COLOR,
       iconBgColor: isLightDisconnected 
         ? (isDarkMode ? 'rgba(148, 163, 184, 0.1)' : '#f1f5f9') 
-        : (isDarkMode ? 'rgba(245, 158, 11, 0.18)' : '#fffbeb'),
-      accentColor: lightStatus.accentColor,
+        : (isDarkMode ? 'rgba(245, 158, 11, 0.16)' : '#fffbeb'),
+      accentColor: LIGHT_COLOR,
       status: lightStatus,
       percent: lightPercent,
       targetPercent: lightTargetPercent,
@@ -267,11 +213,11 @@ export default React.memo(function EnvironmentMetricsGrid({ temp, hum, light, co
       value: isCo2Disconnected ? '--' : co2,
       unit: 'ppm',
       icon: (isCo2Disconnected ? (isControllerOff ? 'cloud-off-outline' : 'alert-circle-outline') : 'molecule-co2') as any,
-      iconColor: isCo2Disconnected ? '#94a3b8' : co2Status.accentColor,
+      iconColor: isCo2Disconnected ? '#94a3b8' : CO2_COLOR,
       iconBgColor: isCo2Disconnected 
         ? (isDarkMode ? 'rgba(148, 163, 184, 0.1)' : '#f1f5f9') 
-        : (isDarkMode ? `${co2Status.accentColor}22` : co2Status.badgeBg),
-      accentColor: co2Status.accentColor,
+        : (isDarkMode ? 'rgba(16, 185, 129, 0.16)' : '#ecfdf5'),
+      accentColor: CO2_COLOR,
       status: co2Status,
       percent: co2Percent,
       targetPercent: co2TargetPercent,
