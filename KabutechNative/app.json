@@ -27,7 +27,14 @@
     "plugins": [
       "expo-font",
       "@react-native-community/datetimepicker",
-      "expo-sharing",
+      [
+        "expo-media-library",
+        {
+          "photosPermission": "Allow KabuTech to access photos to save chamber snapshots.",
+          "savePhotosPermission": "Allow KabuTech to save chamber snapshots to your photos.",
+          "isAccessMediaLocationEnabled": false
+        }
+      ],
       [
         "expo-navigation-bar",
         {

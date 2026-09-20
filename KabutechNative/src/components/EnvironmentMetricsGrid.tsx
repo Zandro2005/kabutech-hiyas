@@ -27,6 +27,7 @@ export default React.memo(function EnvironmentMetricsGrid({ temp, hum, light, co
   const health = useSensorHealth();
   const settings = useSettings();
 
+  // Target Setpoints from Firebase Settings
   const targetTemp = typeof settings?.setpoints?.temperature === 'number'
     ? settings.setpoints.temperature
     : parseFloat(settings?.setpoints?.temperature as any) || 28.0;
@@ -49,76 +50,85 @@ export default React.memo(function EnvironmentMetricsGrid({ temp, hum, light, co
   const isLightDisconnected = health.lightError || light === -999 || light < 0;
   const isCo2Disconnected = health.co2Error || co2 === -999 || co2 < 0;
 
-  // Metric status & percentage calculations
+  // Temperature: 15°C to 35°C
+  const tempMin = 15;
+  const tempMax = 35;
+  const tempDiff = isTempDisconnected ? 0 : Number((temp - targetTemp).toFixed(1));
   const tempStatus = React.useMemo(() => {
     if (isTempDisconnected) {
       return { 
-        label: !health.isControllerOnline ? 'Offline' : 'Not Connected', 
+        label: !health.isControllerOnline ? 'Offline' : 'Fault', 
         color: '#f43f5e', 
         lightBg: '#fff1f2' 
       };
     }
-    if (temp > targetTemp + 4.0) return { label: 'Critical', color: '#ef4444', lightBg: '#fef2f2' };
-    if (temp > targetTemp + 2.5) return { label: 'Warm', color: '#f97316', lightBg: '#fff7ed' };
-    if (temp < targetTemp - 4.0) return { label: 'Cold', color: '#3b82f6', lightBg: '#eff6ff' };
-    if (temp < targetTemp - 2.5) return { label: 'Cool', color: '#0ea5e9', lightBg: '#f0f9ff' };
+    if (tempDiff > 4.0) return { label: `+${tempDiff.toFixed(1)}° High`, color: '#ef4444', lightBg: '#fef2f2' };
+    if (tempDiff > 0.5) return { label: `+${tempDiff.toFixed(1)}° High`, color: '#f97316', lightBg: '#fff7ed' };
+    if (tempDiff < -4.0) return { label: `-${Math.abs(tempDiff).toFixed(1)}° Low`, color: '#3b82f6', lightBg: '#eff6ff' };
+    if (tempDiff < -0.5) return { label: `-${Math.abs(tempDiff).toFixed(1)}° Low`, color: '#0ea5e9', lightBg: '#f0f9ff' };
     return { label: 'Optimal', color: '#10b981', lightBg: '#ecfdf5' };
-  }, [temp, targetTemp, isTempDisconnected, health.isControllerOnline]);
-  const tempPercent = isTempDisconnected ? 0 : Math.min(100, Math.max(8, ((temp - 15) / (35 - 15)) * 100));
+  }, [tempDiff, isTempDisconnected, health.isControllerOnline]);
+  const tempTargetPercent = Math.min(95, Math.max(5, ((targetTemp - tempMin) / (tempMax - tempMin)) * 100));
+  const tempPercent = isTempDisconnected ? 0 : Math.min(100, Math.max(4, ((temp - tempMin) / (tempMax - tempMin)) * 100));
 
+  // Humidity: 40% to 100%
+  const humMin = 40;
+  const humMax = 100;
+  const humDiff = isHumDisconnected ? 0 : Math.round(hum - targetHum);
   const humStatus = React.useMemo(() => {
     if (isHumDisconnected) {
       return { 
-        label: !health.isControllerOnline ? 'Offline' : 'Not Connected', 
+        label: !health.isControllerOnline ? 'Offline' : 'Fault', 
         color: '#f43f5e', 
         lightBg: '#fff1f2' 
       };
     }
-    // Deviations strictly relative to user's configured target setpoint
-    if (hum > targetHum + 10) {
-      return { label: 'Excessive', color: '#ef4444', lightBg: '#fef2f2' };
-    }
-    if (hum > targetHum + 5) {
-      return { label: 'High', color: '#f97316', lightBg: '#fff7ed' };
-    }
-    if (hum < targetHum - 12) {
-      return { label: 'Very Low', color: '#ef4444', lightBg: '#fef2f2' };
-    }
-    if (hum < targetHum - 6) {
-      return { label: 'Low', color: '#f59e0b', lightBg: '#fffbeb' };
-    }
-    // 1-2% drift (up to ±5%) is completely Optimal
+    if (humDiff > 10) return { label: `+${humDiff}% High`, color: '#ef4444', lightBg: '#fef2f2' };
+    if (humDiff > 2) return { label: `+${humDiff}% High`, color: '#f97316', lightBg: '#fff7ed' };
+    if (humDiff < -12) return { label: `-${Math.abs(humDiff)}% Low`, color: '#ef4444', lightBg: '#fef2f2' };
+    if (humDiff < -2) return { label: `-${Math.abs(humDiff)}% Low`, color: '#f59e0b', lightBg: '#fffbeb' };
     return { label: 'Optimal', color: '#10b981', lightBg: '#ecfdf5' };
-  }, [hum, targetHum, isHumDisconnected, health.isControllerOnline]);
-  const humPercent = isHumDisconnected ? 0 : Math.min(100, Math.max(8, ((hum - 30) / (100 - 30)) * 100));
+  }, [humDiff, isHumDisconnected, health.isControllerOnline]);
+  const humTargetPercent = Math.min(95, Math.max(5, ((targetHum - humMin) / (humMax - humMin)) * 100));
+  const humPercent = isHumDisconnected ? 0 : Math.min(100, Math.max(4, ((hum - humMin) / (humMax - humMin)) * 100));
 
+  // Light: 100 to 1000 lx
+  const lightMin = 100;
+  const lightMax = 1000;
+  const lightDiff = isLightDisconnected ? 0 : Math.round(light - targetLight);
   const lightStatus = React.useMemo(() => {
     if (isLightDisconnected) {
       return { 
-        label: !health.isControllerOnline ? 'Offline' : 'Not Connected', 
+        label: !health.isControllerOnline ? 'Offline' : 'Fault', 
         color: '#f43f5e', 
         lightBg: '#fff1f2' 
       };
     }
-    if (light > targetLight + 300) return { label: 'Bright', color: '#f97316', lightBg: '#fff7ed' };
-    if (light < targetLight - 200) return { label: 'Dim', color: '#f59e0b', lightBg: '#fffbeb' };
+    if (lightDiff > 300) return { label: `+${lightDiff} High`, color: '#f97316', lightBg: '#fff7ed' };
+    if (lightDiff < -200) return { label: `-${Math.abs(lightDiff)} Low`, color: '#f59e0b', lightBg: '#fffbeb' };
     return { label: 'Optimal', color: '#10b981', lightBg: '#ecfdf5' };
-  }, [light, targetLight, isLightDisconnected, health.isControllerOnline]);
-  const lightPercent = isLightDisconnected ? 0 : Math.min(100, Math.max(8, (light / 1000) * 100));
+  }, [lightDiff, isLightDisconnected, health.isControllerOnline]);
+  const lightTargetPercent = Math.min(95, Math.max(5, ((targetLight - lightMin) / (lightMax - lightMin)) * 100));
+  const lightPercent = isLightDisconnected ? 0 : Math.min(100, Math.max(4, ((light - lightMin) / (lightMax - lightMin)) * 100));
 
+  // CO2: 300 to 1200 ppm
+  const co2Min = 300;
+  const co2Max = 1200;
+  const co2Diff = isCo2Disconnected ? 0 : Math.round(co2 - targetCO2);
   const co2Status = React.useMemo(() => {
     if (isCo2Disconnected) {
       return { 
-        label: !health.isControllerOnline ? 'Offline' : 'Not Connected', 
+        label: !health.isControllerOnline ? 'Offline' : 'Fault', 
         color: '#f43f5e', 
         lightBg: '#fff1f2' 
       };
     }
-    if (co2 > targetCO2 + 350) return { label: 'High', color: '#ef4444', lightBg: '#fef2f2' };
-    if (co2 > targetCO2 + 150) return { label: 'Elevated', color: '#f97316', lightBg: '#fff7ed' };
+    if (co2Diff > 350) return { label: `+${co2Diff} High`, color: '#ef4444', lightBg: '#fef2f2' };
+    if (co2Diff > 150) return { label: `+${co2Diff} High`, color: '#f97316', lightBg: '#fff7ed' };
     return { label: 'Good', color: '#10b981', lightBg: '#ecfdf5' };
-  }, [co2, targetCO2, isCo2Disconnected, health.isControllerOnline]);
-  const co2Percent = isCo2Disconnected ? 0 : Math.min(100, Math.max(8, ((co2 - 300) / (1200 - 300)) * 100));
+  }, [co2Diff, isCo2Disconnected, health.isControllerOnline]);
+  const co2TargetPercent = Math.min(95, Math.max(5, ((targetCO2 - co2Min) / (co2Max - co2Min)) * 100));
+  const co2Percent = isCo2Disconnected ? 0 : Math.min(100, Math.max(4, ((co2 - co2Min) / (co2Max - co2Min)) * 100));
 
   const handleCardPress = (tabKey: 'temp' | 'hum' | 'light' | 'co2') => {
     hapticSelection();
@@ -134,9 +144,8 @@ export default React.memo(function EnvironmentMetricsGrid({ temp, hum, light, co
 
   const activeCount = [!isTempDisconnected, !isHumDisconnected, !isLightDisconnected, !isCo2Disconnected].filter(Boolean).length;
 
-  // Alert highlight only when deviating beyond target setpoint tolerance (1-2% drift is not an alert)
-  const isHumAlert = hum > targetHum + 5 || hum < targetHum - 6;
-  const humAlertColor = hum > targetHum + 10 || hum < targetHum - 12 ? '#ef4444' : (hum > targetHum + 5 ? '#f97316' : '#f59e0b');
+  const isHumAlert = humDiff > 5 || humDiff < -6;
+  const humAlertColor = humDiff > 10 || humDiff < -12 ? '#ef4444' : (humDiff > 5 ? '#f97316' : '#f59e0b');
 
   const metrics = [
     {
@@ -145,11 +154,13 @@ export default React.memo(function EnvironmentMetricsGrid({ temp, hum, light, co
       value: isTempDisconnected ? '--' : temp,
       unit: '°C',
       icon: (isTempDisconnected ? 'alert-circle-outline' : 'thermometer') as any,
-      iconColor: isTempDisconnected ? '#f43f5e' : '#f97316',
-      iconBg: isTempDisconnected ? 'bg-rose-50 dark:bg-rose-500/15' : 'bg-orange-50 dark:bg-orange-500/15',
-      accentColor: isTempDisconnected ? '#f43f5e' : '#f97316',
+      iconColor: isTempDisconnected ? '#f43f5e' : (tempStatus.label === 'Optimal' ? '#10b981' : tempStatus.color),
+      iconBg: isTempDisconnected ? 'bg-rose-50 dark:bg-rose-500/15' : (tempStatus.label === 'Optimal' ? 'bg-emerald-50 dark:bg-emerald-500/15' : 'bg-orange-50 dark:bg-orange-500/15'),
+      accentColor: isTempDisconnected ? '#f43f5e' : tempStatus.color,
       status: tempStatus,
       percent: tempPercent,
+      targetPercent: tempTargetPercent,
+      targetDisplay: `${targetTemp.toFixed(1)}°C`,
       hasError: isTempDisconnected,
     },
     {
@@ -158,11 +169,13 @@ export default React.memo(function EnvironmentMetricsGrid({ temp, hum, light, co
       value: isHumDisconnected ? '--' : hum,
       unit: '%',
       icon: (isHumDisconnected ? 'alert-circle-outline' : 'water-percent') as any,
-      iconColor: isHumDisconnected ? '#f43f5e' : (isHumAlert ? humAlertColor : '#0ea5e9'),
-      iconBg: isHumDisconnected ? 'bg-rose-50 dark:bg-rose-500/15' : (isHumAlert ? 'bg-orange-50 dark:bg-orange-500/15' : 'bg-sky-50 dark:bg-sky-500/15'),
-      accentColor: isHumDisconnected ? '#f43f5e' : (isHumAlert ? humAlertColor : '#0ea5e9'),
+      iconColor: isHumDisconnected ? '#f43f5e' : (humStatus.label === 'Optimal' ? '#10b981' : (isHumAlert ? humAlertColor : '#0ea5e9')),
+      iconBg: isHumDisconnected ? 'bg-rose-50 dark:bg-rose-500/15' : (humStatus.label === 'Optimal' ? 'bg-emerald-50 dark:bg-emerald-500/15' : 'bg-sky-50 dark:bg-sky-500/15'),
+      accentColor: isHumDisconnected ? '#f43f5e' : humStatus.color,
       status: humStatus,
       percent: humPercent,
+      targetPercent: humTargetPercent,
+      targetDisplay: `${Math.round(targetHum)}%`,
       hasError: isHumDisconnected,
     },
     {
@@ -171,11 +184,13 @@ export default React.memo(function EnvironmentMetricsGrid({ temp, hum, light, co
       value: isLightDisconnected ? '--' : light,
       unit: 'lx',
       icon: (isLightDisconnected ? 'alert-circle-outline' : 'white-balance-sunny') as any,
-      iconColor: isLightDisconnected ? '#f43f5e' : '#f59e0b',
-      iconBg: isLightDisconnected ? 'bg-rose-50 dark:bg-rose-500/15' : 'bg-amber-50 dark:bg-amber-500/15',
-      accentColor: isLightDisconnected ? '#f43f5e' : '#f59e0b',
+      iconColor: isLightDisconnected ? '#f43f5e' : (lightStatus.label === 'Optimal' ? '#10b981' : '#f59e0b'),
+      iconBg: isLightDisconnected ? 'bg-rose-50 dark:bg-rose-500/15' : (lightStatus.label === 'Optimal' ? 'bg-emerald-50 dark:bg-emerald-500/15' : 'bg-amber-50 dark:bg-amber-500/15'),
+      accentColor: isLightDisconnected ? '#f43f5e' : lightStatus.color,
       status: lightStatus,
       percent: lightPercent,
+      targetPercent: lightTargetPercent,
+      targetDisplay: `${Math.round(targetLight)} lx`,
       hasError: isLightDisconnected,
     },
     {
@@ -186,9 +201,11 @@ export default React.memo(function EnvironmentMetricsGrid({ temp, hum, light, co
       icon: (isCo2Disconnected ? 'alert-circle-outline' : 'molecule-co2') as any,
       iconColor: isCo2Disconnected ? '#f43f5e' : '#10b981',
       iconBg: isCo2Disconnected ? 'bg-rose-50 dark:bg-rose-500/15' : 'bg-emerald-50 dark:bg-emerald-500/15',
-      accentColor: isCo2Disconnected ? '#f43f5e' : '#10b981',
+      accentColor: isCo2Disconnected ? '#f43f5e' : co2Status.color,
       status: co2Status,
       percent: co2Percent,
+      targetPercent: co2TargetPercent,
+      targetDisplay: `${Math.round(targetCO2)} ppm`,
       hasError: isCo2Disconnected,
     },
   ];
@@ -229,29 +246,30 @@ export default React.memo(function EnvironmentMetricsGrid({ temp, hum, light, co
             activeOpacity={0.75}
             onPress={() => handleCardPress(item.id)}
             style={[
-              tw`rounded-[24px] p-4 border shadow-sm justify-between ${
+              tw`rounded-[22px] p-3.5 sm:p-4 border shadow-sm justify-between ${
                 item.hasError 
                   ? 'bg-rose-50/30 dark:bg-rose-950/20 border-rose-300 dark:border-rose-800' 
                   : 'bg-white dark:bg-slate-900 border-slate-200/70 dark:border-slate-800'
               }`,
-              { width: '48.5%', minHeight: isSmallDevice ? 132 : 142 }
+              { width: '48.5%', minHeight: isSmallDevice ? 138 : 146 }
             ]}
           >
-            {/* Top Bar: Icon chip + Status badge */}
-            <View style={tw`flex-row justify-between items-center mb-2.5`}>
-              <View style={tw`w-8 h-8 rounded-xl ${item.iconBg} items-center justify-center`}>
-                <MaterialCommunityIcons name={item.icon} size={18} color={item.iconColor} />
+            {/* Top Bar: Icon chip + Minimal Status badge */}
+            <View style={tw`flex-row justify-between items-center mb-1.5`}>
+              <View style={tw`w-7.5 h-7.5 rounded-xl ${item.iconBg} items-center justify-center`}>
+                <MaterialCommunityIcons name={item.icon} size={17} color={item.iconColor} />
               </View>
               <View 
                 style={[
-                  tw`flex-row items-center px-2 py-0.5 rounded-full border border-slate-200/50 dark:border-slate-700/60`,
+                  tw`flex-row items-center px-2 py-0.5 rounded-full border border-slate-200/40 dark:border-slate-700/50`,
                   { backgroundColor: isDarkMode ? '#1e293b' : item.status.lightBg }
                 ]}
               >
                 <View style={[tw`w-1.5 h-1.5 rounded-full mr-1.5`, { backgroundColor: item.status.color }]} />
                 <Text 
+                  numberOfLines={1}
                   style={[
-                    tw`text-[9.5px]`,
+                    tw`text-[9px] sm:text-[9.5px]`,
                     { 
                       fontFamily: 'PlusJakartaSans_700Bold',
                       color: isDarkMode ? '#e2e8f0' : (item.status.color === '#eab308' ? '#b45309' : item.status.color)
@@ -265,28 +283,67 @@ export default React.memo(function EnvironmentMetricsGrid({ temp, hum, light, co
 
             {/* Middle: Label & Big Hero Value */}
             <View>
-              <Text numberOfLines={1} style={[tw`text-[10.5px] text-slate-400 dark:text-slate-500 uppercase tracking-wider`, { fontFamily: 'PlusJakartaSans_700Bold' }]}>
+              <Text numberOfLines={1} style={[tw`text-[10px] text-slate-400 dark:text-slate-500 uppercase tracking-wider`, { fontFamily: 'PlusJakartaSans_700Bold' }]}>
                 {item.name}
               </Text>
-              <View style={tw`flex-row items-baseline mt-1`}>
-                <Text style={[tw`${item.hasError ? 'text-rose-600 dark:text-rose-400' : 'text-slate-900 dark:text-white'}`, { fontSize: isSmallDevice ? 27 : 31, fontFamily: 'PlusJakartaSans_800ExtraBold', letterSpacing: -0.6 }]}>
+              <View style={tw`flex-row items-baseline mt-0.5`}>
+                <Text style={[tw`${item.hasError ? 'text-rose-600 dark:text-rose-400' : 'text-slate-900 dark:text-white'}`, { fontSize: isSmallDevice ? 25 : 28, fontFamily: 'PlusJakartaSans_800ExtraBold', letterSpacing: -0.6 }]}>
                   {item.value}
                 </Text>
                 {item.hasError ? (
-                  <Text style={[tw`text-xs text-rose-500 dark:text-rose-400 ml-1.5`, { fontFamily: 'PlusJakartaSans_700Bold' }]}>
+                  <Text style={[tw`text-xs text-rose-500 dark:text-rose-400 ml-1`, { fontFamily: 'PlusJakartaSans_700Bold' }]}>
                     Fault
                   </Text>
                 ) : (
-                  <Text style={[tw`text-sm text-slate-400 dark:text-slate-500 ml-1.5`, { fontFamily: 'PlusJakartaSans_700Bold' }]}>
+                  <Text style={[tw`text-xs text-slate-400 dark:text-slate-500 ml-1`, { fontFamily: 'PlusJakartaSans_700Bold' }]}>
                     {item.unit}
                   </Text>
                 )}
               </View>
             </View>
 
-            {/* Bottom: Modern Slim Track Bar */}
-            <View style={tw`w-full h-1.5 bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden mt-3`}>
-              <View style={[tw`h-full rounded-full`, { width: `${item.percent}%`, backgroundColor: item.accentColor }]} />
+            {/* Bottom: Sleek Minimal Track Bar with Target Notch & Simple Target Caption */}
+            <View style={tw`mt-2`}>
+              <View style={tw`relative w-full h-1.5 bg-slate-100 dark:bg-slate-800 rounded-full justify-center`}>
+                {/* Current Value Fill Bar */}
+                <View 
+                  style={[
+                    tw`h-full rounded-full`, 
+                    { 
+                      width: `${item.percent}%`, 
+                      backgroundColor: item.accentColor 
+                    }
+                  ]} 
+                />
+
+                {/* Clean Refined Target Notch */}
+                {!item.hasError && (
+                  <View 
+                    style={[
+                      tw`absolute rounded-full`,
+                      { 
+                        left: `${item.targetPercent}%`,
+                        marginLeft: -1,
+                        width: 2,
+                        height: 7.5,
+                        top: -1,
+                        backgroundColor: isDarkMode ? '#94a3b8' : '#64748b',
+                      }
+                    ]} 
+                  />
+                )}
+              </View>
+
+              {/* Clean Single Target Caption */}
+              <Text 
+                numberOfLines={1} 
+                style={[
+                  tw`text-[9.5px] text-slate-400 dark:text-slate-500 mt-1.5`, 
+                  { fontFamily: 'PlusJakartaSans_600SemiBold' }
+                ]}
+              >
+                Target: <Text style={tw`text-slate-600 dark:text-slate-400 font-bold`}>{item.targetDisplay}</Text>
+              </Text>
             </View>
           </TouchableOpacity>
         ))}

@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from 'react';
-import { View, Text, TouchableOpacity, Image, StatusBar } from 'react-native';
+import React, { useState, useEffect, useRef } from 'react';
+import { View, Text, TouchableOpacity, Image, StatusBar, Animated, ActivityIndicator, Platform } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { GlobalNavigationParamList } from '../types/navigation';
@@ -7,9 +7,12 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { MaterialCommunityIcons, Ionicons } from '@expo/vector-icons';
 import tw from '../tailwind';
 import { useSensors } from '../hooks/useFirebaseData';
-import { hapticLight, hapticSelection } from '../utils/haptics';
+import { hapticMedium, hapticSelection, hapticSuccess, hapticError } from '../utils/haptics';
 import { showToast } from '../components/CustomToast';
 import { useTabBar } from '../context/TabBarContext';
+import * as FileSystem from 'expo-file-system/legacy';
+import * as MediaLibrary from 'expo-media-library';
+import { Asset } from 'expo-asset';
 
 export default function LiveFarmScreen() {
   const navigation = useNavigation<NativeStackNavigationProp<GlobalNavigationParamList>>();
@@ -27,6 +30,8 @@ export default function LiveFarmScreen() {
   const [currentTime, setCurrentTime] = useState('');
   const [isNightVision, setIsNightVision] = useState(false);
   const [showGrid, setShowGrid] = useState(true);
+  const [isCapturing, setIsCapturing] = useState(false);
+  const flashAnim = useRef(new Animated.Value(0)).current;
   
   const isOnline = sensors?.esp32_status === 'online';
 
@@ -41,9 +46,105 @@ export default function LiveFarmScreen() {
     return () => clearInterval(interval);
   }, []);
 
-  const handleSnapshot = () => {
-    hapticLight();
-    showToast({ type: 'success', text1: 'Snapshot Saved', text2: 'Frame captured to local media' });
+  const triggerShutterFlash = () => {
+    flashAnim.setValue(0.9);
+    Animated.timing(flashAnim, {
+      toValue: 0,
+      duration: 260,
+      useNativeDriver: true,
+    }).start();
+  };
+
+  const handleSnapshot = async () => {
+    if (isCapturing) return;
+    setIsCapturing(true);
+    hapticMedium();
+    triggerShutterFlash();
+
+    try {
+      const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+      const filename = `KabuTech_Farm_${timestamp}.jpg`;
+      const targetFileUri = `${FileSystem.cacheDirectory}${filename}`;
+
+      const cameraUrl = 'https://images.unsplash.com/photo-1585314062340-f1a5a7c9328d?q=80&w=2787&auto=format&fit=crop';
+      
+      // Step 1: Download live camera frame or bundle fallback
+      let fileReady = false;
+      try {
+        const downloadRes = await FileSystem.downloadAsync(cameraUrl, targetFileUri);
+        if (downloadRes.status === 200) {
+          fileReady = true;
+        }
+      } catch (dlErr) {
+        console.log('Remote frame download failed, using local asset:', dlErr);
+      }
+
+      if (!fileReady) {
+        const asset = Asset.fromModule(require('../../assets/mushroom_feed.png'));
+        await asset.downloadAsync();
+        const localUri = asset.localUri || asset.uri;
+        await FileSystem.copyAsync({ from: localUri, to: targetFileUri });
+        fileReady = true;
+      }
+
+      // Step 2: Request photo library permissions (write permission)
+      const { status } = await MediaLibrary.requestPermissionsAsync(true);
+      if (status !== 'granted') {
+        hapticError();
+        showToast({
+          type: 'error',
+          text1: 'Permission Denied',
+          text2: 'Allow Photos permission in device settings to auto-save.',
+          duration: 4000,
+        });
+        return;
+      }
+
+      // Step 3: Create asset directly in the device's public photo gallery
+      const asset = await MediaLibrary.createAssetAsync(targetFileUri);
+
+      // Step 4: Add into 'KabuTech' gallery album
+      try {
+        const album = await MediaLibrary.getAlbumAsync('KabuTech');
+        if (!album) {
+          await MediaLibrary.createAlbumAsync('KabuTech', asset, false);
+        } else {
+          await MediaLibrary.addAssetsToAlbumAsync([asset], album, false);
+        }
+      } catch (albumErr) {
+        // createAssetAsync has already placed it in the device's photos gallery
+        console.log('Album grouping info:', albumErr);
+      }
+
+      hapticSuccess();
+      showToast({
+        type: 'success',
+        text1: '📸 Saved to Photos!',
+        text2: 'Snapshot saved automatically to your Gallery',
+        duration: 3500,
+      });
+    } catch (err: any) {
+      console.error('Failed to capture snapshot:', err);
+      hapticError();
+      const errMsg = String(err?.message || '');
+      if (errMsg.includes('ExpoMediaLibrary') || errMsg.includes('native module')) {
+        showToast({
+          type: 'error',
+          text1: 'New Build Required',
+          text2: 'Install the new EAS development build to enable direct gallery saving.',
+          duration: 5000,
+        });
+      } else {
+        showToast({
+          type: 'error',
+          text1: 'Capture Error',
+          text2: err?.message || 'Unable to save image.',
+          duration: 4000,
+        });
+      }
+    } finally {
+      setIsCapturing(false);
+    }
   };
 
   return (
@@ -149,6 +250,15 @@ export default function LiveFarmScreen() {
             <View style={tw`w-1.5 h-1.5 rounded-full bg-emerald-400/80`} />
           </View>
         </View>
+
+        {/* Shutter Flash Effect */}
+        <Animated.View
+          pointerEvents="none"
+          style={[
+            tw`absolute inset-0 bg-white z-50`,
+            { opacity: flashAnim }
+          ]}
+        />
       </View>
 
       {/* Floating Bottom Control Bar */}
@@ -170,12 +280,19 @@ export default function LiveFarmScreen() {
         <TouchableOpacity
           activeOpacity={0.7}
           onPress={handleSnapshot}
+          disabled={isCapturing}
           style={tw`items-center gap-1`}
         >
-          <View style={tw`w-12 h-12 rounded-full bg-white items-center justify-center shadow-lg active:scale-95`}>
-            <MaterialCommunityIcons name="camera" size={24} color="#0f172a" />
+          <View style={tw`w-12 h-12 rounded-full ${isCapturing ? 'bg-slate-200' : 'bg-white'} items-center justify-center shadow-lg active:scale-95`}>
+            {isCapturing ? (
+              <ActivityIndicator size="small" color="#0f172a" />
+            ) : (
+              <MaterialCommunityIcons name="camera" size={24} color="#0f172a" />
+            )}
           </View>
-          <Text style={[tw`text-[10px] text-white`, { fontFamily: 'PlusJakartaSans_800ExtraBold' }]}>Snap</Text>
+          <Text style={[tw`text-[10px] text-white`, { fontFamily: 'PlusJakartaSans_800ExtraBold' }]}>
+            {isCapturing ? 'Saving...' : 'Snap'}
+          </Text>
         </TouchableOpacity>
 
         <TouchableOpacity

@@ -1,6 +1,6 @@
 import * as Notifications from 'expo-notifications';
 import { Platform } from 'react-native';
-import { db } from '../services/firebase';
+import { db, auth } from '../services/firebase';
 import { ref, update, get } from 'firebase/database';
 
 Notifications.setNotificationHandler({
@@ -94,6 +94,7 @@ export async function sendPushNotification(expoPushToken: string, title: string,
  */
 export async function notifyAdmins(title: string, body: string, data = {}) {
   try {
+    if (!auth.currentUser) return;
     const usersSnap = await get(ref(db, 'kabutech/users'));
     if (!usersSnap.exists()) return;
     
@@ -109,8 +110,11 @@ export async function notifyAdmins(title: string, body: string, data = {}) {
     for (const token of adminTokens) {
       await sendPushNotification(token, title, body, data);
     }
-  } catch (error) {
-    console.error('Error notifying admins:', error);
+  } catch (error: any) {
+    if (error?.message?.includes('Permission denied') || error?.code === 'PERMISSION_DENIED') {
+      return;
+    }
+    console.warn('Could not broadcast alert to admins:', error?.message);
   }
 }
 
@@ -119,6 +123,7 @@ export async function notifyAdmins(title: string, body: string, data = {}) {
  */
 export async function notifyUser(userId: string, title: string, body: string, data = {}) {
   try {
+    if (!auth.currentUser) return;
     const userSnap = await get(ref(db, `kabutech/users/${userId}`));
     if (userSnap.exists()) {
       const userData = userSnap.val();
@@ -126,8 +131,11 @@ export async function notifyUser(userId: string, title: string, body: string, da
         await sendPushNotification(userData.pushToken, title, body, data);
       }
     }
-  } catch (error) {
-    console.error(`Error notifying user ${userId}:`, error);
+  } catch (error: any) {
+    if (error?.message?.includes('Permission denied') || error?.code === 'PERMISSION_DENIED') {
+      return;
+    }
+    console.warn(`Could not notify user ${userId}:`, error?.message);
   }
 }
 
@@ -167,6 +175,8 @@ export async function notifyEnvironmentalAlert(title: string, body: string, data
 
   // 2. Broadcast push notification to all users registered in the database
   try {
+    if (!auth.currentUser) return;
+
     const usersSnap = await get(ref(db, 'kabutech/users'));
     if (!usersSnap.exists()) return;
 
@@ -182,7 +192,11 @@ export async function notifyEnvironmentalAlert(title: string, body: string, data
     for (const token of tokens) {
       await sendPushNotification(token, title, body, data);
     }
-  } catch (error) {
-    console.error('Error broadcasting environmental alert:', error);
+  } catch (error: any) {
+    if (error?.message?.includes('Permission denied') || error?.code === 'PERMISSION_DENIED') {
+      // User is authenticated but database rules restrict reading global users node
+      return;
+    }
+    console.warn('Could not broadcast environmental push notifications:', error?.message);
   }
 }

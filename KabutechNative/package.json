@@ -21,6 +21,7 @@
     "expo-font": "~57.0.1",
     "expo-haptics": "~57.0.2",
     "expo-linear-gradient": "~57.0.1",
+    "expo-media-library": "~57.0.5",
     "expo-navigation-bar": "~57.0.2",
     "expo-notifications": "~57.0.15",
     "expo-sharing": "~57.0.16",

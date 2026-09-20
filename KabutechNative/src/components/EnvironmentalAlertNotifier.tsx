@@ -1,15 +1,20 @@
 import React, { useEffect, useRef } from 'react';
 import { useEnvironmentAlerts } from '../hooks/useEnvironmentAlerts';
 import { notifyEnvironmentalAlert } from '../utils/PushNotifications';
+import { useAuth } from '../context/AuthContext';
 
 // 15-minute cooldown between re-notifying the exact same active alert
 const COOLDOWN_MS = 15 * 60 * 1000;
 
 export default function EnvironmentalAlertNotifier() {
+  const { user } = useAuth();
   const { activeAlerts } = useEnvironmentAlerts();
   const lastNotifiedRef = useRef<Map<string, number>>(new Map());
 
   useEffect(() => {
+    // Only dispatch notifications if a user session is active
+    if (!user) return;
+
     if (!activeAlerts || activeAlerts.length === 0) {
       // Clear resolved alerts so they trigger notifications again if re-occurring
       lastNotifiedRef.current.clear();
