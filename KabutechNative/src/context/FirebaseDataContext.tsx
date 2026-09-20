@@ -7,11 +7,11 @@ import { showToast } from '../components/CustomToast';
 import { computeScheduledDevicesState, computeAutoDevicesState } from '../utils/scheduleLogic';
 
 const defaultSensors: SensorData = {
-  temperature: 0,
-  humidity: 0,
-  light: 0,
-  co2: 0,
-  waterLevel: 75,
+  temperature: -999,
+  humidity: -999,
+  light: -999,
+  co2: -999,
+  waterLevel: -999,
   esp32_status: 'offline'
 };
 
@@ -27,6 +27,7 @@ const defaultSettings: SettingsData = {
 };
 
 export const ConnectionContext = createContext<boolean>(false);
+export const ServerTimeOffsetContext = createContext<number>(0);
 export const SensorsContext = createContext<SensorData>(defaultSensors);
 export const SettingsContext = createContext<SettingsData>(defaultSettings);
 export const BatchesContext = createContext<BatchData[]>([]);
@@ -37,6 +38,7 @@ export const AllUsersContext = createContext<Record<string, UserProfile>>({});
 
 export const FirebaseDataProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [isConnected, setIsConnected] = useState(false);
+  const [serverTimeOffset, setServerTimeOffset] = useState<number>(0);
   const [sensors, setSensors] = useState<SensorData>(defaultSensors);
   const [settings, setSettings] = useState<SettingsData>(defaultSettings);
   const [batches, setBatches] = useState<BatchData[]>([]);
@@ -53,9 +55,15 @@ export const FirebaseDataProvider: React.FC<{ children: React.ReactNode }> = ({ 
       setIsConnected(snap.val() === true);
     });
 
+    const offsetRef = ref(db, '.info/serverTimeOffset');
+    const unsubscribeOffset = onValue(offsetRef, (snap) => {
+      setServerTimeOffset(snap.val() || 0);
+    });
+
     if (!user) {
       return () => {
         unsubscribeConnected();
+        unsubscribeOffset();
       };
     }
 
@@ -181,21 +189,23 @@ export const FirebaseDataProvider: React.FC<{ children: React.ReactNode }> = ({ 
 
   return (
     <ConnectionContext.Provider value={isConnected}>
-      <SensorsContext.Provider value={sensors}>
-        <SettingsContext.Provider value={settings}>
-          <BatchesContext.Provider value={batches}>
-            <AlertsContext.Provider value={alerts}>
-              <ActivityLogsContext.Provider value={activityLogs}>
-                <StaffTasksContext.Provider value={staffTasks}>
-                  <AllUsersContext.Provider value={allUsers}>
-                    {children}
-                  </AllUsersContext.Provider>
-                </StaffTasksContext.Provider>
-              </ActivityLogsContext.Provider>
-            </AlertsContext.Provider>
-          </BatchesContext.Provider>
-        </SettingsContext.Provider>
-      </SensorsContext.Provider>
+      <ServerTimeOffsetContext.Provider value={serverTimeOffset}>
+        <SensorsContext.Provider value={sensors}>
+          <SettingsContext.Provider value={settings}>
+            <BatchesContext.Provider value={batches}>
+              <AlertsContext.Provider value={alerts}>
+                <ActivityLogsContext.Provider value={activityLogs}>
+                  <StaffTasksContext.Provider value={staffTasks}>
+                    <AllUsersContext.Provider value={allUsers}>
+                      {children}
+                    </AllUsersContext.Provider>
+                  </StaffTasksContext.Provider>
+                </ActivityLogsContext.Provider>
+              </AlertsContext.Provider>
+            </BatchesContext.Provider>
+          </SettingsContext.Provider>
+        </SensorsContext.Provider>
+      </ServerTimeOffsetContext.Provider>
     </ConnectionContext.Provider>
   );
 };

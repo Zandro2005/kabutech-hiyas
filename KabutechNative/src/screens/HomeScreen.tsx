@@ -50,12 +50,14 @@ export default function HomeScreen() {
     return () => cancelAnimationFrame(handle);
   }, []);
 
-  // Safe extraction of sensor values
-  const temp = typeof sensors.temperature === 'number' ? sensors.temperature : 30.0;
-  const hum = typeof sensors.humidity === 'number' ? sensors.humidity : 55.2;
-  const co2 = typeof sensors.co2 === 'number' ? sensors.co2 : 450;
-  const light = typeof sensors.light === 'number' ? sensors.light : 490;
-  const waterLevel = typeof sensors.waterLevel === 'number' ? sensors.waterLevel : 75;
+  const isControllerOff = !health.isControllerOnline;
+
+  // Safe extraction of sensor values: strictly real Firebase data, never mock fallbacks
+  const temp = !isControllerOff && typeof sensors.temperature === 'number' && sensors.temperature !== -999 && sensors.temperature > 0 ? sensors.temperature : -999;
+  const hum = !isControllerOff && typeof sensors.humidity === 'number' && sensors.humidity !== -999 && sensors.humidity > 0 ? sensors.humidity : -999;
+  const co2 = !isControllerOff && typeof sensors.co2 === 'number' && sensors.co2 !== -999 && sensors.co2 > 0 ? sensors.co2 : -999;
+  const light = !isControllerOff && typeof sensors.light === 'number' && sensors.light !== -999 && sensors.light >= 0 ? sensors.light : -999;
+  const waterLevel = !isControllerOff && typeof sensors.waterLevel === 'number' && sensors.waterLevel !== -999 && sensors.waterLevel >= 0 ? sensors.waterLevel : -999;
 
   const isAuto = String(settings?.setpoints?.mode).toLowerCase() === 'auto';
   const isScheduled = String(settings?.setpoints?.mode).toLowerCase() === 'scheduled';
@@ -140,7 +142,7 @@ export default function HomeScreen() {
   };
 
   // Calculate Environment Score (0 to 10) based on all 4 environmental metrics
-  const envScore = calculateEnvironmentScore(temp, hum, light, co2);
+  const envScore = isControllerOff ? '--' : calculateEnvironmentScore(temp, hum, light, co2);
 
   return (
     <View style={tw`flex-1 bg-[#f0f9f4] dark:bg-[#020617]`}>
@@ -173,6 +175,7 @@ export default function HomeScreen() {
           valveActive={valveActive}
           toggleDevice={toggleDevice} 
           navigation={navigation} 
+          isOffline={isControllerOff}
           hasWarning={envAlerts.hasWarning}
           warningBanner={envAlerts.hasWarning ? <DashboardWarningBadges alerts={envAlerts.activeAlerts} /> : null}
         />

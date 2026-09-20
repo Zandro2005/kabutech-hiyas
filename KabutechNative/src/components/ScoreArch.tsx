@@ -22,6 +22,7 @@ interface Props {
   readOnly?: boolean;
   warningBanner?: React.ReactNode;
   hasWarning?: boolean;
+  isOffline?: boolean;
 }
 
 export default React.memo(function ScoreArch({
@@ -38,6 +39,7 @@ export default React.memo(function ScoreArch({
   readOnly = false,
   warningBanner,
   hasWarning = false,
+  isOffline = false,
 }: Props) {
   const { profile } = useAuth();
   const { isSmallDevice } = useResponsive();
@@ -46,15 +48,15 @@ export default React.memo(function ScoreArch({
   const isOptimal = numScore >= 8.0;
   const isWarning = numScore >= 6.0 && numScore < 8.0;
   const isCalibrating = numScore === 0;
-  const scoreLabel = isCalibrating ? 'Calibrating' : isOptimal ? 'Optimal' : isWarning ? 'Moderate' : 'Attention';
-  const scoreBadgeColor = isCalibrating ? '#64748b' : isOptimal ? '#10b981' : isWarning ? '#f59e0b' : '#ea580c';
+  const scoreLabel = isOffline ? 'Offline' : (isCalibrating ? 'Calibrating' : isOptimal ? 'Optimal' : isWarning ? 'Moderate' : 'Attention');
+  const scoreBadgeColor = isOffline ? '#94a3b8' : (isCalibrating ? '#64748b' : isOptimal ? '#10b981' : isWarning ? '#f59e0b' : '#ea580c');
 
   // Smart Halo Ring dimensions (Enlarged Hero Dial)
   const ringSize = isSmallDevice ? 224 : 252;
   const strokeWidth = 14;
   const radius = (ringSize - strokeWidth) / 2;
   const circumference = 2 * Math.PI * radius;
-  const progress = Math.min(1, Math.max(0.05, numScore / 10));
+  const progress = isOffline ? 0 : Math.min(1, Math.max(0.05, numScore / 10));
   const strokeDashoffset = circumference * (1 - progress);
 
   const handleDevicePress = (key: 'fans' | 'misters' | 'lights' | 'co2', active: boolean, label: string) => {
@@ -100,7 +102,9 @@ export default React.memo(function ScoreArch({
               { fontFamily: 'PlusJakartaSans_500Medium' }
             ]}
           >
-            {hasWarning ? 'Chamber A • Attention Required' : 'Chamber A • All Systems Active'}
+            {isOffline 
+              ? 'Chamber A • Controller Offline' 
+              : (hasWarning ? 'Chamber A • Attention Required' : 'Chamber A • All Systems Active')}
           </Text>
         </View>
 
@@ -180,18 +184,20 @@ export default React.memo(function ScoreArch({
               fill="none"
             />
 
-            {/* Glowing Active Progress Arc */}
-            <Circle
-              cx={ringSize / 2}
-              cy={ringSize / 2}
-              r={radius}
-              stroke="url(#haloGrad)"
-              strokeWidth={strokeWidth}
-              strokeDasharray={`${circumference} ${circumference}`}
-              strokeDashoffset={strokeDashoffset}
-              strokeLinecap="round"
-              fill="none"
-            />
+            {/* Glowing Active Progress Arc (only when online) */}
+            {!isOffline && (
+              <Circle
+                cx={ringSize / 2}
+                cy={ringSize / 2}
+                r={radius}
+                stroke="url(#haloGrad)"
+                strokeWidth={strokeWidth}
+                strokeDasharray={`${circumference} ${circumference}`}
+                strokeDashoffset={strokeDashoffset}
+                strokeLinecap="round"
+                fill="none"
+              />
+            )}
           </Svg>
 
           {/* Center Content - Pure Typography with Zero Boxes */}
@@ -208,7 +214,7 @@ export default React.memo(function ScoreArch({
             <View style={tw`flex-row items-baseline mb-0.5`}>
               <Text
                 style={[
-                  tw`text-slate-900 dark:text-white`,
+                  isOffline ? tw`text-slate-400 dark:text-slate-500` : tw`text-slate-900 dark:text-white`,
                   {
                     fontSize: isSmallDevice ? 50 : 58,
                     fontFamily: 'PlusJakartaSans_800ExtraBold',
@@ -217,7 +223,7 @@ export default React.memo(function ScoreArch({
                   }
                 ]}
               >
-                {envScore}
+                {isOffline ? '--' : envScore}
               </Text>
               <Text
                 style={[
@@ -233,9 +239,9 @@ export default React.memo(function ScoreArch({
             <View
               style={[
                 tw`flex-row items-center px-3 py-1 rounded-full border mt-1.5`,
-                isDarkMode
-                  ? tw`bg-slate-900/80 border-slate-700`
-                  : tw`bg-emerald-50/90 border-emerald-200/90`
+                isOffline
+                  ? (isDarkMode ? tw`bg-slate-800 border-slate-700` : tw`bg-slate-100 border-slate-300`)
+                  : (isDarkMode ? tw`bg-slate-900/80 border-slate-700` : tw`bg-emerald-50/90 border-emerald-200/90`)
               ]}
             >
               <View style={[tw`w-2 h-2 rounded-full mr-1.5`, { backgroundColor: scoreBadgeColor }]} />
@@ -244,7 +250,9 @@ export default React.memo(function ScoreArch({
                   tw`text-[11px]`,
                   {
                     fontFamily: 'PlusJakartaSans_700Bold',
-                    color: isDarkMode ? '#e2e8f0' : '#065f46'
+                    color: isOffline 
+                      ? (isDarkMode ? '#94a3b8' : '#64748b')
+                      : (isDarkMode ? '#e2e8f0' : '#065f46')
                   }
                 ]}
               >
@@ -258,11 +266,12 @@ export default React.memo(function ScoreArch({
         <View style={tw`flex-row items-center gap-1.5 mt-3`}>
           <Text
             style={[
-              tw`text-[11px] sm:text-xs text-emerald-600 dark:text-emerald-400`,
+              tw`text-[11px] sm:text-xs`,
+              isOffline ? tw`text-slate-400 dark:text-slate-500` : tw`text-emerald-600 dark:text-emerald-400`,
               { fontFamily: 'PlusJakartaSans_800ExtraBold' }
             ]}
           >
-            ▲ +6% VS last week
+            {isOffline ? 'Offline' : '▲ +6% VS last week'}
           </Text>
           <Text style={tw`text-slate-300 dark:text-slate-600`}>•</Text>
           <Text
@@ -271,7 +280,7 @@ export default React.memo(function ScoreArch({
               { fontFamily: 'PlusJakartaSans_600SemiBold' }
             ]}
           >
-            Chamber Optimal
+            {isOffline ? 'Controller Unreachable' : 'Chamber Optimal'}
           </Text>
         </View>
       </View>

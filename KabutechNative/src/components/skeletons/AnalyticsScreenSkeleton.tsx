@@ -5,7 +5,7 @@ import { Skeleton } from '../Skeleton';
 
 export default function AnalyticsScreenSkeleton() {
   return (
-    <ScrollView contentContainerStyle={tw`pb-36 pt-2`} showsVerticalScrollIndicator={false}>
+    <ScrollView contentContainerStyle={tw`pb-32 pt-2`} showsVerticalScrollIndicator={false}>
       {/* Parameter Selector Horizontal Tabs */}
       <View style={tw`mb-4`}>
         <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={tw`px-5 gap-2.5`}>
@@ -24,39 +24,51 @@ export default function AnalyticsScreenSkeleton() {
         </ScrollView>
       </View>
 
-      {/* Main Interactive Chart Card */}
+      {/* Main 24H Interactive Chart Card */}
       <View style={tw`mx-5 bg-white dark:bg-slate-900 rounded-[28px] p-5 border border-slate-100 dark:border-slate-800/80 shadow-sm mb-5 gap-4`}>
-        {/* Card Header: Live Value + Timeframe Selector */}
+        {/* Card Header: Live Value + 24H Tag */}
         <View style={tw`flex-row justify-between items-start`}>
           <View style={tw`gap-1.5`}>
             <Skeleton width={90} height={12} borderRadius={4} />
             <Skeleton width={130} height={32} borderRadius={8} />
           </View>
-
-          {/* Time range pills (24H, 7D, 30D) */}
-          <View style={tw`flex-row bg-slate-100 dark:bg-slate-800 p-1 rounded-xl gap-1`}>
-            <Skeleton width={36} height={28} borderRadius={8} />
-            <Skeleton width={36} height={28} borderRadius={8} />
-            <Skeleton width={36} height={28} borderRadius={8} />
-          </View>
+          <Skeleton width={96} height={28} borderRadius={14} />
         </View>
 
-        {/* Chart Canvas Placeholder */}
-        <Skeleton width="100%" height={175} borderRadius={16} />
+        {/* Sparkline Canvas Placeholder */}
+        <Skeleton width="100%" height={150} borderRadius={16} />
 
-        {/* Min / Max / Avg stats footer */}
+        {/* Scrubber stats footer */}
         <View style={tw`flex-row justify-between pt-3 border-t border-slate-100 dark:border-slate-800`}>
-          <Skeleton width={70} height={24} borderRadius={6} />
-          <Skeleton width={70} height={24} borderRadius={6} />
-          <Skeleton width={70} height={24} borderRadius={6} />
+          <Skeleton width={120} height={20} borderRadius={6} />
+          <Skeleton width={60} height={20} borderRadius={6} />
         </View>
       </View>
 
-      {/* Environmental Insights Card */}
-      <View style={tw`mx-5 bg-white dark:bg-slate-900 rounded-[24px] p-5 border border-slate-100 dark:border-slate-800/80 shadow-sm gap-3`}>
-        <Skeleton width={140} height={16} borderRadius={4} />
-        <Skeleton width="100%" height={12} borderRadius={4} />
-        <Skeleton width="85%" height={12} borderRadius={4} />
+      {/* Minimal Important Info Card */}
+      <View style={tw`mx-5 bg-white dark:bg-slate-900 rounded-[24px] p-5 border border-slate-100 dark:border-slate-800/80 shadow-sm mb-5 gap-3.5`}>
+        <View style={tw`flex-row justify-between items-center pb-3 border-b border-slate-100 dark:border-slate-800`}>
+          <Skeleton width={100} height={24} borderRadius={12} />
+          <Skeleton width={90} height={16} borderRadius={4} />
+        </View>
+        <View style={tw`flex-row justify-between items-center pt-2`}>
+          <Skeleton width={70} height={34} borderRadius={6} />
+          <Skeleton width={70} height={34} borderRadius={6} />
+          <Skeleton width={70} height={34} borderRadius={6} />
+        </View>
+        <View style={tw`pt-3 border-t border-slate-100 dark:border-slate-800 flex-row justify-between`}>
+          <Skeleton width={130} height={14} borderRadius={4} />
+          <Skeleton width={80} height={14} borderRadius={4} />
+        </View>
+      </View>
+
+      {/* AI Insights CTA Banner */}
+      <View style={tw`mx-5 rounded-[20px] p-4 bg-emerald-500/30 flex-row items-center gap-2.5`}>
+        <Skeleton width={32} height={32} borderRadius={10} />
+        <View style={tw`gap-1 flex-1`}>
+          <Skeleton width={120} height={14} borderRadius={4} />
+          <Skeleton width="80%" height={10} borderRadius={3} />
+        </View>
       </View>
     </ScrollView>
   );

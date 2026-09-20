@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { useSensors } from './useFirebaseData';
+import { useSensors, useServerTimeOffset } from './useFirebaseData';
 
 export interface SensorHealthStatus {
   isControllerOnline: boolean;
@@ -17,7 +17,16 @@ export interface SensorHealthStatus {
 
 export function useSensorHealth(): SensorHealthStatus {
   const sensors = useSensors();
-  const [offlineSeconds, setOfflineSeconds] = useState(0);
+  const serverTimeOffset = useServerTimeOffset();
+  const [, setTick] = useState(0);
+
+  // 1-second pulse to re-evaluate stale timeout in real time
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setTick(t => (t + 1) % 10000);
+    }, 1000);
+    return () => clearInterval(timer);
+  }, []);
 
   // Track the local time when the last snapshot arrived through the WebSocket stream
   const lastPacketReceivedAt = useRef<number>(Date.now());
@@ -27,28 +36,18 @@ export function useSensorHealth(): SensorHealthStatus {
     }
   }, [sensors?.last_seen, sensors?.temperature, sensors?.humidity, sensors?.light, sensors?.co2, sensors?.waterLevel]);
 
-  useEffect(() => {
-    const checkInterval = setInterval(() => {
-      if (sensors?.last_seen) {
-        const diffMs = Date.now() - sensors.last_seen;
-        setOfflineSeconds(Math.max(0, Math.round(diffMs / 1000)));
-      } else {
-        setOfflineSeconds(0);
-      }
-    }, 2000);
-    return () => clearInterval(checkInterval);
-  }, [sensors?.last_seen]);
-
   const hasTimestamp = typeof sensors?.last_seen === 'number' && sensors.last_seen > 0;
   
   // Stale detection:
-  // 1. Buffer (45s) accommodates ESP32 heartbeat (30s) + Wi-Fi retry delays.
-  // 2. Also checks local snapshot arrival time to eliminate client clock skew.
-  const timeSinceServerTs = hasTimestamp ? Date.now() - (sensors.last_seen || 0) : Infinity;
-  const timeSinceLocalPacket = Date.now() - lastPacketReceivedAt.current;
+  // 1. ESP32 pushes every 2.5s (FIREBASE_PUSH_INTERVAL = 2500).
+  // 2. 7 seconds (~3 missed cycles) indicates an unplugged controller or broken link.
+  // 3. Current server time combines device clock + Firebase .info/serverTimeOffset to eliminate clock skew.
+  const currentServerTime = Date.now() + serverTimeOffset;
+  const timeSinceServerTs = hasTimestamp ? Math.max(0, currentServerTime - (sensors.last_seen || 0)) : Infinity;
+  const offlineSeconds = hasTimestamp ? Math.round(timeSinceServerTs / 1000) : 0;
 
-  // Controller is considered stale ONLY if BOTH the server timestamp is > 45s AND no local packet arrived in 35s
-  const isStale = timeSinceServerTs > 45000 && timeSinceLocalPacket > 35000;
+  const STALE_THRESHOLD_MS = 7000;
+  const isStale = !hasTimestamp || timeSinceServerTs > STALE_THRESHOLD_MS;
   
   const isExplicitOffline = sensors?.esp32_status === 'offline';
   const isControllerOnline = !isExplicitOffline && !isStale;

@@ -258,6 +258,14 @@ void setup() {
   }
   Firebase.RTDB.setStreamCallback(&streamDO, streamCallback, streamTimeoutCallback);
 
+  // Register onDisconnect hook with Firebase server:
+  // If the ESP32 is unplugged or Wi-Fi drops, Firebase automatically marks esp32_status as offline immediately
+  if (Firebase.RTDB.onDisconnect(&fbdo, "/kabutech/sensors/live/esp32_status", "offline")) {
+    Serial.println("✅ Firebase onDisconnect handler registered ✓");
+  } else {
+    Serial.printf("⚠️ onDisconnect registration warning: %s\n", fbdo.errorReason().c_str());
+  }
+
   bootTime = millis();
 
   Serial.println();

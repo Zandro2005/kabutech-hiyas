@@ -1,12 +1,16 @@
 import { useContext } from 'react';
 import { 
-  ConnectionContext, SensorsContext, SettingsContext, 
+  ConnectionContext, ServerTimeOffsetContext, SensorsContext, SettingsContext, 
   BatchesContext, AlertsContext, ActivityLogsContext, 
   StaffTasksContext, AllUsersContext 
 } from '../context/FirebaseDataContext';
 
 export function useFirebaseConnection() {
   return useContext(ConnectionContext);
+}
+
+export function useServerTimeOffset() {
+  return useContext(ServerTimeOffsetContext);
 }
 
 export function useSensors() {
