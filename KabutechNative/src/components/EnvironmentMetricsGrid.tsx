@@ -290,7 +290,7 @@ export default React.memo(function EnvironmentMetricsGrid({ temp, hum, light, co
               }`,
               { 
                 width: '48.5%', 
-                minHeight: isSmallDevice ? 162 : 176,
+                minHeight: isSmallDevice ? 140 : 152,
                 shadowColor: '#0f172a',
                 shadowOffset: { width: 0, height: 3 },
                 shadowOpacity: isDarkMode ? 0 : 0.04,
@@ -369,8 +369,8 @@ export default React.memo(function EnvironmentMetricsGrid({ temp, hum, light, co
               </View>
             </View>
 
-            {/* Bottom: Precision Gauge Track & Target Row with subtle detail hint */}
-            <View style={tw`mt-2.5`}>
+            {/* Bottom: Sleek Precision Gauge Track */}
+            <View style={tw`mt-2 mb-0.5`}>
               <View style={tw`relative w-full h-[5px] bg-slate-100 dark:bg-slate-800 rounded-full overflow-visible justify-center`}>
                 {/* Current Value Fill Bar */}
                 <View 
@@ -406,34 +406,6 @@ export default React.memo(function EnvironmentMetricsGrid({ temp, hum, light, co
                     ]} 
                   />
                 )}
-              </View>
-
-              {/* Clean Target Row with Subtle Navigation Chevron */}
-              <View style={tw`flex-row items-center justify-between mt-2`}>
-                <View style={tw`flex-row items-baseline`}>
-                  <Text 
-                    style={[
-                      tw`text-[10px] text-slate-400 dark:text-slate-500 mr-1`, 
-                      { fontFamily: 'PlusJakartaSans_600SemiBold' }
-                    ]}
-                  >
-                    Target
-                  </Text>
-                  <Text 
-                    style={[
-                      tw`text-[10.5px] text-slate-700 dark:text-slate-300`, 
-                      { fontFamily: 'PlusJakartaSans_700Bold' }
-                    ]}
-                  >
-                    {item.targetDisplay}
-                  </Text>
-                </View>
-
-                <Ionicons 
-                  name="chevron-forward" 
-                  size={11} 
-                  color={isDarkMode ? '#475569' : '#cbd5e1'} 
-                />
               </View>
             </View>
           </TouchableOpacity>
