@@ -11,7 +11,7 @@ import { hapticMedium, hapticSelection, hapticSuccess, hapticError } from '../ut
 import { showToast } from '../components/CustomToast';
 import { useTabBar } from '../context/TabBarContext';
 import * as FileSystem from 'expo-file-system/legacy';
-import * as MediaLibrary from 'expo-media-library';
+import * as MediaLibrary from 'expo-media-library/legacy';
 import { Asset } from 'expo-asset';
 
 export default function LiveFarmScreen() {
