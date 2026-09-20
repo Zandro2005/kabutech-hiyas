@@ -71,21 +71,21 @@ export default React.memo(function DashboardWarningBadges({ alerts }: Props) {
             onPress={handlePress}
             style={tw`flex-1 flex-row items-center`}
           >
-            {/* Soft Warm Icon Badge */}
+            {/* Small Red Warning Icon Badge */}
             <View
               style={[
                 tw`w-6.5 h-6.5 rounded-full items-center justify-center shrink-0`,
-                isDarkMode ? tw`bg-amber-400/15` : tw`bg-amber-500/10`,
+                isDarkMode ? tw`bg-rose-500/15` : tw`bg-rose-50`,
               ]}
             >
               <MaterialCommunityIcons
                 name={
                   alerts.length === 1
                     ? (primaryAlert.icon as any)
-                    : 'alert-circle-outline'
+                    : 'alert-circle'
                 }
                 size={14}
-                color={isDarkMode ? '#fbbf24' : '#d97706'}
+                color={isDarkMode ? '#f87171' : '#ef4444'}
               />
             </View>
 
@@ -161,12 +161,15 @@ export default React.memo(function DashboardWarningBadges({ alerts }: Props) {
             <View style={tw`flex-row items-center justify-between pb-3 border-b border-slate-100 dark:border-slate-800`}>
               <View style={tw`flex-row items-center gap-2.5 flex-1 mr-2`}>
                 <View
-                  style={tw`w-8 h-8 rounded-xl bg-amber-500/15 items-center justify-center shrink-0`}
+                  style={[
+                    tw`w-8 h-8 rounded-xl items-center justify-center shrink-0`,
+                    isDarkMode ? tw`bg-rose-500/15` : tw`bg-rose-50`,
+                  ]}
                 >
                   <MaterialCommunityIcons
-                    name="alert-circle-outline"
+                    name="alert-circle"
                     size={18}
-                    color={isDarkMode ? '#fbbf24' : '#d97706'}
+                    color={isDarkMode ? '#f87171' : '#ef4444'}
                   />
                 </View>
                 <Text
