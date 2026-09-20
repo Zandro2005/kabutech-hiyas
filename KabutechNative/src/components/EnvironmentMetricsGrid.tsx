@@ -251,30 +251,32 @@ export default React.memo(function EnvironmentMetricsGrid({ temp, hum, light, co
         </TouchableOpacity>
       </View>
 
-      {/* 2x2 Modern Widget Grid */}
-      <View style={tw`flex-row flex-wrap justify-between gap-y-3`}>
+      {/* 2x2 Modern Widget Grid - Expanded for Spacious Breathing Room */}
+      <View style={tw`flex-row flex-wrap justify-between gap-y-3.5`}>
         {metrics.map((item) => (
           <TouchableOpacity
             key={item.id}
             activeOpacity={0.75}
             onPress={() => handleCardPress(item.id)}
             style={[
-              tw`rounded-[22px] p-3.5 sm:p-4 border shadow-sm justify-between ${
+              tw`rounded-[24px] p-4 sm:p-4.5 border shadow-sm justify-between ${
                 item.hasError 
-                  ? 'bg-rose-50/30 dark:bg-rose-950/20 border-rose-300 dark:border-rose-800' 
+                  ? (isControllerOff
+                      ? 'bg-white dark:bg-slate-900 border-slate-200/70 dark:border-slate-800'
+                      : 'bg-amber-50/20 dark:bg-amber-950/20 border-amber-300/60 dark:border-amber-800/60')
                   : 'bg-white dark:bg-slate-900 border-slate-200/70 dark:border-slate-800'
               }`,
-              { width: '48.5%', minHeight: isSmallDevice ? 138 : 146 }
+              { width: '48.5%', minHeight: isSmallDevice ? 160 : 174 }
             ]}
           >
-            {/* Top Bar: Icon chip + Minimal Status badge */}
-            <View style={tw`flex-row justify-between items-center mb-1.5`}>
-              <View style={tw`w-7.5 h-7.5 rounded-xl ${item.iconBg} items-center justify-center`}>
-                <MaterialCommunityIcons name={item.icon} size={17} color={item.iconColor} />
+            {/* Top Bar: Icon chip + Status badge */}
+            <View style={tw`flex-row justify-between items-center mb-2.5`}>
+              <View style={tw`w-8.5 h-8.5 rounded-xl ${item.iconBg} items-center justify-center`}>
+                <MaterialCommunityIcons name={item.icon} size={19} color={item.iconColor} />
               </View>
               <View 
                 style={[
-                  tw`flex-row items-center px-2 py-0.5 rounded-full border border-slate-200/40 dark:border-slate-700/50`,
+                  tw`flex-row items-center px-2.5 py-1 rounded-full border border-slate-200/50 dark:border-slate-700/60`,
                   { backgroundColor: isDarkMode ? '#1e293b' : item.status.lightBg }
                 ]}
               >
@@ -282,7 +284,7 @@ export default React.memo(function EnvironmentMetricsGrid({ temp, hum, light, co
                 <Text 
                   numberOfLines={1}
                   style={[
-                    tw`text-[9px] sm:text-[9.5px]`,
+                    tw`text-[9.5px] sm:text-[10px]`,
                     { 
                       fontFamily: 'PlusJakartaSans_700Bold',
                       color: isDarkMode ? '#e2e8f0' : (item.status.color === '#eab308' ? '#b45309' : item.status.color)
@@ -295,29 +297,39 @@ export default React.memo(function EnvironmentMetricsGrid({ temp, hum, light, co
             </View>
 
             {/* Middle: Label & Big Hero Value */}
-            <View>
-              <Text numberOfLines={1} style={[tw`text-[10px] text-slate-400 dark:text-slate-500 uppercase tracking-wider`, { fontFamily: 'PlusJakartaSans_700Bold' }]}>
+            <View style={tw`my-0.5`}>
+              <Text numberOfLines={1} style={[tw`text-[10.5px] sm:text-[11px] text-slate-400 dark:text-slate-500 uppercase tracking-wider mb-0.5`, { fontFamily: 'PlusJakartaSans_700Bold' }]}>
                 {item.name}
               </Text>
               <View style={tw`flex-row items-baseline mt-0.5`}>
-                <Text style={[tw`${item.hasError ? 'text-rose-600 dark:text-rose-400' : 'text-slate-900 dark:text-white'}`, { fontSize: isSmallDevice ? 25 : 28, fontFamily: 'PlusJakartaSans_800ExtraBold', letterSpacing: -0.6 }]}>
+                <Text 
+                  style={[
+                    tw`${item.hasError ? (isControllerOff ? 'text-slate-400 dark:text-slate-500' : 'text-amber-600 dark:text-amber-400') : 'text-slate-900 dark:text-white'}`, 
+                    { 
+                      fontSize: isSmallDevice ? 29 : 33, 
+                      fontFamily: 'PlusJakartaSans_800ExtraBold', 
+                      letterSpacing: -0.8,
+                      lineHeight: isSmallDevice ? 33 : 37
+                    }
+                  ]}
+                >
                   {item.value}
                 </Text>
                 {item.hasError ? (
-                  <Text style={[tw`text-xs text-rose-500 dark:text-rose-400 ml-1`, { fontFamily: 'PlusJakartaSans_700Bold' }]}>
-                    Fault
+                  <Text style={[tw`text-xs ml-1.5`, { color: isControllerOff ? '#94a3b8' : '#ea580c', fontFamily: 'PlusJakartaSans_700Bold' }]}>
+                    {isControllerOff ? 'Off' : 'Fault'}
                   </Text>
                 ) : (
-                  <Text style={[tw`text-xs text-slate-400 dark:text-slate-500 ml-1`, { fontFamily: 'PlusJakartaSans_700Bold' }]}>
+                  <Text style={[tw`text-xs sm:text-sm text-slate-400 dark:text-slate-500 ml-1.5`, { fontFamily: 'PlusJakartaSans_700Bold' }]}>
                     {item.unit}
                   </Text>
                 )}
               </View>
             </View>
 
-            {/* Bottom: Sleek Minimal Track Bar with Target Notch & Simple Target Caption */}
-            <View style={tw`mt-2`}>
-              <View style={tw`relative w-full h-1.5 bg-slate-100 dark:bg-slate-800 rounded-full justify-center`}>
+            {/* Bottom: Sleek Minimal Track Bar with Target Notch & Target Caption */}
+            <View style={tw`mt-2.5`}>
+              <View style={tw`relative w-full h-2 bg-slate-100 dark:bg-slate-800 rounded-full justify-center`}>
                 {/* Current Value Fill Bar */}
                 <View 
                   style={[
@@ -336,26 +348,26 @@ export default React.memo(function EnvironmentMetricsGrid({ temp, hum, light, co
                       tw`absolute rounded-full`,
                       { 
                         left: `${item.targetPercent}%`,
-                        marginLeft: -1,
-                        width: 2,
-                        height: 7.5,
-                        top: -1,
-                        backgroundColor: isDarkMode ? '#94a3b8' : '#64748b',
+                        marginLeft: -1.25,
+                        width: 2.5,
+                        height: 9,
+                        top: -0.5,
+                        backgroundColor: isDarkMode ? '#cbd5e1' : '#475569',
                       }
                     ]} 
                   />
                 )}
               </View>
 
-              {/* Clean Single Target Caption */}
+              {/* Clean Target Caption */}
               <Text 
                 numberOfLines={1} 
                 style={[
-                  tw`text-[9.5px] text-slate-400 dark:text-slate-500 mt-1.5`, 
+                  tw`text-[10px] sm:text-[10.5px] text-slate-400 dark:text-slate-500 mt-2`, 
                   { fontFamily: 'PlusJakartaSans_600SemiBold' }
                 ]}
               >
-                Target: <Text style={tw`text-slate-600 dark:text-slate-400 font-bold`}>{item.targetDisplay}</Text>
+                Target: <Text style={tw`text-slate-700 dark:text-slate-300 font-bold`}>{item.targetDisplay}</Text>
               </Text>
             </View>
           </TouchableOpacity>
