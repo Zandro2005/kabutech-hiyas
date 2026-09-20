@@ -56,13 +56,14 @@ export default React.memo(function EnvironmentMetricsGrid({ temp, hum, light, co
   const tempDiff = isTempDisconnected ? 0 : Number((temp - targetTemp).toFixed(1));
   const tempStatus = React.useMemo(() => {
     if (isTempDisconnected) {
+      const isOff = !health.isControllerOnline;
       return { 
-        label: !health.isControllerOnline ? 'Offline' : 'Fault', 
-        color: '#f43f5e', 
-        lightBg: '#fff1f2' 
+        label: isOff ? 'Offline' : 'Fault', 
+        color: isOff ? '#64748b' : '#f59e0b', 
+        lightBg: isOff ? '#f1f5f9' : '#fffbeb' 
       };
     }
-    if (tempDiff > 4.0) return { label: `+${tempDiff.toFixed(1)}° High`, color: '#ef4444', lightBg: '#fef2f2' };
+    if (tempDiff > 4.0) return { label: `+${tempDiff.toFixed(1)}° High`, color: '#ea580c', lightBg: '#fff7ed' };
     if (tempDiff > 0.5) return { label: `+${tempDiff.toFixed(1)}° High`, color: '#f97316', lightBg: '#fff7ed' };
     if (tempDiff < -4.0) return { label: `-${Math.abs(tempDiff).toFixed(1)}° Low`, color: '#3b82f6', lightBg: '#eff6ff' };
     if (tempDiff < -0.5) return { label: `-${Math.abs(tempDiff).toFixed(1)}° Low`, color: '#0ea5e9', lightBg: '#f0f9ff' };
@@ -77,15 +78,16 @@ export default React.memo(function EnvironmentMetricsGrid({ temp, hum, light, co
   const humDiff = isHumDisconnected ? 0 : Math.round(hum - targetHum);
   const humStatus = React.useMemo(() => {
     if (isHumDisconnected) {
+      const isOff = !health.isControllerOnline;
       return { 
-        label: !health.isControllerOnline ? 'Offline' : 'Fault', 
-        color: '#f43f5e', 
-        lightBg: '#fff1f2' 
+        label: isOff ? 'Offline' : 'Fault', 
+        color: isOff ? '#64748b' : '#f59e0b', 
+        lightBg: isOff ? '#f1f5f9' : '#fffbeb' 
       };
     }
-    if (humDiff > 10) return { label: `+${humDiff}% High`, color: '#ef4444', lightBg: '#fef2f2' };
+    if (humDiff > 10) return { label: `+${humDiff}% High`, color: '#ea580c', lightBg: '#fff7ed' };
     if (humDiff > 2) return { label: `+${humDiff}% High`, color: '#f97316', lightBg: '#fff7ed' };
-    if (humDiff < -12) return { label: `-${Math.abs(humDiff)}% Low`, color: '#ef4444', lightBg: '#fef2f2' };
+    if (humDiff < -12) return { label: `-${Math.abs(humDiff)}% Low`, color: '#ea580c', lightBg: '#fff7ed' };
     if (humDiff < -2) return { label: `-${Math.abs(humDiff)}% Low`, color: '#f59e0b', lightBg: '#fffbeb' };
     return { label: 'Optimal', color: '#10b981', lightBg: '#ecfdf5' };
   }, [humDiff, isHumDisconnected, health.isControllerOnline]);
@@ -98,10 +100,11 @@ export default React.memo(function EnvironmentMetricsGrid({ temp, hum, light, co
   const lightDiff = isLightDisconnected ? 0 : Math.round(light - targetLight);
   const lightStatus = React.useMemo(() => {
     if (isLightDisconnected) {
+      const isOff = !health.isControllerOnline;
       return { 
-        label: !health.isControllerOnline ? 'Offline' : 'Fault', 
-        color: '#f43f5e', 
-        lightBg: '#fff1f2' 
+        label: isOff ? 'Offline' : 'Fault', 
+        color: isOff ? '#64748b' : '#f59e0b', 
+        lightBg: isOff ? '#f1f5f9' : '#fffbeb' 
       };
     }
     if (lightDiff > 300) return { label: `+${lightDiff} High`, color: '#f97316', lightBg: '#fff7ed' };
@@ -117,13 +120,14 @@ export default React.memo(function EnvironmentMetricsGrid({ temp, hum, light, co
   const co2Diff = isCo2Disconnected ? 0 : Math.round(co2 - targetCO2);
   const co2Status = React.useMemo(() => {
     if (isCo2Disconnected) {
+      const isOff = !health.isControllerOnline;
       return { 
-        label: !health.isControllerOnline ? 'Offline' : 'Fault', 
-        color: '#f43f5e', 
-        lightBg: '#fff1f2' 
+        label: isOff ? 'Offline' : 'Fault', 
+        color: isOff ? '#64748b' : '#f59e0b', 
+        lightBg: isOff ? '#f1f5f9' : '#fffbeb' 
       };
     }
-    if (co2Diff > 350) return { label: `+${co2Diff} High`, color: '#ef4444', lightBg: '#fef2f2' };
+    if (co2Diff > 350) return { label: `+${co2Diff} High`, color: '#ea580c', lightBg: '#fff7ed' };
     if (co2Diff > 150) return { label: `+${co2Diff} High`, color: '#f97316', lightBg: '#fff7ed' };
     return { label: 'Good', color: '#10b981', lightBg: '#ecfdf5' };
   }, [co2Diff, isCo2Disconnected, health.isControllerOnline]);
@@ -145,7 +149,16 @@ export default React.memo(function EnvironmentMetricsGrid({ temp, hum, light, co
   const activeCount = [!isTempDisconnected, !isHumDisconnected, !isLightDisconnected, !isCo2Disconnected].filter(Boolean).length;
 
   const isHumAlert = humDiff > 5 || humDiff < -6;
-  const humAlertColor = humDiff > 10 || humDiff < -12 ? '#ef4444' : (humDiff > 5 ? '#f97316' : '#f59e0b');
+  const humAlertColor = humDiff > 10 || humDiff < -12 ? '#ea580c' : (humDiff > 5 ? '#f97316' : '#f59e0b');
+
+  const isControllerOff = !health.isControllerOnline;
+  const offlineIconColor = '#94a3b8';
+  const offlineIconBg = 'bg-slate-100 dark:bg-slate-800';
+  const offlineAccent = '#64748b';
+
+  const faultIconColor = '#f59e0b';
+  const faultIconBg = 'bg-amber-50 dark:bg-amber-500/15';
+  const faultAccent = '#f59e0b';
 
   const metrics = [
     {
@@ -153,10 +166,10 @@ export default React.memo(function EnvironmentMetricsGrid({ temp, hum, light, co
       name: 'Temperature',
       value: isTempDisconnected ? '--' : temp,
       unit: '°C',
-      icon: (isTempDisconnected ? 'alert-circle-outline' : 'thermometer') as any,
-      iconColor: isTempDisconnected ? '#f43f5e' : (tempStatus.label === 'Optimal' ? '#10b981' : tempStatus.color),
-      iconBg: isTempDisconnected ? 'bg-rose-50 dark:bg-rose-500/15' : (tempStatus.label === 'Optimal' ? 'bg-emerald-50 dark:bg-emerald-500/15' : 'bg-orange-50 dark:bg-orange-500/15'),
-      accentColor: isTempDisconnected ? '#f43f5e' : tempStatus.color,
+      icon: (isTempDisconnected ? (isControllerOff ? 'cloud-off-outline' : 'alert-circle-outline') : 'thermometer') as any,
+      iconColor: isTempDisconnected ? (isControllerOff ? offlineIconColor : faultIconColor) : (tempStatus.label === 'Optimal' ? '#10b981' : tempStatus.color),
+      iconBg: isTempDisconnected ? (isControllerOff ? offlineIconBg : faultIconBg) : (tempStatus.label === 'Optimal' ? 'bg-emerald-50 dark:bg-emerald-500/15' : 'bg-amber-50 dark:bg-amber-500/15'),
+      accentColor: isTempDisconnected ? (isControllerOff ? offlineAccent : faultAccent) : tempStatus.color,
       status: tempStatus,
       percent: tempPercent,
       targetPercent: tempTargetPercent,
@@ -168,10 +181,10 @@ export default React.memo(function EnvironmentMetricsGrid({ temp, hum, light, co
       name: 'Humidity',
       value: isHumDisconnected ? '--' : hum,
       unit: '%',
-      icon: (isHumDisconnected ? 'alert-circle-outline' : 'water-percent') as any,
-      iconColor: isHumDisconnected ? '#f43f5e' : (humStatus.label === 'Optimal' ? '#10b981' : (isHumAlert ? humAlertColor : '#0ea5e9')),
-      iconBg: isHumDisconnected ? 'bg-rose-50 dark:bg-rose-500/15' : (humStatus.label === 'Optimal' ? 'bg-emerald-50 dark:bg-emerald-500/15' : 'bg-sky-50 dark:bg-sky-500/15'),
-      accentColor: isHumDisconnected ? '#f43f5e' : humStatus.color,
+      icon: (isHumDisconnected ? (isControllerOff ? 'cloud-off-outline' : 'alert-circle-outline') : 'water-percent') as any,
+      iconColor: isHumDisconnected ? (isControllerOff ? offlineIconColor : faultIconColor) : (humStatus.label === 'Optimal' ? '#10b981' : humStatus.color),
+      iconBg: isHumDisconnected ? (isControllerOff ? offlineIconBg : faultIconBg) : (humStatus.label === 'Optimal' ? 'bg-emerald-50 dark:bg-emerald-500/15' : 'bg-sky-50 dark:bg-sky-500/15'),
+      accentColor: isHumDisconnected ? (isControllerOff ? offlineAccent : faultAccent) : humStatus.color,
       status: humStatus,
       percent: humPercent,
       targetPercent: humTargetPercent,
@@ -183,10 +196,10 @@ export default React.memo(function EnvironmentMetricsGrid({ temp, hum, light, co
       name: 'Light Level',
       value: isLightDisconnected ? '--' : light,
       unit: 'lx',
-      icon: (isLightDisconnected ? 'alert-circle-outline' : 'white-balance-sunny') as any,
-      iconColor: isLightDisconnected ? '#f43f5e' : (lightStatus.label === 'Optimal' ? '#10b981' : '#f59e0b'),
-      iconBg: isLightDisconnected ? 'bg-rose-50 dark:bg-rose-500/15' : (lightStatus.label === 'Optimal' ? 'bg-emerald-50 dark:bg-emerald-500/15' : 'bg-amber-50 dark:bg-amber-500/15'),
-      accentColor: isLightDisconnected ? '#f43f5e' : lightStatus.color,
+      icon: (isLightDisconnected ? (isControllerOff ? 'cloud-off-outline' : 'alert-circle-outline') : 'white-balance-sunny') as any,
+      iconColor: isLightDisconnected ? (isControllerOff ? offlineIconColor : faultIconColor) : (lightStatus.label === 'Optimal' ? '#10b981' : '#f59e0b'),
+      iconBg: isLightDisconnected ? (isControllerOff ? offlineIconBg : faultIconBg) : (lightStatus.label === 'Optimal' ? 'bg-emerald-50 dark:bg-emerald-500/15' : 'bg-amber-50 dark:bg-amber-500/15'),
+      accentColor: isLightDisconnected ? (isControllerOff ? offlineAccent : faultAccent) : lightStatus.color,
       status: lightStatus,
       percent: lightPercent,
       targetPercent: lightTargetPercent,
@@ -198,10 +211,10 @@ export default React.memo(function EnvironmentMetricsGrid({ temp, hum, light, co
       name: 'CO2 Level',
       value: isCo2Disconnected ? '--' : co2,
       unit: 'ppm',
-      icon: (isCo2Disconnected ? 'alert-circle-outline' : 'molecule-co2') as any,
-      iconColor: isCo2Disconnected ? '#f43f5e' : '#10b981',
-      iconBg: isCo2Disconnected ? 'bg-rose-50 dark:bg-rose-500/15' : 'bg-emerald-50 dark:bg-emerald-500/15',
-      accentColor: isCo2Disconnected ? '#f43f5e' : co2Status.color,
+      icon: (isCo2Disconnected ? (isControllerOff ? 'cloud-off-outline' : 'alert-circle-outline') : 'molecule-co2') as any,
+      iconColor: isCo2Disconnected ? (isControllerOff ? offlineIconColor : faultIconColor) : '#10b981',
+      iconBg: isCo2Disconnected ? (isControllerOff ? offlineIconBg : faultIconBg) : 'bg-emerald-50 dark:bg-emerald-500/15',
+      accentColor: isCo2Disconnected ? (isControllerOff ? offlineAccent : faultAccent) : co2Status.color,
       status: co2Status,
       percent: co2Percent,
       targetPercent: co2TargetPercent,

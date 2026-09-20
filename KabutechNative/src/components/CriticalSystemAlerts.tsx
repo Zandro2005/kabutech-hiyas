@@ -31,19 +31,19 @@ export default React.memo(function CriticalSystemAlerts({ alerts, onAlertPress }
     switch (type) {
       case 'critical':
         return {
-          icon: 'alert-circle',
-          color: '#ef4444',
-          bg: 'bg-rose-50 dark:bg-rose-500/15',
+          icon: 'alert-circle-outline',
+          color: '#ea580c',
+          bg: 'bg-amber-50 dark:bg-amber-500/15',
           border: 'border-slate-200/60 dark:border-slate-800',
-          textColor: 'text-rose-600 dark:text-rose-400',
+          textColor: 'text-amber-800 dark:text-amber-300',
         };
       case 'warning':
         return {
-          icon: 'alert',
+          icon: 'alert-outline',
           color: '#f59e0b',
           bg: 'bg-amber-50 dark:bg-amber-500/15',
           border: 'border-slate-200/60 dark:border-slate-800',
-          textColor: 'text-amber-600 dark:text-amber-400',
+          textColor: 'text-amber-700 dark:text-amber-400',
         };
       default:
         return {
@@ -66,13 +66,13 @@ export default React.memo(function CriticalSystemAlerts({ alerts, onAlertPress }
           <View style={tw`flex-row items-center gap-2.5 flex-1 mr-2`}>
             <View
               style={tw`w-8 h-8 rounded-xl ${
-                isAllClear ? 'bg-emerald-50 dark:bg-emerald-500/15' : 'bg-rose-50 dark:bg-rose-500/15'
+                isAllClear ? 'bg-emerald-50 dark:bg-emerald-500/15' : 'bg-amber-50 dark:bg-amber-500/15'
               } items-center justify-center shrink-0`}
             >
               <MaterialCommunityIcons
                 name={isAllClear ? 'shield-check-outline' : 'alert-circle-outline'}
                 size={18}
-                color={isAllClear ? '#10b981' : '#ef4444'}
+                color={isAllClear ? '#10b981' : '#d97706'}
               />
             </View>
             <View style={tw`flex-1`}>
@@ -91,19 +91,19 @@ export default React.memo(function CriticalSystemAlerts({ alerts, onAlertPress }
               tw`flex-row items-center px-2.5 py-1 rounded-full shrink-0 border`,
               isAllClear
                 ? tw`bg-emerald-50 dark:bg-emerald-950/40 border-emerald-200/60 dark:border-emerald-800/60`
-                : tw`bg-rose-50 dark:bg-rose-950/40 border-rose-200/60 dark:border-rose-800/60`
+                : tw`bg-amber-50 dark:bg-amber-950/40 border-amber-200/60 dark:border-amber-800/60`
             ]}
           >
             <View
               style={[
                 tw`w-1.5 h-1.5 rounded-full mr-1.5`,
-                { backgroundColor: isAllClear ? '#10b981' : '#ef4444' }
+                { backgroundColor: isAllClear ? '#10b981' : '#f59e0b' }
               ]}
             />
             <Text
               style={[
                 tw`text-[9.5px] uppercase tracking-wider ${
-                  isAllClear ? 'text-emerald-700 dark:text-emerald-400' : 'text-rose-700 dark:text-rose-400'
+                  isAllClear ? 'text-emerald-700 dark:text-emerald-400' : 'text-amber-800 dark:text-amber-300'
                 }`,
                 { fontFamily: 'PlusJakartaSans_800ExtraBold' }
               ]}

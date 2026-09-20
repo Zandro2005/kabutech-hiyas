@@ -34,17 +34,18 @@ export default React.memo(function WaterLevelCard({
   // Status configuration
   const statusConfig = React.useMemo(() => {
     if (isFaulty) {
+      const isOff = !health.isControllerOnline;
       return {
-        label: !health.isControllerOnline ? 'Offline' : 'Not Connected',
-        color: '#f43f5e',
-        badgeBg: isDarkMode ? 'bg-rose-500/15' : 'bg-rose-50',
-        badgeBorder: isDarkMode ? 'border-rose-500/30' : 'border-rose-200',
-        badgeText: isDarkMode ? 'text-rose-400' : 'text-rose-600',
-        dotColor: '#f43f5e',
+        label: isOff ? 'Offline' : 'Standby',
+        color: isOff ? '#64748b' : '#f59e0b',
+        badgeBg: isDarkMode ? 'bg-slate-800' : 'bg-slate-100',
+        badgeBorder: isDarkMode ? 'border-slate-700' : 'border-slate-200',
+        badgeText: isDarkMode ? 'text-slate-400' : 'text-slate-600',
+        dotColor: isOff ? '#94a3b8' : '#f59e0b',
         gradientColors: ['#64748b', '#475569', '#334155'] as [string, string, string],
-        desc: !health.isControllerOnline ? 'Controller is unreachable' : 'Water sensor is unplugged or disconnected',
+        desc: isOff ? 'Controller is unreachable' : 'Water sensor is in standby',
         isCritical: false,
-        isWarning: true,
+        isWarning: false,
       };
     }
     if (clampedLevel > 50) {
@@ -76,15 +77,15 @@ export default React.memo(function WaterLevelCard({
       };
     }
     return {
-      label: 'Refill Now',
-      color: '#f43f5e',
-      badgeBg: isDarkMode ? 'bg-rose-500/15' : 'bg-rose-50',
-      badgeBorder: isDarkMode ? 'border-rose-500/30' : 'border-rose-200',
-      badgeText: isDarkMode ? 'text-rose-400' : 'text-rose-600',
-      dotColor: '#f43f5e',
-      gradientColors: ['#f43f5e', '#e11d48', '#be123c'] as [string, string, string],
-      desc: 'Critical: Water reservoir nearly empty',
-      isCritical: true,
+      label: 'Refill Soon',
+      color: '#ea580c',
+      badgeBg: isDarkMode ? 'bg-amber-500/15' : 'bg-amber-50',
+      badgeBorder: isDarkMode ? 'border-amber-500/30' : 'border-amber-200',
+      badgeText: isDarkMode ? 'text-amber-400' : 'text-amber-700',
+      dotColor: '#ea580c',
+      gradientColors: ['#ea580c', '#d97706', '#b45309'] as [string, string, string],
+      desc: 'Water reservoir level is low',
+      isCritical: false,
       isWarning: true,
     };
   }, [clampedLevel, isDarkMode, isFaulty, health.isControllerOnline]);

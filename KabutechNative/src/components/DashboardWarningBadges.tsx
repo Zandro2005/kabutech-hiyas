@@ -13,10 +13,11 @@ interface Props {
 
 export default React.memo(function DashboardWarningBadges({ alerts }: Props) {
   const [modalVisible, setModalVisible] = useState(false);
+  const [isDismissed, setIsDismissed] = useState(false);
   const { isDarkMode } = useTheme();
   const navigation = useNavigation<any>();
 
-  if (!alerts || alerts.length === 0) return null;
+  if (!alerts || alerts.length === 0 || isDismissed) return null;
 
   const hasCritical = alerts.some(a => a.type === 'critical');
   const primaryAlert = alerts[0];
@@ -54,87 +55,95 @@ export default React.memo(function DashboardWarningBadges({ alerts }: Props) {
 
   return (
     <>
-      {/* Unified Single Warning Widget (Styled like the Refill Now pill) */}
+      {/* Calm, Non-Distracting Minimalist Status Pill */}
       <View style={tw`w-full max-w-sm`}>
-        <TouchableOpacity
-          activeOpacity={0.8}
-          onPress={handlePress}
+        <View
           style={[
-            tw`w-full flex-row items-center justify-between px-3.5 py-2.5 rounded-2xl border shadow-sm`,
+            tw`w-full flex-row items-center justify-between pl-3 pr-2 py-2 rounded-2xl border shadow-xs`,
             isDarkMode
-              ? (hasCritical
-                  ? tw`bg-rose-500/15 border-rose-500/30`
-                  : tw`bg-amber-500/15 border-amber-500/30`)
-              : (hasCritical
-                  ? tw`bg-rose-50 border-rose-200`
-                  : tw`bg-amber-50 border-amber-200`),
+              ? tw`bg-slate-900/95 border-slate-800`
+              : tw`bg-white/95 border-slate-200/90`,
           ]}
         >
-          {/* Left Icon Badge */}
-          <View
-            style={[
-              tw`w-7 h-7 rounded-xl items-center justify-center shrink-0 shadow-sm`,
-              hasCritical ? tw`bg-[#f43f5e]` : tw`bg-[#f59e0b]`,
-            ]}
+          {/* Main Tap Target */}
+          <TouchableOpacity
+            activeOpacity={0.7}
+            onPress={handlePress}
+            style={tw`flex-1 flex-row items-center`}
           >
-            <MaterialCommunityIcons
-              name={
-                alerts.length === 1
-                  ? (primaryAlert.icon as any)
-                  : 'alert-circle'
-              }
-              size={16}
-              color="#ffffff"
-            />
-          </View>
-
-          {/* Center Summary Content: Styled to match Refill Now pill typography */}
-          <View style={tw`flex-1 mx-2.5 justify-center`}>
-            <Text
-              numberOfLines={1}
+            {/* Soft Warm Icon Badge */}
+            <View
               style={[
-                tw`text-xs sm:text-[13px]`,
-                hasCritical
-                  ? (isDarkMode ? tw`text-rose-300` : tw`text-rose-700`)
-                  : (isDarkMode ? tw`text-amber-300` : tw`text-amber-700`),
-                { fontFamily: 'PlusJakartaSans_800ExtraBold' },
+                tw`w-6.5 h-6.5 rounded-full items-center justify-center shrink-0`,
+                isDarkMode ? tw`bg-amber-400/15` : tw`bg-amber-500/10`,
               ]}
             >
-              {alerts.length === 1
-                ? primaryAlert.shortLabel
-                : `${alerts.length} Warnings: ${alerts
-                    .map((a) =>
-                      a.metric === 'temp'
-                        ? 'Temp'
-                        : a.metric === 'hum'
-                        ? 'Humidity'
-                        : a.metric === 'co2'
-                        ? 'CO₂'
-                        : a.metric === 'light'
-                        ? 'Light'
-                        : a.metric === 'water'
-                        ? 'Water'
-                        : 'System'
-                    )
-                    .join(', ')}`}
-            </Text>
-          </View>
+              <MaterialCommunityIcons
+                name={
+                  alerts.length === 1
+                    ? (primaryAlert.icon as any)
+                    : 'alert-circle-outline'
+                }
+                size={14}
+                color={isDarkMode ? '#fbbf24' : '#d97706'}
+              />
+            </View>
 
-          {/* Right Chevron */}
-          <MaterialCommunityIcons
-            name="chevron-right"
-            size={18}
-            color={
-              hasCritical
-                ? (isDarkMode ? '#fb7185' : '#e11d48')
-                : (isDarkMode ? '#fcd34d' : '#d97706')
-            }
-            style={tw`opacity-90 shrink-0`}
-          />
-        </TouchableOpacity>
+            {/* Content: Clean, Calm Typography */}
+            <View style={tw`flex-1 mx-2.5 justify-center`}>
+              <View style={tw`flex-row items-center gap-1.5`}>
+                <Text
+                  numberOfLines={1}
+                  style={[
+                    tw`text-xs text-slate-800 dark:text-slate-200 flex-1`,
+                    { fontFamily: 'PlusJakartaSans_700Bold' },
+                  ]}
+                >
+                  {primaryAlert.shortLabel}
+                </Text>
+                {alerts.length > 1 && (
+                  <View style={tw`px-1.5 py-0.5 rounded-full bg-slate-100 dark:bg-slate-800`}>
+                    <Text
+                      style={[
+                        tw`text-[9px] text-slate-500 dark:text-slate-400`,
+                        { fontFamily: 'PlusJakartaSans_700Bold' },
+                      ]}
+                    >
+                      +{alerts.length - 1} more
+                    </Text>
+                  </View>
+                )}
+              </View>
+            </View>
+
+            {/* Subtle Chevron */}
+            <MaterialCommunityIcons
+              name="chevron-right"
+              size={16}
+              color={isDarkMode ? '#94a3b8' : '#64748b'}
+              style={tw`opacity-80 shrink-0 mr-1`}
+            />
+          </TouchableOpacity>
+
+          {/* Quick Dismiss Button (Hide from view if acknowledged) */}
+          <TouchableOpacity
+            hitSlop={{ top: 12, bottom: 12, left: 8, right: 12 }}
+            onPress={() => {
+              hapticSelection();
+              setIsDismissed(true);
+            }}
+            style={tw`w-6 h-6 rounded-full items-center justify-center ml-1 bg-slate-100 dark:bg-slate-800/80`}
+          >
+            <Ionicons
+              name="close"
+              size={13}
+              color={isDarkMode ? '#94a3b8' : '#64748b'}
+            />
+          </TouchableOpacity>
+        </View>
       </View>
 
-      {/* Pop-Up Warning Modal with Sleek, Compact Cards & Refined Typography */}
+      {/* Pop-Up Warning Modal with Calm, Elegant Styling */}
       <Modal
         visible={modalVisible}
         transparent={true}
@@ -148,18 +157,16 @@ export default React.memo(function DashboardWarningBadges({ alerts }: Props) {
               isDarkMode ? tw`bg-slate-900 border border-slate-800` : tw`bg-white`,
             ]}
           >
-            {/* Header: Sleek, Minimal, No Clutter */}
+            {/* Header: Sleek, Minimal, Calm */}
             <View style={tw`flex-row items-center justify-between pb-3 border-b border-slate-100 dark:border-slate-800`}>
               <View style={tw`flex-row items-center gap-2.5 flex-1 mr-2`}>
                 <View
-                  style={tw`w-8 h-8 rounded-xl ${
-                    hasCritical ? 'bg-red-500/15' : 'bg-amber-500/15'
-                  } items-center justify-center shrink-0`}
+                  style={tw`w-8 h-8 rounded-xl bg-amber-500/15 items-center justify-center shrink-0`}
                 >
                   <MaterialCommunityIcons
-                    name={hasCritical ? 'alert-circle' : 'alert'}
+                    name="alert-circle-outline"
                     size={18}
-                    color={hasCritical ? '#dc2626' : '#d97706'}
+                    color={isDarkMode ? '#fbbf24' : '#d97706'}
                   />
                 </View>
                 <Text
@@ -168,7 +175,7 @@ export default React.memo(function DashboardWarningBadges({ alerts }: Props) {
                     { fontFamily: 'PlusJakartaSans_800ExtraBold' },
                   ]}
                 >
-                  Active Warnings ({alerts.length})
+                  System Notices ({alerts.length})
                 </Text>
               </View>
 
@@ -185,7 +192,7 @@ export default React.memo(function DashboardWarningBadges({ alerts }: Props) {
               </TouchableOpacity>
             </View>
 
-            {/* List of Active Alerts: Sleek, Compact, No Walls of Text */}
+            {/* List of Active Alerts: Sleek, Compact, Calm */}
             <ScrollView
               style={tw`max-h-80 my-2.5`}
               showsVerticalScrollIndicator={false}
@@ -199,12 +206,8 @@ export default React.memo(function DashboardWarningBadges({ alerts }: Props) {
                       style={[
                         tw`p-3 rounded-xl border`,
                         isDarkMode
-                          ? (isCrit
-                              ? tw`bg-slate-800/80 border-red-500/30`
-                              : tw`bg-slate-800/80 border-amber-500/30`)
-                          : (isCrit
-                              ? tw`bg-white border-red-200 shadow-sm`
-                              : tw`bg-white border-amber-200 shadow-sm`),
+                          ? tw`bg-slate-800/80 border-slate-700/60`
+                          : tw`bg-slate-50/80 border-slate-200/90`,
                       ]}
                     >
                       {/* Top Row: Icon + Title + Severity Pill */}
@@ -213,13 +216,13 @@ export default React.memo(function DashboardWarningBadges({ alerts }: Props) {
                           <View
                             style={[
                               tw`w-6.5 h-6.5 rounded-lg items-center justify-center shrink-0`,
-                              isCrit ? tw`bg-red-500/15` : tw`bg-amber-500/15`,
+                              tw`bg-amber-500/15`,
                             ]}
                           >
                             <MaterialCommunityIcons
                               name={alert.icon as any}
                               size={15}
-                              color={isCrit ? '#dc2626' : '#d97706'}
+                              color={isDarkMode ? '#fbbf24' : '#d97706'}
                             />
                           </View>
                           <Text
@@ -236,26 +239,20 @@ export default React.memo(function DashboardWarningBadges({ alerts }: Props) {
                         <View
                           style={[
                             tw`px-2 py-0.5 rounded-full border shrink-0`,
-                            isCrit
-                              ? (isDarkMode
-                                  ? tw`bg-red-950/70 border-red-800/70`
-                                  : tw`bg-red-100 border-red-300`)
-                              : (isDarkMode
-                                  ? tw`bg-amber-950/70 border-amber-800/70`
-                                  : tw`bg-amber-100 border-amber-300`),
+                            isDarkMode
+                              ? tw`bg-amber-950/60 border-amber-800/60`
+                              : tw`bg-amber-50 border-amber-200`,
                           ]}
                         >
                           <Text
                             style={[
                               tw`text-[9px] uppercase tracking-wider font-extrabold`,
                               {
-                                color: isCrit
-                                  ? (isDarkMode ? '#f87171' : '#b91c1c')
-                                  : (isDarkMode ? '#fbbf24' : '#b45309'),
+                                color: isDarkMode ? '#fbbf24' : '#b45309',
                               },
                             ]}
                           >
-                            {isCrit ? 'Critical' : 'Warning'}
+                            {isCrit ? 'Attention' : 'Notice'}
                           </Text>
                         </View>
                       </View>

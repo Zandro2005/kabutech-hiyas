@@ -1,7 +1,7 @@
-import React, { useEffect, useRef } from 'react';
-import { View, Text, TouchableOpacity, Animated, Easing } from 'react-native';
+import React from 'react';
+import { View, Text, TouchableOpacity } from 'react-native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
-import Svg, { Circle, Defs, RadialGradient, LinearGradient as SvgGradient, Stop } from 'react-native-svg';
+import Svg, { Circle, Defs, LinearGradient as SvgGradient, Stop } from 'react-native-svg';
 import tw from '../tailwind';
 import { useAuth } from '../context/AuthContext';
 import { hapticMedium, hapticSelection } from '../utils/haptics';
@@ -45,8 +45,9 @@ export default React.memo(function ScoreArch({
   const numScore = parseFloat(envScore) || 0;
   const isOptimal = numScore >= 8.0;
   const isWarning = numScore >= 6.0 && numScore < 8.0;
-  const scoreLabel = isOptimal ? 'Optimal' : isWarning ? 'Moderate' : 'Calibrate';
-  const scoreBadgeColor = isOptimal ? '#10b981' : isWarning ? '#f59e0b' : '#ef4444';
+  const isCalibrating = numScore === 0;
+  const scoreLabel = isCalibrating ? 'Calibrating' : isOptimal ? 'Optimal' : isWarning ? 'Moderate' : 'Attention';
+  const scoreBadgeColor = isCalibrating ? '#64748b' : isOptimal ? '#10b981' : isWarning ? '#f59e0b' : '#ea580c';
 
   // Smart Halo Ring dimensions (Enlarged Hero Dial)
   const ringSize = isSmallDevice ? 224 : 252;
@@ -55,45 +56,6 @@ export default React.memo(function ScoreArch({
   const circumference = 2 * Math.PI * radius;
   const progress = Math.min(1, Math.max(0.05, numScore / 10));
   const strokeDashoffset = circumference * (1 - progress);
-
-  // Slow Ambient Pulse on Outer Circumference (breathing gradient light)
-  const pulseAnim = useRef(new Animated.Value(0)).current;
-
-  useEffect(() => {
-    // Slow rhythmic breathing pulse (3.4s cycle: 1.7s inhale, 1.7s exhale)
-    const breathingLoop = Animated.loop(
-      Animated.sequence([
-        Animated.timing(pulseAnim, {
-          toValue: 1,
-          duration: 1700,
-          easing: Easing.inOut(Easing.sin),
-          useNativeDriver: true,
-        }),
-        Animated.timing(pulseAnim, {
-          toValue: 0,
-          duration: 1700,
-          easing: Easing.inOut(Easing.sin),
-          useNativeDriver: true,
-        }),
-      ])
-    );
-
-    breathingLoop.start();
-
-    return () => {
-      breathingLoop.stop();
-    };
-  }, []);
-
-  const pulseScale = pulseAnim.interpolate({
-    inputRange: [0, 1],
-    outputRange: [1.0, 1.02],
-  });
-
-  const pulseOpacity = pulseAnim.interpolate({
-    inputRange: [0, 1],
-    outputRange: [isDarkMode ? 0.35 : 0.25, isDarkMode ? 0.90 : 0.75],
-  });
 
   const handleDevicePress = (key: 'fans' | 'misters' | 'lights' | 'co2', active: boolean, label: string) => {
     if (isAuto || isScheduled) {
@@ -194,52 +156,6 @@ export default React.memo(function ScoreArch({
       {/* 2. Smart Halo Gauge (Pure Vector Ring - Zero Boxes) */}
       <View style={tw`items-center justify-center my-3`}>
         <View style={{ width: ringSize, height: ringSize, alignItems: 'center', justifyContent: 'center' }}>
-          {/* Outer Circumference Breathing Color Aura (Short & Tight Gradient Range) */}
-          <Animated.View
-            pointerEvents="none"
-            style={[
-              tw`absolute items-center justify-center`,
-              {
-                width: ringSize + 18,
-                height: ringSize + 18,
-                transform: [{ scale: pulseScale }],
-                opacity: pulseOpacity,
-              }
-            ]}
-          >
-            <Svg
-              width={ringSize + 18}
-              height={ringSize + 18}
-              viewBox={`0 0 ${ringSize + 18} ${ringSize + 18}`}
-            >
-              <Defs>
-                <RadialGradient
-                  id="circumferenceColorGlow"
-                  cx="50%"
-                  cy="50%"
-                  r="50%"
-                  fx="50%"
-                  fy="50%"
-                >
-                  <Stop offset="0%" stopColor={scoreBadgeColor} stopOpacity="0" />
-                  <Stop offset="85%" stopColor={scoreBadgeColor} stopOpacity="0" />
-                  <Stop
-                    offset="93%"
-                    stopColor={isOptimal ? '#10b981' : isWarning ? '#f59e0b' : '#ef4444'}
-                    stopOpacity={isDarkMode ? 0.70 : 0.50}
-                  />
-                  <Stop offset="100%" stopColor={scoreBadgeColor} stopOpacity="0" />
-                </RadialGradient>
-              </Defs>
-              <Circle
-                cx={(ringSize + 18) / 2}
-                cy={(ringSize + 18) / 2}
-                r={(ringSize + 18) / 2}
-                fill="url(#circumferenceColorGlow)"
-              />
-            </Svg>
-          </Animated.View>
-
           {/* Circular SVG Ring */}
           <Svg
             width={ringSize}
