@@ -4,6 +4,7 @@ export interface SensorData {
   light: number;
   co2: number;
   waterLevel?: number;
+  chip_temperature?: number;
   esp32_status: 'online' | 'offline';
   last_seen?: number;
   dht_error?: boolean | string | number;
@@ -138,3 +139,13 @@ export interface StaffTask {
   completionNotes?: string; // Staff can add notes on completion
   isOnTime?: boolean;       // Computed: completedAt <= dueDate+dueTime
 }
+
+export interface SensorHistoryRecord {
+  timestamp: number;
+  temp: number;
+  hum: number;
+  light: number;
+  co2: number;
+}
+
+export type AnalyticsTimeRange = '24H' | '7D' | '30D';

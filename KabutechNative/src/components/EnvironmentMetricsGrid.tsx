@@ -369,9 +369,9 @@ export default React.memo(function EnvironmentMetricsGrid({ temp, hum, light, co
               </View>
             </View>
 
-            {/* Bottom: Sleek Precision Gauge Track */}
+            {/* Bottom: Sleek Gauge Track */}
             <View style={tw`mt-2 mb-0.5`}>
-              <View style={tw`relative w-full h-[5px] bg-slate-100 dark:bg-slate-800 rounded-full overflow-visible justify-center`}>
+              <View style={tw`w-full h-[5px] bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden justify-center`}>
                 {/* Current Value Fill Bar */}
                 <View 
                   style={[
@@ -382,30 +382,6 @@ export default React.memo(function EnvironmentMetricsGrid({ temp, hum, light, co
                     }
                   ]} 
                 />
-
-                {/* Precision Target Notch */}
-                {!item.hasError && (
-                  <View 
-                    style={[
-                      tw`absolute rounded-full`,
-                      { 
-                        left: `${item.targetPercent}%`,
-                        marginLeft: -1.25,
-                        width: 2.5,
-                        height: 7.5,
-                        top: -1.25,
-                        backgroundColor: item.percent >= item.targetPercent 
-                          ? '#ffffff' 
-                          : (isDarkMode ? '#cbd5e1' : '#475569'),
-                        shadowColor: '#000000',
-                        shadowOffset: { width: 0, height: 1 },
-                        shadowOpacity: item.percent >= item.targetPercent ? 0.35 : 0.15,
-                        shadowRadius: 1,
-                        elevation: 2,
-                      }
-                    ]} 
-                  />
-                )}
               </View>
             </View>
           </TouchableOpacity>

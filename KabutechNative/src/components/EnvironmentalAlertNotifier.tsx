@@ -8,21 +8,21 @@ const COOLDOWN_MS = 15 * 60 * 1000;
 
 export default function EnvironmentalAlertNotifier() {
   const { user } = useAuth();
-  const { activeAlerts } = useEnvironmentAlerts();
+  const { unreadAlerts } = useEnvironmentAlerts();
   const lastNotifiedRef = useRef<Map<string, number>>(new Map());
 
   useEffect(() => {
     // Only dispatch notifications if a user session is active
     if (!user) return;
 
-    if (!activeAlerts || activeAlerts.length === 0) {
+    if (!unreadAlerts || unreadAlerts.length === 0) {
       // Clear resolved alerts so they trigger notifications again if re-occurring
       lastNotifiedRef.current.clear();
       return;
     }
 
     const now = Date.now();
-    const currentAlertIds = new Set(activeAlerts.map(a => a.id));
+    const currentAlertIds = new Set(unreadAlerts.map(a => a.id));
 
     // Prune resolved alerts from the tracking map
     for (const id of Array.from(lastNotifiedRef.current.keys())) {
@@ -31,8 +31,8 @@ export default function EnvironmentalAlertNotifier() {
       }
     }
 
-    // Process all currently active alerts
-    activeAlerts.forEach((alert) => {
+    // Process all currently active unread alerts
+    unreadAlerts.forEach((alert) => {
       const lastSent = lastNotifiedRef.current.get(alert.id) || 0;
       const isNewAlert = !lastNotifiedRef.current.has(alert.id);
       const isCooldownElapsed = now - lastSent > COOLDOWN_MS;
@@ -63,7 +63,7 @@ export default function EnvironmentalAlertNotifier() {
         });
       }
     });
-  }, [activeAlerts]);
+  }, [unreadAlerts]);
 
   return null;
 }

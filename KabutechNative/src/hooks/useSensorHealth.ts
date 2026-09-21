@@ -39,14 +39,14 @@ export function useSensorHealth(): SensorHealthStatus {
   const hasTimestamp = typeof sensors?.last_seen === 'number' && sensors.last_seen > 0;
   
   // Stale detection:
-  // 1. ESP32 pushes every 2.5s (FIREBASE_PUSH_INTERVAL = 2500).
-  // 2. 7 seconds (~3 missed cycles) indicates an unplugged controller or broken link.
+  // 1. ESP32 pushes every 5s (FIREBASE_PUSH_INTERVAL = 5000).
+  // 2. 15 seconds (~3 missed cycles) indicates an unplugged controller or broken link.
   // 3. Current server time combines device clock + Firebase .info/serverTimeOffset to eliminate clock skew.
   const currentServerTime = Date.now() + serverTimeOffset;
   const timeSinceServerTs = hasTimestamp ? Math.max(0, currentServerTime - (sensors.last_seen || 0)) : Infinity;
   const offlineSeconds = hasTimestamp ? Math.round(timeSinceServerTs / 1000) : 0;
 
-  const STALE_THRESHOLD_MS = 7000;
+  const STALE_THRESHOLD_MS = 15000;
   const isStale = !hasTimestamp || timeSinceServerTs > STALE_THRESHOLD_MS;
   
   const isExplicitOffline = sensors?.esp32_status === 'offline';

@@ -45,6 +45,35 @@ export default function AnalyticsScreenSkeleton() {
         </View>
       </View>
 
+      {/* Time Range Selector Skeleton */}
+      <View style={tw`mx-6 mb-3 flex-row items-center justify-between`}>
+        <Skeleton width={110} height={14} borderRadius={4} />
+        <View style={tw`flex-row bg-slate-200/50 dark:bg-slate-800 p-1 rounded-2xl gap-1.5`}>
+          <Skeleton width={38} height={24} borderRadius={10} />
+          <Skeleton width={38} height={24} borderRadius={10} />
+          <Skeleton width={38} height={24} borderRadius={10} />
+        </View>
+      </View>
+
+      {/* Historical Trend Chart Skeleton */}
+      <View style={tw`mx-5 bg-white dark:bg-slate-900 rounded-[28px] p-5 border border-slate-100 dark:border-slate-800/80 shadow-sm mb-5 gap-4`}>
+        <View style={tw`flex-row justify-between items-start`}>
+          <View style={tw`gap-1.5`}>
+            <Skeleton width={100} height={12} borderRadius={4} />
+            <Skeleton width={110} height={30} borderRadius={8} />
+          </View>
+          <View style={tw`items-end gap-1`}>
+            <Skeleton width={60} height={10} borderRadius={3} />
+            <Skeleton width={50} height={18} borderRadius={6} />
+          </View>
+        </View>
+        <Skeleton width="100%" height={150} borderRadius={16} />
+        <View style={tw`flex-row justify-between pt-3 border-t border-slate-100 dark:border-slate-800`}>
+          <Skeleton width={110} height={14} borderRadius={4} />
+          <Skeleton width={80} height={14} borderRadius={4} />
+        </View>
+      </View>
+
       {/* Minimal Important Info Card */}
       <View style={tw`mx-5 bg-white dark:bg-slate-900 rounded-[24px] p-5 border border-slate-100 dark:border-slate-800/80 shadow-sm mb-5 gap-3.5`}>
         <View style={tw`flex-row justify-between items-center pb-3 border-b border-slate-100 dark:border-slate-800`}>

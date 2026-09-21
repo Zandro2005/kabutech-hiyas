@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useRef, useEffect } from 'react';
-import { View, Text, ScrollView, TouchableOpacity, StatusBar, PanResponder, Animated, Easing } from 'react-native';
+import { View, Text, ScrollView, TouchableOpacity, StatusBar, PanResponder, Animated, Easing, ActivityIndicator } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { MaterialCommunityIcons, Ionicons } from '@expo/vector-icons';
 import Svg, { Path, Defs, LinearGradient as SvgGradient, Stop, Line, Circle, Text as SvgText } from 'react-native-svg';
@@ -8,6 +8,8 @@ import tw from '../tailwind';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import { useSensors, useSettings, useFirebaseConnection } from '../hooks/useFirebaseData';
 import { useSensorHealth } from '../hooks/useSensorHealth';
+import { useSensorHistory } from '../hooks/useSensorHistory';
+import { AnalyticsTimeRange } from '../types/firebase';
 import { useAuth } from '../context/AuthContext';
 import { hapticLight, hapticSelection, hapticMedium } from '../utils/haptics';
 import AnalyticsScreenSkeleton from '../components/skeletons/AnalyticsScreenSkeleton';
@@ -111,6 +113,22 @@ export default function AnalyticsScreen() {
     initialMetric && ['temp', 'hum', 'light', 'co2'].includes(initialMetric) ? initialMetric : 'temp'
   );
   const [selectedPointIndex, setSelectedPointIndex] = useState<number | null>(null);
+
+  // Time-range state & historical telemetry data hook (Option A: 24H, 7D, 30D)
+  const [timeRange, setTimeRange] = useState<AnalyticsTimeRange>('24H');
+  const [selectedHistoryIndex, setSelectedHistoryIndex] = useState<number | null>(null);
+
+  const {
+    data: historyData,
+    isLoading: isHistoryLoading,
+    min: historyMin,
+    max: historyMax,
+    avg: historyAvg,
+  } = useSensorHistory(activeMetric, timeRange);
+
+  useEffect(() => {
+    setSelectedHistoryIndex(null);
+  }, [activeMetric, timeRange]);
 
   useEffect(() => {
     const paramMetric = route.params?.metric || route.params?.tab;
@@ -451,6 +469,106 @@ export default function AnalyticsScreen() {
       onPanResponderRelease: () => {},
     })
   ).current;
+
+  // Historical Trend Chart Layout & Coordinates
+  const historyChartHeight = 150;
+  const historyChartWidth = Math.max(260, cardWidth - 40);
+
+  const historyMinVal = useMemo(() => {
+    if (!historyData.length) return currentMetric.target;
+    return Math.min(...historyData.map(d => d.value), currentMetric.target);
+  }, [historyData, currentMetric.target]);
+
+  const historyMaxVal = useMemo(() => {
+    if (!historyData.length) return currentMetric.target;
+    return Math.max(...historyData.map(d => d.value), currentMetric.target);
+  }, [historyData, currentMetric.target]);
+
+  const historySpread = Math.max(1, historyMaxVal - historyMinVal);
+  const historyPaddedMin = Math.max(currentMetric.min, Number((historyMinVal - historySpread * 0.12).toFixed(1)));
+  const historyPaddedMax = Math.min(currentMetric.max, Number((historyMaxVal + historySpread * 0.12).toFixed(1)));
+  const historyValueRange = Math.max(0.1, historyPaddedMax - historyPaddedMin);
+
+  const historyPoints = useMemo(() => {
+    if (!historyData.length) return [];
+    const startX = 10;
+    const availableWidth = historyChartWidth - 20;
+    return historyData.map((d, index) => {
+      const x = historyData.length === 1 
+        ? historyChartWidth / 2 
+        : startX + (index / (historyData.length - 1)) * availableWidth;
+      const clampedVal = Math.min(historyPaddedMax, Math.max(historyPaddedMin, d.value));
+      const y = (historyChartHeight - 16) - ((clampedVal - historyPaddedMin) / historyValueRange) * (historyChartHeight - 32);
+      return {
+        x,
+        y,
+        value: d.value,
+        time: d.time,
+        axisLabel: d.axisLabel,
+        timestamp: d.timestamp,
+        index
+      };
+    });
+  }, [historyData, historyChartWidth, historyChartHeight, historyPaddedMin, historyPaddedMax, historyValueRange]);
+
+  const historyTargetY = useMemo(() => {
+    const clampedTarget = Math.min(historyPaddedMax, Math.max(historyPaddedMin, currentMetric.target));
+    return (historyChartHeight - 16) - ((clampedTarget - historyPaddedMin) / historyValueRange) * (historyChartHeight - 32);
+  }, [currentMetric.target, historyPaddedMin, historyPaddedMax, historyValueRange, historyChartHeight]);
+
+  const historyBezierPath = useMemo(() => getBezierPath(historyPoints), [historyPoints]);
+  const historyAreaPath = useMemo(() => {
+    if (!historyBezierPath || historyPoints.length === 0) return '';
+    return `${historyBezierPath} L ${historyPoints[historyPoints.length - 1].x} ${historyChartHeight} L ${historyPoints[0].x} ${historyChartHeight} Z`;
+  }, [historyBezierPath, historyPoints, historyChartHeight]);
+
+  const activeHistoryPoint = selectedHistoryIndex !== null 
+    ? historyPoints[selectedHistoryIndex] 
+    : (historyPoints.length > 0 ? historyPoints[historyPoints.length - 1] : null);
+
+  const handleHistoryTouchAt = (locX: number) => {
+    if (!historyPoints.length) return;
+    const startX = 10;
+    const availableWidth = historyChartWidth - 20;
+    const norm = Math.max(0, Math.min(1, (locX - startX) / availableWidth));
+    const idx = Math.round(norm * (historyData.length - 1));
+    if (idx >= 0 && idx < historyData.length && idx !== selectedHistoryIndex) {
+      setSelectedHistoryIndex(idx);
+    }
+  };
+
+  const historyScrubberPanResponder = useRef(
+    PanResponder.create({
+      onStartShouldSetPanResponder: () => true,
+      onMoveShouldSetPanResponder: (_, gestureState) => {
+        return Math.abs(gestureState.dx) > 3;
+      },
+      onPanResponderGrant: (evt) => {
+        hapticLight();
+        handleHistoryTouchAt(evt.nativeEvent.locationX);
+      },
+      onPanResponderMove: (evt) => {
+        handleHistoryTouchAt(evt.nativeEvent.locationX);
+      },
+      onPanResponderRelease: () => {},
+    })
+  ).current;
+
+  // Extract up to 5 evenly spaced tick points for clean X-axis labels
+  const historyAxisTicks = useMemo(() => {
+    if (historyPoints.length < 2) return [];
+    const count = Math.min(5, historyPoints.length);
+    const step = (historyPoints.length - 1) / (count - 1);
+    const ticks = [];
+    for (let i = 0; i < count; i++) {
+      const idx = Math.round(i * step);
+      ticks.push(historyPoints[idx]);
+    }
+    return ticks;
+  }, [historyPoints]);
+
+  const displayLow = historyMin !== null ? historyMin : (isDis ? '--' : min);
+  const displayHigh = historyMax !== null ? historyMax : (isDis ? '--' : max);
 
   const tabScrollRef = useRef<ScrollView>(null);
   const tabLayouts = useRef<Record<string, { x: number; width: number }>>({});
@@ -832,7 +950,7 @@ export default function AnalyticsScreen() {
           {/* Timeline Footer */}
           <View style={tw`flex-row justify-between items-center px-1 pt-3 border-t border-slate-100 dark:border-slate-800/80 mt-1`}>
             <Text style={[tw`text-[10px] text-slate-400 dark:text-slate-500`, { fontFamily: 'PlusJakartaSans_600SemiBold' }]}>
-              {isDis ? 'Telemetry Stream Paused' : '24H Moving Sparkline'}
+              {isDis ? 'Telemetry Stream Paused' : 'Live Moving Stream'}
             </Text>
             <View style={tw`flex-row items-center gap-1.5`}>
               <View style={[tw`w-2.5 h-[1px] border-b border-dashed`, { borderColor: isDarkMode ? '#64748b' : '#94a3b8' }]} />
@@ -852,6 +970,237 @@ export default function AnalyticsScreen() {
                 isDis ? tw`text-slate-400 dark:text-slate-500` : tw`text-slate-700 dark:text-slate-300`
               ]}>
                 {isDis ? 'Sensor Offline' : 'Live Sync'}
+              </Text>
+            </View>
+          </View>
+        </View>
+
+        {/* Time Range Selector (24H · 7D · 30D) */}
+        <View style={tw`mx-6 mb-3 flex-row items-center justify-between`}>
+          <View style={tw`flex-row items-center gap-1.5`}>
+            <MaterialCommunityIcons name="chart-timeline-variant" size={16} color={isDarkMode ? '#94a3b8' : '#64748b'} />
+            <Text style={[tw`text-xs uppercase tracking-wider text-slate-500 dark:text-slate-400`, { fontFamily: 'PlusJakartaSans_700Bold' }]}>
+              Historical Trends
+            </Text>
+          </View>
+
+          <View style={tw`flex-row bg-slate-200/70 dark:bg-slate-800 p-1 rounded-2xl`}>
+            {(['24H', '7D', '30D'] as AnalyticsTimeRange[]).map((rng) => {
+              const isSelected = timeRange === rng;
+              return (
+                <TouchableOpacity
+                  key={rng}
+                  activeOpacity={0.8}
+                  onPress={() => {
+                    if (timeRange !== rng) {
+                      hapticSelection();
+                      setTimeRange(rng);
+                    }
+                  }}
+                  style={[
+                    tw`px-3.5 py-1.5 rounded-xl`,
+                    isSelected
+                      ? [tw`bg-white dark:bg-slate-900 shadow-sm`]
+                      : tw`bg-transparent`
+                  ]}
+                >
+                  <Text
+                    style={[
+                      tw`text-xs`,
+                      { fontFamily: 'PlusJakartaSans_700Bold' },
+                      isSelected
+                        ? { color: currentMetric.color }
+                        : tw`text-slate-500 dark:text-slate-400`
+                    ]}
+                  >
+                    {rng}
+                  </Text>
+                </TouchableOpacity>
+              );
+            })}
+          </View>
+        </View>
+
+        {/* Historical Trend Chart Card */}
+        <View style={tw`bg-white dark:bg-slate-900 mx-5 rounded-[28px] p-5 shadow-sm border border-slate-200/70 dark:border-slate-800 mb-5`}>
+          {/* Card Top: Range Title & Point Inspector */}
+          <View style={tw`flex-row justify-between items-start mb-3`}>
+            <View>
+              <View style={tw`flex-row items-center gap-2 mb-1`}>
+                <MaterialCommunityIcons name="clock-outline" size={14} color={currentMetric.color} />
+                <Text style={[tw`text-[11px] text-slate-400 dark:text-slate-500 uppercase tracking-wider`, { fontFamily: 'PlusJakartaSans_700Bold' }]}>
+                  {selectedHistoryIndex !== null
+                    ? `Selected (${activeHistoryPoint?.time})`
+                    : `${timeRange === '24H' ? '24-Hour' : (timeRange === '7D' ? '7-Day' : '30-Day')} Trend`}
+                </Text>
+              </View>
+              <View style={tw`flex-row items-baseline gap-1.5`}>
+                <Text style={[
+                  tw`text-3xl tracking-tight`,
+                  { fontFamily: 'PlusJakartaSans_800ExtraBold' },
+                  historyData.length === 0 ? tw`text-slate-400 dark:text-slate-500` : tw`text-slate-900 dark:text-white`
+                ]}>
+                  {historyData.length === 0
+                    ? '--'
+                    : (activeHistoryPoint?.value ?? historyData[historyData.length - 1].value)}
+                </Text>
+                {historyData.length > 0 && (
+                  <Text style={[tw`text-sm text-slate-400 dark:text-slate-500`, { fontFamily: 'PlusJakartaSans_700Bold' }]}>
+                    {currentMetric.unit}
+                  </Text>
+                )}
+                {selectedHistoryIndex !== null && (
+                  <TouchableOpacity
+                    onPress={() => setSelectedHistoryIndex(null)}
+                    style={tw`ml-2 px-2.5 py-0.5 rounded-full bg-slate-100 dark:bg-slate-800`}
+                  >
+                    <Text style={[tw`text-[10px] text-slate-600 dark:text-slate-400`, { fontFamily: 'PlusJakartaSans_700Bold' }]}>
+                      Reset
+                    </Text>
+                  </TouchableOpacity>
+                )}
+              </View>
+            </View>
+
+            {/* Average Badge */}
+            {historyAvg !== null && (
+              <View style={tw`items-end`}>
+                <Text style={[tw`text-[10px] text-slate-400 dark:text-slate-500 uppercase tracking-wider`, { fontFamily: 'PlusJakartaSans_700Bold' }]}>
+                  Period Avg
+                </Text>
+                <Text style={[tw`text-base text-slate-800 dark:text-slate-200`, { fontFamily: 'PlusJakartaSans_800ExtraBold' }]}>
+                  {historyAvg}{currentMetric.unit}
+                </Text>
+              </View>
+            )}
+          </View>
+
+          {/* Chart Body: Loading, Empty, or SVG Bezier Curve */}
+          {isHistoryLoading ? (
+            <View style={[tw`items-center justify-center py-10`, { height: historyChartHeight }]}>
+              <ActivityIndicator size="small" color={currentMetric.color} />
+              <Text style={[tw`text-xs text-slate-400 dark:text-slate-500 mt-2`, { fontFamily: 'PlusJakartaSans_600SemiBold' }]}>
+                Loading historical records...
+              </Text>
+            </View>
+          ) : historyData.length === 0 ? (
+            <View style={[tw`items-center justify-center py-8`, { height: historyChartHeight }]}>
+              <View style={tw`w-12 h-12 rounded-2xl bg-slate-100 dark:bg-slate-800 items-center justify-center mb-2.5 border border-slate-200/60 dark:border-slate-700/60`}>
+                <MaterialCommunityIcons name="database-clock-outline" size={22} color={isDarkMode ? '#64748b' : '#94a3b8'} />
+              </View>
+              <Text style={[tw`text-sm text-slate-700 dark:text-slate-300 mb-1`, { fontFamily: 'PlusJakartaSans_700Bold' }]}>
+                No Historical Data Logged Yet
+              </Text>
+              <Text style={[tw`text-[11px] text-slate-400 dark:text-slate-500 text-center px-4 max-w-xs`, { fontFamily: 'PlusJakartaSans_500Medium' }]}>
+                The ESP32 logs hourly averages to Firebase. Records will appear here as hourly cycles complete.
+              </Text>
+            </View>
+          ) : (
+            <>
+              <View style={tw`flex-row items-center justify-end mb-2 gap-1`}>
+                <MaterialCommunityIcons name="gesture-tap" size={13} color={isDarkMode ? '#64748b' : '#94a3b8'} />
+                <Text style={[tw`text-[10px] text-slate-400 dark:text-slate-500`, { fontFamily: 'PlusJakartaSans_600SemiBold' }]}>
+                  Slide across curve to inspect records
+                </Text>
+              </View>
+
+              <View
+                {...historyScrubberPanResponder.panHandlers}
+                style={{ width: historyChartWidth, height: historyChartHeight }}
+              >
+                <Svg width={historyChartWidth} height={historyChartHeight}>
+                  <Defs>
+                    <SvgGradient id={`historyGrad-${activeMetric}`} x1="0" y1="0" x2="0" y2="1">
+                      <Stop offset="0%" stopColor={currentMetric.color} stopOpacity="0.32" />
+                      <Stop offset="100%" stopColor={currentMetric.color} stopOpacity="0.0" />
+                    </SvgGradient>
+                  </Defs>
+
+                  {/* Target Setpoint Line */}
+                  <Line
+                    x1="0"
+                    y1={historyTargetY}
+                    x2={historyChartWidth}
+                    y2={historyTargetY}
+                    stroke={isDarkMode ? '#475569' : '#cbd5e1'}
+                    strokeDasharray="4 4"
+                    strokeWidth="1.2"
+                  />
+
+                  {/* Area Gradient Fill */}
+                  {historyAreaPath ? (
+                    <Path
+                      d={historyAreaPath}
+                      fill={`url(#historyGrad-${activeMetric})`}
+                    />
+                  ) : null}
+
+                  {/* Smooth Bezier Line */}
+                  {historyBezierPath ? (
+                    <Path
+                      d={historyBezierPath}
+                      fill="none"
+                      stroke={currentMetric.color}
+                      strokeWidth="2.5"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                    />
+                  ) : null}
+
+                  {/* Active Scrubber Point & Vertical Indicator */}
+                  {activeHistoryPoint && (
+                    <>
+                      <Line
+                        x1={activeHistoryPoint.x}
+                        y1={8}
+                        x2={activeHistoryPoint.x}
+                        y2={historyChartHeight - 8}
+                        stroke={currentMetric.color}
+                        strokeDasharray="3 3"
+                        strokeWidth="1.5"
+                      />
+                      <Circle
+                        cx={activeHistoryPoint.x}
+                        cy={activeHistoryPoint.y}
+                        r="6"
+                        fill={currentMetric.color}
+                        stroke={isDarkMode ? '#0f172a' : '#ffffff'}
+                        strokeWidth="2.5"
+                      />
+                    </>
+                  )}
+                </Svg>
+              </View>
+
+              {/* X-Axis Timeline Labels */}
+              <View style={tw`flex-row justify-between items-center px-2 pt-2 border-t border-slate-100 dark:border-slate-800/80 mt-1`}>
+                {historyAxisTicks.map((pt, i) => (
+                  <Text
+                    key={i}
+                    style={[tw`text-[10px] text-slate-400 dark:text-slate-500`, { fontFamily: 'PlusJakartaSans_600SemiBold' }]}
+                  >
+                    {pt.axisLabel}
+                  </Text>
+                ))}
+              </View>
+            </>
+          )}
+
+          {/* Timeline Footer */}
+          <View style={tw`flex-row justify-between items-center px-1 pt-3 border-t border-slate-100 dark:border-slate-800/80 mt-2`}>
+            <Text style={[tw`text-[10px] text-slate-400 dark:text-slate-500`, { fontFamily: 'PlusJakartaSans_600SemiBold' }]}>
+              {timeRange === '24H' ? '24 Hours (Hourly)' : (timeRange === '7D' ? '7 Days (4h avg)' : '30 Days (4h avg)')}
+            </Text>
+            <View style={tw`flex-row items-center gap-1.5`}>
+              <View style={[tw`w-2.5 h-[1px] border-b border-dashed`, { borderColor: isDarkMode ? '#64748b' : '#94a3b8' }]} />
+              <Text style={[tw`text-[10px] text-slate-400 dark:text-slate-500`, { fontFamily: 'PlusJakartaSans_600SemiBold' }]}>
+                Target: {currentMetric.target}{currentMetric.unit}
+              </Text>
+            </View>
+            <View style={tw`flex-row items-center gap-1`}>
+              <MaterialCommunityIcons name="database-check-outline" size={12} color={currentMetric.color} />
+              <Text style={[tw`text-[10px] text-slate-700 dark:text-slate-300`, { fontFamily: 'PlusJakartaSans_700Bold' }]}>
+                Firebase RTDB
               </Text>
             </View>
           </View>
@@ -912,13 +1261,13 @@ export default function AnalyticsScreen() {
 
             <View style={tw`flex-1 items-center`}>
               <Text style={[tw`text-[10.5px] text-slate-400 uppercase tracking-wider mb-1`, { fontFamily: 'PlusJakartaSans_700Bold' }]}>
-                24H Low
+                {timeRange} Low
               </Text>
               <View style={tw`flex-row items-baseline gap-0.5`}>
                 <Text style={[tw`text-xl text-slate-900 dark:text-white`, { fontFamily: 'PlusJakartaSans_800ExtraBold' }]}>
-                  {isDis ? '--' : min}
+                  {displayLow}
                 </Text>
-                {!isDis && (
+                {displayLow !== '--' && (
                   <Text style={[tw`text-xs text-slate-400`, { fontFamily: 'PlusJakartaSans_700Bold' }]}>
                     {currentMetric.unit}
                   </Text>
@@ -930,13 +1279,13 @@ export default function AnalyticsScreen() {
 
             <View style={tw`flex-1 items-end`}>
               <Text style={[tw`text-[10.5px] text-slate-400 uppercase tracking-wider mb-1`, { fontFamily: 'PlusJakartaSans_700Bold' }]}>
-                24H High
+                {timeRange} High
               </Text>
               <View style={tw`flex-row items-baseline gap-0.5`}>
                 <Text style={[tw`text-xl text-slate-900 dark:text-white`, { fontFamily: 'PlusJakartaSans_800ExtraBold' }]}>
-                  {isDis ? '--' : max}
+                  {displayHigh}
                 </Text>
-                {!isDis && (
+                {displayHigh !== '--' && (
                   <Text style={[tw`text-xs text-slate-400`, { fontFamily: 'PlusJakartaSans_700Bold' }]}>
                     {currentMetric.unit}
                   </Text>

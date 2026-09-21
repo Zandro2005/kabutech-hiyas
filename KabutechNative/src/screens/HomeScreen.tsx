@@ -177,7 +177,7 @@ export default function HomeScreen() {
           navigation={navigation} 
           isOffline={isControllerOff}
           hasWarning={envAlerts.hasWarning}
-          warningBanner={envAlerts.hasWarning ? <DashboardWarningBadges alerts={envAlerts.activeAlerts} /> : null}
+          warningBanner={envAlerts.hasWarning ? <DashboardWarningBadges alerts={envAlerts.unreadAlerts} /> : null}
         />
 
         {/* Health Metrics (2x2 Grid) */}

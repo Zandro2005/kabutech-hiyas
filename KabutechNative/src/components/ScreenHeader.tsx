@@ -121,17 +121,12 @@ export default React.memo(function ScreenHeader({ title, subtitle, rightComponen
                   });
                 }
               }}
-              style={[
-                tw`ml-1 px-1.5 py-0.5 rounded-full flex-row items-center border`,
-                hasCritical
-                  ? (isDarkMode ? tw`bg-rose-500/15 border-rose-500/30` : tw`bg-rose-50 border-rose-200`)
-                  : (isDarkMode ? tw`bg-amber-500/15 border-amber-500/30` : tw`bg-amber-50 border-amber-200`),
-              ]}
+              style={tw`ml-1.5 p-1 items-center justify-center`}
             >
               <MaterialCommunityIcons
-                name={hasCritical ? "alert-circle" : "alert"}
-                size={14}
-                color={hasCritical ? "#f43f5e" : "#f59e0b"}
+                name="alert"
+                size={18}
+                color="#ef4444"
               />
             </TouchableOpacity>
           )}

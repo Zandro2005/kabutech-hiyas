@@ -37,6 +37,7 @@
 #include <WiFi.h>
 #include <Firebase_ESP_Client.h>
 #include <DHT.h>
+#include <time.h>
 
 // ─── Addons for Firebase token management ───
 #include <addons/TokenHelper.h>
@@ -77,9 +78,10 @@
 // ═══════════════════════════════════════════════
 
 #define SERIAL_PRINT_INTERVAL   1000   // Print to Serial Monitor every 1s (100% local, ZERO delay)
-#define FIREBASE_PUSH_INTERVAL  2500   // Push to cloud every 2.5s (fast updates without choking network)
+#define FIREBASE_PUSH_INTERVAL  5000   // Push to cloud every 5s (relieves radio duty cycle for 24/7 continuous operation)
 #define HEARTBEAT_INTERVAL      30000  // Send "online" heartbeat every 30 seconds
 #define MQ135_WARMUP_MS         10000  // MQ-135 warm-up time (10s)
+#define HOURLY_PUSH_INTERVAL    3600000 // Hourly history push (1 hour = 3,600,000 ms)
 
 // ═══════════════════════════════════════════════
 //  WATER LEVEL CALIBRATION
@@ -107,6 +109,19 @@ unsigned long lastHeartbeat    = 0;
 unsigned long bootTime         = 0;
 bool firebaseReady             = false;
 bool mq135WarmedUp             = false;
+
+// ── Hourly History Logging & 90-Day Pruning ──
+unsigned long lastHourlyPush   = 0;
+int lastLoggedHour             = -1;
+int lastPrunedDay              = -1;
+bool initialHistoryLogged      = false;
+double hourlyTempSum           = 0.0;
+double hourlyHumSum            = 0.0;
+double hourlyLightSum          = 0.0;
+double hourlyCO2Sum            = 0.0;
+unsigned long hourlyDHTCount   = 0;
+unsigned long hourlyLightCount = 0;
+unsigned long hourlyCO2Count   = 0;
 
 // Live readings & health flags (-999 indicates disconnected/error)
 float currentTemp   = -999.0;
@@ -176,6 +191,12 @@ void streamTimeoutCallback(bool timeout) {
 
 void setup() {
   Serial.begin(115200);
+
+  // ── Thermal & Power Optimization for 24/7 Deployment ──
+  // Downclock from 240MHz to 80MHz: Reduces CPU power dissipation by ~50%
+  // while preserving full performance for SSL/TLS cryptography and ADC sampling.
+  setCpuFrequencyMhz(80);
+
   Serial.println();
   Serial.println("╔══════════════════════════════════════╗");
   Serial.println("║   KABUTECH HIYAS — Sensor Prototype  ║");
@@ -221,8 +242,14 @@ void setup() {
     Serial.println();
     Serial.print("✅ WiFi connected! IP: ");
     Serial.println(WiFi.localIP());
-    // Disable WiFi sleep mode for near-instant (10-20ms) packet latency
-    WiFi.setSleep(false);
+    // Enable WiFi modem sleep mode:
+    // Powers down the 2.4GHz RF power amplifier between DTIM beacon intervals.
+    // Drastically reduces operating temperature while keeping Firebase stream listener active.
+    WiFi.setSleep(true);
+
+    // Sync NTP Time (UTC+8 for Philippines: 8 * 3600 = 28800s offset, 0 daylight savings)
+    configTime(8 * 3600, 0, "pool.ntp.org", "time.nist.gov");
+    Serial.println("⏰ NTP time sync configured (UTC+8 Philippine Standard Time)");
   } else {
     Serial.println();
     Serial.println("❌ WiFi connection FAILED. Check SSID/password.");
@@ -257,14 +284,6 @@ void setup() {
     Serial.printf("❌ Stream begin error: %s\n", streamDO.errorReason().c_str());
   }
   Firebase.RTDB.setStreamCallback(&streamDO, streamCallback, streamTimeoutCallback);
-
-  // Register onDisconnect hook with Firebase server:
-  // If the ESP32 is unplugged or Wi-Fi drops, Firebase automatically marks esp32_status as offline immediately
-  if (Firebase.RTDB.onDisconnect(&fbdo, "/kabutech/sensors/live/esp32_status", "offline")) {
-    Serial.println("✅ Firebase onDisconnect handler registered ✓");
-  } else {
-    Serial.printf("⚠️ onDisconnect registration warning: %s\n", fbdo.errorReason().c_str());
-  }
 
   bootTime = millis();
 
@@ -466,6 +485,7 @@ void pushToFirebase(float temp, float hum, int light, int co2, int waterLevel,
   json.set("co2", sendCO2);
   json.set("waterLevel", sendWater);
   json.set("esp32_status", "online");
+  json.set("chip_temperature", temperatureRead());
 
   // Granular individual error flags
   json.set("dht_error", dhtErr);
@@ -504,6 +524,97 @@ void sendHeartbeat() {
 
   if (Firebase.RTDB.updateNode(&fbdo, "/kabutech/sensors/live", &json)) {
     Serial.println("   💓 Heartbeat sent");
+  }
+}
+
+// ═══════════════════════════════════════════════
+//  HISTORICAL HOURLY DATA LOGGING & PRUNING
+// ═══════════════════════════════════════════════
+
+void pruneOldHistory() {
+  time_t nowSec = time(NULL);
+  if (nowSec < 1600000000) return; // NTP not synced yet
+
+  // Calculate 90 days ago in seconds (90 days * 24 hrs * 3600 secs)
+  time_t ninetyDaysAgo = nowSec - (90L * 24L * 3600L);
+  struct tm oldTime;
+  localtime_r(&ninetyDaysAgo, &oldTime);
+
+  char oldDateStr[12];
+  strftime(oldDateStr, sizeof(oldDateStr), "%Y-%m-%d", &oldTime);
+
+  String prunePath = String("/kabutech/sensors/history/") + oldDateStr;
+  Serial.printf("   🧹 Checking 90-day retention prune: Deleting %s\n", prunePath.c_str());
+
+  if (Firebase.RTDB.deleteNode(&fbdo, prunePath.c_str())) {
+    Serial.println("   ✅ 90-day retention prune check complete.");
+  } else {
+    Serial.printf("   ℹ️ Prune status: %s\n", fbdo.errorReason().c_str());
+  }
+}
+
+void pushHourlyHistory() {
+  if (!Firebase.ready()) return;
+
+  struct tm timeinfo;
+  char dateStr[12] = "unknown";
+  char hourStr[4] = "00";
+  bool timeValid = false;
+
+  if (getLocalTime(&timeinfo, 100) && timeinfo.tm_year > 120) {
+    strftime(dateStr, sizeof(dateStr), "%Y-%m-%d", &timeinfo);
+    strftime(hourStr, sizeof(hourStr), "%H", &timeinfo);
+    timeValid = true;
+  }
+
+  if (!timeValid) {
+    Serial.println("   ⚠️ Cannot log hourly history: NTP time not synced yet");
+    return;
+  }
+
+  // Calculate averages; fallback to current live readings if count is zero
+  float avgTemp = hourlyDHTCount > 0 ? (float)(hourlyTempSum / hourlyDHTCount) : currentTemp;
+  float avgHum  = hourlyDHTCount > 0 ? (float)(hourlyHumSum / hourlyDHTCount) : currentHum;
+  int avgLight  = hourlyLightCount > 0 ? (int)(hourlyLightSum / hourlyLightCount) : currentLight;
+  int avgCO2    = hourlyCO2Count > 0 ? (int)(hourlyCO2Sum / hourlyCO2Count) : currentCO2;
+
+  // Round temp and hum to 1 decimal place
+  if (avgTemp != -999.0f) avgTemp = roundf(avgTemp * 10.0f) / 10.0f;
+  if (avgHum != -999.0f)  avgHum  = roundf(avgHum * 10.0f) / 10.0f;
+
+  String historyPath = String("/kabutech/sensors/history/") + dateStr + "/" + hourStr;
+
+  FirebaseJson historyJson;
+  FirebaseJson ts;
+  ts.set(".sv", "timestamp");
+  historyJson.set("timestamp", ts);
+  historyJson.set("temp", avgTemp);
+  historyJson.set("hum", avgHum);
+  historyJson.set("light", avgLight);
+  historyJson.set("co2", avgCO2);
+
+  Serial.printf("   📅 Logging hourly history to %s (Samples: DHT=%lu, LDR=%lu, CO2=%lu)...\n",
+                historyPath.c_str(), hourlyDHTCount, hourlyLightCount, hourlyCO2Count);
+
+  if (Firebase.RTDB.updateNode(&fbdo, historyPath.c_str(), &historyJson)) {
+    Serial.println("   ✅ Hourly history logged successfully!");
+  } else {
+    Serial.printf("   ❌ Failed to log hourly history: %s\n", fbdo.errorReason().c_str());
+  }
+
+  // Reset accumulator
+  hourlyTempSum = 0.0;
+  hourlyHumSum = 0.0;
+  hourlyLightSum = 0.0;
+  hourlyCO2Sum = 0.0;
+  hourlyDHTCount = 0;
+  hourlyLightCount = 0;
+  hourlyCO2Count = 0;
+
+  // Prune history older than 90 days once daily
+  if (timeValid && timeinfo.tm_mday != lastPrunedDay) {
+    lastPrunedDay = timeinfo.tm_mday;
+    pruneOldHistory();
   }
 }
 
@@ -625,6 +736,8 @@ void loop() {
     } else {
       Serial.printf("   🫧 Water Level:  %d %%\n", currentWater);
     }
+    Serial.printf("   🔥 ESP32 Chip Temp: %.1f °C (On-die junction)\n", temperatureRead());
+    Serial.printf("   ⚡ CPU Frequency:   %d MHz\n", getCpuFrequencyMhz());
     Serial.println("────────────────────────────────────────");
   }
 
@@ -634,7 +747,51 @@ void loop() {
     if (WiFi.status() == WL_CONNECTED) {
       pushToFirebase(currentTemp, currentHum, currentLight, currentCO2, currentWater,
                      dhtFault, lightFault, co2Fault, waterFault);
+
+      // Accumulate for hourly history averages if sensor is not faulted
+      if (!dhtFault && currentTemp > 0 && currentHum > 0) {
+        hourlyTempSum += currentTemp;
+        hourlyHumSum += currentHum;
+        hourlyDHTCount++;
+      }
+      if (!lightFault && currentLight >= 0) {
+        hourlyLightSum += currentLight;
+        hourlyLightCount++;
+      }
+      if (!co2Fault && currentCO2 > 0) {
+        hourlyCO2Sum += currentCO2;
+        hourlyCO2Count++;
+      }
     }
+  }
+
+  // ── Initial History Push on Boot (after 30s warmup & NTP sync) ──
+  if (!initialHistoryLogged && mq135WarmedUp && (now - bootTime >= 30000) && Firebase.ready()) {
+    struct tm initTime;
+    if (getLocalTime(&initTime, 50) && initTime.tm_year > 120) {
+      initialHistoryLogged = true;
+      lastLoggedHour = initTime.tm_hour;
+      lastHourlyPush = now;
+      pushHourlyHistory();
+      Serial.println("   🚀 Initial boot history point saved to Firebase!");
+    }
+  }
+
+  // ── Periodic Hourly History Push ──
+  // Triggers either when clock hour rolls over (NTP synced) or every HOURLY_PUSH_INTERVAL
+  struct tm loopTime;
+  if (getLocalTime(&loopTime, 10) && loopTime.tm_year > 120) {
+    if (lastLoggedHour == -1) {
+      lastLoggedHour = loopTime.tm_hour;
+      lastHourlyPush = now;
+    } else if (loopTime.tm_hour != lastLoggedHour) {
+      lastLoggedHour = loopTime.tm_hour;
+      lastHourlyPush = now;
+      pushHourlyHistory();
+    }
+  } else if (now - lastHourlyPush >= HOURLY_PUSH_INTERVAL && lastHourlyPush > 0) {
+    lastHourlyPush = now;
+    pushHourlyHistory();
   }
 
   // ── Heartbeat at interval ──
@@ -643,6 +800,6 @@ void loop() {
     sendHeartbeat();
   }
 
-  // Small delay to allow ESP32 background network tasks & stream callbacks to execute immediately
-  delay(10);
+  // Yield to FreeRTOS idle task so CPU cores can enter low-power wait state (waiti)
+  delay(15);
 }

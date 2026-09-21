@@ -1,4 +1,5 @@
-import { useMemo } from 'react';
+import { useState, useEffect, useMemo, useCallback } from 'react';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useSensors, useSettings, useAlerts } from './useFirebaseData';
 import { useSensorHealth, SensorHealthStatus } from './useSensorHealth';
 import { computeScheduledDevicesState, computeAutoDevicesState } from '../utils/scheduleLogic';
@@ -18,12 +19,69 @@ export interface EnvironmentAlertItem {
 
 export interface EnvironmentAlertsResult {
   activeAlerts: EnvironmentAlertItem[];
+  unreadAlerts: EnvironmentAlertItem[];
   hasWarning: boolean;
   hasCritical: boolean;
+  hasActiveWarning: boolean;
   count: number;
+  totalCount: number;
   primaryAlert: EnvironmentAlertItem | null;
   health: SensorHealthStatus;
   waterLevel: number;
+  dismissAlert: (id: string) => void;
+  dismissAllAlerts: () => void;
+  isDismissed: (id: string) => boolean;
+}
+
+const DISMISSED_STORAGE_KEY = '@kabutech_dismissed_env_alerts';
+let globalDismissedIds = new Set<string>();
+const subscribers = new Set<() => void>();
+
+AsyncStorage.getItem(DISMISSED_STORAGE_KEY)
+  .then(raw => {
+    if (raw) {
+      try {
+        const parsed = JSON.parse(raw);
+        if (Array.isArray(parsed)) {
+          globalDismissedIds = new Set(parsed);
+          subscribers.forEach(cb => cb());
+        }
+      } catch (_) {}
+    }
+  })
+  .catch(() => {});
+
+function notifySubscribers() {
+  subscribers.forEach(cb => cb());
+}
+
+function persistDismissedIds() {
+  AsyncStorage.setItem(
+    DISMISSED_STORAGE_KEY,
+    JSON.stringify(Array.from(globalDismissedIds))
+  ).catch(() => {});
+}
+
+export function dismissEnvironmentAlert(id: string) {
+  globalDismissedIds.add(id);
+  persistDismissedIds();
+  notifySubscribers();
+}
+
+export function dismissAllEnvironmentAlerts(ids?: string[]) {
+  if (ids && ids.length > 0) {
+    ids.forEach(id => globalDismissedIds.add(id));
+  }
+  persistDismissedIds();
+  notifySubscribers();
+}
+
+export function clearDismissedEnvironmentAlert(id: string) {
+  if (globalDismissedIds.has(id)) {
+    globalDismissedIds.delete(id);
+    persistDismissedIds();
+    notifySubscribers();
+  }
 }
 
 export function useEnvironmentAlerts(): EnvironmentAlertsResult {
@@ -32,7 +90,17 @@ export function useEnvironmentAlerts(): EnvironmentAlertsResult {
   const health = useSensorHealth();
   const alerts = useAlerts();
 
-  return useMemo(() => {
+  const [revision, setRevision] = useState(0);
+
+  useEffect(() => {
+    const cb = () => setRevision(r => r + 1);
+    subscribers.add(cb);
+    return () => {
+      subscribers.delete(cb);
+    };
+  }, []);
+
+  const result = useMemo(() => {
     const list: EnvironmentAlertItem[] = [];
 
     // Target Setpoints from Settings (Strictly numeric parsing)
@@ -345,17 +413,56 @@ export function useEnvironmentAlerts(): EnvironmentAlertsResult {
       }
     }
 
-    const hasCritical = list.some(a => a.type === 'critical');
-    const hasWarning = list.length > 0;
+    // Auto-prune dismissed IDs that are no longer active (meaning the issue has resolved!)
+    const activeIdSet = new Set(list.map(a => a.id));
+    let pruned = false;
+    for (const dismissedId of Array.from(globalDismissedIds)) {
+      if (!activeIdSet.has(dismissedId)) {
+        globalDismissedIds.delete(dismissedId);
+        pruned = true;
+      }
+    }
+    if (pruned) {
+      persistDismissedIds();
+    }
+
+    // Only unread (undismissed) alerts trigger warnings and badges
+    const unreadAlerts = list.filter(a => !globalDismissedIds.has(a.id));
+
+    const hasWarning = unreadAlerts.length > 0;
+    const hasCritical = unreadAlerts.some(a => a.type === 'critical');
+    const hasActiveWarning = list.length > 0;
 
     return {
       activeAlerts: list,
+      unreadAlerts,
       hasWarning,
       hasCritical,
-      count: list.length,
-      primaryAlert: list[0] || null,
+      hasActiveWarning,
+      count: unreadAlerts.length,
+      totalCount: list.length,
+      primaryAlert: unreadAlerts[0] || list[0] || null,
       health,
       waterLevel,
     };
-  }, [sensors, settings, health, alerts]);
+  }, [sensors, settings, health, alerts, revision]);
+
+  const dismissAlert = useCallback((id: string) => {
+    dismissEnvironmentAlert(id);
+  }, []);
+
+  const dismissAllAlerts = useCallback(() => {
+    dismissAllEnvironmentAlerts(result.activeAlerts.map(a => a.id));
+  }, [result.activeAlerts]);
+
+  const isDismissed = useCallback((id: string) => {
+    return globalDismissedIds.has(id);
+  }, []);
+
+  return {
+    ...result,
+    dismissAlert,
+    dismissAllAlerts,
+    isDismissed,
+  };
 }

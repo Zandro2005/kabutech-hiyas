@@ -4,7 +4,7 @@ import { MaterialCommunityIcons, Ionicons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
 import tw from '../tailwind';
 import { useTheme } from '../context/ThemeContext';
-import { EnvironmentAlertItem } from '../hooks/useEnvironmentAlerts';
+import { EnvironmentAlertItem, useEnvironmentAlerts } from '../hooks/useEnvironmentAlerts';
 import { hapticSelection, hapticMedium } from '../utils/haptics';
 
 interface Props {
@@ -16,6 +16,7 @@ export default React.memo(function DashboardWarningBadges({ alerts }: Props) {
   const [isDismissed, setIsDismissed] = useState(false);
   const { isDarkMode } = useTheme();
   const navigation = useNavigation<any>();
+  const { dismissAllAlerts } = useEnvironmentAlerts();
 
   if (!alerts || alerts.length === 0 || isDismissed) return null;
 
@@ -131,6 +132,7 @@ export default React.memo(function DashboardWarningBadges({ alerts }: Props) {
             onPress={() => {
               hapticSelection();
               setIsDismissed(true);
+              dismissAllAlerts();
             }}
             style={tw`w-6 h-6 rounded-full items-center justify-center ml-1 bg-slate-100 dark:bg-slate-800/80`}
           >
@@ -321,7 +323,12 @@ export default React.memo(function DashboardWarningBadges({ alerts }: Props) {
 
               <TouchableOpacity
                 activeOpacity={0.8}
-                onPress={() => setModalVisible(false)}
+                onPress={() => {
+                  hapticSelection();
+                  setIsDismissed(true);
+                  dismissAllAlerts();
+                  setModalVisible(false);
+                }}
                 style={tw`px-4 py-2.5 rounded-xl bg-slate-100 dark:bg-slate-800 items-center justify-center`}
               >
                 <Text

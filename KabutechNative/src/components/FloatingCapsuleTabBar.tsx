@@ -299,9 +299,7 @@ export default function FloatingCapsuleTabBar({
                   {route.name === 'Home' && hasWarning && (
                     <View
                       style={[
-                        tw`absolute -top-0.5 -right-1 w-2.5 h-2.5 rounded-full ${
-                          hasCritical ? 'bg-rose-500' : 'bg-amber-500'
-                        }`,
+                        tw`absolute -top-0.5 -right-1 w-2.5 h-2.5 rounded-full bg-red-500`,
                         {
                           borderWidth: 1.5,
                           borderColor: isDarkMode ? '#0f172a' : '#ffffff',

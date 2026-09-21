@@ -55,7 +55,7 @@ Open `kabutech_prototype.ino` and update your WiFi credentials:
 | **GND** | DHT11 GND | Ground |
 | **GPIO 5** | LDR Junction | Voltage divider: LDR to 3.3V, 10kΩ to GND |
 | **GPIO 6** | MQ-135 AO | Analog output |
-| **5V / VIN** | MQ-135 VCC | Needs 5V for internal heater coil |
+| **5V / VIN** | MQ-135 VCC | Needs 5V for internal heater coil *(Keep MQ-135 at least 5-10cm away from the ESP32 and DHT11 to avoid radiant heating)* |
 | **GND** | MQ-135 GND | Ground |
 | **GPIO 7** | Water Level S | Analog signal |
 | **GPIO 8** | Water Level + | Digital power (toggled to prevent electrolysis corrosion) |
