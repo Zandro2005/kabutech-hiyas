@@ -759,10 +759,15 @@ export default function ControlsScreen() {
                 ]}
               >
                 {isLocked ? (
-                  <MaterialCommunityIcons
-                    name="lock"
-                    size={10}
-                    color={isAiOverride ? '#3b82f6' : isAuto ? '#10b981' : '#a855f7'}
+                  <View
+                    style={[
+                      tw`w-1.5 h-1.5 rounded-full`,
+                      isAiOverride
+                        ? tw`bg-blue-500`
+                        : isAuto
+                        ? tw`bg-emerald-500`
+                        : tw`bg-purple-500`
+                    ]}
                   />
                 ) : (
                   <View style={tw`w-1.5 h-1.5 rounded-full bg-emerald-500`} />
@@ -790,6 +795,9 @@ export default function ControlsScreen() {
           <View style={tw`flex-row justify-between gap-2 mb-2`}>
             {deviceToggles.map((device) => {
               const showActive = device.active;
+              // Vibrant green in MANUAL mode; soft/opaque visible green in AUTO/TIMED modes.
+              const isHighlightActive = showActive && !isLocked;
+              const isAutoActive = showActive && isLocked;
 
               return (
                 <TouchableOpacity
@@ -810,40 +818,45 @@ export default function ControlsScreen() {
                   style={[
                     tw`flex-1 rounded-[18px] py-2 px-1 items-center justify-between border`,
                     { height: 84 },
-                    showActive
+                    isHighlightActive
                       ? [
                           isDarkMode ? tw`bg-emerald-950/20` : tw`bg-white`,
                           tw`border-emerald-500/50 dark:border-emerald-500/40`,
                           tw`shadow-sm`,
+                        ]
+                      : isAutoActive
+                      ? [
+                          isDarkMode ? tw`bg-slate-900/90 border-slate-700/70` : tw`bg-slate-100/70 border-slate-200/80`,
                         ]
                       : [
                           isDarkMode ? tw`bg-slate-900/90 border-slate-800/80` : tw`bg-white/95 border-slate-200/80`,
                         ]
                   ]}
                 >
-                  {/* Top: Compact Squircle Icon Badge with Lock Indicator */}
+                  {/* Top: Compact Squircle Icon Badge */}
                   <View style={tw`relative items-center justify-center`}>
                     <View
                       style={[
                         tw`w-7.5 h-7.5 rounded-xl items-center justify-center`,
-                        showActive
+                        isHighlightActive
                           ? [tw`bg-emerald-500/15 dark:bg-emerald-500/25`, { borderWidth: 1, borderColor: '#10b98140' }]
+                          : isAutoActive
+                          ? (isDarkMode ? tw`bg-slate-800/90 border border-slate-700/60` : tw`bg-slate-200/70 border border-slate-300/60`)
                           : (isDarkMode ? tw`bg-slate-800/80 border border-slate-700/50` : tw`bg-slate-100/90 border border-slate-200/60`)
                       ]}
                     >
                       <MaterialCommunityIcons
                         name={device.icon}
                         size={17}
-                        color={showActive ? '#10b981' : (isDarkMode ? '#64748b' : '#94a3b8')}
+                        color={
+                          isHighlightActive
+                            ? '#10b981'
+                            : isAutoActive
+                            ? (isDarkMode ? '#80a894' : '#4b6e5b')
+                            : (isDarkMode ? '#64748b' : '#94a3b8')
+                        }
                       />
                     </View>
-
-                    {/* Lock overlay glyph if automated */}
-                    {isLocked && (
-                      <View style={tw`absolute -top-1 -right-1 w-3 h-3 rounded-full bg-slate-200 dark:bg-slate-700 items-center justify-center border border-white dark:border-slate-800`}>
-                        <MaterialCommunityIcons name="lock" size={6.5} color={isDarkMode ? '#94a3b8' : '#64748b'} />
-                      </View>
-                    )}
                   </View>
 
                   {/* Middle: Equipment Tag */}
@@ -851,9 +864,11 @@ export default function ControlsScreen() {
                     style={[
                       tw`text-[10px] uppercase tracking-wider text-center`,
                       { fontFamily: 'PlusJakartaSans_800ExtraBold' },
-                      showActive
+                      isHighlightActive
                         ? (isDarkMode ? tw`text-emerald-400` : tw`text-emerald-700`)
-                        : (isDarkMode ? tw`text-slate-300` : tw`text-slate-700`)
+                        : isAutoActive
+                        ? (isDarkMode ? tw`text-slate-300` : tw`text-slate-600`)
+                        : (isDarkMode ? tw`text-slate-400` : tw`text-slate-500`)
                     ]}
                     numberOfLines={1}
                   >
@@ -864,22 +879,32 @@ export default function ControlsScreen() {
                   <View
                     style={[
                       tw`px-2 py-0.5 rounded-full flex-row items-center gap-1`,
-                      showActive
+                      isHighlightActive
                         ? [{ backgroundColor: '#10b981' }]
+                        : isAutoActive
+                        ? (isDarkMode ? tw`bg-slate-800 border border-slate-700/80` : tw`bg-slate-200/80 border border-slate-300/80`)
                         : (isDarkMode ? tw`bg-slate-800 border border-slate-700/60` : tw`bg-slate-100 border border-slate-200/60`)
                     ]}
                   >
                     <View
                       style={[
                         tw`w-1.5 h-1.5 rounded-full`,
-                        showActive ? tw`bg-white` : tw`bg-slate-400 dark:bg-slate-500`
+                        isHighlightActive
+                          ? tw`bg-white`
+                          : isAutoActive
+                          ? tw`bg-emerald-500/60 dark:bg-emerald-400/60`
+                          : tw`bg-slate-400 dark:bg-slate-500`
                       ]}
                     />
                     <Text
                       style={[
                         tw`text-[8.5px] tracking-wider`,
                         { fontFamily: 'PlusJakartaSans_800ExtraBold' },
-                        showActive ? tw`text-white` : tw`text-slate-500 dark:text-slate-400`
+                        isHighlightActive
+                          ? tw`text-white`
+                          : isAutoActive
+                          ? tw`text-slate-700 dark:text-slate-200`
+                          : tw`text-slate-500 dark:text-slate-400`
                       ]}
                     >
                       {showActive ? 'ON' : 'OFF'}
@@ -890,7 +915,11 @@ export default function ControlsScreen() {
                           tw`text-[7.5px] ml-0.5`,
                           {
                             fontFamily: 'PlusJakartaSans_700Bold',
-                            color: showActive ? '#ffffff' : (device.isLowWater ? '#ef4444' : (isDarkMode ? '#34d399' : '#059669'))
+                            color: isHighlightActive
+                              ? '#ffffff'
+                              : isAutoActive
+                              ? (device.isLowWater ? '#ef4444' : (isDarkMode ? '#80a894' : '#4b6e5b'))
+                              : (device.isLowWater ? '#ef4444' : (isDarkMode ? '#94a3b8' : '#64748b'))
                           }
                         ]}
                       >

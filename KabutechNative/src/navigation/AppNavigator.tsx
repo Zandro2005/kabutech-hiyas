@@ -27,16 +27,25 @@ const Stack = createNativeStackNavigator();
 export default function AppNavigator() {
   const { user, profile, isLoading } = useAuth();
 
-  // Inside the component...
   useEffect(() => {
+    // Safety timeout: Never keep splash screen frozen for more than 1.5s
+    const timeout = setTimeout(() => {
+      SplashScreen.hideAsync().catch(() => {});
+    }, 1500);
+
     if (!isLoading) {
-      // Hide the native splash screen smoothly once auth is resolved and the tree is ready
       SplashScreen.hideAsync().catch(() => {});
     }
+
+    return () => clearTimeout(timeout);
   }, [isLoading]);
 
   if (isLoading) {
-    return null; // Native splash screen remains visible
+    return (
+      <View style={{ flex: 1, backgroundColor: '#0e3a22', justifyContent: 'center', alignItems: 'center' }}>
+        <ActivityIndicator size="large" color="#4ade80" />
+      </View>
+    );
   }
 
   // Check if user exists and is approved

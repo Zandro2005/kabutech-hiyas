@@ -1,12 +1,15 @@
 import * as FileSystem from 'expo-file-system/legacy';
 import * as Sharing from 'expo-sharing';
-import * as XLSX from 'xlsx';
 import { showToast } from '../components/CustomToast';
+
+// Lazy loader: SheetJS (~1.8MB) is only parsed into memory when exporting
+const getXLSX = () => require('xlsx');
 
 export const handleChartExport = async (data: any[], chartPeriod: string, isExporting: React.MutableRefObject<boolean>) => {
   if (isExporting.current) return;
   isExporting.current = true;
   try {
+    const XLSX = getXLSX();
     const aoaData: any[][] = [['Period', 'Total Yield (kg)']];
     data.forEach(d => {
       aoaData.push([d.label, parseFloat(d.kg.toFixed(2))]);
@@ -42,6 +45,7 @@ export const handleExport = async (sortedDates: string[], dailyMap: any, allRack
   if (isExporting.current) return;
   isExporting.current = true;
   try {
+    const XLSX = getXLSX();
     const rackNamesArray = Array.from(allRackNames).sort();
     
     const aoaData = [];

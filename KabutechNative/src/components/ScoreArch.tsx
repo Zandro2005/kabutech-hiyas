@@ -291,6 +291,9 @@ export default React.memo(function ScoreArch({
           {devices.map((item) => {
             const showActive = item.active;
             const isLocked = isAuto || isScheduled;
+            const isHighlightActive = showActive && !isLocked;
+            const isAutoActive = showActive && isLocked;
+
             return (
               <TouchableOpacity
                 key={item.key}
@@ -302,27 +305,42 @@ export default React.memo(function ScoreArch({
                 <View
                   style={[
                     tw`w-13 h-13 sm:w-14 sm:h-14 rounded-full items-center justify-center border`,
-                    showActive
+                    isHighlightActive
                       ? (isDarkMode
                           ? tw`bg-emerald-500/20 border-emerald-400 shadow-sm`
                           : tw`bg-emerald-600 border-emerald-600 shadow-md`)
+                      : isAutoActive
+                      ? (isDarkMode
+                          ? tw`bg-slate-800/90 border-slate-700 shadow-sm`
+                          : tw`bg-slate-200/80 border-slate-300 shadow-sm`)
                       : (isDarkMode
                           ? tw`bg-slate-900 border-slate-800`
                           : tw`bg-white border-slate-200/80`),
-                    isLocked ? tw`opacity-75` : tw`opacity-100`
+                    isLocked ? tw`opacity-80` : tw`opacity-100`
                   ]}
                 >
                   <MaterialCommunityIcons
                     name={item.icon as any}
                     size={22}
-                    color={showActive ? (isDarkMode ? '#34d399' : '#ffffff') : (isDarkMode ? '#94a3b8' : '#64748b')}
+                    color={
+                      isHighlightActive
+                        ? (isDarkMode ? '#34d399' : '#ffffff')
+                        : isAutoActive
+                        ? (isDarkMode ? '#80a894' : '#4b6e5b')
+                        : (isDarkMode ? '#64748b' : '#94a3b8')
+                    }
                   />
                 </View>
 
                 {/* Puck Label & Status */}
                 <Text
                   style={[
-                    tw`text-[11px] mt-1.5 text-slate-800 dark:text-slate-200`,
+                    tw`text-[11px] mt-1.5`,
+                    isHighlightActive
+                      ? tw`text-slate-900 dark:text-white`
+                      : isAutoActive
+                      ? tw`text-slate-700 dark:text-slate-300`
+                      : tw`text-slate-500 dark:text-slate-400`,
                     { fontFamily: 'PlusJakartaSans_700Bold' }
                   ]}
                 >
@@ -333,7 +351,13 @@ export default React.memo(function ScoreArch({
                   <View
                     style={[
                       tw`w-1.5 h-1.5 rounded-full`,
-                      { backgroundColor: showActive ? (isDarkMode ? '#34d399' : '#059669') : (isDarkMode ? '#475569' : '#cbd5e1') }
+                      {
+                        backgroundColor: isHighlightActive
+                          ? (isDarkMode ? '#34d399' : '#059669')
+                          : isAutoActive
+                          ? (isDarkMode ? '#34d39970' : '#10b98170')
+                          : (isDarkMode ? '#475569' : '#cbd5e1')
+                      }
                     ]}
                   />
                   <Text
@@ -341,7 +365,11 @@ export default React.memo(function ScoreArch({
                       tw`text-[9px] uppercase tracking-wider`,
                       {
                         fontFamily: 'PlusJakartaSans_800ExtraBold',
-                        color: showActive ? (isDarkMode ? '#34d399' : '#059669') : (isDarkMode ? '#64748b' : '#94a3b8')
+                        color: isHighlightActive
+                          ? (isDarkMode ? '#34d399' : '#059669')
+                          : isAutoActive
+                          ? (isDarkMode ? '#94a3b8' : '#64748b')
+                          : (isDarkMode ? '#64748b' : '#94a3b8')
                       }
                     ]}
                   >

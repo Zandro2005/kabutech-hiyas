@@ -191,11 +191,12 @@ void streamTimeoutCallback(bool timeout) {
 
 void setup() {
   Serial.begin(115200);
+#if defined(ARDUINO_USB_CDC_ON_BOOT) && (ARDUINO_USB_CDC_ON_BOOT != 0)
+  Serial.setTxTimeoutMs(0); // CRITICAL: Never block on Serial when USB cable is disconnected from PC!
+#endif
 
-  // ── Thermal & Power Optimization for 24/7 Deployment ──
-  // Downclock from 240MHz to 80MHz: Reduces CPU power dissipation by ~50%
-  // while preserving full performance for SSL/TLS cryptography and ADC sampling.
-  setCpuFrequencyMhz(80);
+  // Run at 160MHz: Fast hardware TLS/SSL cryptography while maintaining thermal efficiency
+  setCpuFrequencyMhz(160);
 
   Serial.println();
   Serial.println("╔══════════════════════════════════════╗");
@@ -242,10 +243,8 @@ void setup() {
     Serial.println();
     Serial.print("✅ WiFi connected! IP: ");
     Serial.println(WiFi.localIP());
-    // Enable WiFi modem sleep mode:
-    // Powers down the 2.4GHz RF power amplifier between DTIM beacon intervals.
-    // Drastically reduces operating temperature while keeping Firebase stream listener active.
-    WiFi.setSleep(true);
+    // Keep WiFi active (disable modem sleep) to maintain persistent Firebase RTDB TLS stream without dropping packets
+    WiFi.setSleep(false);
 
     // Sync NTP Time (UTC+8 for Philippines: 8 * 3600 = 28800s offset, 0 daylight savings)
     configTime(8 * 3600, 0, "pool.ntp.org", "time.nist.gov");
@@ -741,7 +740,18 @@ void loop() {
     Serial.println("────────────────────────────────────────");
   }
 
-  // ── Push to Cloud every 2.5 seconds (gives network room so LEDs react instantly) ──
+  // ── Auto Wi-Fi Reconnection Watchdog ──
+  static unsigned long lastWifiReconnectAttempt = 0;
+  if (WiFi.status() != WL_CONNECTED) {
+    if (now - lastWifiReconnectAttempt >= 10000) {
+      lastWifiReconnectAttempt = now;
+      Serial.println("🔄 Wi-Fi link lost, attempting reconnection...");
+      WiFi.disconnect();
+      WiFi.reconnect();
+    }
+  }
+
+  // ── Push to Cloud every 5 seconds ──
   if (now - lastFirebasePush >= FIREBASE_PUSH_INTERVAL) {
     lastFirebasePush = now;
     if (WiFi.status() == WL_CONNECTED) {

@@ -5,7 +5,6 @@ import AppNavigator from './src/navigation/AppNavigator';
 import { StatusBar } from 'expo-status-bar';
 import * as Font from 'expo-font';
 import * as SplashScreen from 'expo-splash-screen';
-import { Asset } from 'expo-asset';
 
 // Keep the splash screen visible while we fetch resources
 SplashScreen.preventAutoHideAsync();
@@ -69,40 +68,32 @@ export default function App() {
   useEffect(() => {
     async function loadResources() {
       try {
-        await Promise.all([
-          Font.loadAsync({
-            PlusJakartaSans_400Regular,
-            PlusJakartaSans_500Medium,
-            PlusJakartaSans_600SemiBold,
-            PlusJakartaSans_700Bold,
-            PlusJakartaSans_800ExtraBold,
-          }),
-          Asset.loadAsync([
-            require('./assets/mushroom_bg.png'),
-            require('./assets/mushroom_feed.png'),
-            require('./assets/icon.png'),
-            require('./assets/sounds/success_fast.wav'),
-            require('./assets/sounds/engk.wav'),
-            require('./assets/sounds/ting.wav'),
-            require('./assets/sounds/welcome.mp3'),
-          ]),
-          SoundManager.init(),
-        ]);
+        await Font.loadAsync({
+          PlusJakartaSans_400Regular,
+          PlusJakartaSans_500Medium,
+          PlusJakartaSans_600SemiBold,
+          PlusJakartaSans_700Bold,
+          PlusJakartaSans_800ExtraBold,
+        });
       } catch (e) {
-        console.warn(e);
+        console.warn('Font loading error:', e);
       } finally {
         setFontsLoaded(true);
+        // Defer audio session initialization to background so initial UI renders immediately
+        setTimeout(() => {
+          SoundManager.init().catch(() => {});
+        }, 150);
       }
     }
     loadResources();
   }, []);
 
   useEffect(() => {
-    // Re-enable immersive mode (hidden until swipe)
+    // Re-enable immersive mode (hidden until swipe) safely
     async function configureNavBar() {
       if (Platform.OS === 'android') {
         try {
-          NavigationBar.setHidden(true);
+          await NavigationBar.setVisibilityAsync('hidden').catch(() => {});
         } catch (e) {}
       }
     }
@@ -120,7 +111,6 @@ export default function App() {
           <TabBarProvider>
             <SafeAreaProvider>
               <StatusBar style="auto" />
-              <NavigationBar hidden={true} />
               <EnvironmentalAlertNotifier />
               <ErrorBoundary>
                 <AppNavigator />

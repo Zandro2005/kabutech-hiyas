@@ -40,14 +40,20 @@ export function useSensorHealth(): SensorHealthStatus {
   
   // Stale detection:
   // 1. ESP32 pushes every 5s (FIREBASE_PUSH_INTERVAL = 5000).
-  // 2. 15 seconds (~3 missed cycles) indicates an unplugged controller or broken link.
+  // 2. 35 seconds (~7 missed cycles) provides tolerance against packet drops and network jitter.
   // 3. Current server time combines device clock + Firebase .info/serverTimeOffset to eliminate clock skew.
   const currentServerTime = Date.now() + serverTimeOffset;
   const timeSinceServerTs = hasTimestamp ? Math.max(0, currentServerTime - (sensors.last_seen || 0)) : Infinity;
   const offlineSeconds = hasTimestamp ? Math.round(timeSinceServerTs / 1000) : 0;
 
-  const STALE_THRESHOLD_MS = 15000;
-  const isStale = !hasTimestamp || timeSinceServerTs > STALE_THRESHOLD_MS;
+  const STALE_THRESHOLD_MS = 35000;
+  const timeSinceLocalPacket = lastPacketReceivedAt.current > 0 ? Date.now() - lastPacketReceivedAt.current : Infinity;
+
+  // Resilient stale check: Only consider stale if BOTH the server timestamp AND
+  // local WebSocket stream arrival have exceeded the threshold (guards against phone clock skew)
+  const isServerStale = !hasTimestamp || timeSinceServerTs > STALE_THRESHOLD_MS;
+  const isLocalStale = timeSinceLocalPacket > STALE_THRESHOLD_MS;
+  const isStale = isServerStale && isLocalStale;
   
   const isExplicitOffline = sensors?.esp32_status === 'offline';
   const isControllerOnline = !isExplicitOffline && !isStale;

@@ -993,25 +993,16 @@ export default function AnalyticsScreen() {
                     </SvgGradient>
                   </Defs>
 
-                  {/* Dotted Target Setpoint Reference Line (Soft translucent guide) */}
+                  {/* Dotted Target Setpoint Reference Line (Darker, distinct guide) */}
                   <Line
                     x1="0"
                     y1={targetY}
                     x2={sparklineWidth}
                     y2={targetY}
-                    stroke={isDarkMode ? 'rgba(148, 163, 184, 0.35)' : 'rgba(100, 116, 139, 0.28)'}
+                    stroke={isDarkMode ? 'rgba(148, 163, 184, 0.65)' : 'rgba(51, 65, 85, 0.6)'}
                     strokeDasharray="4 4"
-                    strokeWidth="1"
+                    strokeWidth="1.5"
                   />
-                  <SvgText
-                    x="6"
-                    y={Math.max(16, targetY - 5)}
-                    fontSize="9"
-                    fontWeight="700"
-                    fill={isDarkMode ? '#64748b' : '#94a3b8'}
-                  >
-                    Target: {currentMetric.target}{currentMetric.unit}
-                  </SvgText>
 
                   {/* Area Gradient Underfill */}
                   {areaPath !== '' && <Path d={areaPath} fill="url(#sparklineGrad)" />}
@@ -1081,8 +1072,8 @@ export default function AnalyticsScreen() {
               {isDis ? 'Telemetry Stream Paused' : 'Live Moving Stream'}
             </Text>
             <View style={tw`flex-row items-center gap-1.5`}>
-              <View style={[tw`w-2.5 h-[1px] border-b border-dashed`, { borderColor: isDarkMode ? '#64748b' : '#94a3b8' }]} />
-              <Text style={[tw`text-[10px] text-slate-400 dark:text-slate-500`, { fontFamily: 'PlusJakartaSans_600SemiBold' }]}>
+              <View style={[tw`w-2.5 h-[1.5px] border-b border-dashed`, { borderColor: isDarkMode ? '#94a3b8' : '#475569' }]} />
+              <Text style={[tw`text-[10px] text-slate-500 dark:text-slate-400`, { fontFamily: 'PlusJakartaSans_600SemiBold' }]}>
                 Target: {currentMetric.target}{currentMetric.unit}
               </Text>
             </View>
@@ -1302,25 +1293,16 @@ export default function AnalyticsScreen() {
                     </SvgGradient>
                   </Defs>
 
-                  {/* Target Setpoint Benchmark Line (Soft translucent guide behind bars & curves) */}
+                  {/* Target Setpoint Benchmark Line (Darker, distinct guide behind bars & curves) */}
                   <Line
                     x1="0"
                     y1={historyTargetY}
                     x2={historyChartWidth}
                     y2={historyTargetY}
-                    stroke={isDarkMode ? 'rgba(148, 163, 184, 0.35)' : 'rgba(100, 116, 139, 0.28)'}
+                    stroke={isDarkMode ? 'rgba(148, 163, 184, 0.65)' : 'rgba(51, 65, 85, 0.6)'}
                     strokeDasharray="4 4"
-                    strokeWidth="1"
+                    strokeWidth="1.5"
                   />
-                  <SvgText
-                    x="8"
-                    y={Math.max(16, historyTargetY - 5)}
-                    fontSize="9"
-                    fontWeight="700"
-                    fill={isDarkMode ? '#64748b' : '#94a3b8'}
-                  >
-                    Target: {currentMetric.target}{currentMetric.unit}
-                  </SvgText>
 
                   {/* Body Option A: Rounded Column Bars (Flat Bottom on Ground Baseline) */}
                   {historyChartStyle === 'bar' && (
@@ -1484,8 +1466,8 @@ export default function AnalyticsScreen() {
               {timeRange === '24H' ? '24 Hours (Hourly)' : (timeRange === '7D' ? '7 Days (4h avg)' : '30 Days (4h avg)')}
             </Text>
             <View style={tw`flex-row items-center gap-1.5`}>
-              <View style={[tw`w-2.5 h-[1px] border-b border-dashed`, { borderColor: isDarkMode ? '#64748b' : '#94a3b8' }]} />
-              <Text style={[tw`text-[10px] text-slate-400 dark:text-slate-500`, { fontFamily: 'PlusJakartaSans_600SemiBold' }]}>
+              <View style={[tw`w-2.5 h-[1.5px] border-b border-dashed`, { borderColor: isDarkMode ? '#94a3b8' : '#475569' }]} />
+              <Text style={[tw`text-[10px] text-slate-500 dark:text-slate-400`, { fontFamily: 'PlusJakartaSans_600SemiBold' }]}>
                 Target: {currentMetric.target}{currentMetric.unit}
               </Text>
             </View>
