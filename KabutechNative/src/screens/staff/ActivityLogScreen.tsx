@@ -13,6 +13,7 @@ import { showToast } from '../../components/CustomToast';
 import { ActivityLogEntry } from '../../types/firebase';
 import { useTheme } from '../../context/ThemeContext';
 import { notifyAdmins } from '../../utils/PushNotifications';
+import { useTabBarScroll } from '../../context/TabBarContext';
 
 const ACTION_TYPES = [
   { id: 'harvest', label: 'Harvest', icon: 'leaf', color: '#10b981' },
@@ -25,6 +26,7 @@ const ACTION_TYPES = [
 ];
 
 export default function ActivityLogScreen() {
+  const { onScroll: handleTabBarScroll } = useTabBarScroll();
   const navigation = useNavigation();
   const { isDarkMode } = useTheme();
   const { user, profile } = useAuth();
@@ -107,6 +109,8 @@ export default function ActivityLogScreen() {
         keyExtractor={(item) => item.id}
         contentContainerStyle={tw`p-5 pb-36`}
         showsVerticalScrollIndicator={false}
+        onScroll={handleTabBarScroll}
+        scrollEventThrottle={16}
         ListHeaderComponent={
           <>
             {/* Title */}

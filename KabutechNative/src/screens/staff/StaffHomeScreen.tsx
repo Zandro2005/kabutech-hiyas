@@ -118,17 +118,17 @@ export default function StaffHomeScreen() {
           readOnly={true}
           isOffline={isControllerOff}
           hasWarning={envAlerts.hasWarning}
-          warningBanner={envAlerts.hasWarning ? <DashboardWarningBadges alerts={envAlerts.unreadAlerts} /> : null}
+          warningBanner={envAlerts.hasWarning ? <DashboardWarningBadges alerts={envAlerts.unreadAlerts} readOnly={true} /> : null}
         />
 
         {/* Health Metrics (2x2 Grid) */}
         <EnvironmentMetricsGrid temp={temp} hum={hum} light={light} co2={co2} navigation={navigation} />
 
         {/* Water Reservoir Level Indicator */}
-        <WaterLevelCard waterLevel={waterLevel} navigation={navigation} />
+        <WaterLevelCard waterLevel={waterLevel} navigation={navigation} readOnly={true} />
 
         {/* Critical System Alerts */}
-        <CriticalSystemAlerts alerts={alerts} onAlertPress={() => navigation.navigate('Analytics' as never)} />
+        <CriticalSystemAlerts alerts={alerts} />
 
         {/* Live Farm Video Stream */}
         <LiveFarmCard navigation={navigation} />

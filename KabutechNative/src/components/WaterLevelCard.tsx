@@ -9,21 +9,26 @@ import { hapticSelection } from '../utils/haptics';
 import { useResponsive } from '../utils/responsive';
 
 import { useSensorHealth } from '../hooks/useSensorHealth';
+import { useAuth } from '../context/AuthContext';
 
 interface Props {
   waterLevel?: number; // 0 to 100 percentage
   capacityLiters?: number; // Default 20 Liters
   navigation?: any;
+  readOnly?: boolean;
 }
 
 export default React.memo(function WaterLevelCard({
   waterLevel = 75,
   capacityLiters = 20,
-  navigation
+  navigation,
+  readOnly = false,
 }: Props) {
   const { isDarkMode } = useTheme();
   const { isSmallDevice } = useResponsive();
   const health = useSensorHealth();
+  const { profile } = useAuth();
+  const isStaff = readOnly || profile?.role === 'staff';
 
   const isFaulty = health.waterError || !health.isControllerOnline || waterLevel === -999 || waterLevel < 0;
 
@@ -155,6 +160,7 @@ export default React.memo(function WaterLevelCard({
   });
 
   const handlePress = () => {
+    if (isStaff) return;
     hapticSelection();
     if (navigation?.navigate) {
       navigation.navigate('Main', {
@@ -205,26 +211,28 @@ export default React.memo(function WaterLevelCard({
           </View>
         </View>
 
-        <TouchableOpacity
-          hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
-          onPress={handlePress}
-          style={tw`flex-row items-center py-1 px-2 rounded-lg`}
-        >
-          <Text
-            style={[
-              tw`text-xs text-[#0ea5e9] mr-1`,
-              { fontFamily: 'PlusJakartaSans_700Bold' },
-            ]}
+        {!isStaff && (
+          <TouchableOpacity
+            hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
+            onPress={handlePress}
+            style={tw`flex-row items-center py-1 px-2 rounded-lg`}
           >
-            Misters
-          </Text>
-          <MaterialCommunityIcons name="chevron-right" size={14} color="#0ea5e9" />
-        </TouchableOpacity>
+            <Text
+              style={[
+                tw`text-xs text-[#0ea5e9] mr-1`,
+                { fontFamily: 'PlusJakartaSans_700Bold' },
+              ]}
+            >
+              Misters
+            </Text>
+            <MaterialCommunityIcons name="chevron-right" size={14} color="#0ea5e9" />
+          </TouchableOpacity>
+        )}
       </View>
 
       {/* Main Container Card */}
       <TouchableOpacity
-        activeOpacity={0.88}
+        activeOpacity={isStaff ? 1 : 0.88}
         onPress={handlePress}
         style={[
           tw`bg-white dark:bg-slate-900 rounded-[28px] p-4 sm:p-5 border border-slate-200/70 dark:border-slate-800 shadow-sm overflow-hidden`,

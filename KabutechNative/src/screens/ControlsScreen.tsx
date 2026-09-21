@@ -421,7 +421,7 @@ export default function ControlsScreen() {
       color: '#10b981',
       activeStatus: 'Active Flow',
       inactiveStatus: 'Standby',
-      activeBg: 'bg-emerald-500/10 dark:bg-emerald-500/20',
+      activeBg: 'bg-emerald-500/15 dark:bg-emerald-500/25',
       activeBorder: 'border-emerald-500/50 dark:border-emerald-500/40',
       activeGlow: 'bg-emerald-500',
     },
@@ -436,7 +436,7 @@ export default function ControlsScreen() {
       color: '#10b981',
       activeStatus: 'Misting Active',
       inactiveStatus: 'Standby',
-      activeBg: 'bg-emerald-500/10 dark:bg-emerald-500/20',
+      activeBg: 'bg-emerald-500/15 dark:bg-emerald-500/25',
       activeBorder: 'border-emerald-500/50 dark:border-emerald-500/40',
       activeGlow: 'bg-emerald-500',
       isLowWater: waterLevel <= 20,
@@ -452,7 +452,7 @@ export default function ControlsScreen() {
       color: '#10b981',
       activeStatus: 'Illuminating',
       inactiveStatus: 'Dark Cycle',
-      activeBg: 'bg-emerald-500/10 dark:bg-emerald-500/20',
+      activeBg: 'bg-emerald-500/15 dark:bg-emerald-500/25',
       activeBorder: 'border-emerald-500/50 dark:border-emerald-500/40',
       activeGlow: 'bg-emerald-500',
     },
@@ -467,7 +467,7 @@ export default function ControlsScreen() {
       color: '#10b981',
       activeStatus: 'Valve Open',
       inactiveStatus: 'Sealed',
-      activeBg: 'bg-emerald-500/10 dark:bg-emerald-500/20',
+      activeBg: 'bg-emerald-500/15 dark:bg-emerald-500/25',
       activeBorder: 'border-emerald-500/50 dark:border-emerald-500/40',
       activeGlow: 'bg-emerald-500',
     },
@@ -712,10 +712,10 @@ export default function ControlsScreen() {
           </View>
         ) : null}
 
-        {/* Hardware Actuators Modern 2x2 Console */}
-        <View style={tw`px-5 pt-1 mb-2`}>
+        {/* Hardware Actuators Single-Line Modular Console (Ultra-Compact & Sleek) */}
+        <View style={tw`px-5 pt-0.5 mb-2`}>
           {/* Section Header */}
-          <View style={tw`flex-row justify-between items-center mb-2`}>
+          <View style={tw`flex-row justify-between items-center mb-2.5`}>
             <View style={tw`flex-row items-center gap-2`}>
               <View style={tw`w-1.5 h-3.5 rounded-full bg-[#10b981]`} />
               <Text style={[tw`text-[14px] text-slate-900 dark:text-white tracking-tight`, { fontFamily: 'PlusJakartaSans_800ExtraBold' }]}>
@@ -786,7 +786,7 @@ export default function ControlsScreen() {
             </View>
           </View>
 
-          {/* Hardware Actuators Single-Line Modular Console */}
+          {/* Hardware Actuators Single-Line Modular Console (Compact & Sleek) */}
           <View style={tw`flex-row justify-between gap-2 mb-2`}>
             {deviceToggles.map((device) => {
               const showActive = device.active;
@@ -808,11 +808,11 @@ export default function ControlsScreen() {
                     toggleDevice(device.key, !device.active);
                   }}
                   style={[
-                    tw`flex-1 rounded-2xl py-1 px-1 items-center justify-between border`,
-                    { height: 60 },
+                    tw`flex-1 rounded-[18px] py-2 px-1 items-center justify-between border`,
+                    { height: 84 },
                     showActive
                       ? [
-                          isDarkMode ? tw`bg-slate-800/95` : tw`bg-emerald-50/50`,
+                          isDarkMode ? tw`bg-emerald-950/20` : tw`bg-white`,
                           tw`border-emerald-500/50 dark:border-emerald-500/40`,
                           tw`shadow-sm`,
                         ]
@@ -825,7 +825,7 @@ export default function ControlsScreen() {
                   <View style={tw`relative items-center justify-center`}>
                     <View
                       style={[
-                        tw`w-6.5 h-6.5 rounded-lg items-center justify-center`,
+                        tw`w-7.5 h-7.5 rounded-xl items-center justify-center`,
                         showActive
                           ? [tw`bg-emerald-500/15 dark:bg-emerald-500/25`, { borderWidth: 1, borderColor: '#10b98140' }]
                           : (isDarkMode ? tw`bg-slate-800/80 border border-slate-700/50` : tw`bg-slate-100/90 border border-slate-200/60`)
@@ -833,15 +833,15 @@ export default function ControlsScreen() {
                     >
                       <MaterialCommunityIcons
                         name={device.icon}
-                        size={15}
+                        size={17}
                         color={showActive ? '#10b981' : (isDarkMode ? '#64748b' : '#94a3b8')}
                       />
                     </View>
 
                     {/* Lock overlay glyph if automated */}
                     {isLocked && (
-                      <View style={tw`absolute -top-1 -right-1 w-2.5 h-2.5 rounded-full bg-slate-200 dark:bg-slate-700 items-center justify-center border border-white dark:border-slate-800`}>
-                        <MaterialCommunityIcons name="lock" size={5.5} color={isDarkMode ? '#94a3b8' : '#64748b'} />
+                      <View style={tw`absolute -top-1 -right-1 w-3 h-3 rounded-full bg-slate-200 dark:bg-slate-700 items-center justify-center border border-white dark:border-slate-800`}>
+                        <MaterialCommunityIcons name="lock" size={6.5} color={isDarkMode ? '#94a3b8' : '#64748b'} />
                       </View>
                     )}
                   </View>
@@ -849,7 +849,7 @@ export default function ControlsScreen() {
                   {/* Middle: Equipment Tag */}
                   <Text
                     style={[
-                      tw`text-[9px] uppercase tracking-wide text-center`,
+                      tw`text-[10px] uppercase tracking-wider text-center`,
                       { fontFamily: 'PlusJakartaSans_800ExtraBold' },
                       showActive
                         ? (isDarkMode ? tw`text-emerald-400` : tw`text-emerald-700`)
@@ -860,10 +860,10 @@ export default function ControlsScreen() {
                     {device.tag}
                   </Text>
 
-                  {/* Bottom: Compact Tactile State Pill */}
+                  {/* Bottom: Modern Compact Tactile State Pill */}
                   <View
                     style={[
-                      tw`px-1.5 py-0.2 rounded-full flex-row items-center gap-1`,
+                      tw`px-2 py-0.5 rounded-full flex-row items-center gap-1`,
                       showActive
                         ? [{ backgroundColor: '#10b981' }]
                         : (isDarkMode ? tw`bg-slate-800 border border-slate-700/60` : tw`bg-slate-100 border border-slate-200/60`)
@@ -871,19 +871,32 @@ export default function ControlsScreen() {
                   >
                     <View
                       style={[
-                        tw`w-1 h-1 rounded-full`,
+                        tw`w-1.5 h-1.5 rounded-full`,
                         showActive ? tw`bg-white` : tw`bg-slate-400 dark:bg-slate-500`
                       ]}
                     />
                     <Text
                       style={[
-                        tw`text-[7.5px] tracking-wider`,
+                        tw`text-[8.5px] tracking-wider`,
                         { fontFamily: 'PlusJakartaSans_800ExtraBold' },
                         showActive ? tw`text-white` : tw`text-slate-500 dark:text-slate-400`
                       ]}
                     >
-                      {device.key === 'misters' && device.isLowWater ? 'LOW' : (showActive ? 'ON' : 'OFF')}
+                      {showActive ? 'ON' : 'OFF'}
                     </Text>
+                    {device.key === 'misters' && (
+                      <Text
+                        style={[
+                          tw`text-[7.5px] ml-0.5`,
+                          {
+                            fontFamily: 'PlusJakartaSans_700Bold',
+                            color: showActive ? '#ffffff' : (device.isLowWater ? '#ef4444' : (isDarkMode ? '#34d399' : '#059669'))
+                          }
+                        ]}
+                      >
+                        {Math.round(waterLevel)}%
+                      </Text>
+                    )}
                   </View>
                 </TouchableOpacity>
               );

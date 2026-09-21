@@ -142,15 +142,15 @@ export default React.memo(function EnvironmentMetricsGrid({ temp, hum, light, co
   const co2Percent = isCo2Disconnected ? 0 : Math.min(100, Math.max(4, ((co2 - co2Min) / (co2Max - co2Min)) * 100));
 
   const handleCardPress = (tabKey: 'temp' | 'hum' | 'light' | 'co2') => {
-    hapticSelection();
     if (isStaff) {
-      navigation.navigate('Analytics', { metric: tabKey, tab: tabKey });
-    } else {
-      navigation.navigate('Main', {
-        screen: 'Controls',
-        params: { tab: tabKey }
-      });
+      // Staff accounts do not have access to Analytics or Controls
+      return;
     }
+    hapticSelection();
+    navigation.navigate('Main', {
+      screen: 'Controls',
+      params: { tab: tabKey }
+    });
   };
 
   const activeCount = [!isTempDisconnected, !isHumDisconnected, !isLightDisconnected, !isCo2Disconnected].filter(Boolean).length;
@@ -260,17 +260,19 @@ export default React.memo(function EnvironmentMetricsGrid({ temp, hum, light, co
           </View>
         </View>
 
-        <TouchableOpacity 
-          hitSlop={{ top: 15, bottom: 15, left: 15, right: 15 }}  
-          onPress={() => {
-            hapticSelection();
-            navigation.navigate('Analytics' as never);
-          }}
-          style={tw`flex-row items-center py-1 px-2.5 rounded-full bg-emerald-500/10 dark:bg-emerald-500/15`}
-        >
-          <Text style={[tw`text-xs text-[#10b981] mr-1`, { fontFamily: 'PlusJakartaSans_700Bold' }]}>Analytics</Text>
-          <Ionicons name="chevron-forward" size={12} color="#10b981" />
-        </TouchableOpacity>
+        {!isStaff && (
+          <TouchableOpacity 
+            hitSlop={{ top: 15, bottom: 15, left: 15, right: 15 }}  
+            onPress={() => {
+              hapticSelection();
+              navigation.navigate('Analytics' as never);
+            }}
+            style={tw`flex-row items-center py-1 px-2.5 rounded-full bg-emerald-500/10 dark:bg-emerald-500/15`}
+          >
+            <Text style={[tw`text-xs text-[#10b981] mr-1`, { fontFamily: 'PlusJakartaSans_700Bold' }]}>Analytics</Text>
+            <Ionicons name="chevron-forward" size={12} color="#10b981" />
+          </TouchableOpacity>
+        )}
       </View>
 
       {/* 2x2 Modern Widget Grid */}
@@ -278,7 +280,7 @@ export default React.memo(function EnvironmentMetricsGrid({ temp, hum, light, co
         {metrics.map((item) => (
           <TouchableOpacity
             key={item.id}
-            activeOpacity={0.78}
+            activeOpacity={isStaff ? 1 : 0.78}
             onPress={() => handleCardPress(item.id)}
             style={[
               tw`rounded-[26px] p-4 sm:p-4.5 border justify-between ${

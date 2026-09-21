@@ -6,17 +6,21 @@ import tw from '../tailwind';
 import { useTheme } from '../context/ThemeContext';
 import { EnvironmentAlertItem, useEnvironmentAlerts } from '../hooks/useEnvironmentAlerts';
 import { hapticSelection, hapticMedium } from '../utils/haptics';
+import { useAuth } from '../context/AuthContext';
 
 interface Props {
   alerts: EnvironmentAlertItem[];
+  readOnly?: boolean;
 }
 
-export default React.memo(function DashboardWarningBadges({ alerts }: Props) {
+export default React.memo(function DashboardWarningBadges({ alerts, readOnly = false }: Props) {
   const [modalVisible, setModalVisible] = useState(false);
   const [isDismissed, setIsDismissed] = useState(false);
   const { isDarkMode } = useTheme();
   const navigation = useNavigation<any>();
   const { dismissAllAlerts } = useEnvironmentAlerts();
+  const { profile } = useAuth();
+  const isStaff = readOnly || profile?.role === 'staff';
 
   if (!alerts || alerts.length === 0 || isDismissed) return null;
 
@@ -306,20 +310,22 @@ export default React.memo(function DashboardWarningBadges({ alerts }: Props) {
 
             {/* Action Buttons: Sleek, Compact, & Refined */}
             <View style={tw`flex-row items-center gap-2 pt-2.5 border-t border-slate-100 dark:border-slate-800`}>
-              <TouchableOpacity
-                activeOpacity={0.8}
-                onPress={handleGoToControls}
-                style={tw`flex-1 py-2.5 rounded-xl bg-[#166534] dark:bg-[#059669] items-center justify-center shadow-sm`}
-              >
-                <Text
-                  style={[
-                    tw`text-[13px] text-white`,
-                    { fontFamily: 'PlusJakartaSans_700Bold' },
-                  ]}
+              {!isStaff && (
+                <TouchableOpacity
+                  activeOpacity={0.8}
+                  onPress={handleGoToControls}
+                  style={tw`flex-1 py-2.5 rounded-xl bg-[#166534] dark:bg-[#059669] items-center justify-center shadow-sm`}
                 >
-                  Adjust in Controls
-                </Text>
-              </TouchableOpacity>
+                  <Text
+                    style={[
+                      tw`text-[13px] text-white`,
+                      { fontFamily: 'PlusJakartaSans_700Bold' },
+                    ]}
+                  >
+                    Adjust in Controls
+                  </Text>
+                </TouchableOpacity>
+              )}
 
               <TouchableOpacity
                 activeOpacity={0.8}
@@ -329,11 +335,15 @@ export default React.memo(function DashboardWarningBadges({ alerts }: Props) {
                   dismissAllAlerts();
                   setModalVisible(false);
                 }}
-                style={tw`px-4 py-2.5 rounded-xl bg-slate-100 dark:bg-slate-800 items-center justify-center`}
+                style={[
+                  isStaff ? tw`flex-1 bg-[#166534] dark:bg-[#059669]` : tw`px-4 bg-slate-100 dark:bg-slate-800`,
+                  tw`py-2.5 rounded-xl items-center justify-center`
+                ]}
               >
                 <Text
                   style={[
-                    tw`text-[13px] text-slate-700 dark:text-slate-300`,
+                    tw`text-[13px]`,
+                    isStaff ? tw`text-white` : tw`text-slate-700 dark:text-slate-300`,
                     { fontFamily: 'PlusJakartaSans_700Bold' },
                   ]}
                 >

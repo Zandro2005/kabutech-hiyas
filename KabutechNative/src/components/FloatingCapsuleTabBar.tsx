@@ -193,10 +193,6 @@ export default function FloatingCapsuleTabBar({
               navigation.navigate('Report' as never);
               return;
             }
-            if (route.name === 'ActivityLog') {
-              navigation.navigate('ActivityLog' as never);
-              return;
-            }
 
             const event = navigation.emit({
               type: 'tabPress',

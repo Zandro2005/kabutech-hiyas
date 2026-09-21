@@ -22,11 +22,8 @@ import StaffYieldScreen from '../screens/staff/StaffYieldScreen';
 import StaffProfileScreen from '../screens/staff/StaffProfileScreen';
 import ActivityLogScreen from '../screens/staff/ActivityLogScreen';
 import MyTasksScreen from '../screens/staff/MyTasksScreen';
-import AnalyticsScreen from '../screens/AnalyticsScreen';
 
 import FloatingCapsuleTabBar from '../components/FloatingCapsuleTabBar';
-
-const DummyScreen = () => null;
 
 const Tab = createBottomTabNavigator();
 const HomeStack = createNativeStackNavigator();
@@ -42,7 +39,6 @@ function StaffHomeStackNavigator() {
       }}
     >
       <HomeStack.Screen name="HomeScreen" component={StaffHomeScreen} />
-      <HomeStack.Screen name="Analytics" component={AnalyticsScreen} />
     </HomeStack.Navigator>
   );
 }
@@ -66,7 +62,7 @@ export default function StaffTabNavigator() {
       />
       <Tab.Screen 
         name="ActivityLog" 
-        component={DummyScreen} 
+        component={ActivityLogScreen} 
       />
       <Tab.Screen 
         name="Tasks" 

@@ -38,6 +38,7 @@ export type StaffTabParamList = {
   Home: undefined;
   Crop: undefined;
   ActivityLog: undefined;
+  Tasks: undefined;
   Yield: undefined;
   Profile: undefined;
 };
