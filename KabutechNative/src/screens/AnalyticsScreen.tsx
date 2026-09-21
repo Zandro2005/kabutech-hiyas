@@ -159,6 +159,8 @@ export default function AnalyticsScreen() {
   const [timeRange, setTimeRange] = useState<AnalyticsTimeRange>('24H');
   const [selectedHistoryIndex, setSelectedHistoryIndex] = useState<number | null>(null);
   const [historyChartStyle, setHistoryChartStyle] = useState<'bar' | 'line'>('bar');
+  const historyScrollRef = useRef<ScrollView>(null);
+  const isInitialHistoryScrollDone = useRef(false);
 
   const {
     data: historyData,
@@ -170,7 +172,15 @@ export default function AnalyticsScreen() {
 
   useEffect(() => {
     setSelectedHistoryIndex(null);
+    isInitialHistoryScrollDone.current = false;
   }, [activeMetric, timeRange]);
+
+  const handleHistoryContentSizeChange = () => {
+    if (!isInitialHistoryScrollDone.current && historyScrollRef.current) {
+      historyScrollRef.current.scrollToEnd({ animated: false });
+      isInitialHistoryScrollDone.current = true;
+    }
+  };
 
   useEffect(() => {
     const paramMetric = route.params?.metric || route.params?.tab;
@@ -513,13 +523,29 @@ export default function AnalyticsScreen() {
   ).current;
 
   // Historical Trend Chart Layout & Coordinates
-  const historyChartHeight = 160;
+  const historyChartHeight = 176;
   const historyChartWidth = Math.max(260, cardWidth - 40);
-  const historyLeftMargin = 8;
-  const historyPlotWidth = historyChartWidth - 16;
+  const historyLeftMargin = 16;
+  const historyRightMargin = 16;
   const historyPlotTop = 18;
   const historyPlotBottom = 136;
   const historyPlotHeight = historyPlotBottom - historyPlotTop;
+
+  // Dedicated slot width per bar (min 52px so every label has plenty of breathing room)
+  const slotWidth = useMemo(() => {
+    if (!historyData.length) return 52;
+    const availableWidth = historyChartWidth - historyLeftMargin - historyRightMargin;
+    return Math.max(52, availableWidth / historyData.length);
+  }, [historyData.length, historyChartWidth, historyLeftMargin, historyRightMargin]);
+
+  const historyPlotWidth = useMemo(() => {
+    if (!historyData.length) return historyChartWidth - historyLeftMargin - historyRightMargin;
+    const minPlotWidth = historyChartWidth - historyLeftMargin - historyRightMargin;
+    return Math.max(minPlotWidth, historyData.length * slotWidth);
+  }, [historyData.length, slotWidth, historyChartWidth, historyLeftMargin, historyRightMargin]);
+
+  const historyScrollContentWidth = historyPlotWidth + historyLeftMargin + historyRightMargin;
+  const isHistoryScrollable = historyScrollContentWidth > historyChartWidth + 4;
 
   const historyScale = useMemo(() => {
     const vals = historyData.map(d => d.value);
@@ -537,42 +563,27 @@ export default function AnalyticsScreen() {
     return historyPlotBottom - ((clampedTarget - historyPaddedMin) / historyValueRange) * historyPlotHeight;
   }, [currentMetric.target, historyPaddedMin, historyPaddedMax, historyValueRange, historyPlotBottom, historyPlotHeight]);
 
-  // Discrete Rounded Column Bars Calculation (Cohesive spacing, no sparse gaps)
+  // Discrete Rounded Column Bars Calculation (Evenly distributed with dedicated slots)
   const historyBars = useMemo(() => {
     if (!historyData.length) return [];
-    const n = historyData.length;
-
-    let barWidth: number;
-    let gap: number;
-    let startX: number;
-
-    if (n <= 10) {
-      // Cohesive tight spacing for few data points so bars don't drift miles apart
-      barWidth = Math.max(18, Math.min(28, (historyPlotWidth / n) * 0.6));
-      gap = Math.max(6, Math.min(10, barWidth * 0.35));
-      const totalContentWidth = n * barWidth + (n - 1) * gap;
-      startX = historyLeftMargin + Math.max(0, (historyPlotWidth - totalContentWidth) / 2);
-    } else {
-      // Full width distribution for larger sets of data points
-      const slotWidth = historyPlotWidth / n;
-      gap = Math.max(2, Math.min(5, slotWidth * 0.22));
-      barWidth = Math.max(3, slotWidth - gap);
-      startX = historyLeftMargin + (slotWidth - barWidth) / 2;
-    }
+    const barWidth = Math.min(22, Math.max(14, slotWidth * 0.38));
 
     return historyData.map((d, index) => {
       const clampedVal = Math.min(historyPaddedMax, Math.max(historyPaddedMin, d.value));
       const valRatio = (clampedVal - historyPaddedMin) / historyValueRange;
       const barHeight = Math.max(6, valRatio * historyPlotHeight);
-      const x = n <= 10 ? startX + index * (barWidth + gap) : historyLeftMargin + index * (barWidth + gap);
+      const slotStartX = historyLeftMargin + index * slotWidth;
+      const x = slotStartX + (slotWidth - barWidth) / 2;
       const y = historyPlotBottom - barHeight;
-      const centerX = x + barWidth / 2;
+      const centerX = slotStartX + slotWidth / 2;
 
       return {
         x,
         y,
         width: barWidth,
         height: barHeight,
+        slotStartX,
+        slotWidth,
         centerX,
         value: d.value,
         time: d.time,
@@ -581,7 +592,7 @@ export default function AnalyticsScreen() {
         index,
       };
     });
-  }, [historyData, historyPlotWidth, historyLeftMargin, historyPlotBottom, historyPlotHeight, historyPaddedMin, historyPaddedMax, historyValueRange]);
+  }, [historyData, slotWidth, historyLeftMargin, historyPlotBottom, historyPlotHeight, historyPaddedMin, historyPaddedMax, historyValueRange]);
 
   // Smooth Bezier Curve / Line Points for Line mode
   const historyPoints = useMemo(() => {
@@ -590,12 +601,14 @@ export default function AnalyticsScreen() {
     return historyData.map((d, index) => {
       const x = n === 1 
         ? historyLeftMargin + historyPlotWidth / 2 
-        : historyLeftMargin + (index / (n - 1)) * historyPlotWidth;
+        : historyLeftMargin + (index + 0.5) * slotWidth;
       const clampedVal = Math.min(historyPaddedMax, Math.max(historyPaddedMin, d.value));
       const y = historyPlotBottom - ((clampedVal - historyPaddedMin) / historyValueRange) * historyPlotHeight;
       return {
         x,
         y,
+        slotStartX: historyLeftMargin + index * slotWidth,
+        slotWidth,
         centerX: x,
         value: d.value,
         time: d.time,
@@ -604,7 +617,7 @@ export default function AnalyticsScreen() {
         index
       };
     });
-  }, [historyData, historyPlotWidth, historyLeftMargin, historyPlotBottom, historyPlotHeight, historyPaddedMin, historyPaddedMax, historyValueRange]);
+  }, [historyData, slotWidth, historyLeftMargin, historyPlotWidth, historyPlotBottom, historyPlotHeight, historyPaddedMin, historyPaddedMax, historyValueRange]);
 
   const historyBezierPath = useMemo(() => getBezierPath(historyPoints), [historyPoints]);
   const historyAreaPath = useMemo(() => {
@@ -623,67 +636,6 @@ export default function AnalyticsScreen() {
     }
     return historyPoints.length > 0 ? historyPoints[historyPoints.length - 1] : null;
   }, [selectedHistoryIndex, historyChartStyle, historyBars, historyPoints]);
-
-  const handleHistoryTouchAt = (locX: number) => {
-    if (!historyBars.length && !historyPoints.length) return;
-    const list = historyChartStyle === 'bar' ? historyBars : historyPoints;
-    let closestIdx = 0;
-    let minDistance = Infinity;
-    list.forEach((pt, idx) => {
-      const dist = Math.abs(locX - pt.centerX);
-      if (dist < minDistance) {
-        minDistance = dist;
-        closestIdx = idx;
-      }
-    });
-    if (closestIdx !== selectedHistoryIndex) {
-      setSelectedHistoryIndex(closestIdx);
-    }
-  };
-
-  const historyScrubberPanResponder = useRef(
-    PanResponder.create({
-      onStartShouldSetPanResponder: () => true,
-      onMoveShouldSetPanResponder: (_, gestureState) => {
-        return Math.abs(gestureState.dx) > 3;
-      },
-      onPanResponderGrant: (evt) => {
-        hapticLight();
-        handleHistoryTouchAt(evt.nativeEvent.locationX);
-      },
-      onPanResponderMove: (evt) => {
-        handleHistoryTouchAt(evt.nativeEvent.locationX);
-      },
-      onPanResponderRelease: () => {},
-    })
-  ).current;
-
-  // Extract clean ticks matching exact bar/point centers
-  const historyAxisTicks = useMemo(() => {
-    if (historyChartStyle === 'bar') {
-      if (historyBars.length <= 10) {
-        return historyBars;
-      }
-      const count = Math.min(6, historyBars.length);
-      const step = (historyBars.length - 1) / (count - 1);
-      const ticks = [];
-      for (let i = 0; i < count; i++) {
-        const idx = Math.round(i * step);
-        ticks.push(historyBars[idx]);
-      }
-      return ticks;
-    }
-
-    if (historyPoints.length < 2) return historyPoints;
-    const count = Math.min(6, historyPoints.length);
-    const step = (historyPoints.length - 1) / (count - 1);
-    const ticks = [];
-    for (let i = 0; i < count; i++) {
-      const idx = Math.round(i * step);
-      ticks.push(historyPoints[idx]);
-    }
-    return ticks;
-  }, [historyChartStyle, historyBars, historyPoints]);
 
 
   const displayLow = historyMin !== null ? historyMin : (isDis ? '--' : min);
@@ -1259,20 +1211,43 @@ export default function AnalyticsScreen() {
             </View>
           ) : (
             <>
-              {/* Swipe Hint indicator */}
-              <View style={tw`flex-row items-center justify-end mb-2 gap-1`}>
-                <MaterialCommunityIcons name="gesture-tap" size={13} color={isDarkMode ? '#64748b' : '#94a3b8'} />
-                <Text style={[tw`text-[10px] text-slate-400 dark:text-slate-500`, { fontFamily: 'PlusJakartaSans_600SemiBold' }]}>
-                  {historyChartStyle === 'bar' ? 'Tap or slide bars to inspect' : 'Slide across curve to inspect'}
-                </Text>
+              {/* Swipe & Tap Hint indicator */}
+              <View style={tw`flex-row items-center justify-between mb-2`}>
+                {isHistoryScrollable ? (
+                  <View style={tw`flex-row items-center gap-1`}>
+                    <MaterialCommunityIcons name="arrow-left-right" size={12} color={currentMetric.color} />
+                    <Text style={[tw`text-[10px] text-slate-400 dark:text-slate-500`, { fontFamily: 'PlusJakartaSans_600SemiBold' }]}>
+                      Scroll timeline
+                    </Text>
+                  </View>
+                ) : (
+                  <View />
+                )}
+                <View style={tw`flex-row items-center gap-1`}>
+                  <MaterialCommunityIcons 
+                    name={isHistoryScrollable ? "gesture-swipe-horizontal" : "gesture-tap"} 
+                    size={13} 
+                    color={isDarkMode ? '#64748b' : '#94a3b8'} 
+                  />
+                  <Text style={[tw`text-[10px] text-slate-400 dark:text-slate-500`, { fontFamily: 'PlusJakartaSans_600SemiBold' }]}>
+                    {isHistoryScrollable 
+                      ? 'Swipe to browse • Tap bar to inspect' 
+                      : 'Tap bar to inspect'}
+                  </Text>
+                </View>
               </View>
 
-              {/* Chart SVG with Pan Scrubber */}
-              <View
-                {...historyScrubberPanResponder.panHandlers}
+              {/* Horizontally Scrollable & Swipeable Chart Canvas */}
+              <ScrollView
+                ref={historyScrollRef}
+                horizontal
+                showsHorizontalScrollIndicator={false}
+                nestedScrollEnabled={true}
+                onContentSizeChange={handleHistoryContentSizeChange}
+                contentContainerStyle={{ minWidth: historyChartWidth }}
                 style={{ width: historyChartWidth, height: historyChartHeight }}
               >
-                <Svg width={historyChartWidth} height={historyChartHeight}>
+                <Svg width={historyScrollContentWidth} height={historyChartHeight}>
                   <Defs>
                     {/* Bar Fill Gradient */}
                     <SvgGradient id={`barGrad-${activeMetric}`} x1="0" y1="0" x2="0" y2="1">
@@ -1293,28 +1268,41 @@ export default function AnalyticsScreen() {
                     </SvgGradient>
                   </Defs>
 
-                  {/* Target Setpoint Benchmark Line (Darker, distinct guide behind bars & curves) */}
+                  {/* Target Setpoint Benchmark Line */}
                   <Line
                     x1="0"
                     y1={historyTargetY}
-                    x2={historyChartWidth}
+                    x2={historyScrollContentWidth}
                     y2={historyTargetY}
                     stroke={isDarkMode ? 'rgba(148, 163, 184, 0.65)' : 'rgba(51, 65, 85, 0.6)'}
                     strokeDasharray="4 4"
                     strokeWidth="1.5"
                   />
 
-                  {/* Body Option A: Rounded Column Bars (Flat Bottom on Ground Baseline) */}
+                  {/* Body Option A: Rounded Column Bars with dedicated labels and tap hitboxes */}
                   {historyChartStyle === 'bar' && (
                     <G>
                       {historyBars.map((bar) => {
                         const isSelected = selectedHistoryIndex === bar.index;
                         const isAnySelected = selectedHistoryIndex !== null;
-                        const barOpacity = isSelected ? 1 : (isAnySelected ? 0.35 : 0.85);
+                        const barOpacity = isSelected ? 1 : (isAnySelected ? 0.35 : 0.88);
 
                         return (
                           <G key={`bar-group-${bar.index}`}>
-                            {/* Solid Card Background Knockout Base: makes broken lines disappear inside the bar */}
+                            {/* Full-Height Invisible Hit Box for easy tapping */}
+                            <Rect
+                              x={bar.slotStartX}
+                              y={historyPlotTop}
+                              width={bar.slotWidth}
+                              height={historyChartHeight - historyPlotTop}
+                              fill="transparent"
+                              onPress={() => {
+                                hapticSelection();
+                                setSelectedHistoryIndex(isSelected ? null : bar.index);
+                              }}
+                            />
+
+                            {/* Solid Card Background Knockout Base */}
                             <Path
                               d={getBarPath(bar.x, bar.y, bar.width, historyPlotBottom)}
                               fill={isDarkMode ? '#0f172a' : '#ffffff'}
@@ -1325,6 +1313,10 @@ export default function AnalyticsScreen() {
                               d={getBarPath(bar.x, bar.y, bar.width, historyPlotBottom)}
                               fill={isSelected ? `url(#activeBarGrad-${activeMetric})` : `url(#barGrad-${activeMetric})`}
                               opacity={barOpacity}
+                              onPress={() => {
+                                hapticSelection();
+                                setSelectedHistoryIndex(isSelected ? null : bar.index);
+                              }}
                             />
 
                             {/* Selected Bar Indicator & Top Highlight Cap */}
@@ -1342,20 +1334,33 @@ export default function AnalyticsScreen() {
                                 <Circle
                                   cx={bar.centerX}
                                   cy={bar.y}
-                                  r={Math.max(3.5, Math.min(5.5, bar.width / 2))}
+                                  r={Math.max(4, Math.min(5.5, bar.width / 2))}
                                   fill={currentMetric.color}
                                   stroke={isDarkMode ? '#0f172a' : '#ffffff'}
                                   strokeWidth="2"
                                 />
                               </>
                             )}
+
+                            {/* X-Axis Timeline Label placed directly beneath bar */}
+                            <SvgText
+                              x={bar.centerX}
+                              y={158}
+                              textAnchor="middle"
+                              fontSize="10"
+                              fontWeight={isSelected ? '700' : '600'}
+                              fill={isSelected ? currentMetric.color : (isDarkMode ? '#94a3b8' : '#64748b')}
+                              letterSpacing={0.2}
+                            >
+                              {bar.axisLabel}
+                            </SvgText>
                           </G>
                         );
                       })}
                     </G>
                   )}
 
-                  {/* Body Option B: Continuous Historical Curve with Nodes */}
+                  {/* Body Option B: Continuous Historical Curve with Nodes & Labels */}
                   {historyChartStyle === 'line' && (
                     <G>
                       {historyAreaPath ? (
@@ -1367,7 +1372,6 @@ export default function AnalyticsScreen() {
 
                       {historyBezierPath ? (
                         <>
-                          {/* Knockout halo: makes broken lines disappear right as curve passes through */}
                           <Path
                             d={historyBezierPath}
                             fill="none"
@@ -1387,27 +1391,53 @@ export default function AnalyticsScreen() {
                         </>
                       ) : null}
 
-                      {/* Discrete Node Dots on Vertices */}
+                      {/* Discrete Node Dots with Hitboxes and Labels */}
                       {historyPoints.map((pt, idx) => {
-                        const showDot = historyPoints.length <= 30 || idx % Math.ceil(historyPoints.length / 24) === 0;
-                        if (!showDot) return null;
                         const isSelected = selectedHistoryIndex === idx;
 
                         return (
-                          <Circle
-                            key={`hist-node-${idx}`}
-                            cx={pt.x}
-                            cy={pt.y}
-                            r={isSelected ? 5 : 2.5}
-                            fill={isSelected ? currentMetric.color : (isDarkMode ? '#0f172a' : '#ffffff')}
-                            stroke={currentMetric.color}
-                            strokeWidth={isSelected ? 2 : 1.5}
-                          />
+                          <G key={`hist-node-group-${idx}`}>
+                            {/* Hitbox */}
+                            <Rect
+                              x={pt.slotStartX}
+                              y={historyPlotTop}
+                              width={pt.slotWidth}
+                              height={historyChartHeight - historyPlotTop}
+                              fill="transparent"
+                              onPress={() => {
+                                hapticSelection();
+                                setSelectedHistoryIndex(isSelected ? null : idx);
+                              }}
+                            />
+                            <Circle
+                              cx={pt.x}
+                              cy={pt.y}
+                              r={isSelected ? 5.5 : 3}
+                              fill={isSelected ? currentMetric.color : (isDarkMode ? '#0f172a' : '#ffffff')}
+                              stroke={currentMetric.color}
+                              strokeWidth={isSelected ? 2.5 : 1.5}
+                              onPress={() => {
+                                hapticSelection();
+                                setSelectedHistoryIndex(isSelected ? null : idx);
+                              }}
+                            />
+                            <SvgText
+                              x={pt.centerX}
+                              y={158}
+                              textAnchor="middle"
+                              fontSize="10"
+                              fontWeight={isSelected ? '700' : '600'}
+                              fill={isSelected ? currentMetric.color : (isDarkMode ? '#94a3b8' : '#64748b')}
+                              letterSpacing={0.2}
+                            >
+                              {pt.axisLabel}
+                            </SvgText>
+                          </G>
                         );
                       })}
 
                       {/* Active Scrubber Point in Line Mode */}
-                      {activeHistoryPoint && (
+                      {activeHistoryPoint && selectedHistoryIndex !== null && (
                         <>
                           <Line
                             x1={activeHistoryPoint.centerX}
@@ -1431,32 +1461,17 @@ export default function AnalyticsScreen() {
                     </G>
                   )}
 
-                  {/* Solid Ground Baseline (anchors bars and eliminates floating) */}
+                  {/* Solid Ground Baseline */}
                   <Line
                     x1="0"
                     y1={historyPlotBottom}
-                    x2={historyChartWidth}
+                    x2={historyScrollContentWidth}
                     y2={historyPlotBottom}
                     stroke={isDarkMode ? '#334155' : '#cbd5e1'}
                     strokeWidth="1.5"
                   />
-
-                  {/* X-Axis Timeline Labels placed directly beneath bars */}
-                  {historyAxisTicks.map((pt, i) => (
-                    <SvgText
-                      key={`axis-tick-${i}`}
-                      x={pt.centerX}
-                      y={historyChartHeight - 6}
-                      textAnchor="middle"
-                      fontSize="9"
-                      fontWeight="600"
-                      fill={isDarkMode ? '#64748b' : '#94a3b8'}
-                    >
-                      {pt.axisLabel}
-                    </SvgText>
-                  ))}
                 </Svg>
-              </View>
+              </ScrollView>
             </>
           )}
 

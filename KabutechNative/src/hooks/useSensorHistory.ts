@@ -152,7 +152,10 @@ export function useSensorHistory(metric: MetricType, range: AnalyticsTimeRange):
       return validFiltered.map(r => {
         const d = new Date(r.timestamp);
         const timeStr = d.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
-        const axisStr = d.toLocaleTimeString([], { hour: 'numeric' });
+        const hours = d.getHours();
+        const ampm = hours >= 12 ? 'PM' : 'AM';
+        const h12 = hours % 12 || 12;
+        const axisStr = `${h12} ${ampm}`;
         return {
           timestamp: r.timestamp,
           value: Number(r[metric].toFixed(1)),
