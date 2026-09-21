@@ -2,7 +2,7 @@ import React, { useState, useMemo, useRef, useEffect } from 'react';
 import { View, Text, ScrollView, TouchableOpacity, StatusBar, PanResponder, Animated, Easing, ActivityIndicator } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { MaterialCommunityIcons, Ionicons } from '@expo/vector-icons';
-import Svg, { Path, Defs, LinearGradient as SvgGradient, Stop, Line, Circle, Text as SvgText } from 'react-native-svg';
+import Svg, { Path, Defs, LinearGradient as SvgGradient, Stop, Line, Circle, Rect, G, Text as SvgText } from 'react-native-svg';
 import { useTheme } from '../context/ThemeContext';
 import tw from '../tailwind';
 import { useNavigation, useRoute } from '@react-navigation/native';
@@ -84,6 +84,47 @@ const getBezierPath = (pts: { x: number; y: number }[]) => {
   return path;
 };
 
+// Flat-bottomed, rounded-top column bar path generator (anchored firmly to baseline)
+const getBarPath = (x: number, y: number, width: number, bottom: number) => {
+  const height = Math.max(2, bottom - y);
+  const r = Math.min(width / 2, 4, height / 2);
+  return `M ${x} ${bottom} L ${x} ${y + r} Q ${x} ${y} ${x + r} ${y} L ${x + width - r} ${y} Q ${x + width} ${y} ${x + width} ${y + r} L ${x + width} ${bottom} Z`;
+};
+
+/**
+ * Computes a balanced Y-axis scale domain [paddedMin, paddedMax] ensuring the
+ * target setpoint benchmark line is always positioned comfortably in the view (roughly 38% - 62% height),
+ * preventing it from ever being squished against the bottom baseline or top ceiling.
+ */
+const computeBalancedScale = (
+  dataValues: number[],
+  target: number,
+  metricMin: number,
+  metricMax: number
+) => {
+  const rawMin = dataValues.length ? Math.min(...dataValues) : target;
+  const rawMax = dataValues.length ? Math.max(...dataValues) : target;
+
+  const spanBelow = Math.max(0, target - rawMin);
+  const spanAbove = Math.max(0, rawMax - target);
+  const dataSpread = Math.max(0.5, rawMax - rawMin);
+
+  // Initial padding: provide proportional breathing room
+  let bottomSpan = Math.max(spanBelow + Math.max(0.4, spanBelow * 0.18), dataSpread * 0.25, 0.8);
+  let topSpan = Math.max(spanAbove + Math.max(0.4, spanAbove * 0.18), dataSpread * 0.25, 0.8);
+
+  // Enforce minimum vertical headroom so target line is never squished near the floor or ceiling.
+  // This guarantees the target line sits stably in the visible ~39% - ~61% sweet spot.
+  bottomSpan = Math.max(bottomSpan, topSpan * 0.65);
+  topSpan = Math.max(topSpan, bottomSpan * 0.65);
+
+  const paddedMin = Math.max(metricMin, Number((target - bottomSpan).toFixed(1)));
+  const paddedMax = Math.min(metricMax, Number((target + topSpan).toFixed(1)));
+  const valueRange = Math.max(0.1, paddedMax - paddedMin);
+
+  return { paddedMin, paddedMax, valueRange };
+};
+
 export default function AnalyticsScreen() {
   const { onScroll: handleTabBarScroll } = useTabBarScroll();
   const { isDarkMode } = useTheme();
@@ -117,6 +158,7 @@ export default function AnalyticsScreen() {
   // Time-range state & historical telemetry data hook (Option A: 24H, 7D, 30D)
   const [timeRange, setTimeRange] = useState<AnalyticsTimeRange>('24H');
   const [selectedHistoryIndex, setSelectedHistoryIndex] = useState<number | null>(null);
+  const [historyChartStyle, setHistoryChartStyle] = useState<'bar' | 'line'>('bar');
 
   const {
     data: historyData,
@@ -405,12 +447,12 @@ export default function AnalyticsScreen() {
   const [cardWidth, setCardWidth] = useState(width - 40);
   const sparklineWidth = Math.max(260, cardWidth - 40);
 
-  const minVal = Math.min(...chartData.map(d => d.value), currentMetric.target);
-  const maxVal = Math.max(...chartData.map(d => d.value), currentMetric.target);
-  const spread = Math.max(1, maxVal - minVal);
-  const paddedMin = Math.max(currentMetric.min, Number((minVal - spread * 0.12).toFixed(1)));
-  const paddedMax = Math.min(currentMetric.max, Number((maxVal + spread * 0.12).toFixed(1)));
-  const valueRange = Math.max(0.1, paddedMax - paddedMin);
+  const liveScale = useMemo(() => {
+    const vals = chartData.map(d => d.value);
+    return computeBalancedScale(vals, currentMetric.target, currentMetric.min, currentMetric.max);
+  }, [chartData, currentMetric.target, currentMetric.min, currentMetric.max]);
+
+  const { paddedMin, paddedMax, valueRange } = liveScale;
 
   const points = useMemo(() => {
     const startX = 8;
@@ -471,37 +513,90 @@ export default function AnalyticsScreen() {
   ).current;
 
   // Historical Trend Chart Layout & Coordinates
-  const historyChartHeight = 150;
+  const historyChartHeight = 160;
   const historyChartWidth = Math.max(260, cardWidth - 40);
+  const historyLeftMargin = 8;
+  const historyPlotWidth = historyChartWidth - 16;
+  const historyPlotTop = 18;
+  const historyPlotBottom = 136;
+  const historyPlotHeight = historyPlotBottom - historyPlotTop;
 
-  const historyMinVal = useMemo(() => {
-    if (!historyData.length) return currentMetric.target;
-    return Math.min(...historyData.map(d => d.value), currentMetric.target);
-  }, [historyData, currentMetric.target]);
+  const historyScale = useMemo(() => {
+    const vals = historyData.map(d => d.value);
+    return computeBalancedScale(vals, currentMetric.target, currentMetric.min, currentMetric.max);
+  }, [historyData, currentMetric.target, currentMetric.min, currentMetric.max]);
 
-  const historyMaxVal = useMemo(() => {
-    if (!historyData.length) return currentMetric.target;
-    return Math.max(...historyData.map(d => d.value), currentMetric.target);
-  }, [historyData, currentMetric.target]);
+  const {
+    paddedMin: historyPaddedMin,
+    paddedMax: historyPaddedMax,
+    valueRange: historyValueRange,
+  } = historyScale;
 
-  const historySpread = Math.max(1, historyMaxVal - historyMinVal);
-  const historyPaddedMin = Math.max(currentMetric.min, Number((historyMinVal - historySpread * 0.12).toFixed(1)));
-  const historyPaddedMax = Math.min(currentMetric.max, Number((historyMaxVal + historySpread * 0.12).toFixed(1)));
-  const historyValueRange = Math.max(0.1, historyPaddedMax - historyPaddedMin);
+  const historyTargetY = useMemo(() => {
+    const clampedTarget = Math.min(historyPaddedMax, Math.max(historyPaddedMin, currentMetric.target));
+    return historyPlotBottom - ((clampedTarget - historyPaddedMin) / historyValueRange) * historyPlotHeight;
+  }, [currentMetric.target, historyPaddedMin, historyPaddedMax, historyValueRange, historyPlotBottom, historyPlotHeight]);
 
-  const historyPoints = useMemo(() => {
+  // Discrete Rounded Column Bars Calculation (Cohesive spacing, no sparse gaps)
+  const historyBars = useMemo(() => {
     if (!historyData.length) return [];
-    const startX = 10;
-    const availableWidth = historyChartWidth - 20;
+    const n = historyData.length;
+
+    let barWidth: number;
+    let gap: number;
+    let startX: number;
+
+    if (n <= 10) {
+      // Cohesive tight spacing for few data points so bars don't drift miles apart
+      barWidth = Math.max(18, Math.min(28, (historyPlotWidth / n) * 0.6));
+      gap = Math.max(6, Math.min(10, barWidth * 0.35));
+      const totalContentWidth = n * barWidth + (n - 1) * gap;
+      startX = historyLeftMargin + Math.max(0, (historyPlotWidth - totalContentWidth) / 2);
+    } else {
+      // Full width distribution for larger sets of data points
+      const slotWidth = historyPlotWidth / n;
+      gap = Math.max(2, Math.min(5, slotWidth * 0.22));
+      barWidth = Math.max(3, slotWidth - gap);
+      startX = historyLeftMargin + (slotWidth - barWidth) / 2;
+    }
+
     return historyData.map((d, index) => {
-      const x = historyData.length === 1 
-        ? historyChartWidth / 2 
-        : startX + (index / (historyData.length - 1)) * availableWidth;
       const clampedVal = Math.min(historyPaddedMax, Math.max(historyPaddedMin, d.value));
-      const y = (historyChartHeight - 16) - ((clampedVal - historyPaddedMin) / historyValueRange) * (historyChartHeight - 32);
+      const valRatio = (clampedVal - historyPaddedMin) / historyValueRange;
+      const barHeight = Math.max(6, valRatio * historyPlotHeight);
+      const x = n <= 10 ? startX + index * (barWidth + gap) : historyLeftMargin + index * (barWidth + gap);
+      const y = historyPlotBottom - barHeight;
+      const centerX = x + barWidth / 2;
+
       return {
         x,
         y,
+        width: barWidth,
+        height: barHeight,
+        centerX,
+        value: d.value,
+        time: d.time,
+        axisLabel: d.axisLabel,
+        timestamp: d.timestamp,
+        index,
+      };
+    });
+  }, [historyData, historyPlotWidth, historyLeftMargin, historyPlotBottom, historyPlotHeight, historyPaddedMin, historyPaddedMax, historyValueRange]);
+
+  // Smooth Bezier Curve / Line Points for Line mode
+  const historyPoints = useMemo(() => {
+    if (!historyData.length) return [];
+    const n = historyData.length;
+    return historyData.map((d, index) => {
+      const x = n === 1 
+        ? historyLeftMargin + historyPlotWidth / 2 
+        : historyLeftMargin + (index / (n - 1)) * historyPlotWidth;
+      const clampedVal = Math.min(historyPaddedMax, Math.max(historyPaddedMin, d.value));
+      const y = historyPlotBottom - ((clampedVal - historyPaddedMin) / historyValueRange) * historyPlotHeight;
+      return {
+        x,
+        y,
+        centerX: x,
         value: d.value,
         time: d.time,
         axisLabel: d.axisLabel,
@@ -509,31 +604,40 @@ export default function AnalyticsScreen() {
         index
       };
     });
-  }, [historyData, historyChartWidth, historyChartHeight, historyPaddedMin, historyPaddedMax, historyValueRange]);
-
-  const historyTargetY = useMemo(() => {
-    const clampedTarget = Math.min(historyPaddedMax, Math.max(historyPaddedMin, currentMetric.target));
-    return (historyChartHeight - 16) - ((clampedTarget - historyPaddedMin) / historyValueRange) * (historyChartHeight - 32);
-  }, [currentMetric.target, historyPaddedMin, historyPaddedMax, historyValueRange, historyChartHeight]);
+  }, [historyData, historyPlotWidth, historyLeftMargin, historyPlotBottom, historyPlotHeight, historyPaddedMin, historyPaddedMax, historyValueRange]);
 
   const historyBezierPath = useMemo(() => getBezierPath(historyPoints), [historyPoints]);
   const historyAreaPath = useMemo(() => {
     if (!historyBezierPath || historyPoints.length === 0) return '';
-    return `${historyBezierPath} L ${historyPoints[historyPoints.length - 1].x} ${historyChartHeight} L ${historyPoints[0].x} ${historyChartHeight} Z`;
-  }, [historyBezierPath, historyPoints, historyChartHeight]);
+    return `${historyBezierPath} L ${historyPoints[historyPoints.length - 1].x} ${historyPlotBottom} L ${historyPoints[0].x} ${historyPlotBottom} Z`;
+  }, [historyBezierPath, historyPoints, historyPlotBottom]);
 
-  const activeHistoryPoint = selectedHistoryIndex !== null 
-    ? historyPoints[selectedHistoryIndex] 
-    : (historyPoints.length > 0 ? historyPoints[historyPoints.length - 1] : null);
+  const activeHistoryPoint = useMemo(() => {
+    if (selectedHistoryIndex !== null) {
+      return historyChartStyle === 'bar'
+        ? (historyBars[selectedHistoryIndex] || null)
+        : (historyPoints[selectedHistoryIndex] || null);
+    }
+    if (historyChartStyle === 'bar') {
+      return historyBars.length > 0 ? historyBars[historyBars.length - 1] : null;
+    }
+    return historyPoints.length > 0 ? historyPoints[historyPoints.length - 1] : null;
+  }, [selectedHistoryIndex, historyChartStyle, historyBars, historyPoints]);
 
   const handleHistoryTouchAt = (locX: number) => {
-    if (!historyPoints.length) return;
-    const startX = 10;
-    const availableWidth = historyChartWidth - 20;
-    const norm = Math.max(0, Math.min(1, (locX - startX) / availableWidth));
-    const idx = Math.round(norm * (historyData.length - 1));
-    if (idx >= 0 && idx < historyData.length && idx !== selectedHistoryIndex) {
-      setSelectedHistoryIndex(idx);
+    if (!historyBars.length && !historyPoints.length) return;
+    const list = historyChartStyle === 'bar' ? historyBars : historyPoints;
+    let closestIdx = 0;
+    let minDistance = Infinity;
+    list.forEach((pt, idx) => {
+      const dist = Math.abs(locX - pt.centerX);
+      if (dist < minDistance) {
+        minDistance = dist;
+        closestIdx = idx;
+      }
+    });
+    if (closestIdx !== selectedHistoryIndex) {
+      setSelectedHistoryIndex(closestIdx);
     }
   };
 
@@ -554,10 +658,24 @@ export default function AnalyticsScreen() {
     })
   ).current;
 
-  // Extract up to 5 evenly spaced tick points for clean X-axis labels
+  // Extract clean ticks matching exact bar/point centers
   const historyAxisTicks = useMemo(() => {
-    if (historyPoints.length < 2) return [];
-    const count = Math.min(5, historyPoints.length);
+    if (historyChartStyle === 'bar') {
+      if (historyBars.length <= 10) {
+        return historyBars;
+      }
+      const count = Math.min(6, historyBars.length);
+      const step = (historyBars.length - 1) / (count - 1);
+      const ticks = [];
+      for (let i = 0; i < count; i++) {
+        const idx = Math.round(i * step);
+        ticks.push(historyBars[idx]);
+      }
+      return ticks;
+    }
+
+    if (historyPoints.length < 2) return historyPoints;
+    const count = Math.min(6, historyPoints.length);
     const step = (historyPoints.length - 1) / (count - 1);
     const ticks = [];
     for (let i = 0; i < count; i++) {
@@ -565,7 +683,8 @@ export default function AnalyticsScreen() {
       ticks.push(historyPoints[idx]);
     }
     return ticks;
-  }, [historyPoints]);
+  }, [historyChartStyle, historyBars, historyPoints]);
+
 
   const displayLow = historyMin !== null ? historyMin : (isDis ? '--' : min);
   const displayHigh = historyMax !== null ? historyMax : (isDis ? '--' : max);
@@ -874,19 +993,19 @@ export default function AnalyticsScreen() {
                     </SvgGradient>
                   </Defs>
 
-                  {/* Dotted Target Setpoint Reference Line */}
+                  {/* Dotted Target Setpoint Reference Line (Soft translucent guide) */}
                   <Line
                     x1="0"
                     y1={targetY}
                     x2={sparklineWidth}
                     y2={targetY}
-                    stroke={isDarkMode ? '#334155' : '#e2e8f0'}
+                    stroke={isDarkMode ? 'rgba(148, 163, 184, 0.35)' : 'rgba(100, 116, 139, 0.28)'}
                     strokeDasharray="4 4"
                     strokeWidth="1"
                   />
                   <SvgText
                     x="6"
-                    y={targetY - 5}
+                    y={Math.max(16, targetY - 5)}
                     fontSize="9"
                     fontWeight="700"
                     fill={isDarkMode ? '#64748b' : '#94a3b8'}
@@ -897,15 +1016,24 @@ export default function AnalyticsScreen() {
                   {/* Area Gradient Underfill */}
                   {areaPath !== '' && <Path d={areaPath} fill="url(#sparklineGrad)" />}
 
-                  {/* Smooth Bezier Sparkline Curve */}
+                  {/* Smooth Bezier Sparkline Curve (with knockout halo so broken lines disappear when passing through) */}
                   {bezierPath !== '' && (
-                    <Path
-                      d={bezierPath}
-                      stroke={currentMetric.color}
-                      strokeWidth="2.75"
-                      fill="none"
-                      strokeLinecap="round"
-                    />
+                    <>
+                      <Path
+                        d={bezierPath}
+                        stroke={isDarkMode ? '#0f172a' : '#ffffff'}
+                        strokeWidth="6.5"
+                        fill="none"
+                        strokeLinecap="round"
+                      />
+                      <Path
+                        d={bezierPath}
+                        stroke={currentMetric.color}
+                        strokeWidth="2.75"
+                        fill="none"
+                        strokeLinecap="round"
+                      />
+                    </>
                   )}
 
                   {/* Active Scrubber Indicator when inspecting a point */}
@@ -1023,7 +1151,7 @@ export default function AnalyticsScreen() {
 
         {/* Historical Trend Chart Card */}
         <View style={tw`bg-white dark:bg-slate-900 mx-5 rounded-[28px] p-5 shadow-sm border border-slate-200/70 dark:border-slate-800 mb-5`}>
-          {/* Card Top: Range Title & Point Inspector */}
+          {/* Card Top: Range Title, Point Inspector & Chart Mode Switcher */}
           <View style={tw`flex-row justify-between items-start mb-3`}>
             <View>
               <View style={tw`flex-row items-center gap-2 mb-1`}>
@@ -1031,7 +1159,7 @@ export default function AnalyticsScreen() {
                 <Text style={[tw`text-[11px] text-slate-400 dark:text-slate-500 uppercase tracking-wider`, { fontFamily: 'PlusJakartaSans_700Bold' }]}>
                   {selectedHistoryIndex !== null
                     ? `Selected (${activeHistoryPoint?.time})`
-                    : `${timeRange === '24H' ? '24-Hour' : (timeRange === '7D' ? '7-Day' : '30-Day')} Trend`}
+                    : `${timeRange === '24H' ? '24-Hour' : (timeRange === '7D' ? '7-Day' : '30-Day')} Aggregate`}
                 </Text>
               </View>
               <View style={tw`flex-row items-baseline gap-1.5`}>
@@ -1062,20 +1190,63 @@ export default function AnalyticsScreen() {
               </View>
             </View>
 
-            {/* Average Badge */}
-            {historyAvg !== null && (
-              <View style={tw`items-end`}>
-                <Text style={[tw`text-[10px] text-slate-400 dark:text-slate-500 uppercase tracking-wider`, { fontFamily: 'PlusJakartaSans_700Bold' }]}>
-                  Period Avg
-                </Text>
-                <Text style={[tw`text-base text-slate-800 dark:text-slate-200`, { fontFamily: 'PlusJakartaSans_800ExtraBold' }]}>
-                  {historyAvg}{currentMetric.unit}
-                </Text>
+            {/* Right: Sleek Bar/Line View Toggle */}
+            <View style={tw`items-end`}>
+              <View style={tw`flex-row bg-slate-100 dark:bg-slate-800 p-0.5 rounded-xl border border-slate-200/60 dark:border-slate-700/60`}>
+                <TouchableOpacity
+                  activeOpacity={0.7}
+                  onPress={() => {
+                    hapticSelection();
+                    setHistoryChartStyle('bar');
+                  }}
+                  style={[
+                    tw`px-2.5 py-1 rounded-lg flex-row items-center gap-1`,
+                    historyChartStyle === 'bar' ? tw`bg-white dark:bg-slate-700 shadow-sm` : tw`bg-transparent`
+                  ]}
+                >
+                  <MaterialCommunityIcons
+                    name="chart-bar"
+                    size={13}
+                    color={historyChartStyle === 'bar' ? currentMetric.color : (isDarkMode ? '#94a3b8' : '#64748b')}
+                  />
+                  <Text style={[
+                    tw`text-[10px]`,
+                    { fontFamily: 'PlusJakartaSans_700Bold' },
+                    historyChartStyle === 'bar' ? { color: currentMetric.color } : tw`text-slate-500 dark:text-slate-400`
+                  ]}>
+                    Bar
+                  </Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  activeOpacity={0.7}
+                  onPress={() => {
+                    hapticSelection();
+                    setHistoryChartStyle('line');
+                  }}
+                  style={[
+                    tw`px-2.5 py-1 rounded-lg flex-row items-center gap-1`,
+                    historyChartStyle === 'line' ? tw`bg-white dark:bg-slate-700 shadow-sm` : tw`bg-transparent`
+                  ]}
+                >
+                  <MaterialCommunityIcons
+                    name="chart-line"
+                    size={13}
+                    color={historyChartStyle === 'line' ? currentMetric.color : (isDarkMode ? '#94a3b8' : '#64748b')}
+                  />
+                  <Text style={[
+                    tw`text-[10px]`,
+                    { fontFamily: 'PlusJakartaSans_700Bold' },
+                    historyChartStyle === 'line' ? { color: currentMetric.color } : tw`text-slate-500 dark:text-slate-400`
+                  ]}>
+                    Line
+                  </Text>
+                </TouchableOpacity>
               </View>
-            )}
+            </View>
           </View>
 
-          {/* Chart Body: Loading, Empty, or SVG Bezier Curve */}
+          {/* Chart Body: Loading, Empty, or SVG Bar/Line Chart */}
           {isHistoryLoading ? (
             <View style={[tw`items-center justify-center py-10`, { height: historyChartHeight }]}>
               <ActivityIndicator size="small" color={currentMetric.color} />
@@ -1097,91 +1268,212 @@ export default function AnalyticsScreen() {
             </View>
           ) : (
             <>
+              {/* Swipe Hint indicator */}
               <View style={tw`flex-row items-center justify-end mb-2 gap-1`}>
                 <MaterialCommunityIcons name="gesture-tap" size={13} color={isDarkMode ? '#64748b' : '#94a3b8'} />
                 <Text style={[tw`text-[10px] text-slate-400 dark:text-slate-500`, { fontFamily: 'PlusJakartaSans_600SemiBold' }]}>
-                  Slide across curve to inspect records
+                  {historyChartStyle === 'bar' ? 'Tap or slide bars to inspect' : 'Slide across curve to inspect'}
                 </Text>
               </View>
 
+              {/* Chart SVG with Pan Scrubber */}
               <View
                 {...historyScrubberPanResponder.panHandlers}
                 style={{ width: historyChartWidth, height: historyChartHeight }}
               >
                 <Svg width={historyChartWidth} height={historyChartHeight}>
                   <Defs>
-                    <SvgGradient id={`historyGrad-${activeMetric}`} x1="0" y1="0" x2="0" y2="1">
-                      <Stop offset="0%" stopColor={currentMetric.color} stopOpacity="0.32" />
+                    {/* Bar Fill Gradient */}
+                    <SvgGradient id={`barGrad-${activeMetric}`} x1="0" y1="0" x2="0" y2="1">
+                      <Stop offset="0%" stopColor={currentMetric.color} stopOpacity="0.9" />
+                      <Stop offset="100%" stopColor={currentMetric.color} stopOpacity="0.5" />
+                    </SvgGradient>
+
+                    {/* Active Selected Bar Gradient */}
+                    <SvgGradient id={`activeBarGrad-${activeMetric}`} x1="0" y1="0" x2="0" y2="1">
+                      <Stop offset="0%" stopColor="#ffffff" stopOpacity="0.3" />
+                      <Stop offset="100%" stopColor={currentMetric.color} stopOpacity="1" />
+                    </SvgGradient>
+
+                    {/* Line Area Gradient */}
+                    <SvgGradient id={`historyLineGrad-${activeMetric}`} x1="0" y1="0" x2="0" y2="1">
+                      <Stop offset="0%" stopColor={currentMetric.color} stopOpacity="0.28" />
                       <Stop offset="100%" stopColor={currentMetric.color} stopOpacity="0.0" />
                     </SvgGradient>
                   </Defs>
 
-                  {/* Target Setpoint Line */}
+                  {/* Target Setpoint Benchmark Line (Soft translucent guide behind bars & curves) */}
                   <Line
                     x1="0"
                     y1={historyTargetY}
                     x2={historyChartWidth}
                     y2={historyTargetY}
-                    stroke={isDarkMode ? '#475569' : '#cbd5e1'}
+                    stroke={isDarkMode ? 'rgba(148, 163, 184, 0.35)' : 'rgba(100, 116, 139, 0.28)'}
                     strokeDasharray="4 4"
-                    strokeWidth="1.2"
+                    strokeWidth="1"
+                  />
+                  <SvgText
+                    x="8"
+                    y={Math.max(16, historyTargetY - 5)}
+                    fontSize="9"
+                    fontWeight="700"
+                    fill={isDarkMode ? '#64748b' : '#94a3b8'}
+                  >
+                    Target: {currentMetric.target}{currentMetric.unit}
+                  </SvgText>
+
+                  {/* Body Option A: Rounded Column Bars (Flat Bottom on Ground Baseline) */}
+                  {historyChartStyle === 'bar' && (
+                    <G>
+                      {historyBars.map((bar) => {
+                        const isSelected = selectedHistoryIndex === bar.index;
+                        const isAnySelected = selectedHistoryIndex !== null;
+                        const barOpacity = isSelected ? 1 : (isAnySelected ? 0.35 : 0.85);
+
+                        return (
+                          <G key={`bar-group-${bar.index}`}>
+                            {/* Solid Card Background Knockout Base: makes broken lines disappear inside the bar */}
+                            <Path
+                              d={getBarPath(bar.x, bar.y, bar.width, historyPlotBottom)}
+                              fill={isDarkMode ? '#0f172a' : '#ffffff'}
+                            />
+
+                            {/* Measured Column Bar with Flat Grounded Base and Rounded Top */}
+                            <Path
+                              d={getBarPath(bar.x, bar.y, bar.width, historyPlotBottom)}
+                              fill={isSelected ? `url(#activeBarGrad-${activeMetric})` : `url(#barGrad-${activeMetric})`}
+                              opacity={barOpacity}
+                            />
+
+                            {/* Selected Bar Indicator & Top Highlight Cap */}
+                            {isSelected && (
+                              <>
+                                <Line
+                                  x1={bar.centerX}
+                                  y1={historyPlotTop - 4}
+                                  x2={bar.centerX}
+                                  y2={bar.y}
+                                  stroke={currentMetric.color}
+                                  strokeWidth="1"
+                                  strokeDasharray="2 2"
+                                />
+                                <Circle
+                                  cx={bar.centerX}
+                                  cy={bar.y}
+                                  r={Math.max(3.5, Math.min(5.5, bar.width / 2))}
+                                  fill={currentMetric.color}
+                                  stroke={isDarkMode ? '#0f172a' : '#ffffff'}
+                                  strokeWidth="2"
+                                />
+                              </>
+                            )}
+                          </G>
+                        );
+                      })}
+                    </G>
+                  )}
+
+                  {/* Body Option B: Continuous Historical Curve with Nodes */}
+                  {historyChartStyle === 'line' && (
+                    <G>
+                      {historyAreaPath ? (
+                        <Path
+                          d={historyAreaPath}
+                          fill={`url(#historyLineGrad-${activeMetric})`}
+                        />
+                      ) : null}
+
+                      {historyBezierPath ? (
+                        <>
+                          {/* Knockout halo: makes broken lines disappear right as curve passes through */}
+                          <Path
+                            d={historyBezierPath}
+                            fill="none"
+                            stroke={isDarkMode ? '#0f172a' : '#ffffff'}
+                            strokeWidth="6.5"
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                          />
+                          <Path
+                            d={historyBezierPath}
+                            fill="none"
+                            stroke={currentMetric.color}
+                            strokeWidth="2.5"
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                          />
+                        </>
+                      ) : null}
+
+                      {/* Discrete Node Dots on Vertices */}
+                      {historyPoints.map((pt, idx) => {
+                        const showDot = historyPoints.length <= 30 || idx % Math.ceil(historyPoints.length / 24) === 0;
+                        if (!showDot) return null;
+                        const isSelected = selectedHistoryIndex === idx;
+
+                        return (
+                          <Circle
+                            key={`hist-node-${idx}`}
+                            cx={pt.x}
+                            cy={pt.y}
+                            r={isSelected ? 5 : 2.5}
+                            fill={isSelected ? currentMetric.color : (isDarkMode ? '#0f172a' : '#ffffff')}
+                            stroke={currentMetric.color}
+                            strokeWidth={isSelected ? 2 : 1.5}
+                          />
+                        );
+                      })}
+
+                      {/* Active Scrubber Point in Line Mode */}
+                      {activeHistoryPoint && (
+                        <>
+                          <Line
+                            x1={activeHistoryPoint.centerX}
+                            y1={historyPlotTop}
+                            x2={activeHistoryPoint.centerX}
+                            y2={historyPlotBottom}
+                            stroke={currentMetric.color}
+                            strokeDasharray="3 3"
+                            strokeWidth="1.5"
+                          />
+                          <Circle
+                            cx={activeHistoryPoint.centerX}
+                            cy={activeHistoryPoint.y}
+                            r="5.5"
+                            fill={currentMetric.color}
+                            stroke={isDarkMode ? '#0f172a' : '#ffffff'}
+                            strokeWidth="2"
+                          />
+                        </>
+                      )}
+                    </G>
+                  )}
+
+                  {/* Solid Ground Baseline (anchors bars and eliminates floating) */}
+                  <Line
+                    x1="0"
+                    y1={historyPlotBottom}
+                    x2={historyChartWidth}
+                    y2={historyPlotBottom}
+                    stroke={isDarkMode ? '#334155' : '#cbd5e1'}
+                    strokeWidth="1.5"
                   />
 
-                  {/* Area Gradient Fill */}
-                  {historyAreaPath ? (
-                    <Path
-                      d={historyAreaPath}
-                      fill={`url(#historyGrad-${activeMetric})`}
-                    />
-                  ) : null}
-
-                  {/* Smooth Bezier Line */}
-                  {historyBezierPath ? (
-                    <Path
-                      d={historyBezierPath}
-                      fill="none"
-                      stroke={currentMetric.color}
-                      strokeWidth="2.5"
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                    />
-                  ) : null}
-
-                  {/* Active Scrubber Point & Vertical Indicator */}
-                  {activeHistoryPoint && (
-                    <>
-                      <Line
-                        x1={activeHistoryPoint.x}
-                        y1={8}
-                        x2={activeHistoryPoint.x}
-                        y2={historyChartHeight - 8}
-                        stroke={currentMetric.color}
-                        strokeDasharray="3 3"
-                        strokeWidth="1.5"
-                      />
-                      <Circle
-                        cx={activeHistoryPoint.x}
-                        cy={activeHistoryPoint.y}
-                        r="6"
-                        fill={currentMetric.color}
-                        stroke={isDarkMode ? '#0f172a' : '#ffffff'}
-                        strokeWidth="2.5"
-                      />
-                    </>
-                  )}
+                  {/* X-Axis Timeline Labels placed directly beneath bars */}
+                  {historyAxisTicks.map((pt, i) => (
+                    <SvgText
+                      key={`axis-tick-${i}`}
+                      x={pt.centerX}
+                      y={historyChartHeight - 6}
+                      textAnchor="middle"
+                      fontSize="9"
+                      fontWeight="600"
+                      fill={isDarkMode ? '#64748b' : '#94a3b8'}
+                    >
+                      {pt.axisLabel}
+                    </SvgText>
+                  ))}
                 </Svg>
-              </View>
-
-              {/* X-Axis Timeline Labels */}
-              <View style={tw`flex-row justify-between items-center px-2 pt-2 border-t border-slate-100 dark:border-slate-800/80 mt-1`}>
-                {historyAxisTicks.map((pt, i) => (
-                  <Text
-                    key={i}
-                    style={[tw`text-[10px] text-slate-400 dark:text-slate-500`, { fontFamily: 'PlusJakartaSans_600SemiBold' }]}
-                  >
-                    {pt.axisLabel}
-                  </Text>
-                ))}
               </View>
             </>
           )}

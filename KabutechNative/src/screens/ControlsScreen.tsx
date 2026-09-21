@@ -165,6 +165,19 @@ export default function ControlsScreen() {
     }
   };
 
+  const turnOffAllDevices = async () => {
+    if (isLocked) return;
+    hapticMedium();
+    const desired = { fans: false, misters: false, lights: false, co2: false };
+    setDevices(desired);
+    try {
+      await update(ref(db, 'kabutech/settings/setpoints/devices'), desired);
+      showToast({ type: 'info', text1: 'All Actuators Switched Off', text2: 'Hardware returned to standby.' });
+    } catch (e: any) {
+      showToast({ type: 'error', text1: 'Action Failed', text2: e?.message || 'Unable to update devices' });
+    }
+  };
+
   const executeSetMode = (mode: 'auto' | 'manual' | 'scheduled') => {
     let nextDevices = settings?.setpoints?.devices || { fans: false, misters: false, lights: false, co2: false };
     if (mode === 'scheduled') {
@@ -394,11 +407,70 @@ export default function ControlsScreen() {
     };
   }, []);
 
+  const activeDeviceCount = Object.values(devices).filter(Boolean).length;
+
   const deviceToggles = [
-    { key: 'fans', label: 'FANS', icon: 'fan', active: devices.fans, color: '#3b82f6' },
-    { key: 'misters', label: 'MISTERS', icon: 'water', active: devices.misters, color: '#0ea5e9' },
-    { key: 'lights', label: 'LIGHTS', icon: 'lightbulb-on', active: devices.lights, color: '#eab308' },
-    { key: 'co2', label: 'VALVE', icon: 'weather-windy', active: devices.co2, color: '#10b981' },
+    {
+      key: 'fans',
+      name: 'Ventilation',
+      tag: 'FANS',
+      roleHint: 'Airflow',
+      subtitle: 'Exhaust & Circulation',
+      icon: 'fan' as const,
+      active: Boolean(devices.fans),
+      color: '#10b981',
+      activeStatus: 'Active Flow',
+      inactiveStatus: 'Standby',
+      activeBg: 'bg-emerald-500/10 dark:bg-emerald-500/20',
+      activeBorder: 'border-emerald-500/50 dark:border-emerald-500/40',
+      activeGlow: 'bg-emerald-500',
+    },
+    {
+      key: 'misters',
+      name: 'Humidifier',
+      tag: 'MIST',
+      roleHint: 'Fogger',
+      subtitle: 'Ultrasonic Fogger',
+      icon: 'water-percent' as const,
+      active: Boolean(devices.misters),
+      color: '#10b981',
+      activeStatus: 'Misting Active',
+      inactiveStatus: 'Standby',
+      activeBg: 'bg-emerald-500/10 dark:bg-emerald-500/20',
+      activeBorder: 'border-emerald-500/50 dark:border-emerald-500/40',
+      activeGlow: 'bg-emerald-500',
+      isLowWater: waterLevel <= 20,
+    },
+    {
+      key: 'lights',
+      name: 'Grow Lights',
+      tag: 'LIGHTS',
+      roleHint: 'LED Array',
+      subtitle: 'Full Spectrum Array',
+      icon: 'lightbulb-on' as const,
+      active: Boolean(devices.lights),
+      color: '#10b981',
+      activeStatus: 'Illuminating',
+      inactiveStatus: 'Dark Cycle',
+      activeBg: 'bg-emerald-500/10 dark:bg-emerald-500/20',
+      activeBorder: 'border-emerald-500/50 dark:border-emerald-500/40',
+      activeGlow: 'bg-emerald-500',
+    },
+    {
+      key: 'co2',
+      name: 'CO2 Gas Valve',
+      tag: 'VALVE',
+      roleHint: 'Gas Flow',
+      subtitle: 'Aeration Solenoid',
+      icon: 'molecule-co2' as const,
+      active: Boolean(devices.co2),
+      color: '#10b981',
+      activeStatus: 'Valve Open',
+      inactiveStatus: 'Sealed',
+      activeBg: 'bg-emerald-500/10 dark:bg-emerald-500/20',
+      activeBorder: 'border-emerald-500/50 dark:border-emerald-500/40',
+      activeGlow: 'bg-emerald-500',
+    },
   ];
 
   return (
@@ -640,85 +712,179 @@ export default function ControlsScreen() {
           </View>
         ) : null}
 
-        {/* Hardware Actuators Single Widget */}
-        <View style={tw`px-5 pt-1`}>
-          <View style={tw`flex-row justify-between items-center mb-2.5`}>
+        {/* Hardware Actuators Modern 2x2 Console */}
+        <View style={tw`px-5 pt-1 mb-2`}>
+          {/* Section Header */}
+          <View style={tw`flex-row justify-between items-center mb-2`}>
             <View style={tw`flex-row items-center gap-2`}>
-              <View style={tw`w-2 h-4 rounded-full bg-[#10b981]`} />
-              <Text style={[tw`text-[14px] text-slate-900 dark:text-white tracking-wide`, { fontFamily: 'PlusJakartaSans_800ExtraBold' }]}>
+              <View style={tw`w-1.5 h-3.5 rounded-full bg-[#10b981]`} />
+              <Text style={[tw`text-[14px] text-slate-900 dark:text-white tracking-tight`, { fontFamily: 'PlusJakartaSans_800ExtraBold' }]}>
                 Hardware Actuators
               </Text>
             </View>
-            <View style={tw`bg-slate-100 dark:bg-slate-800 px-2 py-0.5 rounded-full border border-slate-200/60 dark:border-slate-700 flex-row items-center gap-1`}>
-              {isLocked ? (
-                <MaterialCommunityIcons name="lock-outline" size={10} color={isDarkMode ? '#94a3b8' : '#64748b'} />
-              ) : (
-                <View style={tw`w-1.5 h-1.5 rounded-full bg-emerald-500`} />
+
+            <View style={tw`flex-row items-center gap-1.5`}>
+              {/* All Off Safety Cutoff Button (visible in manual mode when at least 1 device is running) */}
+              {!isLocked && activeDeviceCount > 0 && (
+                <TouchableOpacity
+                  activeOpacity={0.75}
+                  onPress={turnOffAllDevices}
+                  style={tw`px-2.5 py-1 rounded-xl bg-rose-50 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-800/60 flex-row items-center gap-1`}
+                >
+                  <MaterialCommunityIcons name="power" size={11} color="#ef4444" />
+                  <Text style={[tw`text-[9.5px] text-rose-600 dark:text-rose-400`, { fontFamily: 'PlusJakartaSans_700Bold' }]}>
+                    All Off
+                  </Text>
+                </TouchableOpacity>
               )}
-              <Text style={[tw`text-[9.5px] text-slate-600 dark:text-slate-400`, { fontFamily: 'PlusJakartaSans_700Bold' }]}>
-                {isAiOverride ? 'AI Active' : isLocked ? `${isAuto ? 'AUTO' : 'TIMED'}` : `${Object.values(devices).filter(Boolean).length} Active`}
-              </Text>
+
+              {/* Mode Status Pill */}
+              <TouchableOpacity
+                activeOpacity={isLocked ? 0.75 : 1}
+                onPress={() => {
+                  if (isLocked) {
+                    hapticSelection();
+                    DeviceEventEmitter.emit('showManualOverrideModal');
+                  }
+                }}
+                style={[
+                  tw`px-2.5 py-1 rounded-full border flex-row items-center gap-1.2`,
+                  isAiOverride
+                    ? tw`bg-blue-50 dark:bg-blue-950/40 border-blue-200 dark:border-blue-800`
+                    : isAuto
+                    ? tw`bg-emerald-50 dark:bg-emerald-950/40 border-emerald-200 dark:border-emerald-800`
+                    : isScheduled
+                    ? tw`bg-purple-50 dark:bg-purple-950/40 border-purple-200 dark:border-purple-800`
+                    : tw`bg-slate-100 dark:bg-slate-800 border-slate-200/80 dark:border-slate-700`
+                ]}
+              >
+                {isLocked ? (
+                  <MaterialCommunityIcons
+                    name="lock"
+                    size={10}
+                    color={isAiOverride ? '#3b82f6' : isAuto ? '#10b981' : '#a855f7'}
+                  />
+                ) : (
+                  <View style={tw`w-1.5 h-1.5 rounded-full bg-emerald-500`} />
+                )}
+                <Text
+                  style={[
+                    tw`text-[9.5px]`,
+                    { fontFamily: 'PlusJakartaSans_700Bold' },
+                    isAiOverride
+                      ? tw`text-blue-600 dark:text-blue-400`
+                      : isAuto
+                      ? tw`text-emerald-600 dark:text-emerald-400`
+                      : isScheduled
+                      ? tw`text-purple-600 dark:text-purple-400`
+                      : tw`text-slate-600 dark:text-slate-400`
+                  ]}
+                >
+                  {isAiOverride ? 'AI Locked' : isAuto ? 'AUTO' : isScheduled ? 'TIMED' : `${activeDeviceCount} Active`}
+                </Text>
+              </TouchableOpacity>
             </View>
           </View>
 
-
-          {/* Unified Single Widget Bar */}
-          <View style={[
-            tw`bg-white dark:bg-slate-900 rounded-[24px] py-3.5 px-2 border border-slate-200/70 dark:border-slate-800 shadow-sm flex-row items-center justify-between`,
-            isLocked ? tw`opacity-60` : null
-          ]}>
-            {deviceToggles.map((device, index) => {
+          {/* Hardware Actuators Single-Line Modular Console */}
+          <View style={tw`flex-row justify-between gap-2 mb-2`}>
+            {deviceToggles.map((device) => {
               const showActive = device.active;
+
               return (
-                <TouchableOpacity 
-                  hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                <TouchableOpacity
                   key={device.key}
-                  disabled={isLocked}
-                  activeOpacity={0.7}
-                  onPress={() => toggleDevice(device.key, !device.active)}
-                  style={tw`flex-1 items-center justify-center`}
+                  activeOpacity={isLocked ? 0.85 : 0.75}
+                  onPress={() => {
+                    if (isLocked) {
+                      hapticLight();
+                      showToast({
+                        type: 'info',
+                        text1: `${isAiOverride ? 'AI Override' : isAuto ? 'Automatic Mode' : 'Scheduled Mode'} Active`,
+                        text2: 'Tap MANUAL above to control equipment directly.',
+                      });
+                      return;
+                    }
+                    toggleDevice(device.key, !device.active);
+                  }}
+                  style={[
+                    tw`flex-1 rounded-2xl py-1 px-1 items-center justify-between border`,
+                    { height: 60 },
+                    showActive
+                      ? [
+                          isDarkMode ? tw`bg-slate-800/95` : tw`bg-emerald-50/50`,
+                          tw`border-emerald-500/50 dark:border-emerald-500/40`,
+                          tw`shadow-sm`,
+                        ]
+                      : [
+                          isDarkMode ? tw`bg-slate-900/90 border-slate-800/80` : tw`bg-white/95 border-slate-200/80`,
+                        ]
+                  ]}
                 >
-                  <MaterialCommunityIcons 
-                    name={device.icon as any} 
-                    size={22} 
-                    color={showActive ? device.color : (isDarkMode ? '#64748b' : '#94a3b8')} 
-                  />
+                  {/* Top: Compact Squircle Icon Badge with Lock Indicator */}
+                  <View style={tw`relative items-center justify-center`}>
+                    <View
+                      style={[
+                        tw`w-6.5 h-6.5 rounded-lg items-center justify-center`,
+                        showActive
+                          ? [tw`bg-emerald-500/15 dark:bg-emerald-500/25`, { borderWidth: 1, borderColor: '#10b98140' }]
+                          : (isDarkMode ? tw`bg-slate-800/80 border border-slate-700/50` : tw`bg-slate-100/90 border border-slate-200/60`)
+                      ]}
+                    >
+                      <MaterialCommunityIcons
+                        name={device.icon}
+                        size={15}
+                        color={showActive ? '#10b981' : (isDarkMode ? '#64748b' : '#94a3b8')}
+                      />
+                    </View>
 
-                  <Text 
-                    style={[
-                      tw`text-[10px] mt-1.5 text-center uppercase tracking-wide`, 
-                      showActive 
-                        ? [tw`text-slate-900 dark:text-white`, { fontFamily: 'PlusJakartaSans_800ExtraBold' }] 
-                        : tw`text-slate-500 dark:text-slate-400 font-bold`
-                    ]} 
-                    numberOfLines={1}
-                  >
-                    {device.label}
-                  </Text>
-
-                  {/* Status Indicator Dot + Text */}
-                  <View style={tw`flex-row items-center gap-1 mt-1`}>
-                    <View style={[
-                      tw`w-1.5 h-1.5 rounded-full`,
-                      showActive ? { backgroundColor: device.color } : tw`bg-slate-300 dark:bg-slate-600`
-                    ]} />
-                    <Text style={[
-                      tw`text-[9px]`,
-                      showActive ? { color: device.color, fontFamily: 'PlusJakartaSans_800ExtraBold' } : tw`text-slate-400 dark:text-slate-500 font-bold`
-                    ]}>
-                      {showActive ? 'ON' : 'OFF'}
-                    </Text>
+                    {/* Lock overlay glyph if automated */}
+                    {isLocked && (
+                      <View style={tw`absolute -top-1 -right-1 w-2.5 h-2.5 rounded-full bg-slate-200 dark:bg-slate-700 items-center justify-center border border-white dark:border-slate-800`}>
+                        <MaterialCommunityIcons name="lock" size={5.5} color={isDarkMode ? '#94a3b8' : '#64748b'} />
+                      </View>
+                    )}
                   </View>
 
-                  {/* Water level badge for misters */}
-                  {device.key === 'misters' && (
-                    <View style={tw`flex-row items-center gap-0.5 mt-0.5`}>
-                      <MaterialCommunityIcons name="water" size={10} color={waterLevel <= 20 ? '#ef4444' : '#0ea5e9'} />
-                      <Text style={[tw`text-[8.5px]`, { color: waterLevel <= 20 ? '#ef4444' : (isDarkMode ? '#38bdf8' : '#0284c7'), fontFamily: 'PlusJakartaSans_700Bold' }]}>
-                        {Math.round(waterLevel)}%
-                      </Text>
-                    </View>
-                  )}
+                  {/* Middle: Equipment Tag */}
+                  <Text
+                    style={[
+                      tw`text-[9px] uppercase tracking-wide text-center`,
+                      { fontFamily: 'PlusJakartaSans_800ExtraBold' },
+                      showActive
+                        ? (isDarkMode ? tw`text-emerald-400` : tw`text-emerald-700`)
+                        : (isDarkMode ? tw`text-slate-300` : tw`text-slate-700`)
+                    ]}
+                    numberOfLines={1}
+                  >
+                    {device.tag}
+                  </Text>
+
+                  {/* Bottom: Compact Tactile State Pill */}
+                  <View
+                    style={[
+                      tw`px-1.5 py-0.2 rounded-full flex-row items-center gap-1`,
+                      showActive
+                        ? [{ backgroundColor: '#10b981' }]
+                        : (isDarkMode ? tw`bg-slate-800 border border-slate-700/60` : tw`bg-slate-100 border border-slate-200/60`)
+                    ]}
+                  >
+                    <View
+                      style={[
+                        tw`w-1 h-1 rounded-full`,
+                        showActive ? tw`bg-white` : tw`bg-slate-400 dark:bg-slate-500`
+                      ]}
+                    />
+                    <Text
+                      style={[
+                        tw`text-[7.5px] tracking-wider`,
+                        { fontFamily: 'PlusJakartaSans_800ExtraBold' },
+                        showActive ? tw`text-white` : tw`text-slate-500 dark:text-slate-400`
+                      ]}
+                    >
+                      {device.key === 'misters' && device.isLowWater ? 'LOW' : (showActive ? 'ON' : 'OFF')}
+                    </Text>
+                  </View>
                 </TouchableOpacity>
               );
             })}
