@@ -54,7 +54,9 @@
     "typescript": "~6.0.3"
   },
   "scripts": {
-    "start": "adb reverse tcp:8081 tcp:8081 & expo start",
+    "start": "expo start",
+    "start:usb": "adb reverse tcp:8081 tcp:8081 & expo start",
+    "start:tunnel": "expo start --tunnel",
     "android": "expo run:android",
     "ios": "expo run:ios",
     "web": "expo start --web",
