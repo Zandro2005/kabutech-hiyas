@@ -6,8 +6,8 @@ import { StatusBar } from 'expo-status-bar';
 import * as Font from 'expo-font';
 import * as SplashScreen from 'expo-splash-screen';
 
-// Keep the splash screen visible while we fetch resources
-SplashScreen.preventAutoHideAsync();
+// Keep the splash screen visible while we fetch resources safely
+SplashScreen.preventAutoHideAsync().catch(() => {});
 import {
   PlusJakartaSans_400Regular,
   PlusJakartaSans_500Medium,
@@ -26,33 +26,43 @@ import { SoundManager } from './src/utils/SoundManager';
 import { NavigationBar } from 'expo-navigation-bar';
 import { Platform, Alert as RNAlert, LogBox, Text, TextInput } from 'react-native';
 
-// Force consistent font family and font scaling across all Android and iOS devices/custom OS fonts
-if ((Text as any).defaultProps == null) {
-  (Text as any).defaultProps = {};
+// Force consistent font family and font scaling across all Android and iOS devices/custom OS fonts safely
+try {
+  if ((Text as any).defaultProps == null) {
+    (Text as any).defaultProps = {};
+  }
+  (Text as any).defaultProps.style = { fontFamily: 'PlusJakartaSans_400Regular' };
+  (Text as any).defaultProps.allowFontScaling = false;
+  (Text as any).defaultProps.maxFontSizeMultiplier = 1.0;
+} catch (e) {
+  // Ignore in case React 19 / Hermes restricts prototype mutation
 }
-(Text as any).defaultProps.style = { fontFamily: 'PlusJakartaSans_400Regular' };
-(Text as any).defaultProps.allowFontScaling = false;
-(Text as any).defaultProps.maxFontSizeMultiplier = 1.0;
 
-if ((TextInput as any).defaultProps == null) {
-  (TextInput as any).defaultProps = {};
+try {
+  if ((TextInput as any).defaultProps == null) {
+    (TextInput as any).defaultProps = {};
+  }
+  (TextInput as any).defaultProps.style = { fontFamily: 'PlusJakartaSans_400Regular' };
+  (TextInput as any).defaultProps.allowFontScaling = false;
+  (TextInput as any).defaultProps.maxFontSizeMultiplier = 1.0;
+} catch (e) {
+  // Ignore in case React 19 / Hermes restricts prototype mutation
 }
-(TextInput as any).defaultProps.style = { fontFamily: 'PlusJakartaSans_400Regular' };
-(TextInput as any).defaultProps.allowFontScaling = false;
-(TextInput as any).defaultProps.maxFontSizeMultiplier = 1.0;
 
 LogBox.ignoreLogs([
   '`transition-all` unknown or invalid utility',
   'InteractionManager has been deprecated',
 ]);
 
-const originalAlert = RNAlert.alert;
-RNAlert.alert = (title, message, buttons, options) => {
-  if (title && (title.toLowerCase().includes('error') || title.toLowerCase().includes('invalid') || title.toLowerCase().includes('fail'))) {
-    SoundManager.playError();
-  }
-  originalAlert(title, message, buttons, options);
-};
+try {
+  const originalAlert = RNAlert.alert;
+  RNAlert.alert = (title, message, buttons, options) => {
+    if (title && (title.toLowerCase().includes('error') || title.toLowerCase().includes('invalid') || title.toLowerCase().includes('fail'))) {
+      try { SoundManager.playError(); } catch (_) {}
+    }
+    originalAlert(title, message, buttons, options);
+  };
+} catch (_) {}
 
 import ErrorBoundary from './src/components/ErrorBoundary';
 import GlobalAlarmModal from './src/components/GlobalAlarmModal';
@@ -66,6 +76,14 @@ export default function App() {
   useDeviceContext(tw, { observeDeviceColorSchemeChanges: false, initialColorScheme: 'light' });
 
   useEffect(() => {
+    let isMounted = true;
+    const safetyTimer = setTimeout(() => {
+      if (isMounted) {
+        setFontsLoaded(true);
+        try { SplashScreen.hideAsync().catch(() => {}); } catch (_) {}
+      }
+    }, 2500);
+
     async function loadResources() {
       try {
         await Font.loadAsync({
@@ -78,14 +96,25 @@ export default function App() {
       } catch (e) {
         console.warn('Font loading error:', e);
       } finally {
-        setFontsLoaded(true);
-        // Defer audio session initialization to background so initial UI renders immediately
-        setTimeout(() => {
-          SoundManager.init().catch(() => {});
-        }, 150);
+        clearTimeout(safetyTimer);
+        if (isMounted) {
+          setFontsLoaded(true);
+          try {
+            SplashScreen.hideAsync().catch(() => {});
+          } catch (_) {}
+          // Defer audio session initialization to background so initial UI renders immediately
+          setTimeout(() => {
+            try { SoundManager.init().catch(() => {}); } catch (_) {}
+          }, 300);
+        }
       }
     }
     loadResources();
+
+    return () => {
+      isMounted = false;
+      clearTimeout(safetyTimer);
+    };
   }, []);
 
   useEffect(() => {
@@ -93,7 +122,7 @@ export default function App() {
     async function configureNavBar() {
       if (Platform.OS === 'android') {
         try {
-          await NavigationBar.setVisibilityAsync('hidden').catch(() => {});
+          await (NavigationBar as any).setVisibilityAsync('hidden').catch(() => {});
         } catch (e) {}
       }
     }
@@ -105,23 +134,23 @@ export default function App() {
   }
 
   return (
-    <ThemeProvider>
-      <AuthProvider>
-        <FirebaseDataProvider>
-          <TabBarProvider>
-            <SafeAreaProvider>
-              <StatusBar style="auto" />
-              <EnvironmentalAlertNotifier />
-              <ErrorBoundary>
+    <ErrorBoundary>
+      <ThemeProvider>
+        <AuthProvider>
+          <FirebaseDataProvider>
+            <TabBarProvider>
+              <SafeAreaProvider>
+                <StatusBar style="auto" />
+                <EnvironmentalAlertNotifier />
                 <AppNavigator />
                 <GlobalAlarmModal />
-              </ErrorBoundary>
-              <CustomToast />
-              <InteractiveWelcomeHud />
-            </SafeAreaProvider>
-          </TabBarProvider>
-        </FirebaseDataProvider>
-      </AuthProvider>
-    </ThemeProvider>
+                <CustomToast />
+                <InteractiveWelcomeHud />
+              </SafeAreaProvider>
+            </TabBarProvider>
+          </FirebaseDataProvider>
+        </AuthProvider>
+      </ThemeProvider>
+    </ErrorBoundary>
   );
 }

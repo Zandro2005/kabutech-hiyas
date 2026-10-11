@@ -40,7 +40,7 @@ export default class ErrorBoundary extends Component<Props, State> {
         <SafeAreaView style={tw`flex-1 bg-white dark:bg-slate-900`}>
           <ScrollView contentContainerStyle={tw`flex-1 p-6 justify-center items-center`}>
             <View style={tw`w-20 h-20 bg-red-100 dark:bg-red-900/40 rounded-full items-center justify-center mb-6`}>
-              <MaterialCommunityIcons name="alert-circle-outline" size={40} color="#ef4444" />
+              <Text style={tw`text-3xl`}>⚠️</Text>
             </View>
             
             <Text style={tw`text-2xl font-bold text-slate-800 dark:text-slate-100 mb-2 text-center`}>

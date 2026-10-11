@@ -55,6 +55,7 @@ export interface SettingsData {
   setpoints: Setpoints;
   schedules?: ScheduleSettings;
   yieldTarget?: number;
+  lastAlertNotificationTime?: number;
 }
 
 export interface HarvestLogData {

@@ -35,6 +35,7 @@ export interface EnvironmentAlertsResult {
 
 const DISMISSED_STORAGE_KEY = '@kabutech_dismissed_env_alerts';
 let globalDismissedIds = new Set<string>();
+const inactiveSinceMap = new Map<string, number>();
 const subscribers = new Set<() => void>();
 
 AsyncStorage.getItem(DISMISSED_STORAGE_KEY)
@@ -413,13 +414,24 @@ export function useEnvironmentAlerts(): EnvironmentAlertsResult {
       }
     }
 
-    // Auto-prune dismissed IDs that are no longer active (meaning the issue has resolved!)
+    // Auto-prune dismissed IDs only after sustained resolution (> 2 minutes) to prevent flapping
     const activeIdSet = new Set(list.map(a => a.id));
+    const nowTs = Date.now();
     let pruned = false;
     for (const dismissedId of Array.from(globalDismissedIds)) {
       if (!activeIdSet.has(dismissedId)) {
-        globalDismissedIds.delete(dismissedId);
-        pruned = true;
+        const inactiveStart = inactiveSinceMap.get(dismissedId);
+        if (inactiveStart === undefined) {
+          inactiveSinceMap.set(dismissedId, nowTs);
+        } else if (nowTs - inactiveStart > 120_000) {
+          // Sustained inactive for over 2 minutes -> genuinely resolved
+          globalDismissedIds.delete(dismissedId);
+          inactiveSinceMap.delete(dismissedId);
+          pruned = true;
+        }
+      } else {
+        // Still active or re-occurred within grace period -> reset inactive tracker
+        inactiveSinceMap.delete(dismissedId);
       }
     }
     if (pruned) {

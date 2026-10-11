@@ -1,5 +1,6 @@
 import * as Notifications from 'expo-notifications';
 import { Platform } from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { db, auth } from '../services/firebase';
 import { ref, update, get } from 'firebase/database';
 
@@ -15,12 +16,16 @@ Notifications.setNotificationHandler({
 export async function registerForPushNotificationsAsync(userId: string) {
   let token;
   if (Platform.OS === 'android') {
-    await Notifications.setNotificationChannelAsync('default', {
-      name: 'default',
-      importance: Notifications.AndroidImportance.MAX,
-      vibrationPattern: [0, 800, 300, 800, 300, 800], // 3 long, heavy pulses
-      lightColor: '#FF231F7C',
-    });
+    try {
+      await Notifications.setNotificationChannelAsync('default', {
+        name: 'default',
+        importance: Notifications.AndroidImportance.MAX,
+        vibrationPattern: [0, 800, 300, 800, 300, 800], // 3 long, heavy pulses
+        lightColor: '#FF231F7C',
+      });
+    } catch (e) {
+      console.log('Notification channel error:', e);
+    }
   }
 
   const { status: existingStatus } = await Notifications.getPermissionsAsync();
@@ -165,17 +170,68 @@ export async function scheduleLocalNotification(title: string, body: string, dat
   }
 }
 
+// Strict 5-minute cooldown guardrail for environmental alerts
+const ENV_NOTIF_COOLDOWN_MS = 5 * 60 * 1000; // 5 minutes
+const STORAGE_LAST_ENV_NOTIF = '@kabutech_last_env_notif_time';
+let lastEnvNotifMemory = 0;
+
+// Initialize memory cache from AsyncStorage on module load
+AsyncStorage.getItem(STORAGE_LAST_ENV_NOTIF)
+  .then((val) => {
+    if (val) {
+      const ts = parseInt(val, 10);
+      if (!isNaN(ts)) {
+        lastEnvNotifMemory = Math.max(lastEnvNotifMemory, ts);
+      }
+    }
+  })
+  .catch(() => {});
+
 /**
  * Notifies all registered users with an environmental alert push notification,
  * and schedules an immediate local notification banner on this device.
+ * Enforces a strict 5-minute cooldown to prevent notification flooding.
  */
 export async function notifyEnvironmentalAlert(title: string, body: string, data = {}) {
+  const now = Date.now();
+
+  // Guardrail 1: In-memory 5-minute cooldown check
+  if (now - lastEnvNotifMemory < ENV_NOTIF_COOLDOWN_MS) {
+    console.log('[PushNotifications] Cooldown active (memory). Suppressing environmental alert.');
+    return;
+  }
+
+  // Guardrail 2: Persistent storage 5-minute cooldown check
+  try {
+    const stored = await AsyncStorage.getItem(STORAGE_LAST_ENV_NOTIF);
+    if (stored) {
+      const lastStoredTime = parseInt(stored, 10);
+      if (!isNaN(lastStoredTime) && now - lastStoredTime < ENV_NOTIF_COOLDOWN_MS) {
+        lastEnvNotifMemory = lastStoredTime;
+        console.log('[PushNotifications] Cooldown active (storage). Suppressing environmental alert.');
+        return;
+      }
+    }
+  } catch (_) {}
+
+  // Update cooldown timestamps immediately to prevent concurrent executions
+  lastEnvNotifMemory = now;
+  AsyncStorage.setItem(STORAGE_LAST_ENV_NOTIF, String(now)).catch(() => {});
+
+  // Sync to Firebase settings for cross-device awareness
+  try {
+    update(ref(db, 'kabutech/settings'), {
+      lastAlertNotificationTime: now,
+    }).catch(() => {});
+  } catch (_) {}
+
   // 1. Immediately trigger native banner on current device
   await scheduleLocalNotification(title, body, data);
 
-  // 2. Broadcast push notification to all users registered in the database
+  // 2. Broadcast push notification to other users registered in the database
   try {
     if (!auth.currentUser) return;
+    const currentUid = auth.currentUser.uid;
 
     const usersSnap = await get(ref(db, 'kabutech/users'));
     if (!usersSnap.exists()) return;
@@ -183,8 +239,9 @@ export async function notifyEnvironmentalAlert(title: string, body: string, data
     const users = usersSnap.val();
     const tokens = new Set<string>();
 
-    Object.values(users).forEach((u: any) => {
-      if (u && u.pushToken) {
+    Object.entries(users).forEach(([uid, u]: [string, any]) => {
+      // Exclude current user's token so this device doesn't get duplicate remote + local banners
+      if (uid !== currentUid && u && u.pushToken) {
         tokens.add(u.pushToken);
       }
     });
