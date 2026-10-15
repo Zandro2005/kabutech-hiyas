@@ -11,6 +11,7 @@ export interface SensorHealthStatus {
   co2Error: boolean;
   waterError: boolean;
   offlineSeconds: number;
+  secondsSinceUpdate: number | null;
   hasAnyError: boolean;
   faultySensorsList: string[];
 }
@@ -45,6 +46,9 @@ export function useSensorHealth(): SensorHealthStatus {
   const currentServerTime = Date.now() + serverTimeOffset;
   const timeSinceServerTs = hasTimestamp ? Math.max(0, currentServerTime - (sensors.last_seen || 0)) : Infinity;
   const offlineSeconds = hasTimestamp ? Math.round(timeSinceServerTs / 1000) : 0;
+  const secondsSinceUpdate = hasTimestamp
+    ? Math.max(0, Math.round(timeSinceServerTs / 1000))
+    : (lastPacketReceivedAt.current > 0 ? Math.max(0, Math.round((Date.now() - lastPacketReceivedAt.current) / 1000)) : null);
 
   const STALE_THRESHOLD_MS = 35000;
   const timeSinceLocalPacket = lastPacketReceivedAt.current > 0 ? Date.now() - lastPacketReceivedAt.current : Infinity;
@@ -128,6 +132,7 @@ export function useSensorHealth(): SensorHealthStatus {
     co2Error,
     waterError,
     offlineSeconds,
+    secondsSinceUpdate,
     hasAnyError,
     faultySensorsList,
   };

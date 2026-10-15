@@ -107,17 +107,13 @@ def create_kabutech_checklist(filepath):
         },
         {
             "code": "B",
-            "name": "Hanging Sensor Probe Housing (PVC Bell Reducer Design)",
+            "name": "Hanging Sensor Probe Housing (Mini Radiation Shield Design)",
             "icon": "🏠",
             "items": [
-                ("B1", "2\" to 1\" PVC Bell Reducer (White/Gray)", "Schedule 40 PVC fitting. 2\" bell opening down to 1\" neck. Lightweight housing.", 1, "pc", 25, 45, "Local Hardware (Citi / Wilcon / Ace)", "2 x 1 PVC bell reducer fitting", "Forms inverted bell chamber shielding sensors from mist."),
-                ("B2", "M16 or M20 IP68 Waterproof Cable Gland", "Nylon PA66 body, rubber clamping ring, IP68 rated, fits cables 4-8mm / 6-12mm.", 1, "pc", 30, 60, "Shopee / Lazada / Hardware", "M16 or M20 cable gland IP68 waterproof", "Screws into top neck; clamps cable and hangs probe."),
-                ("B3", "PG7 Cable Gland (Nylon, IP68)", "Mini cable gland for 3-6.5mm cables, weatherproof sealing.", 2, "pcs", 15, 25, "Shopee / Hardware Store", "PG7 cable gland nylon IP68", "Internal cable strain relief and wire pass-throughs."),
-                ("B4", "Fine Stainless Steel Mesh / Nylon Filter", "80-120 mesh SS304 wire cloth or dense nylon micron mesh.", 1, "sheet", 30, 60, "Hardware Store / Shopee", "Stainless steel 304 mesh screen 100 mesh", "Glued to 2\" bottom rim. Stops droplets, passes CO2."),
-                ("B5", "PTFE Hydrophobic Membrane Disc (13-25mm)", "ePTFE breathable membrane, hydrophobic IP67 rating, gas permeable.", 1, "pc", 40, 80, "Shopee", "PTFE membrane disc sensor waterproof", "Glued over SCD41 aperture to prevent condensation."),
-                ("B6", "PVC Solvent Cement & Rapid Epoxy", "100ml PVC cement + 2-part rapid epoxy (Pioneer/Devcon).", 1, "tube", 45, 80, "Any Hardware Store", "PVC cement Neltex + Pioneer epoxy", "Bonds screen to PVC rim and seals gland threads."),
-                ("B7", "Printed Vinyl Label Sticker", "Weatherproof vinyl sticker: 'KABUTECH HIYAS — Probe SN-01'.", 1, "pc", 20, 30, "Print Shop / DIY Vinyl", "Waterproof vinyl sticker printing", "Professional thesis branding for probe assembly."),
-                ("B8", "Nylon Cable Zip Ties (100mm)", "2.5mm × 100mm black nylon UV-resistant zip ties (Pack of 100).", 1, "pack", 30, 45, "Hardware Store / Shopee", "Nylon zip ties 100mm black pack", "Internal wire bundling and strain relief.")
+                ("B1", "Mini Multi-Plate Solar Radiation Shield", "Multi-tier white ABS louvered disc shelter with internal cavity & top cable gland. 360° airflow, sheds mist.", 1, "pc", 200, 350, "Shopee / Lazada", "Mini radiation shield sensor weather station", "Houses SHT31, SCD41, BH1750. Eliminates DIY PVC pipe cutting/gluing."),
+                ("B2", "PTFE Hydrophobic Membrane Disc (13-25mm)", "ePTFE breathable membrane, hydrophobic IP67 rating, gas permeable.", 1, "pc", 30, 60, "Shopee", "PTFE membrane disc sensor waterproof", "Affixed over SCD41 aperture to prevent condensation fouling."),
+                ("B3", "Nylon Cable Zip Ties (100mm)", "2.5mm × 100mm black nylon UV-resistant zip ties (Pack of 100).", 1, "pack", 25, 40, "Hardware Store / Shopee", "Nylon zip ties 100mm black pack", "Internal cable strain relief inside shield."),
+                ("B4", "Printed Weatherproof Vinyl Label Sticker", "Weatherproof vinyl sticker: 'KABUTECH HIYAS — Probe SN-01'.", 1, "pc", 20, 30, "Print Shop / DIY Vinyl", "Waterproof vinyl sticker printing", "Professional thesis branding for probe assembly.")
             ]
         },
         {
@@ -144,7 +140,7 @@ def create_kabutech_checklist(filepath):
             "name": "Power Supply & Distribution",
             "icon": "⚡",
             "items": [
-                ("D1", "12V 5A (60W) Enclosed Switching PSU", "Metal mesh chassis, universal AC in (110-240V), regulated 12VDC ±1%.", 1, "pc", 600, 1000, "Shopee / Lazada / Alexan", "12V 5A switching power supply metal case", "Powers entire system safely: ESP32, fans, pump, valve."),
+                ("D1", "12V 10A (120W) Enclosed Switching PSU", "Metal mesh chassis, universal AC in (110-240V), regulated 12VDC ±1%.", 1, "pc", 450, 850, "Shopee / Lazada / Alexan", "12V 10A switching power supply metal case 120W", "Powers entire system safely with heavy-duty headroom: ESP32, fans, pump, valve."),
                 ("D2", "IEC C14 Inlet Socket with Fuse & Switch", "Panel-mount AC socket with built-in 5x20mm fuse drawer & illuminated switch.", 1, "pc", 60, 100, "Shopee / Lazada / Alexan", "IEC C14 power socket with fuse switch panel mount", "Professional computer kettle cord inlet on enclosure face."),
                 ("D3", "220V AC Power Cord (3-Prong PH, 1.5m)", "Heavy-duty 3-conductor (G, N, L) cable, rated 250V 10A, molded C13 plug.", 1, "pc", 80, 150, "Hardware Store / Shopee", "PC power cord 3 prong IEC C13 1.5m", "Standard wall plug with true safety earth grounding."),
                 ("D4", "12-Position Terminal Block Strip (15A)", "Dual-row screw terminal strip with clear cover, 15A 600V rated.", 2, "pcs", 30, 60, "Shopee / Hardware Store", "TB-1512 barrier terminal block 12 position 15A", "Organized 12V (+), GND (-), and relay output distribution."),

@@ -9,6 +9,7 @@ export type RootStackParamList = {
   StaffMain: { screen?: keyof StaffTabParamList; params?: any } | undefined;
   DeviceSchedules: undefined;
   Report: undefined;
+  Alerts: undefined;
   PendingApproval: undefined;
   StaffReportsInbox: undefined;
   StaffApprovals: undefined;
@@ -16,7 +17,6 @@ export type RootStackParamList = {
   MyActivityHistory: undefined;
   MyTasks: undefined;
   Analytics: { metric?: 'temp' | 'hum' | 'light' | 'co2'; tab?: 'temp' | 'hum' | 'light' | 'co2' } | undefined;
-  LiveFarm: undefined;
 };
 
 export type MainTabParamList = {
@@ -30,7 +30,7 @@ export type MainTabParamList = {
 
 export type HomeStackParamList = {
   HomeScreen: undefined;
-  LiveFarm: undefined;
+  Alerts: undefined;
   Analytics: { metric?: 'temp' | 'hum' | 'light' | 'co2'; tab?: 'temp' | 'hum' | 'light' | 'co2' } | undefined;
 };
 

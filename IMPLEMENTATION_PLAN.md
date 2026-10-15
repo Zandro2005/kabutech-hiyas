@@ -53,34 +53,36 @@ The ESP32 and the mobile app communicate via Firebase Cloud Realtime Database. T
 
 ---
 
-## 4. Professional DIY Hanging Sensor Probe (The "PVC Bell Reducer Probe")
+## 4. Professional Hanging Sensor Probe (Multi-Plate Radiation Shield Design)
 
-To ensure the hanging probe is compact, lightweight, and streamlined (rather than a bulky square box), the design uses a standard **2" to 1" PVC Bell Reducer** or conduit coupling. It looks like an industrial commercial sensor capsule, hangs unobtrusively between grow racks, and requires zero 3D printing.
+To eliminate messy DIY plumbing fabrication and achieve a commercial-grade agricultural finish, the suspended probe uses an off-the-shelf **Mini Multi-Plate Solar Radiation Shield** (meteorological louvered disc shelter). It hangs unobtrusively between grow racks, protects delicate sensors from overhead mist droplets, and requires zero pipe cutting or gluing.
 
 ### Hanging Probe Design Concept
 ![Kabutech Hiyas Hanging Sensor Probe](firmware/assets/sensor_probe_hanging.jpg)
-*Figure 3: Compact suspended PVC bell probe hanging among mushroom grow bags, featuring a top IP68 cable gland and bottom breathable micro-mesh barrier.*
+*Figure 3: Compact suspended multi-plate radiation shield probe hanging among mushroom grow bags, featuring tiered louvered umbrella discs, top IP68 cable gland, and 360° natural air/CO₂ exchange.*
 
-### The 10-Minute Build Steps
-1. **The Bell Body**: Get a **2-inch to 1-inch PVC Reducer** (white or industrial gray). It stands only ~3.5 to 4 inches tall and weighs under 100 grams.
-2. **Top Cable Gland (Suspension)**: Screw an **M16/M20 waterproof cable gland** into the 1-inch top opening. The gland grips the CAT5/CAT6 umbilical cable tightly, acting as both the water seal and the hanging anchor.
-3. **Internal Sensor Mounting**: 
-   - Solder/wire the DHT11, MQ-135, and LDR onto a small perfboard strip (or mount them back-to-back).
-   - Slide the sensor assembly up inside the bell cavity.
-4. **Bottom Micro-Mesh Screen**:
-   - Cut a small circular piece of fine stainless steel or nylon mesh (window screen / fine filter mesh).
-   - Secure it across the 2-inch bottom rim using PVC solvent or adhesive.
-   - This prevents mist splashes from entering upward while allowing free ambient air circulation and CO₂ diffusion.
+### The 5-Minute Build Steps
+1. **The Shield Housing**: Procure a pre-assembled **Mini Multi-Plate Radiation Shield** (~₱250 on Shopee). It features 6–8 stacked downward-sloped white louvers with an internal central hollow chamber (~35–45mm diameter).
+2. **Sensor Mounting**: 
+   - Cut a slim vertical strip of **Perfboard (A7)** (~2.5cm × 6cm).
+   - Solder the **SCD41** (CO₂), **SHT31-D** (Temp/Humidity), and downward-facing **BH1750** (Lux) modules along the strip, daisy-chaining their shared 3.3V I2C pins.
+3. **Internal Suspension & Strain Relief**:
+   - Feed the **4-Core Shielded Cable (E2)** through the top cable gland.
+   - Solder the 4 cores to the perfboard pads.
+   - Cinch a nylon zip tie around the cable jacket inside the chamber as a strain-relief anchor.
+   - Tighten the top cable gland so the board hangs suspended in the dry center core of the shield.
+4. **Hydrophobic Aperture Protection (Optional)**:
+   - Affix a breathable **PTFE membrane disc** over the SCD41 intake to provide IP67 water droplet barrier protection.
 
 ### Why this design excels for the Thesis Defense:
-- **Streamlined & Compact**: Unlike a bulky square junction box, this slim cylindrical profile won't obstruct walkways or bump into fruiting mushroom bags.
-- **Natural Umbrella Shielding**: The bell's solid dome naturally sheds water droplets falling from overhead misting nozzles.
-- **Commercial Polish**: With a clean printed label (e.g., "KABUTECH HIYAS - Environmental Probe SN-01"), it looks indistinguishable from commercial greenhouse sensors costing thousands of pesos.
-- **Ultra-Low Cost**: Built entirely with ~₱60–₱100 worth of standard plumbing/electrical parts available at any hardware store.
+- **Commercial Agricultural Polish**: It uses the exact same multi-disc meteorological shelter format employed by Davis Instruments, Meter Group, and high-end smart greenhouse nodes.
+- **Natural Umbrella Shielding**: The tiered downward-slanted discs naturally shed falling water droplets from overhead mist nozzles.
+- **Accurate Environmental Sampling**: Eliminates radiant heat bias on the SHT31 while providing open 360° natural air convection and molecular diffusion for fast CO₂ response.
+- **Zero DIY Complexity**: Eliminates PVC pipe cutting, cement fumes, and fragile screen gluing.
 
 > [!TIP]
 > **Thesis Defense Script**
-> *"We engineered a streamlined, suspended cylindrical sensor capsule using a modified industrial PVC reducer. The upper conical geometry naturally deflects falling mist condensation, while the bottom aperture features a hydrophobic micro-mesh barrier that facilitates unhindered gaseous exchange for precise CO₂ and humidity monitoring without risking water pooling on sensor electronics."*
+> *"We integrated our environmental sensing array into an industrial-standard multi-plate radiation shield. The tiered hydrophobic louver geometry prevents liquid droplet fouling on the Sensirion SCD41 photoacoustic aperture and eliminates radiant thermal bias on the SHT31, while maintaining uninhibited 360-degree gaseous diffusion and sub-second response times for autonomous climate regulation."*
 
 ---
 
@@ -95,16 +97,19 @@ To ensure the hanging probe is compact, lightweight, and streamlined (rather tha
 
 ---
 
-## 6. Universal Grow House Adaptability
+## 6. Universal Grow House Adaptability & Biological Profiles
+
+> [!NOTE]
+> Grounded in peer-reviewed biological literature. For full citations and APA bibliography, see [refs/REFERENCES.md](file:///c:/Users/ADMIN/Documents/kabutech-hiyas-main/refs/REFERENCES.md) and [cropProfiles.ts](file:///c:/Users/ADMIN/Documents/kabutech-hiyas-main/KabutechNative/src/config/cropProfiles.ts).
 
 ### Preset Crop Profiles
-| Parameter | Oyster Mushroom | Shiitake | Lion's Mane |
-|---|---|---|---|
-| **Temperature** | 20–28°C | 15–21°C | 18–24°C |
-| **Relative Humidity** | 85–95% | 80–90% | 85–95% |
-| **CO₂ Concentration** | < 1000 ppm | < 1000 ppm | < 800 ppm |
-| **Light Level** | 500–1000 lux | 500–1000 lux | 500–800 lux |
-| **Air Exchange** | High | Medium | High |
+| Parameter | Oyster Mushroom (*P. ostreatus*) | Shiitake | Lion's Mane | Literature Basis (Oyster) |
+|---|---|---|---|---|
+| **Temperature** | 18–25°C | 15–21°C | 18–24°C | Islam et al. (2022); Hu et al. (2023); Girmay et al. (2016) |
+| **Relative Humidity** | 80–95% | 80–90% | 85–95% | Islam et al. (2022); Chong et al. (2023) |
+| **CO₂ Concentration** | ≤ 1,000 ppm | < 1,000 ppm | < 800 ppm | Bellettini et al. (2019); Lin et al. (2022) |
+| **Light Level** | 150–500 lux *(Max 1,000 lx)* | 500–1000 lux | 500–800 lux | Bellettini et al. (2019); Arjona et al. (2009) |
+| **Air Exchange** | High | Medium | High | Mohammed et al. (2018) |
 
 ### First-Boot Auto-Calibration
 When installed in a new grow house, the system runs an automatic 10-minute diagnostic:
@@ -193,19 +198,15 @@ When installed in a new grow house, the system runs an automatic 10-minute diagn
 
 ---
 
-### B. Hanging Sensor Probe Housing (PVC Bell Reducer Design)
+### B. Hanging Sensor Probe Housing (Mini Radiation Shield Design)
 
 | # | Component | Purpose | Specs | Qty | Price (₱) | Where to Buy |
 |---|---|---|---|---|---|---|
-| B1 | **2" → 1" PVC Bell Reducer** (White/Gray) | Acts as the suspended probe body; conical shape deflects overhead water mist away from sensors. | Probe body. ~3.5" tall, lightweight. | 1 | 25–45 | Citi Hardware / Wilcon / any hardware store |
-| B2 | **M16 or M20 IP68 Waterproof Cable Gland** (Nylon) | Grips the umbilical cable at the probe top to provide cable strain relief and a watertight seal. | Screws into 1" top opening. Grips umbilical cable = hanging anchor + water seal. | 1 | 30–60 | Shopee / Lazada / hardware store |
-| B3 | **PG7 Cable Gland** | Seals secondary sensor wire penetrations against humid air and water ingress. | Seals individual sensor wire entries. | 2 | 30–50 | Shopee / hardware store |
-| B4 | **Fine Stainless Steel Mesh / Nylon Filter Screen** | Covers the bottom opening to block direct mist splashing while permitting free air diffusion and CO₂ exchange. | Cut circular disc for 2" bottom opening. Blocks mist, passes airflow for CO₂. | 1 sheet | 30–60 | Hardware store / Shopee |
-| B5 | **PTFE Membrane Disc (13–25mm)** | Protects the SCD41 optical aperture from liquid condensation while allowing gaseous CO₂ transmission. | Breathable hydrophobic membrane over SCD41 intake. Blocks water, passes gas. IP67. | 1 | 40–80 | Shopee (search "PTFE membrane disc sensor") |
-| B6 | **PVC Solvent Cement / Epoxy** | Permanently bonds the protective mesh screen to the PVC bell rim and seals joint seams. | Bonds mesh to bell rim and seals joints. | 1 tube | 45–80 | Any hardware store |
-| B7 | **Printed Label Sticker** | Identifies the probe unit and provides clean commercial branding for thesis presentation. | "KABUTECH HIYAS — Environmental Probe SN-01" for commercial look. | 1 | 20–30 | Print shop / DIY inkjet on vinyl |
-| B8 | **Small Zip Ties / Nylon Cable Ties (100mm)** | Bundles and anchors internal wiring harnesses inside the probe to prevent mechanical strain. | Secures wiring inside the probe. | 1 pack | 30–45 | Hardware store / Shopee |
-| | | | | **Subtotal:** | **₱250 – ₱450** | |
+| B1 | **Mini Multi-Plate Solar Radiation Shield** | Suspended sensor shelter; tiered downward-sloped louvers shed falling mist while providing 360° airflow and CO₂ diffusion. | Multi-tier white ABS disc shelter, internal probe cavity (~35–45mm), top cable gland & mounting bracket. | 1 pc | 200–350 | Shopee / Lazada (search "Mini radiation shield sensor") |
+| B2 | **PTFE Hydrophobic Membrane Disc (13–25mm)** | Breathable waterproof barrier disc placed over SCD41 intake; blocks water droplets (IP67) while allowing gaseous CO₂ transmission. | ePTFE membrane disc, hydrophobic IP67 rating, gas permeable. | 1 pc | 30–60 | Shopee (search "PTFE membrane disc sensor") |
+| B3 | **Small Zip Ties / Nylon Cable Ties (100mm)** | Internal cable strain relief anchor inside the shield chamber to prevent pulling on solder joints. | 2.5mm × 100mm UV-resistant black nylon cable ties. | 1 pack | 25–40 | Hardware store / Shopee |
+| B4 | **Printed Weatherproof Vinyl Label Sticker** | Identifies the probe unit with crisp commercial branding for thesis presentation. | "KABUTECH HIYAS — Environmental Probe SN-01". | 1 pc | 20–30 | Print shop / DIY inkjet on vinyl |
+| | | | | **Subtotal:** | **₱275 – ₱480** | |
 
 ---
 
@@ -233,7 +234,7 @@ When installed in a new grow house, the system runs an automatic 10-minute diagn
 
 | # | Component | Purpose | Specs | Qty | Price (₱) | Where to Buy |
 |---|---|---|---|---|---|---|
-| D1 | **12V 5A (60W) Enclosed Switching Power Supply** | Converts 220V AC mains into regulated 12V DC power for all fans, pump, solenoid, lights, and step-down circuits. | Mean Well LRS-75-12 or equivalent. 220VAC → 12VDC. Powers entire system. Short-circuit & overload protected. | 1 | 600–1,000 | Shopee / Lazada / Alexan |
+| D1 | **12V 10A (120W) Enclosed Switching Power Supply** | Converts 220V AC mains into regulated 12V DC power for all fans, pump, solenoid, lights, and step-down circuits. | Mean Well LRS-150-12 or equivalent. 220VAC → 12VDC. 120W heavy-duty headroom. Short-circuit & overload protected. | 1 | 450–850 | Shopee / Lazada / Alexan |
 | D2 | **IEC 320 C14 Inlet Socket with Fuse Holder** | Standardized, fused chassis-mount receptacle for plugging in the main AC power cord safely. | Standard computer-style power inlet. Mounts on enclosure. Accepts standard 220V cord. Built-in fuse. | 1 | 60–100 | Shopee / Lazada / Alexan |
 | D3 | **220V AC Power Cord (3-Prong, 1.5m)** | Connects household wall outlet power to the enclosure inlet socket with grounding safety. | Standard PH 3-pin plug → IEC C13 connector. | 1 | 80–150 | Hardware store / Shopee |
 | D4 | **Terminal Block Strip (12-Position, 15A)** | Provides neat, screw-clamped distribution hubs for 12V DC positive, ground, and relay outputs. | Screw-type for clean 12V power distribution. No loose jumper wires. | 2 | 60–120 | Shopee / hardware store |

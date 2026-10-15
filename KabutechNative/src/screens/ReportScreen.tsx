@@ -33,8 +33,11 @@ import { showToast } from '../components/CustomToast';
 import { ref, update } from 'firebase/database';
 import { db } from '../services/firebase';
 import tw from '../tailwind';
-import { useSensors, useSettings, calculateEnvironmentScore } from '../hooks/useFirebaseData';
+import { useSensors, useSettings } from '../hooks/useFirebaseData';
 import { useTheme } from '../context/ThemeContext';
+import { evaluateChamber } from '../utils/environmentRanges';
+import { ACTIVE_PROFILE } from '../config/cropProfiles';
+
 import { SoundManager } from '../utils/SoundManager';
 import {
   hapticLight,
@@ -167,10 +170,10 @@ export default function ReportScreen() {
   }, []);
 
   // Sensor inputs
-  const liveTemp = typeof sensors.temperature === 'number' && sensors.temperature > 0 ? sensors.temperature : 25.8;
-  const liveHum = typeof sensors.humidity === 'number' && sensors.humidity > 0 ? sensors.humidity : 72;
-  const liveLight = typeof sensors.light === 'number' && sensors.light >= 0 ? sensors.light : 430;
-  const liveCo2 = typeof sensors.co2 === 'number' && sensors.co2 > 0 ? sensors.co2 : 760;
+  const liveTemp = typeof sensors.temperature === 'number' && sensors.temperature > 0 && sensors.temperature !== -999 ? sensors.temperature : 0;
+  const liveHum = typeof sensors.humidity === 'number' && sensors.humidity > 0 && sensors.humidity !== -999 ? sensors.humidity : 0;
+  const liveLight = typeof sensors.light === 'number' && sensors.light >= 0 && sensors.light !== -999 ? sensors.light : 0;
+  const liveCo2 = typeof sensors.co2 === 'number' && sensors.co2 > 0 && sensors.co2 !== -999 ? sensors.co2 : 0;
 
   const targetTemp = settings?.setpoints?.temperature ?? 28.0;
   const targetHum = settings?.setpoints?.humidity ?? 85;
@@ -186,9 +189,19 @@ export default function ReportScreen() {
   const isCo2Critical = co2Variance > 180;
   const hasCriticalRisk = isTempCritical || isHumCritical || isCo2Critical;
 
-  const stabilityScore = useMemo(() => {
-    return calculateEnvironmentScore(liveTemp, liveHum, liveLight, liveCo2);
+  const chamberEval = useMemo(() => {
+    return evaluateChamber(
+      {
+        temp: liveTemp > 0 ? liveTemp : null,
+        hum: liveHum > 0 ? liveHum : null,
+        light: liveLight >= 0 ? liveLight : null,
+        co2: liveCo2 > 0 ? liveCo2 : null,
+      },
+      {},
+      ACTIVE_PROFILE
+    );
   }, [liveTemp, liveHum, liveLight, liveCo2]);
+
 
   // Dynamic 2h projections
   const futureValues = useMemo(() => {

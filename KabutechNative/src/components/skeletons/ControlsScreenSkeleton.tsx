@@ -70,21 +70,24 @@ export default function ControlsScreenSkeleton() {
         {/* Header */}
         <View style={tw`flex-row justify-between items-center mb-2.5`}>
           <View style={tw`flex-row items-center gap-2`}>
-            <View style={tw`w-2 h-4 rounded-full bg-emerald-500/50`} />
+            <Skeleton width={24} height={24} borderRadius={8} />
             <Skeleton width={140} height={16} borderRadius={4} />
           </View>
           <Skeleton width={64} height={18} borderRadius={9} />
         </View>
 
-        {/* Unified 4-in-1 Actuators Bar */}
-        <View
-          style={tw`bg-white dark:bg-slate-900 rounded-[24px] py-4 px-2 border border-slate-200/70 dark:border-slate-800 shadow-sm flex-row items-center justify-between`}
-        >
+        {/* Single Line Actuator Switches Skeleton */}
+        <View style={tw`flex-row justify-between gap-1.5`}>
           {[0, 1, 2, 3].map((idx) => (
-            <View key={idx} style={tw`flex-1 items-center justify-center gap-2`}>
-              <Skeleton width={28} height={28} borderRadius={8} />
-              <Skeleton width={40} height={10} borderRadius={3} />
-              <Skeleton width={32} height={12} borderRadius={4} />
+            <View
+              key={idx}
+              style={[
+                tw`flex-1 bg-white dark:bg-slate-900 rounded-2xl py-2 px-1 items-center justify-between border border-slate-200/70 dark:border-slate-800 shadow-sm`,
+                { height: 58 },
+              ]}
+            >
+              <Skeleton width={38} height={12} borderRadius={4} />
+              <Skeleton width={28} height={18} borderRadius={9} />
             </View>
           ))}
         </View>

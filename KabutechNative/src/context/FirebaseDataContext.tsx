@@ -112,7 +112,34 @@ export const FirebaseDataProvider: React.FC<{ children: React.ReactNode }> = ({ 
 
     const alertsRef = ref(db, 'kabutech/alerts');
     const unsubscribeAlerts = onValue(alertsRef, (snapshot) => {
-      setAlerts(snapshot.val() || []);
+      const val = snapshot.val();
+      if (!val) {
+        setAlerts([]);
+        return;
+      }
+      if (Array.isArray(val)) {
+        setAlerts(
+          val
+            .map((a, idx) => {
+              if (!a) return null;
+              return {
+                ...a,
+                id: a.id || String(idx),
+                firebaseKey: String(idx),
+              };
+            })
+            .filter((a): a is AlertData => a !== null)
+        );
+      } else if (typeof val === 'object') {
+        const list: AlertData[] = Object.entries(val).map(([k, v]: [string, any]) => ({
+          ...v,
+          id: v?.id || k,
+          firebaseKey: k,
+        }));
+        setAlerts(list);
+      } else {
+        setAlerts([]);
+      }
     }, (error) => {
       console.error('Alerts listener error:', error);
     });

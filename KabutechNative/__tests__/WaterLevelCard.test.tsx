@@ -29,6 +29,30 @@ jest.mock('../src/utils/haptics', () => ({
   hapticSelection: jest.fn(),
 }));
 
+jest.mock('../src/hooks/useSensorHealth', () => ({
+  useSensorHealth: () => ({
+    isControllerOnline: true,
+    isStale: false,
+    dhtError: false,
+    tempError: false,
+    humError: false,
+    lightError: false,
+    co2Error: false,
+    waterError: false,
+    offlineSeconds: 0,
+    hasAnyError: false,
+    faultySensorsList: [],
+  }),
+}));
+
+jest.mock('../src/context/AuthContext', () => ({
+  useAuth: () => ({
+    user: { uid: 'test-admin' },
+    profile: { role: 'admin' },
+    isLoading: false,
+  }),
+}));
+
 describe('WaterLevelCard', () => {
   beforeEach(() => {
     jest.useFakeTimers();

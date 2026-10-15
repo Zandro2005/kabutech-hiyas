@@ -15,7 +15,7 @@ import StaffApprovalsScreen from '../screens/StaffApprovalsScreen';
 import AssignTaskScreen from '../screens/AssignTaskScreen';
 import StaffTaskHistoryScreen from '../screens/StaffTaskHistoryScreen';
 import AnalyticsScreen from '../screens/AnalyticsScreen';
-import LiveFarmScreen from '../screens/LiveFarmScreen';
+import AlertsScreen from '../screens/AlertsScreen';
 import MyActivityHistoryScreen from '../screens/staff/MyActivityHistoryScreen';
 import MyTasksScreen from '../screens/staff/MyTasksScreen';
 import ActivityLogScreen from '../screens/staff/ActivityLogScreen';
@@ -80,8 +80,8 @@ export default function AppNavigator() {
             <Stack.Screen name="ActivityLog" component={ActivityLogScreen} />
             <Stack.Screen name="MyActivityHistory" component={MyActivityHistoryScreen} />
             <Stack.Screen name="MyTasks" component={MyTasksScreen} />
-            <Stack.Screen name="LiveFarm" component={LiveFarmScreen} />
             <Stack.Screen name="Report" component={ReportScreen} />
+            <Stack.Screen name="Alerts" component={AlertsScreen} />
             <Stack.Screen name="DeviceSchedules" component={DeviceSchedulesScreen} />
           </>
         ) : (
@@ -90,12 +90,12 @@ export default function AppNavigator() {
             <Stack.Screen name="Main" component={MainTabNavigator} />
             <Stack.Screen name="DeviceSchedules" component={DeviceSchedulesScreen} />
             <Stack.Screen name="Report" component={ReportScreen} />
+            <Stack.Screen name="Alerts" component={AlertsScreen} />
             <Stack.Screen name="StaffReportsInbox" component={StaffReportsInboxScreen} />
             <Stack.Screen name="StaffApprovals" component={StaffApprovalsScreen} />
             <Stack.Screen name="AssignTask" component={AssignTaskScreen} />
             <Stack.Screen name="StaffTaskHistory" component={StaffTaskHistoryScreen} />
             <Stack.Screen name="Analytics" component={AnalyticsScreen} />
-            <Stack.Screen name="LiveFarm" component={LiveFarmScreen} />
           </>
         )}
       </Stack.Navigator>

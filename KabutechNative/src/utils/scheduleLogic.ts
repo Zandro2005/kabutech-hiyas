@@ -67,20 +67,25 @@ export const computeScheduledDevicesState = (schedules?: ScheduleSettings | null
   return state;
 };
 
+export interface AutoDecisionResult {
+  states: { fans: boolean; misters: boolean; lights: boolean; co2: boolean };
+  reasons: {
+    fans?: string;
+    misters?: string;
+    lights?: string;
+    co2?: string;
+    mistersBlocked?: string;
+  };
+}
+
 /**
- * Computes automatic device states based on live sensor readings and environmental setpoints.
- * Actuators actively mitigate detected environmental deviations:
- * - High Humidity -> Fans turn ON to exhaust moisture
- * - Low Temperature -> Fans turn OFF to retain heat
- * - High Temperature -> Fans turn ON to cool chamber
- * - High CO2 -> Fans turn ON to flush stale air
- * - Low Humidity -> Misters turn ON to raise moisture (with low-water safety cutoff)
- * - Low Light -> Lights turn ON to support mushroom photomorphogenesis
+ * Computes automatic device states AND explicit rationales for why devices are active or blocked.
+ * Grounded in agricultural control thresholds and setpoints.
  */
-export const computeAutoDevicesState = (
+export const computeAutoDecision = (
   sensors?: { temperature?: number; humidity?: number; light?: number; co2?: number; waterLevel?: number } | null,
   setpoints?: { temperature?: number; humidity?: number; light?: number; co2?: number } | null
-) => {
+): AutoDecisionResult => {
   const targetTemp = typeof setpoints?.temperature === 'number'
     ? setpoints.temperature
     : parseFloat(setpoints?.temperature as any) || 28.0;
@@ -117,67 +122,185 @@ export const computeAutoDevicesState = (
   const isCo2Valid = currentCO2 > 0 && currentCO2 !== -999;
   const isWaterSafe = currentWater > 15; // Low water safety threshold to protect mister pump
 
-  // ══════════════════════════════════════════════════════════════
-  //  1. CO₂ PURGING & AIR VENTILATION (Exhaust Fans)
-  // ══════════════════════════════════════════════════════════════
-  // Action in alerts: "Run exhaust fans to ventilate"
-  // When CO2 is elevated above setpoint, fans MUST turn ON to pull in fresh air.
+  const reasons: AutoDecisionResult['reasons'] = {};
+
+  // 1. CO₂ PURGING & AIR VENTILATION (Exhaust Fans)
   const needFansForCo2 = isCo2Valid && currentCO2 > (targetCO2 + 25);
 
-  // ══════════════════════════════════════════════════════════════
-  //  2. HUMIDITY REGULATION (Exhaust Fans & Misters)
-  // ══════════════════════════════════════════════════════════════
-  // HIGH Humidity Action: "Run exhaust fans to reduce moisture"
-  // When humidity is above setpoint (+2.5%), exhaust fans turn ON to vent moisture
+  // 2. HUMIDITY REGULATION (Exhaust Fans & Misters)
   const needFansForHum = isHumValid && currentHum > (targetHum + 2.5);
+  const needMistersForHum = isHumValid && currentHum < (targetHum - 2.0);
 
-  // LOW Humidity Action: "Run misters to raise humidity to target"
-  // When humidity is below setpoint (-2.0%), misters turn ON to raise moisture (if water safe)
-  // Misters turn OFF when target is reached or if water is depleted
-  const misters = isHumValid && isWaterSafe && currentHum < (targetHum - 2.0);
-
-  // ══════════════════════════════════════════════════════════════
-  //  3. TEMPERATURE REGULATION (Exhaust Fans)
-  // ══════════════════════════════════════════════════════════════
-  // HIGH Temperature Action: "Run exhaust fans to cool chamber"
-  // When temperature is above setpoint (+0.5°C), exhaust fans turn ON
-  const needFansForTemp = isTempValid && currentTemp > (targetTemp + 0.5);
-
-  // LOW Temperature Action: "Reduce fan ventilation to retain heat"
-  // If temperature is cold, we do not run fans for cooling.
-  const isTempCold = isTempValid && currentTemp < (targetTemp - 2.0);
-
-  // ══════════════════════════════════════════════════════════════
-  //  4. UNIFIED EXHAUST FAN STATE
-  // ══════════════════════════════════════════════════════════════
-  // Fans turn ON if:
-  // - CO2 is elevated (ventilate stale air)
-  // - Humidity is high (exhaust moisture)
-  // - Temperature is hot (cool chamber)
-  //
-  // Low temp suppresses fan cooling, but NEVER suppresses CO2 ventilation
-  let fans = false;
-  if (needFansForCo2) {
-    fans = true; // CO2 air exchange is top priority
-  } else if (needFansForHum) {
-    fans = true; // Moisture reduction
-  } else if (needFansForTemp && !isTempCold) {
-    fans = true; // Active cooling
+  let misters = false;
+  if (needMistersForHum) {
+    if (isWaterSafe) {
+      misters = true;
+      reasons.misters = `Humidity ${Math.round(currentHum)}% is below target ${Math.round(targetHum)}%`;
+    } else {
+      reasons.mistersBlocked = `Water at ${Math.round(currentWater)}%: misting paused to protect pump`;
+    }
   }
 
-  // ══════════════════════════════════════════════════════════════
-  //  5. GROW LIGHT REGULATION
-  // ══════════════════════════════════════════════════════════════
-  // Action in alerts: "Turn on grow lights" when ambient light is dim
-  // Turn OFF when light level satisfies the setpoint
-  const lights = isLightValid && currentLight < (targetLight - 50);
+  // 3. TEMPERATURE REGULATION (Exhaust Fans)
+  const needFansForTemp = isTempValid && currentTemp > (targetTemp + 0.5);
+  const isTempCold = isTempValid && currentTemp < (targetTemp - 2.0);
 
-  // ══════════════════════════════════════════════════════════════
-  //  6. CO₂ VALVE
-  // ══════════════════════════════════════════════════════════════
-  // Stays closed during automated mushroom fruiting (CO2 flushing handled by exhaust fans)
+  // 4. UNIFIED EXHAUST FAN STATE
+  let fans = false;
+  if (needFansForCo2) {
+    fans = true;
+    reasons.fans = `CO₂ ${Math.round(currentCO2)} ppm is above target ${Math.round(targetCO2)} ppm`;
+  } else if (needFansForHum) {
+    fans = true;
+    reasons.fans = `Humidity ${Math.round(currentHum)}% is above target ${Math.round(targetHum)}%`;
+  } else if (needFansForTemp && !isTempCold) {
+    fans = true;
+    reasons.fans = `Temp ${currentTemp.toFixed(1)}°C is above target ${targetTemp.toFixed(1)}°C`;
+  }
+
+  // 5. GROW LIGHT REGULATION
+  let lights = false;
+  if (isLightValid && currentLight < (targetLight - 50)) {
+    lights = true;
+    reasons.lights = `Light ${Math.round(currentLight)} lx is below target ${Math.round(targetLight)} lx`;
+  }
+
+  // 6. CO₂ VALVE (Closed during oyster fruiting)
   const co2 = false;
 
-  return { fans, misters, lights, co2 };
+  return {
+    states: { fans, misters, lights, co2 },
+    reasons,
+  };
 };
+
+/**
+ * Backwards-compatible wrapper returning only the device states.
+ */
+export const computeAutoDevicesState = (
+  sensors?: { temperature?: number; humidity?: number; light?: number; co2?: number; waterLevel?: number } | null,
+  setpoints?: { temperature?: number; humidity?: number; light?: number; co2?: number } | null
+) => {
+  return computeAutoDecision(sensors, setpoints).states;
+};
+
+export interface DeviceActivityExplanation {
+  device: 'fans' | 'misters' | 'lights' | 'co2';
+  label: string;
+  isActive: boolean;
+  reason: string;
+  isWarning?: boolean;
+}
+
+/**
+ * Produces structured explanations for why devices are active or idle in the current mode.
+ */
+export const explainDeviceActivity = (
+  mode: string = 'auto',
+  activeDevices: { fans: boolean; misters: boolean; lights: boolean; co2: boolean },
+  sensors?: { temperature?: number; humidity?: number; light?: number; co2?: number; waterLevel?: number } | null,
+  setpoints?: { temperature?: number; humidity?: number; light?: number; co2?: number } | null,
+  schedules?: ScheduleSettings | null
+): DeviceActivityExplanation[] => {
+  const normMode = mode.toLowerCase();
+  const list: DeviceActivityExplanation[] = [];
+
+  if (normMode === 'auto') {
+    const { reasons } = computeAutoDecision(sensors, setpoints);
+
+    if (activeDevices.fans) {
+      list.push({
+        device: 'fans',
+        label: 'Fans',
+        isActive: true,
+        reason: reasons.fans || 'Ventilating chamber',
+      });
+    }
+    if (activeDevices.misters) {
+      list.push({
+        device: 'misters',
+        label: 'Mister',
+        isActive: true,
+        reason: reasons.misters || 'Humidifying chamber',
+      });
+    } else if (reasons.mistersBlocked) {
+      list.push({
+        device: 'misters',
+        label: 'Mister',
+        isActive: false,
+        reason: reasons.mistersBlocked,
+        isWarning: true,
+      });
+    }
+    if (activeDevices.lights) {
+      list.push({
+        device: 'lights',
+        label: 'Lights',
+        isActive: true,
+        reason: reasons.lights || 'Fruiting photoperiod lighting active',
+      });
+    }
+    if (activeDevices.co2) {
+      list.push({
+        device: 'co2',
+        label: 'Valve',
+        isActive: true,
+        reason: 'Solenoid valve open',
+      });
+    }
+
+    if (list.length === 0) {
+      list.push({
+        device: 'fans',
+        label: 'System',
+        isActive: false,
+        reason: 'All devices idle • Chamber readings within setpoints',
+      });
+    }
+  } else if (normMode === 'scheduled') {
+    if (activeDevices.fans) {
+      list.push({ device: 'fans', label: 'Fans', isActive: true, reason: 'Active on schedule window' });
+    }
+    if (activeDevices.misters) {
+      list.push({
+        device: 'misters',
+        label: 'Mister',
+        isActive: true,
+        reason: `Misting interval (${schedules?.misters?.durationMins || 30}m every ${schedules?.misters?.intervalHours || 2}h)`,
+      });
+    }
+    if (activeDevices.lights) {
+      list.push({ device: 'lights', label: 'Lights', isActive: true, reason: 'Active on photoperiod schedule' });
+    }
+    if (list.length === 0) {
+      list.push({ device: 'fans', label: 'Schedule', isActive: false, reason: 'Standby between scheduled cycles' });
+    }
+  } else {
+    // Manual mode
+    const activeNames: string[] = [];
+    if (activeDevices.fans) activeNames.push('Fans');
+    if (activeDevices.misters) activeNames.push('Mister');
+    if (activeDevices.lights) activeNames.push('Lights');
+    if (activeDevices.co2) activeNames.push('Valve');
+
+    if (activeNames.length > 0) {
+      list.push({
+        device: 'fans',
+        label: 'Manual Control',
+        isActive: true,
+        reason: `${activeNames.join(', ')} switched on manually by operator`,
+      });
+    } else {
+      list.push({
+        device: 'fans',
+        label: 'Manual Control',
+        isActive: false,
+        reason: 'All actuators currently switched off manually',
+      });
+    }
+  }
+
+  return list;
+};
+
 

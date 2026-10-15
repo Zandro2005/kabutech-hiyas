@@ -1,31 +1,25 @@
-import React, { useState, useEffect } from 'react';
-import { View, Text, ScrollView, TouchableOpacity, Image, StatusBar } from 'react-native';
+import React, { useState, useEffect, useMemo } from 'react';
+import { View, ScrollView, StatusBar } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { GlobalNavigationParamList } from '../types/navigation';
-import { MaterialCommunityIcons } from '@expo/vector-icons';
-import { LinearGradient } from 'expo-linear-gradient';
-import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import tw from '../tailwind';
-import { useSensors, useSettings, useFirebaseConnection, useAlerts, calculateEnvironmentScore } from '../hooks/useFirebaseData';
+import { useSensors, useSettings, useFirebaseConnection, useAlerts } from '../hooks/useFirebaseData';
 import { useTheme } from '../context/ThemeContext';
 import ScreenHeader from '../components/ScreenHeader';
 import AiInsightModal from '../components/AiInsightModal';
 import CriticalSystemAlerts from '../components/CriticalSystemAlerts';
-import LiveFarmCard from '../components/LiveFarmCard';
 import EnvironmentMetricsGrid from '../components/EnvironmentMetricsGrid';
 import WaterLevelCard from '../components/WaterLevelCard';
-import ScoreArch from '../components/ScoreArch';
+import ChamberStatusHero from '../components/ChamberStatusHero';
 import HomeScreenSkeleton from '../components/skeletons/HomeScreenSkeleton';
-import { ref, update } from 'firebase/database';
-import { db } from '../services/firebase';
-import { showToast } from '../components/CustomToast';
-import { computeScheduledDevicesState, computeAutoDevicesState } from '../utils/scheduleLogic';
 import { useSensorHealth } from '../hooks/useSensorHealth';
 import { useEnvironmentAlerts } from '../hooks/useEnvironmentAlerts';
 import DashboardWarningBadges from '../components/DashboardWarningBadges';
-import { hapticMedium, hapticSelection } from '../utils/haptics';
 import { useTabBarScroll } from '../context/TabBarContext';
+import { evaluateChamber } from '../utils/environmentRanges';
+import { ACTIVE_PROFILE } from '../config/cropProfiles'; // Literature-backed crop baseline
 
 export default function HomeScreen() {
   const navigation = useNavigation<NativeStackNavigationProp<GlobalNavigationParamList>>();
@@ -61,88 +55,26 @@ export default function HomeScreen() {
 
   const isAuto = String(settings?.setpoints?.mode).toLowerCase() === 'auto';
   const isScheduled = String(settings?.setpoints?.mode).toLowerCase() === 'scheduled';
-  const isLocked = isAuto || isScheduled;
-  
-  const rawDevices = settings?.setpoints?.devices || { fans: false, misters: false, lights: false, co2: false };
-  const [devices, setDevices] = useState(rawDevices);
 
-  useEffect(() => {
-    if (isScheduled) {
-      const interval = setInterval(() => {
-        setDevices(computeScheduledDevicesState(settings?.schedules));
-      }, 3000);
-      setDevices(computeScheduledDevicesState(settings?.schedules));
-      return () => clearInterval(interval);
-    } else if (isAuto) {
-      const interval = setInterval(() => {
-        setDevices(computeAutoDevicesState(sensors, settings?.setpoints));
-      }, 3000);
-      setDevices(computeAutoDevicesState(sensors, settings?.setpoints));
-      return () => clearInterval(interval);
-    } else {
-      setDevices(rawDevices);
-    }
-  }, [isScheduled, isAuto, settings?.schedules, settings?.setpoints, sensors, rawDevices]);
-  
-  const fansActive = devices.fans;
-  const misterActive = devices.misters;
-  const lightActive = devices.lights;
-  const valveActive = devices.co2;
-
-  const toggleDevice = async (key: string, currentState: boolean) => {
-    if (isLocked) return; // User cannot toggle while in auto or scheduled mode
-    const newState = !currentState;
-    hapticMedium();
-
-    const deviceName = key === 'co2' ? 'Valve' : key.charAt(0).toUpperCase() + key.slice(1);
-
-    // ⚡ 0ms Optimistic UI update
-    setDevices(prev => ({ ...prev, [key]: newState }));
-
-    const startTime = Date.now();
-    let delayTimer: ReturnType<typeof setTimeout> | null = null;
-
-    // Notify user if command takes longer than 2.5 seconds to reach controller
-    delayTimer = setTimeout(() => {
-      showToast({
-        type: 'info',
-        text1: 'Slow Response',
-        text2: `Sending command to ${deviceName}...`,
-        duration: 3500,
-      });
-    }, 2500);
-
-    try {
-      await update(ref(db, `kabutech/settings/setpoints/devices`), {
-        [key]: newState
-      });
-      if (delayTimer) clearTimeout(delayTimer);
-
-      const elapsed = Date.now() - startTime;
-      if (elapsed > 2500) {
-        showToast({
-          type: 'success',
-          text1: `${deviceName} Switched ${newState ? 'ON' : 'OFF'}`,
-          text2: `Delivered in ${(elapsed / 1000).toFixed(1)}s`,
-        });
-      } else {
-        showToast({ type: 'success', text1: `${deviceName} Switched ${newState ? 'ON' : 'OFF'}` });
-      }
-    } catch (error) {
-      if (delayTimer) clearTimeout(delayTimer);
-      setDevices(prev => ({ ...prev, [key]: currentState }));
-      console.error(error);
-      showToast({ 
-        type: 'error', 
-        text1: 'Command Failed', 
-        text2: `Unable to switch ${deviceName}. Check connection.`,
-        duration: 4000,
-      });
-    }
-  };
-
-  // Calculate Environment Score (0 to 10) based on all 4 environmental metrics
-  const envScore = isControllerOff ? '--' : calculateEnvironmentScore(temp, hum, light, co2);
+  // Chamber evaluation against cited agricultural crop profile
+  const chamberEval = useMemo(() => {
+    return evaluateChamber(
+      {
+        temp: temp !== -999 ? temp : null,
+        hum: hum !== -999 ? hum : null,
+        co2: co2 !== -999 ? co2 : null,
+        light: light !== -999 ? light : null,
+      },
+      {
+        temp: health.tempError,
+        hum: health.humError,
+        co2: health.co2Error,
+        light: health.lightError,
+        isControllerOffline: isControllerOff,
+      },
+      ACTIVE_PROFILE
+    );
+  }, [temp, hum, co2, light, health, isControllerOff]);
 
   return (
     <View style={tw`flex-1 bg-[#f0f9f4] dark:bg-[#020617]`}>
@@ -159,40 +91,38 @@ export default function HomeScreen() {
           onScroll={handleTabBarScroll}
           scrollEventThrottle={16}
         >
-        {/* Overscroll Filler to prevent white gap when bouncing */}
-        <View style={[tw`absolute left-0 right-0 bg-[#f0f9f4] dark:bg-[#020617]`, { top: -500, height: 500 }]} />
+          {/* Overscroll Filler to prevent white gap when bouncing */}
+          <View style={[tw`absolute left-0 right-0 bg-[#f0f9f4] dark:bg-[#020617]`, { top: -500, height: 500 }]} />
 
+          {/* 1. Chamber Status Hero Ring: Factual Parameters in Range (x / 4) */}
+          <ChamberStatusHero 
+            evaluation={chamberEval}
+            isAuto={isAuto} 
+            isScheduled={isScheduled}
+            isDarkMode={isDarkMode} 
+            isOffline={isControllerOff}
+            secondsSinceUpdate={health.secondsSinceUpdate}
+            navigation={navigation} 
+            hasWarning={envAlerts.hasWarning}
+          />
 
-        {/* Arch Gradient Score Section */}
-        <ScoreArch 
-          envScore={envScore} 
-          isAuto={isAuto} 
-          isScheduled={isScheduled}
-          isDarkMode={isDarkMode} 
-          fansActive={fansActive} 
-          misterActive={misterActive} 
-          lightActive={lightActive} 
-          valveActive={valveActive}
-          toggleDevice={toggleDevice} 
-          navigation={navigation} 
-          isOffline={isControllerOff}
-          hasWarning={envAlerts.hasWarning}
-          warningBanner={envAlerts.hasWarning ? <DashboardWarningBadges alerts={envAlerts.unreadAlerts} /> : null}
-        />
+          {/* 2. Immediate Situational Awareness: Alerts Positioned Under Hero */}
+          {envAlerts.hasWarning && (
+            <View style={tw`px-5 sm:px-6 pt-1`}>
+              <DashboardWarningBadges alerts={envAlerts.unreadAlerts} />
+            </View>
+          )}
 
-        {/* Health Metrics (2x2 Grid) */}
-        <EnvironmentMetricsGrid temp={temp} hum={hum} light={light} co2={co2} navigation={navigation} />
+          {/* 3. Health Metrics (2x2 Minimal Clean Grid) */}
+          <EnvironmentMetricsGrid temp={temp} hum={hum} light={light} co2={co2} navigation={navigation} />
 
-        {/* Water Reservoir Level Indicator */}
-        <WaterLevelCard waterLevel={waterLevel} navigation={navigation} />
+          {/* 4. Water Reservoir Level Indicator */}
+          <WaterLevelCard waterLevel={waterLevel} navigation={navigation} />
 
-        {/* Critical System Alerts */}
-        <CriticalSystemAlerts alerts={alerts} onAlertPress={() => navigation.navigate('Analytics' as never)} />
+          {/* 5. Critical Hardware & System Alerts */}
+          <CriticalSystemAlerts alerts={alerts} onAlertPress={() => navigation.navigate('Alerts')} />
 
-        {/* Live Farm Video Stream */}
-        <LiveFarmCard navigation={navigation} />
-
-      </ScrollView>
+        </ScrollView>
       )}
       
       {/* AI Insight Modal */}

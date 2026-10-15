@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { View, Text, ScrollView, TouchableOpacity, StatusBar, DeviceEventEmitter, Alert, Modal, PanResponder } from 'react-native';
+import { View, Text, ScrollView, TouchableOpacity, StatusBar, DeviceEventEmitter, Alert, Modal, PanResponder, LayoutAnimation, Platform, UIManager } from 'react-native';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { GlobalNavigationParamList } from '../types/navigation';
@@ -120,6 +120,11 @@ export default function ControlsScreen() {
 
     const previousState = devices[key as keyof typeof devices];
 
+    if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
+      UIManager.setLayoutAnimationEnabledExperimental(true);
+    }
+    LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+
     // ⚡ 0ms Optimistic UI update for instant touch response
     setDevices(prev => ({ ...prev, [key]: state }));
 
@@ -168,6 +173,7 @@ export default function ControlsScreen() {
   const turnOffAllDevices = async () => {
     if (isLocked) return;
     hapticMedium();
+    LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
     const desired = { fans: false, misters: false, lights: false, co2: false };
     setDevices(desired);
     try {
@@ -717,7 +723,9 @@ export default function ControlsScreen() {
           {/* Section Header */}
           <View style={tw`flex-row justify-between items-center mb-2.5`}>
             <View style={tw`flex-row items-center gap-2`}>
-              <View style={tw`w-1.5 h-3.5 rounded-full bg-[#10b981]`} />
+              <View style={tw`w-6 h-6 rounded-lg bg-emerald-500/10 dark:bg-emerald-500/20 items-center justify-center`}>
+                <MaterialCommunityIcons name="toggle-switch-outline" size={16} color="#10b981" />
+              </View>
               <Text style={[tw`text-[14px] text-slate-900 dark:text-white tracking-tight`, { fontFamily: 'PlusJakartaSans_800ExtraBold' }]}>
                 Hardware Actuators
               </Text>
@@ -791,141 +799,97 @@ export default function ControlsScreen() {
             </View>
           </View>
 
-          {/* Hardware Actuators Single-Line Modular Console (Compact & Sleek) */}
-          <View style={tw`flex-row justify-between gap-2 mb-2`}>
+          {/* Hardware Actuators Minimal Switches (Single Line Layout) */}
+          <View style={tw`flex-row justify-between gap-1.5 mb-2`}>
             {deviceToggles.map((device) => {
               const showActive = device.active;
-              // Vibrant green in MANUAL mode; soft/opaque visible green in AUTO/TIMED modes.
               const isHighlightActive = showActive && !isLocked;
               const isAutoActive = showActive && isLocked;
+
+              const label =
+                device.key === 'fans'
+                  ? 'Fans'
+                  : device.key === 'misters'
+                  ? 'Mist'
+                  : device.key === 'lights'
+                  ? 'Lights'
+                  : 'CO₂';
 
               return (
                 <TouchableOpacity
                   key={device.key}
-                  activeOpacity={isLocked ? 0.85 : 0.75}
+                  activeOpacity={0.85}
                   onPress={() => {
                     if (isLocked) {
                       hapticLight();
                       showToast({
                         type: 'info',
                         text1: `${isAiOverride ? 'AI Override' : isAuto ? 'Automatic Mode' : 'Scheduled Mode'} Active`,
-                        text2: 'Tap MANUAL above to control equipment directly.',
+                        text2: 'Switch to MANUAL mode above to control equipment.',
                       });
                       return;
                     }
-                    toggleDevice(device.key, !device.active);
+                    toggleDevice(device.key, !showActive);
                   }}
                   style={[
-                    tw`flex-1 rounded-[18px] py-2 px-1 items-center justify-between border`,
-                    { height: 84 },
+                    tw`flex-1 rounded-2xl py-2 px-1 items-center justify-between border bg-white dark:bg-slate-900 shadow-sm`,
+                    { height: 58 },
                     isHighlightActive
-                      ? [
-                          isDarkMode ? tw`bg-emerald-950/20` : tw`bg-white`,
-                          tw`border-emerald-500/50 dark:border-emerald-500/40`,
-                          tw`shadow-sm`,
-                        ]
+                      ? tw`border-emerald-500 dark:border-emerald-500`
                       : isAutoActive
-                      ? [
-                          isDarkMode ? tw`bg-slate-900/90 border-slate-700/70` : tw`bg-slate-100/70 border-slate-200/80`,
-                        ]
-                      : [
-                          isDarkMode ? tw`bg-slate-900/90 border-slate-800/80` : tw`bg-white/95 border-slate-200/80`,
-                        ]
+                      ? tw`border-emerald-500/60 dark:border-emerald-500/50`
+                      : tw`border-slate-200/80 dark:border-slate-800`,
                   ]}
                 >
-                  {/* Top: Compact Squircle Icon Badge */}
-                  <View style={tw`relative items-center justify-center`}>
-                    <View
-                      style={[
-                        tw`w-7.5 h-7.5 rounded-xl items-center justify-center`,
-                        isHighlightActive
-                          ? [tw`bg-emerald-500/15 dark:bg-emerald-500/25`, { borderWidth: 1, borderColor: '#10b98140' }]
-                          : isAutoActive
-                          ? (isDarkMode ? tw`bg-slate-800/90 border border-slate-700/60` : tw`bg-slate-200/70 border border-slate-300/60`)
-                          : (isDarkMode ? tw`bg-slate-800/80 border border-slate-700/50` : tw`bg-slate-100/90 border border-slate-200/60`)
-                      ]}
-                    >
+                  {/* Top: Icon + Label */}
+                  <View style={tw`flex-row items-center gap-1`}>
+                    <View style={tw`relative`}>
                       <MaterialCommunityIcons
                         name={device.icon}
-                        size={17}
-                        color={
-                          isHighlightActive
-                            ? '#10b981'
-                            : isAutoActive
-                            ? (isDarkMode ? '#80a894' : '#4b6e5b')
-                            : (isDarkMode ? '#64748b' : '#94a3b8')
-                        }
+                        size={13}
+                        color={showActive ? '#10b981' : isDarkMode ? '#64748b' : '#94a3b8'}
                       />
+                      {device.key === 'misters' && device.isLowWater && (
+                        <View style={tw`absolute -top-1 -right-1 w-1.5 h-1.5 rounded-full bg-rose-500`} />
+                      )}
                     </View>
+                    <Text
+                      numberOfLines={1}
+                      style={[
+                        tw`text-[10px]`,
+                        { fontFamily: 'PlusJakartaSans_700Bold' },
+                        showActive
+                          ? (isDarkMode ? tw`text-white` : tw`text-slate-900`)
+                          : (isDarkMode ? tw`text-slate-400` : tw`text-slate-600`),
+                      ]}
+                    >
+                      {label}
+                    </Text>
                   </View>
 
-                  {/* Middle: Equipment Tag */}
-                  <Text
-                    style={[
-                      tw`text-[10px] uppercase tracking-wider text-center`,
-                      { fontFamily: 'PlusJakartaSans_800ExtraBold' },
-                      isHighlightActive
-                        ? (isDarkMode ? tw`text-emerald-400` : tw`text-emerald-700`)
-                        : isAutoActive
-                        ? (isDarkMode ? tw`text-slate-300` : tw`text-slate-600`)
-                        : (isDarkMode ? tw`text-slate-400` : tw`text-slate-500`)
-                    ]}
-                    numberOfLines={1}
-                  >
-                    {device.tag}
-                  </Text>
-
-                  {/* Bottom: Modern Compact Tactile State Pill */}
+                  {/* Bottom: Tactile Switch (Solid Pill Track + Solid White Thumb) */}
                   <View
                     style={[
-                      tw`px-2 py-0.5 rounded-full flex-row items-center gap-1`,
-                      isHighlightActive
-                        ? [{ backgroundColor: '#10b981' }]
-                        : isAutoActive
-                        ? (isDarkMode ? tw`bg-slate-800 border border-slate-700/80` : tw`bg-slate-200/80 border border-slate-300/80`)
-                        : (isDarkMode ? tw`bg-slate-800 border border-slate-700/60` : tw`bg-slate-100 border border-slate-200/60`)
+                      tw`w-8.5 h-4.5 rounded-full px-0.5 justify-center`,
+                      showActive
+                        ? tw`bg-emerald-500 items-end`
+                        : isDarkMode
+                        ? tw`bg-slate-700 items-start`
+                        : tw`bg-slate-200 items-start`,
                     ]}
                   >
                     <View
                       style={[
-                        tw`w-1.5 h-1.5 rounded-full`,
-                        isHighlightActive
-                          ? tw`bg-white`
-                          : isAutoActive
-                          ? tw`bg-emerald-500/60 dark:bg-emerald-400/60`
-                          : tw`bg-slate-400 dark:bg-slate-500`
+                        tw`w-3.5 h-3.5 rounded-full bg-white`,
+                        {
+                          shadowColor: '#000',
+                          shadowOffset: { width: 0, height: 1 },
+                          shadowOpacity: 0.2,
+                          shadowRadius: 1,
+                          elevation: 2,
+                        },
                       ]}
                     />
-                    <Text
-                      style={[
-                        tw`text-[8.5px] tracking-wider`,
-                        { fontFamily: 'PlusJakartaSans_800ExtraBold' },
-                        isHighlightActive
-                          ? tw`text-white`
-                          : isAutoActive
-                          ? tw`text-slate-700 dark:text-slate-200`
-                          : tw`text-slate-500 dark:text-slate-400`
-                      ]}
-                    >
-                      {showActive ? 'ON' : 'OFF'}
-                    </Text>
-                    {device.key === 'misters' && (
-                      <Text
-                        style={[
-                          tw`text-[7.5px] ml-0.5`,
-                          {
-                            fontFamily: 'PlusJakartaSans_700Bold',
-                            color: isHighlightActive
-                              ? '#ffffff'
-                              : isAutoActive
-                              ? (device.isLowWater ? '#ef4444' : (isDarkMode ? '#80a894' : '#4b6e5b'))
-                              : (device.isLowWater ? '#ef4444' : (isDarkMode ? '#94a3b8' : '#64748b'))
-                          }
-                        ]}
-                      >
-                        {Math.round(waterLevel)}%
-                      </Text>
-                    )}
                   </View>
                 </TouchableOpacity>
               );

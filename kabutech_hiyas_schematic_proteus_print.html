@@ -1,0 +1,1218 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>Original Proteus ISIS Schematic (Full Annotations)</title>
+<style>
+  @page {
+    size: 2860px 1720px;
+    margin: 0;
+  }
+  html, body {
+    margin: 0;
+    padding: 0;
+    width: 2860px;
+    height: 1720px;
+    background-color: #DFE5D5;
+    overflow: hidden;
+  }
+  svg {
+    display: block;
+    width: 2860px;
+    height: 1720px;
+  }
+</style>
+</head>
+<body>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 2860 1720" width="2860" height="1720">
+<defs>
+    <!-- Proteus signature dot grid -->
+    <pattern id="dotGrid" width="20" height="20" patternUnits="userSpaceOnUse">
+        <circle cx="10" cy="10" r="1.0" fill="#B5C0AB" />
+    </pattern>
+    <style>
+        .wire { stroke: #005500; stroke-width: 2.2; fill: none; stroke-linecap: round; stroke-linejoin: round; }
+        .pin-lead { stroke: #990000; stroke-width: 1.8; fill: none; }
+        .comp-body { stroke: #990000; stroke-width: 2.0; fill: #D5DAC8; }
+        .ic-box { stroke: #880000; stroke-width: 2.4; fill: #CED5C2; }
+        .sub-box { stroke: #667A5E; stroke-width: 1.5; stroke-dasharray: 6,4; fill: rgba(225,232,216,0.35); }
+        .resistor-box { stroke: #990000; stroke-width: 1.8; fill: #FFFFFF; }
+        .text-ref { font-family: 'Consolas', 'Courier New', monospace; font-size: 15px; font-weight: bold; fill: #000000; }
+        .text-val { font-family: 'Consolas', 'Courier New', monospace; font-size: 13px; font-weight: bold; fill: #004400; }
+        .text-placeholder { font-family: 'Consolas', monospace; font-size: 11px; fill: #556B55; }
+        .text-pin-name { font-family: 'Arial', sans-serif; font-size: 13px; font-weight: bold; fill: #000000; }
+        .text-pin-num { font-family: 'Consolas', monospace; font-size: 12px; font-weight: bold; fill: #990000; }
+        .text-hdr { font-family: 'Segoe UI', Arial, sans-serif; font-size: 16px; font-weight: 800; fill: #102B19; letter-spacing: 0.5px; }
+        .text-desc { font-family: 'Segoe UI', Arial, sans-serif; font-size: 12px; fill: #334433; }
+        .symbol-part { stroke: #990000; stroke-width: 2.0; fill: none; }
+        .symbol-solid { fill: #990000; stroke: #990000; stroke-width: 1.5; }
+        .junction-dot { fill: #005500; stroke: none; }
+        .gnd-bar { stroke: #005500; stroke-width: 2.2; }
+        .title-hdr { font-family: 'Segoe UI', Arial, sans-serif; font-size: 21px; font-weight: 800; fill: #0D2214; }
+        .title-sub { font-family: 'Segoe UI', Arial, sans-serif; font-size: 13.5px; font-weight: 600; fill: #244630; }
+    </style>
+</defs>
+
+<!-- Canvas Background -->
+<rect width="2860" height="1720" fill="#DFE5D5" />
+<rect width="2860" height="1720" fill="url(#dotGrid)" />
+
+<!-- Engineering Borders -->
+<rect x="25" y="25" width="2810" height="1670" stroke="#5E6D52" stroke-width="2.6" fill="none" />
+<rect x="31" y="31" width="2798" height="1658" stroke="#78896D" stroke-width="1.2" fill="none" />
+
+
+    <!-- SECTION 1: POWER SUPPLY -->
+    <rect x="55" y="55" width="720" height="465" class="sub-box" rx="6" />
+    <text x="75" y="85" class="text-hdr">SECTION 1: 220V AC MAINS &amp; DC POWER DISTRIBUTION</text>
+    <text x="75" y="105" class="text-desc">Switching PSU (12V 5A), LM2596 Step-Down (5V/3A) &amp; Dual Rails</text>
+
+    <!-- SECTION 2: RELAY MODULE -->
+    <rect x="55" y="540" width="720" height="600" class="sub-box" rx="6" />
+    <text x="75" y="570" class="text-hdr">SECTION 2: MULTI-CHANNEL 12V RELAY ACTUATOR CONTROLLERS</text>
+    <text x="75" y="590" class="text-desc">Optocoupled 10A Relays, 1N4007 Flyback Suppression &amp; 12V Actuator Loads</text>
+
+    <!-- SECTION 3: LIQUID SENSORS & SYSTEM CONTROLS -->
+    <rect x="55" y="1165" width="720" height="495" class="sub-box" rx="6" />
+    <text x="75" y="1195" class="text-hdr">SECTION 3: LIQUID HANDLING SENSORS &amp; HARDWARE CONTROLS</text>
+    <text x="75" y="1215" class="text-desc">YF-S201 Hall Flow Meter, XKC-Y25 Capacitive Level &amp; Panel Switches</text>
+
+    <!-- SECTION 4: ENVIRONMENTAL SENSOR ARRAYS -->
+    <rect x="1330" y="55" width="1475" height="465" class="sub-box" rx="6" />
+    <text x="1350" y="85" class="text-hdr">SECTION 4: CORE PROTOTYPE ENVIRONMENTAL SENSORS</text>
+    <text x="1350" y="105" class="text-desc">Breadboard Sensing Array: DHT11 Temp/Hum, LDR Lux, MQ-135 Gas &amp; Submersible Water Probe</text>
+
+    <!-- SECTION 5: SUSPENDED I2C AGRICULTURAL PROBE -->
+    <rect x="1330" y="545" width="1475" height="285" class="sub-box" rx="6" />
+    <text x="1350" y="575" class="text-hdr">SECTION 5: SUSPENDED I2C ENVIRONMENTAL PROBE (WEATHER SHIELD)</text>
+    <text x="1350" y="595" class="text-desc">True NDIR CO2 (SCD41), Precision SHT31, BH1750 Lux &amp; SSD1306 Cabinet OLED Display</text>
+
+    <!-- SECTION 6: ACTUATOR OUTPUTS & CONNECTORS -->
+    <rect x="1330" y="855" width="1475" height="285" class="sub-box" rx="6" />
+    <text x="1350" y="885" class="text-hdr">SECTION 6: PROTOTYPE LED FEEDBACK &amp; EXTERNAL GX16 PORTS</text>
+    <text x="1350" y="905" class="text-desc">On-board Diagnostics LEDs + IP65 Screw-Lock Aviation Ports for Field Equipment</text>
+
+    <!-- SECTION 7: SPECIFICATIONS & TITLE BLOCK -->
+    <rect x="1330" y="1165" width="1475" height="495" class="sub-box" rx="6" />
+    <text x="1350" y="1200" class="text-hdr">SECTION 7: COMPLETE PINOUT DIRECTORY &amp; SYSTEM NETLIST</text>
+    <text x="1350" y="1220" class="text-desc">Official Engineering Documentation, Net Connections &amp; Protection Standards</text>
+    
+
+    <!-- U1: ESP32-S3 Dev Module -->
+    <rect x="830" y="160" width="440" height="1450" class="ic-box" />
+    <text x="850" y="148" class="text-ref" style="font-size:18px;">U1</text>
+    <text x="850" y="190" class="text-ref" style="font-size:16px;">ESP32-S3-WROOM-1</text>
+    <text x="850" y="208" class="text-val">DevKit N16R8 (Xtensa 240MHz)</text>
+    <text x="850" y="224" class="text-placeholder">&lt;TEXT&gt;</text>
+    
+
+        <line x1="795" y1="240" x2="830" y2="240" class="pin-lead" />
+        <text x="790" y="236" text-anchor="end" class="text-pin-num">1</text>
+        <text x="845" y="245" class="text-pin-name">3V3</text>
+        
+
+        <line x1="795" y1="310" x2="830" y2="310" class="pin-lead" />
+        <text x="790" y="306" text-anchor="end" class="text-pin-num">2</text>
+        <text x="845" y="315" class="text-pin-name">VIN</text>
+        
+
+        <line x1="795" y1="380" x2="830" y2="380" class="pin-lead" />
+        <text x="790" y="376" text-anchor="end" class="text-pin-num">3</text>
+        <text x="845" y="385" class="text-pin-name">GND_1</text>
+        
+
+        <line x1="795" y1="450" x2="830" y2="450" class="pin-lead" />
+        <text x="790" y="446" text-anchor="end" class="text-pin-num">4</text>
+        <text x="845" y="455" class="text-pin-name">EN/RST</text>
+        
+
+        <line x1="795" y1="670" x2="830" y2="670" class="pin-lead" />
+        <text x="790" y="666" text-anchor="end" class="text-pin-num">5</text>
+        <text x="845" y="675" class="text-pin-name">IO9</text>
+        
+
+        <line x1="795" y1="755" x2="830" y2="755" class="pin-lead" />
+        <text x="790" y="751" text-anchor="end" class="text-pin-num">6</text>
+        <text x="845" y="760" class="text-pin-name">IO10</text>
+        
+
+        <line x1="795" y1="840" x2="830" y2="840" class="pin-lead" />
+        <text x="790" y="836" text-anchor="end" class="text-pin-num">7</text>
+        <text x="845" y="845" class="text-pin-name">IO11</text>
+        
+
+        <line x1="795" y1="925" x2="830" y2="925" class="pin-lead" />
+        <text x="790" y="921" text-anchor="end" class="text-pin-num">8</text>
+        <text x="845" y="930" class="text-pin-name">IO12</text>
+        
+
+        <line x1="795" y1="1010" x2="830" y2="1010" class="pin-lead" />
+        <text x="790" y="1006" text-anchor="end" class="text-pin-num">9</text>
+        <text x="845" y="1015" class="text-pin-name">IO13</text>
+        
+
+        <line x1="795" y1="1240" x2="830" y2="1240" class="pin-lead" />
+        <text x="790" y="1236" text-anchor="end" class="text-pin-num">10</text>
+        <text x="845" y="1245" class="text-pin-name">IO14</text>
+        
+
+        <line x1="795" y1="1310" x2="830" y2="1310" class="pin-lead" />
+        <text x="790" y="1306" text-anchor="end" class="text-pin-num">11</text>
+        <text x="845" y="1315" class="text-pin-name">IO21</text>
+        
+
+        <line x1="795" y1="1480" x2="830" y2="1480" class="pin-lead" />
+        <text x="790" y="1476" text-anchor="end" class="text-pin-num">12</text>
+        <text x="845" y="1485" class="text-pin-name">IO38</text>
+        
+
+        <line x1="795" y1="1550" x2="830" y2="1550" class="pin-lead" />
+        <text x="790" y="1546" text-anchor="end" class="text-pin-num">13</text>
+        <text x="845" y="1555" class="text-pin-name">GND_2</text>
+        
+
+        <line x1="1270" y1="240" x2="1305" y2="240" class="pin-lead" />
+        <text x="1310" y="236" class="text-pin-num">14</text>
+        <text x="1255" y="245" text-anchor="end" class="text-pin-name">IO4</text>
+        
+
+        <line x1="1270" y1="310" x2="1305" y2="310" class="pin-lead" />
+        <text x="1310" y="306" class="text-pin-num">15</text>
+        <text x="1255" y="315" text-anchor="end" class="text-pin-name">IO5</text>
+        
+
+        <line x1="1270" y1="380" x2="1305" y2="380" class="pin-lead" />
+        <text x="1310" y="376" class="text-pin-num">16</text>
+        <text x="1255" y="385" text-anchor="end" class="text-pin-name">IO6</text>
+        
+
+        <line x1="1270" y1="450" x2="1305" y2="450" class="pin-lead" />
+        <text x="1310" y="446" class="text-pin-num">17</text>
+        <text x="1255" y="455" text-anchor="end" class="text-pin-name">IO7</text>
+        
+
+        <line x1="1270" y1="520" x2="1305" y2="520" class="pin-lead" />
+        <text x="1310" y="516" class="text-pin-num">18</text>
+        <text x="1255" y="525" text-anchor="end" class="text-pin-name">IO8</text>
+        
+
+        <line x1="1270" y1="670" x2="1305" y2="670" class="pin-lead" />
+        <text x="1310" y="666" class="text-pin-num">19</text>
+        <text x="1255" y="675" text-anchor="end" class="text-pin-name">IO1/SDA</text>
+        
+
+        <line x1="1270" y1="740" x2="1305" y2="740" class="pin-lead" />
+        <text x="1310" y="736" class="text-pin-num">20</text>
+        <text x="1255" y="745" text-anchor="end" class="text-pin-name">IO2/SCL</text>
+        
+
+        <line x1="1270" y1="920" x2="1305" y2="920" class="pin-lead" />
+        <text x="1310" y="916" class="text-pin-num">21</text>
+        <text x="1255" y="925" text-anchor="end" class="text-pin-name">IO47</text>
+        
+
+        <line x1="1270" y1="990" x2="1305" y2="990" class="pin-lead" />
+        <text x="1310" y="986" class="text-pin-num">22</text>
+        <text x="1255" y="995" text-anchor="end" class="text-pin-name">IO48</text>
+        
+
+        <line x1="1270" y1="1060" x2="1305" y2="1060" class="pin-lead" />
+        <text x="1310" y="1056" class="text-pin-num">23</text>
+        <text x="1255" y="1065" text-anchor="end" class="text-pin-name">GND_3</text>
+        
+
+    <!-- AC Inlet J_AC -->
+    <rect x="90" y="160" width="80" height="110" class="comp-body" />
+    <text x="98" y="152" class="text-ref">J_AC</text>
+    <text x="98" y="288" class="text-val">IEC C14</text>
+    <text x="98" y="302" class="text-placeholder">220VAC PH</text>
+
+    <!-- Pins -->
+    <line x1="70" y1="185" x2="90" y2="185" class="pin-lead" />
+    <text x="98" y="190" class="text-pin-name">L</text>
+    <line x1="70" y1="215" x2="90" y2="215" class="pin-lead" />
+    <text x="98" y="220" class="text-pin-name">N</text>
+    <line x1="70" y1="245" x2="90" y2="245" class="pin-lead" />
+    <text x="98" y="250" class="text-pin-name">PE</text>
+    
+
+        <line x1="195" y1="245" x2="195" y2="259" class="wire" />
+        <line x1="181" y1="259" x2="209" y2="259" class="gnd-bar" />
+        <line x1="186" y1="264" x2="204" y2="264" class="gnd-bar" />
+        <line x1="191" y1="269" x2="199" y2="269" class="gnd-bar" />
+        
+<text x="211" y="267" class="text-val" style="font-size:12px;">EARTH</text>
+<polyline points="170,245 195,245" class="wire" />
+
+            <line x1="201" y1="185" x2="213" y2="185" class="pin-lead" />
+            <rect x="213" y="178" width="34" height="15" class="resistor-box" />
+            <line x1="247" y1="185" x2="259" y2="185" class="pin-lead" />
+            <text x="230" y="162" text-anchor="middle" class="text-ref">F1</text>
+            <text x="230" y="175" text-anchor="middle" class="text-val">5A/250V</text>
+            <text x="230" y="207" text-anchor="middle" class="text-placeholder">&lt;TEXT&gt;</text>
+            
+<polyline points="170,185 213,185" class="wire" />
+
+    <!-- SW1 Rocker Switch -->
+    <line x1="247" y1="185" x2="275" y2="185" class="wire" />
+    <circle cx="275" cy="185" r="3" fill="#990000" />
+    <line x1="275" y1="185" x2="302" y2="170" class="symbol-part" stroke-width="2.2" />
+    <circle cx="305" cy="185" r="3" fill="#990000" />
+    <line x1="305" y1="185" x2="330" y2="185" class="wire" />
+    <text x="290" y="158" text-anchor="middle" class="text-ref">SW1</text>
+    <text x="290" y="202" text-anchor="middle" class="text-val">KCD1 (Mains)</text>
+    
+<polyline points="330,185 355,185" class="wire" />
+<circle cx="355" cy="185" r="4.0" class="junction-dot" />
+<polyline points="170,215 355,215" class="wire" />
+<circle cx="355" cy="215" r="4.0" class="junction-dot" />
+
+            <line x1="355" y1="178" x2="355" y2="190" class="pin-lead" />
+            <rect x="349" y="190" width="12" height="20" class="resistor-box" />
+            <line x1="355" y1="210" x2="355" y2="222" class="pin-lead" />
+            <text x="367" y="195" class="text-ref">MOV1</text>
+            <text x="367" y="209" class="text-val">10D431K</text>
+            <text x="367" y="222" class="text-placeholder">&lt;TEXT&gt;</text>
+            
+
+    <!-- PSU1: Mean Well 12V 5A -->
+    <rect x="390" y="150" width="150" height="120" class="comp-body" />
+    <text x="400" y="142" class="text-ref">PSU1</text>
+    <text x="400" y="288" class="text-val">LRS-75-12 (5A / 60W)</text>
+    <text x="400" y="302" class="text-desc">220VAC IN &#8594; 12VDC OUT</text>
+    <text x="400" y="316" class="text-placeholder">&lt;TEXT&gt;</text>
+
+    <!-- Terminals Left -->
+    <text x="400" y="180" class="text-pin-name">AC (L)</text>
+    <text x="400" y="215" class="text-pin-name">AC (N)</text>
+    <text x="400" y="250" class="text-pin-name">FG (Earth)</text>
+
+    <!-- Terminals Right -->
+    <text x="530" y="180" text-anchor="end" class="text-pin-name">+12V</text>
+    <text x="530" y="235" text-anchor="end" class="text-pin-name">GND</text>
+    
+<polyline points="355,185 390,185 390,175" class="wire" />
+<polyline points="355,215 390,215 390,210" class="wire" />
+
+            <line x1="551" y1="175" x2="563" y2="175" class="pin-lead" />
+            <rect x="563" y="168" width="34" height="15" class="resistor-box" />
+            <line x1="597" y1="175" x2="609" y2="175" class="pin-lead" />
+            <text x="580" y="152" text-anchor="middle" class="text-ref">F2</text>
+            <text x="580" y="165" text-anchor="middle" class="text-val">5A (Blade)</text>
+            <text x="580" y="197" text-anchor="middle" class="text-placeholder">&lt;TEXT&gt;</text>
+            
+<polyline points="540,175 563,175" class="wire" />
+<polyline points="597,175 630,175" class="wire" />
+
+        <line x1="630" y1="175" x2="630" y2="161" class="wire" />
+        <polygon points="630,153 623,161 637,161" stroke="#005500" stroke-width="1.8" fill="#DFE5D5" />
+        
+<text x="630" y="149" text-anchor="middle" class="text-val" style="font-size:12px; font-weight:bold;">+12V (BUS)</text>
+<circle cx="630" cy="175" r="4.0" class="junction-dot" />
+
+        <line x1="630" y1="211" x2="630" y2="228" class="pin-lead" />
+        <rect x="617" y="228" width="26" height="4" class="symbol-solid" />
+        <rect x="617" y="239" width="26" height="4" class="symbol-part" />
+        <line x1="630" y1="243" x2="630" y2="259" class="pin-lead" />
+        <text x="614" y="225" class="text-pin-num" style="font-size:15px;">+</text>
+        <text x="646" y="230" class="text-ref">C1</text>
+        <text x="646" y="244" class="text-val">100uF/35V</text>
+        <text x="646" y="257" class="text-placeholder">&lt;TEXT&gt;</text>
+        
+<polyline points="630,175 630,211" class="wire" />
+<polyline points="630,259 630,275" class="wire" />
+
+        <line x1="630" y1="275" x2="630" y2="289" class="wire" />
+        <line x1="616" y1="289" x2="644" y2="289" class="gnd-bar" />
+        <line x1="621" y1="294" x2="639" y2="294" class="gnd-bar" />
+        <line x1="626" y1="299" x2="634" y2="299" class="gnd-bar" />
+        
+<text x="646" y="297" class="text-val" style="font-size:12px;">GND</text>
+<polyline points="540,230 570,230" class="wire" />
+
+        <line x1="570" y1="230" x2="570" y2="244" class="wire" />
+        <line x1="556" y1="244" x2="584" y2="244" class="gnd-bar" />
+        <line x1="561" y1="249" x2="579" y2="249" class="gnd-bar" />
+        <line x1="566" y1="254" x2="574" y2="254" class="gnd-bar" />
+        
+<text x="586" y="252" class="text-val" style="font-size:12px;">GND</text>
+
+    <!-- U2: LM2596 Buck Converter -->
+    <rect x="390" y="340" width="150" height="110" class="comp-body" />
+    <text x="400" y="332" class="text-ref">U2 (BUCK)</text>
+    <text x="400" y="468" class="text-val">LM2596-5.0 DC-DC</text>
+    <text x="400" y="482" class="text-desc">High-Efficiency 3A Step-Down</text>
+    <text x="400" y="496" class="text-placeholder">&lt;TEXT&gt;</text>
+
+    <!-- Pins with clear vertical separation -->
+    <text x="400" y="362" class="text-pin-name">IN+ (12V)</text>
+    <text x="400" y="435" class="text-pin-name">IN- (GND)</text>
+    <text x="530" y="362" text-anchor="end" class="text-pin-name">OUT+ (5V)</text>
+    <text x="530" y="435" text-anchor="end" class="text-pin-name">OUT- (GND)</text>
+    
+<polyline points="630,175 670,175 670,375 390,375" class="wire" />
+<circle cx="670" cy="175" r="4.0" class="junction-dot" />
+
+        <line x1="370" y1="420" x2="370" y2="434" class="wire" />
+        <line x1="356" y1="434" x2="384" y2="434" class="gnd-bar" />
+        <line x1="361" y1="439" x2="379" y2="439" class="gnd-bar" />
+        <line x1="366" y1="444" x2="374" y2="444" class="gnd-bar" />
+        
+<text x="386" y="442" class="text-val" style="font-size:12px;">GND</text>
+<polyline points="370,420 390,420" class="wire" />
+<polyline points="540,375 590,375" class="wire" />
+<circle cx="590" cy="375" r="4.0" class="junction-dot" />
+
+        <line x1="590" y1="375" x2="590" y2="361" class="wire" />
+        <polygon points="590,353 583,361 597,361" stroke="#005500" stroke-width="1.8" fill="#DFE5D5" />
+        
+<text x="590" y="349" text-anchor="middle" class="text-val" style="font-size:12px; font-weight:bold;">+5V (VIN)</text>
+
+        <line x1="590" y1="406" x2="590" y2="423" class="pin-lead" />
+        <rect x="577" y="423" width="26" height="4" class="symbol-solid" />
+        <rect x="577" y="434" width="26" height="4" class="symbol-part" />
+        <line x1="590" y1="438" x2="590" y2="454" class="pin-lead" />
+        <text x="574" y="420" class="text-pin-num" style="font-size:15px;">+</text>
+        <text x="606" y="425" class="text-ref">C2</text>
+        <text x="606" y="439" class="text-val">220uF/16V</text>
+        <text x="606" y="452" class="text-placeholder">&lt;TEXT&gt;</text>
+        
+<polyline points="590,375 590,406" class="wire" />
+<polyline points="590,454 590,470" class="wire" />
+
+        <line x1="590" y1="470" x2="590" y2="484" class="wire" />
+        <line x1="576" y1="484" x2="604" y2="484" class="gnd-bar" />
+        <line x1="581" y1="489" x2="599" y2="489" class="gnd-bar" />
+        <line x1="586" y1="494" x2="594" y2="494" class="gnd-bar" />
+        
+<text x="606" y="492" class="text-val" style="font-size:12px;">GND</text>
+<polyline points="540,420 560,420" class="wire" />
+
+        <line x1="560" y1="420" x2="560" y2="434" class="wire" />
+        <line x1="546" y1="434" x2="574" y2="434" class="gnd-bar" />
+        <line x1="551" y1="439" x2="569" y2="439" class="gnd-bar" />
+        <line x1="556" y1="444" x2="564" y2="444" class="gnd-bar" />
+        
+<text x="576" y="442" class="text-val" style="font-size:12px;">GND</text>
+<polyline points="590,375 710,375 710,310 795,310" class="wire" />
+<polyline points="795,240 640,240" class="wire" />
+
+        <line x1="640" y1="240" x2="640" y2="226" class="wire" />
+        <polygon points="640,218 633,226 647,226" stroke="#005500" stroke-width="1.8" fill="#DFE5D5" />
+        
+<text x="640" y="214" text-anchor="middle" class="text-val" style="font-size:12px; font-weight:bold;">+3.3V (VDD)</text>
+<circle cx="640" cy="240" r="4.0" class="junction-dot" />
+
+        <line x1="640" y1="266" x2="640" y2="283" class="pin-lead" />
+        <rect x="627" y="283" width="26" height="4" class="symbol-solid" />
+        <rect x="627" y="294" width="26" height="4" class="symbol-part" />
+        <line x1="640" y1="298" x2="640" y2="314" class="pin-lead" />
+        <text x="624" y="280" class="text-pin-num" style="font-size:15px;">+</text>
+        <text x="656" y="285" class="text-ref">C3</text>
+        <text x="656" y="299" class="text-val">10uF/10V</text>
+        <text x="656" y="312" class="text-placeholder">&lt;TEXT&gt;</text>
+        
+<polyline points="640,240 640,266" class="wire" />
+<polyline points="640,314 640,330" class="wire" />
+
+        <line x1="640" y1="330" x2="640" y2="344" class="wire" />
+        <line x1="626" y1="344" x2="654" y2="344" class="gnd-bar" />
+        <line x1="631" y1="349" x2="649" y2="349" class="gnd-bar" />
+        <line x1="636" y1="354" x2="644" y2="354" class="gnd-bar" />
+        
+<text x="656" y="352" class="text-val" style="font-size:12px;">VSS</text>
+<polyline points="795,380 740,380" class="wire" />
+
+        <line x1="740" y1="380" x2="740" y2="394" class="wire" />
+        <line x1="726" y1="394" x2="754" y2="394" class="gnd-bar" />
+        <line x1="731" y1="399" x2="749" y2="399" class="gnd-bar" />
+        <line x1="736" y1="404" x2="744" y2="404" class="gnd-bar" />
+        
+<text x="756" y="402" class="text-val" style="font-size:12px;">VSS</text>
+
+            <line x1="712" y1="450" x2="724" y2="450" class="pin-lead" />
+            <rect x="724" y="443" width="32" height="15" class="resistor-box" />
+            <line x1="756" y1="450" x2="768" y2="450" class="pin-lead" />
+            <text x="740" y="427" text-anchor="middle" class="text-ref">R_RST</text>
+            <text x="740" y="440" text-anchor="middle" class="text-val">10k</text>
+            <text x="740" y="472" text-anchor="middle" class="text-placeholder">&lt;TEXT&gt;</text>
+            
+<polyline points="795,450 756,450" class="wire" />
+<circle cx="756" cy="450" r="4.0" class="junction-dot" />
+<polyline points="724,450 690,450" class="wire" />
+
+        <line x1="690" y1="450" x2="690" y2="436" class="wire" />
+        <polygon points="690,428 683,436 697,436" stroke="#005500" stroke-width="1.8" fill="#DFE5D5" />
+        
+<text x="690" y="424" text-anchor="middle" class="text-val" style="font-size:12px; font-weight:bold;">+3.3V</text>
+<polyline points="756,450 756,480" class="wire" />
+
+    <!-- Reset Pushbutton -->
+    <line x1="740" y1="480" x2="772" y2="480" class="symbol-part" />
+    <line x1="756" y1="480" x2="756" y2="496" class="symbol-lead" />
+    <circle cx="748" cy="500" r="3" fill="#990000" />
+    <circle cx="764" cy="500" r="3" fill="#990000" />
+    <text x="720" y="520" class="text-ref">SW_RST</text>
+    <text x="720" y="534" class="text-val">Reset Btn</text>
+    
+
+        <line x1="756" y1="510" x2="756" y2="524" class="wire" />
+        <line x1="742" y1="524" x2="770" y2="524" class="gnd-bar" />
+        <line x1="747" y1="529" x2="765" y2="529" class="gnd-bar" />
+        <line x1="752" y1="534" x2="760" y2="534" class="gnd-bar" />
+        
+<text x="772" y="532" class="text-val" style="font-size:12px;">VSS</text>
+
+    <!-- RLY_MOD1: 8-Channel Relay Module -->
+    <rect x="90" y="610" width="650" height="500" class="comp-body" />
+    <text x="105" y="602" class="text-ref">RLY_MOD1 (8-CHANNEL OPTOCOUPLED RELAY BOARD)</text>
+    <text x="105" y="1130" class="text-val">Songle SRD-05VDC-SL-C (10A 250VAC / 10A 30VDC Rating)</text>
+    <text x="105" y="1146" class="text-desc">Optically Isolated Active-LOW Coil Triggers with 1N4007 Flyback Suppression</text>
+    <text x="105" y="1160" class="text-placeholder">&lt;TEXT&gt;</text>
+    
+
+        <line x1="120" y1="640" x2="120" y2="626" class="wire" />
+        <polygon points="120,618 113,626 127,626" stroke="#005500" stroke-width="1.8" fill="#DFE5D5" />
+        
+<text x="120" y="614" text-anchor="middle" class="text-val" style="font-size:12px; font-weight:bold;">+5V (RELAY VCC)</text>
+
+        <line x1="170" y1="640" x2="170" y2="654" class="wire" />
+        <line x1="156" y1="654" x2="184" y2="654" class="gnd-bar" />
+        <line x1="161" y1="659" x2="179" y2="659" class="gnd-bar" />
+        <line x1="166" y1="664" x2="174" y2="664" class="gnd-bar" />
+        
+<text x="186" y="662" class="text-val" style="font-size:12px;">GND</text>
+
+        <!-- Channel 1: K1 -->
+        <rect x="105" y="660" width="620" height="70" fill="#DFE5D5" stroke="#7A896F" stroke-width="1.2" rx="4" />
+        <text x="115" y="684" class="text-ref">K1: EXHAUST FAN</text>
+        <text x="115" y="702" class="text-desc">12V DC 120mm Ball Bearing Fan (>70 CFM)</text>
+        <text x="115" y="718" class="text-val" style="font-size:11px;">Flyback Diode: D5 (1N4007)</text>
+
+        <!-- Terminals -->
+        <text x="410" y="695" class="text-pin-name" style="font-size:12px;">POWER: COM &#8592; +12V</text>
+        <text x="410" y="715" class="text-pin-name" style="font-size:12px; fill:#990000;">LOAD: NO &#8594; PORT 1</text>
+        <text x="715" y="698" text-anchor="end" class="text-pin-name" style="font-size:12px; fill:#005500;">IN1 &#8592; IO9</text>
+        
+<polyline points="795,670 725,670" class="wire" />
+<circle cx="795" cy="670" r="4.0" class="junction-dot" />
+
+        <!-- Channel 2: K2 -->
+        <rect x="105" y="745" width="620" height="70" fill="#DFE5D5" stroke="#7A896F" stroke-width="1.2" rx="4" />
+        <text x="115" y="769" class="text-ref">K2: INTAKE FAN</text>
+        <text x="115" y="787" class="text-desc">12V DC Fresh Air Intake / CO2 Purge Fan</text>
+        <text x="115" y="803" class="text-val" style="font-size:11px;">Flyback Diode: D6 (1N4007)</text>
+
+        <!-- Terminals -->
+        <text x="410" y="780" class="text-pin-name" style="font-size:12px;">POWER: COM &#8592; +12V</text>
+        <text x="410" y="800" class="text-pin-name" style="font-size:12px; fill:#990000;">LOAD: NO &#8594; PORT 2</text>
+        <text x="715" y="783" text-anchor="end" class="text-pin-name" style="font-size:12px; fill:#005500;">IN2 &#8592; IO10</text>
+        
+<polyline points="795,755 725,755" class="wire" />
+<circle cx="795" cy="755" r="4.0" class="junction-dot" />
+
+        <!-- Channel 3: K3 -->
+        <rect x="105" y="830" width="620" height="70" fill="#DFE5D5" stroke="#7A896F" stroke-width="1.2" rx="4" />
+        <text x="115" y="854" class="text-ref">K3: MISTER PUMP</text>
+        <text x="115" y="872" class="text-desc">12V DC Diaphragm Mist Pump (60W Peak)</text>
+        <text x="115" y="888" class="text-val" style="font-size:11px;">Flyback Diode: D7 (1N4007)</text>
+
+        <!-- Terminals -->
+        <text x="410" y="865" class="text-pin-name" style="font-size:12px;">POWER: COM &#8592; +12V</text>
+        <text x="410" y="885" class="text-pin-name" style="font-size:12px; fill:#990000;">LOAD: NO &#8594; PORT 3</text>
+        <text x="715" y="868" text-anchor="end" class="text-pin-name" style="font-size:12px; fill:#005500;">IN3 &#8592; IO11</text>
+        
+<polyline points="795,840 725,840" class="wire" />
+<circle cx="795" cy="840" r="4.0" class="junction-dot" />
+
+        <!-- Channel 4: K4 -->
+        <rect x="105" y="915" width="620" height="70" fill="#DFE5D5" stroke="#7A896F" stroke-width="1.2" rx="4" />
+        <text x="115" y="939" class="text-ref">K4: GROW LIGHTS</text>
+        <text x="115" y="957" class="text-desc">12V LED Grow Light Strip (Full Spectrum)</text>
+        <text x="115" y="973" class="text-val" style="font-size:11px;">Flyback Diode: D8 (1N4007)</text>
+
+        <!-- Terminals -->
+        <text x="410" y="950" class="text-pin-name" style="font-size:12px;">POWER: COM &#8592; +12V</text>
+        <text x="410" y="970" class="text-pin-name" style="font-size:12px; fill:#990000;">LOAD: NO &#8594; PORT 4</text>
+        <text x="715" y="953" text-anchor="end" class="text-pin-name" style="font-size:12px; fill:#005500;">IN4 &#8592; IO12</text>
+        
+<polyline points="795,925 725,925" class="wire" />
+<circle cx="795" cy="925" r="4.0" class="junction-dot" />
+
+        <!-- Channel 5: K5 -->
+        <rect x="105" y="1000" width="620" height="70" fill="#DFE5D5" stroke="#7A896F" stroke-width="1.2" rx="4" />
+        <text x="115" y="1024" class="text-ref">K5: SOLENOID VALVE</text>
+        <text x="115" y="1042" class="text-desc">12V DC Water Solenoid (NC, 1/2" Thread)</text>
+        <text x="115" y="1058" class="text-val" style="font-size:11px;">Flyback Diode: D9 (1N4007)</text>
+
+        <!-- Terminals -->
+        <text x="410" y="1035" class="text-pin-name" style="font-size:12px;">POWER: COM &#8592; +12V</text>
+        <text x="410" y="1055" class="text-pin-name" style="font-size:12px; fill:#990000;">LOAD: NO &#8594; PORT 5</text>
+        <text x="715" y="1038" text-anchor="end" class="text-pin-name" style="font-size:12px; fill:#005500;">IN5 &#8592; IO13</text>
+        
+<polyline points="795,1010 725,1010" class="wire" />
+<circle cx="795" cy="1010" r="4.0" class="junction-dot" />
+
+    <!-- YF-S201 Flow Sensor -->
+    <rect x="90" y="1240" width="300" height="150" class="comp-body" />
+    <text x="100" y="1232" class="text-ref">SEN_FLOW (YF-S201)</text>
+    <text x="100" y="1408" class="text-val">Hall-Effect Flow Sensor</text>
+    <text x="100" y="1422" class="text-desc">1-30 L/min, Pulse: 7.5*Q</text>
+    <text x="100" y="1436" class="text-placeholder">&lt;TEXT&gt;</text>
+
+    <!-- Pins -->
+    <text x="100" y="1275" class="text-pin-name">Red: VCC (5V)</text>
+    <text x="100" y="1315" class="text-pin-name">Black: GND (VSS)</text>
+    <text x="100" y="1355" class="text-pin-name">Yellow: Pulse Out &#8594; IO14</text>
+    
+
+        <line x1="65" y1="1270" x2="65" y2="1256" class="wire" />
+        <polygon points="65,1248 58,1256 72,1256" stroke="#005500" stroke-width="1.8" fill="#DFE5D5" />
+        
+<text x="65" y="1244" text-anchor="middle" class="text-val" style="font-size:12px; font-weight:bold;">+5V</text>
+<polyline points="90,1270 65,1270" class="wire" />
+
+        <line x1="65" y1="1310" x2="65" y2="1324" class="wire" />
+        <line x1="51" y1="1324" x2="79" y2="1324" class="gnd-bar" />
+        <line x1="56" y1="1329" x2="74" y2="1329" class="gnd-bar" />
+        <line x1="61" y1="1334" x2="69" y2="1334" class="gnd-bar" />
+        
+<text x="81" y="1332" class="text-val" style="font-size:12px;">GND</text>
+<polyline points="90,1310 65,1310" class="wire" />
+
+            <line x1="330" y1="1283" x2="330" y2="1295" class="pin-lead" />
+            <rect x="323" y="1295" width="15" height="30" class="resistor-box" />
+            <line x1="330" y1="1325" x2="330" y2="1337" class="pin-lead" />
+            <text x="343" y="1305" class="text-ref">R9</text>
+            <text x="343" y="1319" class="text-val">10k</text>
+            <text x="343" y="1332" class="text-placeholder">&lt;TEXT&gt;</text>
+            
+
+        <line x1="330" y1="1285" x2="330" y2="1271" class="wire" />
+        <polygon points="330,1263 323,1271 337,1271" stroke="#005500" stroke-width="1.8" fill="#DFE5D5" />
+        
+<text x="330" y="1259" text-anchor="middle" class="text-val" style="font-size:12px; font-weight:bold;">+5V</text>
+<polyline points="250,1350 330,1350" class="wire" />
+<circle cx="330" cy="1350" r="4.0" class="junction-dot" />
+<polyline points="330,1325 330,1350" class="wire" />
+<polyline points="330,1350 795,1240" class="wire" />
+
+    <!-- XKC-Y25 Capacitive Level Sensor -->
+    <rect x="430" y="1240" width="300" height="150" class="comp-body" />
+    <text x="440" y="1232" class="text-ref">SEN_LEVEL (XKC-Y25)</text>
+    <text x="440" y="1408" class="text-val">Capacitive Non-Contact</text>
+    <text x="440" y="1422" class="text-desc">Penetrates 20mm Tank Wall</text>
+    <text x="440" y="1436" class="text-placeholder">&lt;TEXT&gt;</text>
+
+    <!-- Pins -->
+    <text x="440" y="1275" class="text-pin-name">Brown: VCC (5-12V)</text>
+    <text x="440" y="1315" class="text-pin-name">Blue: GND (VSS)</text>
+    <text x="440" y="1355" class="text-pin-name">Yellow: Digital Out &#8594; IO21</text>
+    
+
+        <line x1="405" y1="1270" x2="405" y2="1256" class="wire" />
+        <polygon points="405,1248 398,1256 412,1256" stroke="#005500" stroke-width="1.8" fill="#DFE5D5" />
+        
+<text x="405" y="1244" text-anchor="middle" class="text-val" style="font-size:12px; font-weight:bold;">+5V</text>
+<polyline points="430,1270 405,1270" class="wire" />
+
+        <line x1="405" y1="1310" x2="405" y2="1324" class="wire" />
+        <line x1="391" y1="1324" x2="419" y2="1324" class="gnd-bar" />
+        <line x1="396" y1="1329" x2="414" y2="1329" class="gnd-bar" />
+        <line x1="401" y1="1334" x2="409" y2="1334" class="gnd-bar" />
+        
+<text x="421" y="1332" class="text-val" style="font-size:12px;">GND</text>
+<polyline points="430,1310 405,1310" class="wire" />
+<polyline points="600,1350 795,1310" class="wire" />
+
+    <!-- Panel Rotary Mode Switch -->
+    <rect x="90" y="1470" width="640" height="150" class="comp-body" />
+    <text x="100" y="1462" class="text-ref">FRONT PANEL HARDWARE CONTROLS &amp; OVERRIDES</text>
+    <text x="100" y="1638" class="text-val">3-Position Heavy Duty Mode Selector</text>
+    <text x="100" y="1652" class="text-desc">Allows Growers to Force Autonomous PID, Full Shutdown, or App Bypass</text>
+
+    <!-- Switch Symbol -->
+    <text x="120" y="1505" class="text-ref">SW_MODE (3-POS)</text>
+    <text x="120" y="1522" class="text-val">Rotary Override</text>
+    <circle cx="160" cy="1560" r="4" fill="#990000" />
+    <line x1="160" y1="1560" x2="200" y2="1545" class="symbol-part" stroke-width="2.5" />
+    <circle cx="205" cy="1545" r="3" fill="#990000" />
+    <text x="215" y="1549" class="text-pin-name" style="font-size:12px;">POS 1: AUTO (Local PID)</text>
+    <circle cx="205" cy="1560" r="3" fill="#990000" />
+    <text x="215" y="1564" class="text-pin-name" style="font-size:12px;">POS 2: SYSTEM OFF</text>
+    <circle cx="205" cy="1575" r="3" fill="#990000" />
+    <text x="215" y="1579" class="text-pin-name" style="font-size:12px;">POS 3: MANUAL OVERRIDE</text>
+    
+<polyline points="160,1560 160,1480 795,1480" class="wire" />
+
+    <!-- S1: DHT11 Sensor -->
+    <rect x="1400" y="160" width="180" height="140" class="comp-body" />
+    <text x="1410" y="152" class="text-ref">S1 (DHT11 / SHT31)</text>
+    <text x="1410" y="318" class="text-val">Temp &amp; Relative Humidity</text>
+    <text x="1410" y="332" class="text-desc">&#177;2% RH / 0-100% Humidity</text>
+    <text x="1410" y="346" class="text-placeholder">&lt;TEXT&gt;</text>
+
+    <!-- Pins -->
+    <text x="1410" y="190" class="text-pin-name">1: VCC (3.3V)</text>
+    <text x="1410" y="225" class="text-pin-name">2: DATA (IO4)</text>
+    <text x="1410" y="255" class="text-pin-name">3: NC (Unused)</text>
+    <text x="1410" y="285" class="text-pin-name">4: GND (VSS)</text>
+    
+<polyline points="1400,185 1370,185" class="wire" />
+
+        <line x1="1370" y1="185" x2="1370" y2="171" class="wire" />
+        <polygon points="1370,163 1363,171 1377,171" stroke="#005500" stroke-width="1.8" fill="#DFE5D5" />
+        
+<text x="1370" y="159" text-anchor="middle" class="text-val" style="font-size:12px; font-weight:bold;">+3.3V</text>
+<polyline points="1400,280 1370,280" class="wire" />
+
+        <line x1="1370" y1="280" x2="1370" y2="294" class="wire" />
+        <line x1="1356" y1="294" x2="1384" y2="294" class="gnd-bar" />
+        <line x1="1361" y1="299" x2="1379" y2="299" class="gnd-bar" />
+        <line x1="1366" y1="304" x2="1374" y2="304" class="gnd-bar" />
+        
+<text x="1386" y="302" class="text-val" style="font-size:12px;">VSS</text>
+
+            <line x1="1355" y1="148" x2="1355" y2="160" class="pin-lead" />
+            <rect x="1348" y="160" width="15" height="30" class="resistor-box" />
+            <line x1="1355" y1="190" x2="1355" y2="202" class="pin-lead" />
+            <text x="1368" y="170" class="text-ref">R1</text>
+            <text x="1368" y="184" class="text-val">10k</text>
+            <text x="1368" y="197" class="text-placeholder">&lt;TEXT&gt;</text>
+            
+
+        <line x1="1355" y1="150" x2="1355" y2="136" class="wire" />
+        <polygon points="1355,128 1348,136 1362,136" stroke="#005500" stroke-width="1.8" fill="#DFE5D5" />
+        
+<text x="1355" y="124" text-anchor="middle" class="text-val" style="font-size:12px; font-weight:bold;">+3.3V</text>
+<polyline points="1400,220 1355,220" class="wire" />
+<circle cx="1355" cy="220" r="4.0" class="junction-dot" />
+<polyline points="1355,190 1355,220" class="wire" />
+<polyline points="1355,220 1305,240" class="wire" />
+
+    <!-- S2: LDR Light Sensor -->
+    <rect x="1750" y="160" width="180" height="140" class="comp-body" />
+    <text x="1760" y="152" class="text-ref">S2 (LDR SENSOR)</text>
+    <text x="1760" y="318" class="text-val">GL5528 Photocell</text>
+    <text x="1760" y="332" class="text-desc">0-1000 Lux Light Tracker</text>
+    <text x="1760" y="346" class="text-placeholder">&lt;TEXT&gt;</text>
+
+    <!-- Pins -->
+    <text x="1760" y="190" class="text-pin-name">1: VCC (3.3V)</text>
+    <text x="1760" y="230" class="text-pin-name">2: DIVIDER JCT</text>
+    <text x="1760" y="275" class="text-pin-name">3: GND (via 10k)</text>
+    
+<polyline points="1750,185 1720,185" class="wire" />
+
+        <line x1="1720" y1="185" x2="1720" y2="171" class="wire" />
+        <polygon points="1720,163 1713,171 1727,171" stroke="#005500" stroke-width="1.8" fill="#DFE5D5" />
+        
+<text x="1720" y="159" text-anchor="middle" class="text-val" style="font-size:12px; font-weight:bold;">+3.3V</text>
+
+            <line x1="1705" y1="238" x2="1705" y2="250" class="pin-lead" />
+            <rect x="1698" y="250" width="15" height="30" class="resistor-box" />
+            <line x1="1705" y1="280" x2="1705" y2="292" class="pin-lead" />
+            <text x="1718" y="260" class="text-ref">R2</text>
+            <text x="1718" y="274" class="text-val">10k</text>
+            <text x="1718" y="287" class="text-placeholder">&lt;TEXT&gt;</text>
+            
+<polyline points="1750,225 1705,225" class="wire" />
+<circle cx="1705" cy="225" r="4.0" class="junction-dot" />
+<polyline points="1705,225 1705,250" class="wire" />
+<polyline points="1705,280 1705,295" class="wire" />
+
+        <line x1="1705" y1="295" x2="1705" y2="309" class="wire" />
+        <line x1="1691" y1="309" x2="1719" y2="309" class="gnd-bar" />
+        <line x1="1696" y1="314" x2="1714" y2="314" class="gnd-bar" />
+        <line x1="1701" y1="319" x2="1709" y2="319" class="gnd-bar" />
+        
+<text x="1721" y="317" class="text-val" style="font-size:12px;">VSS</text>
+<polyline points="1705,225 1330,225 1330,310 1305,310" class="wire" />
+
+    <!-- S3: MQ-135 Gas Sensor -->
+    <rect x="2100" y="160" width="180" height="140" class="comp-body" />
+    <text x="2110" y="152" class="text-ref">S3 (MQ-135 MODULE)</text>
+    <text x="2110" y="318" class="text-val">CO2 / NH3 / Air Index</text>
+    <text x="2110" y="332" class="text-desc">Dedicated 5V Heater Rail</text>
+    <text x="2110" y="346" class="text-placeholder">&lt;TEXT&gt;</text>
+
+    <!-- Pins -->
+    <text x="2110" y="190" class="text-pin-name">1: VCC (5V VIN)</text>
+    <text x="2110" y="225" class="text-pin-name">2: GND (VSS)</text>
+    <text x="2110" y="255" class="text-pin-name">3: DO (Threshold)</text>
+    <text x="2110" y="285" class="text-pin-name">4: AO (Analog Out)</text>
+    
+<polyline points="2100,185 2070,185" class="wire" />
+
+        <line x1="2070" y1="185" x2="2070" y2="171" class="wire" />
+        <polygon points="2070,163 2063,171 2077,171" stroke="#005500" stroke-width="1.8" fill="#DFE5D5" />
+        
+<text x="2070" y="159" text-anchor="middle" class="text-val" style="font-size:12px; font-weight:bold;">+5V (HEATER)</text>
+<polyline points="2100,220 2070,220" class="wire" />
+
+        <line x1="2070" y1="220" x2="2070" y2="234" class="wire" />
+        <line x1="2056" y1="234" x2="2084" y2="234" class="gnd-bar" />
+        <line x1="2061" y1="239" x2="2079" y2="239" class="gnd-bar" />
+        <line x1="2066" y1="244" x2="2074" y2="244" class="gnd-bar" />
+        
+<text x="2086" y="242" class="text-val" style="font-size:12px;">VSS</text>
+<polyline points="2100,280 2050,280 2050,380 1305,380" class="wire" />
+
+    <!-- S4: Submersible Water Level Probe -->
+    <rect x="2450" y="160" width="180" height="140" class="comp-body" />
+    <text x="2460" y="152" class="text-ref">S4 (WATER LEVEL)</text>
+    <text x="2460" y="318" class="text-val">Submersible Probe</text>
+    <text x="2460" y="332" class="text-desc">Anti-Corrosion Strobe</text>
+    <text x="2460" y="346" class="text-placeholder">&lt;TEXT&gt;</text>
+
+    <!-- Pins -->
+    <text x="2460" y="190" class="text-pin-name">1: + (PWR STROBE)</text>
+    <text x="2460" y="235" class="text-pin-name">2: - (GND VSS)</text>
+    <text x="2460" y="280" class="text-pin-name">3: S (SIGNAL OUT)</text>
+    
+<polyline points="2450,230 2420,230" class="wire" />
+
+        <line x1="2420" y1="230" x2="2420" y2="244" class="wire" />
+        <line x1="2406" y1="244" x2="2434" y2="244" class="gnd-bar" />
+        <line x1="2411" y1="249" x2="2429" y2="249" class="gnd-bar" />
+        <line x1="2416" y1="254" x2="2424" y2="254" class="gnd-bar" />
+        
+<text x="2436" y="252" class="text-val" style="font-size:12px;">VSS</text>
+<polyline points="2450,185 2390,185 2390,520 1305,520" class="wire" />
+<polyline points="2450,275 2370,275 2370,450 1305,450" class="wire" />
+
+            <line x1="1440" y1="649" x2="1440" y2="661" class="pin-lead" />
+            <rect x="1433" y="661" width="15" height="28" class="resistor-box" />
+            <line x1="1440" y1="689" x2="1440" y2="701" class="pin-lead" />
+            <text x="1453" y="670" class="text-ref">R7</text>
+            <text x="1453" y="684" class="text-val">4k7 (SDA)</text>
+            <text x="1453" y="697" class="text-placeholder">&lt;TEXT&gt;</text>
+            
+
+        <line x1="1440" y1="650" x2="1440" y2="636" class="wire" />
+        <polygon points="1440,628 1433,636 1447,636" stroke="#005500" stroke-width="1.8" fill="#DFE5D5" />
+        
+<text x="1440" y="624" text-anchor="middle" class="text-val" style="font-size:12px; font-weight:bold;">+3.3V</text>
+
+            <line x1="1490" y1="649" x2="1490" y2="661" class="pin-lead" />
+            <rect x="1483" y="661" width="15" height="28" class="resistor-box" />
+            <line x1="1490" y1="689" x2="1490" y2="701" class="pin-lead" />
+            <text x="1503" y="670" class="text-ref">R8</text>
+            <text x="1503" y="684" class="text-val">4k7 (SCL)</text>
+            <text x="1503" y="697" class="text-placeholder">&lt;TEXT&gt;</text>
+            
+
+        <line x1="1490" y1="650" x2="1490" y2="636" class="wire" />
+        <polygon points="1490,628 1483,636 1497,636" stroke="#005500" stroke-width="1.8" fill="#DFE5D5" />
+        
+<text x="1490" y="624" text-anchor="middle" class="text-val" style="font-size:12px; font-weight:bold;">+3.3V</text>
+<polyline points="1440,689 1440,670" class="wire" />
+<circle cx="1440" cy="670" r="4.0" class="junction-dot" />
+<polyline points="1490,689 1490,740" class="wire" />
+<circle cx="1490" cy="740" r="4.0" class="junction-dot" />
+<polyline points="1305,670 1440,670" class="wire" />
+<polyline points="1305,740 1490,740" class="wire" />
+
+        <rect x="1580" y="660" width="240" height="145" class="comp-body" />
+        <text x="1592" y="681" class="text-ref">U3 (SCD41)</text>
+        <text x="1592" y="698" class="text-val">Sensirion True NDIR CO2</text>
+        <text x="1592" y="715" class="text-desc">400-5000 ppm (&#177;40ppm)</text>
+        <line x1="1580" y1="725" x2="1820" y2="725" stroke="#999999" stroke-width="0.8" />
+        <text x="1592" y="743" class="text-pin-name" style="font-size:11px;">1: VDD (3.3V)</text>
+        <text x="1592" y="761" class="text-pin-name" style="font-size:11px;">2: GND (VSS)</text>
+        <text x="1592" y="779" class="text-pin-name" style="font-size:11px;">3: SDA (Data)</text>
+        <text x="1710" y="779" class="text-pin-name" style="font-size:11px;">4: SCL (Clock)</text>
+        
+<polyline points="1585,739 1565,739" class="wire" />
+
+        <line x1="1565" y1="739" x2="1565" y2="725" class="wire" />
+        <polygon points="1565,717 1558,725 1572,725" stroke="#005500" stroke-width="1.8" fill="#DFE5D5" />
+        
+<text x="1565" y="713" text-anchor="middle" class="text-val" style="font-size:12px; font-weight:bold;">3V3</text>
+<polyline points="1585,757 1565,757" class="wire" />
+
+        <line x1="1565" y1="757" x2="1565" y2="771" class="wire" />
+        <line x1="1551" y1="771" x2="1579" y2="771" class="gnd-bar" />
+        <line x1="1556" y1="776" x2="1574" y2="776" class="gnd-bar" />
+        <line x1="1561" y1="781" x2="1569" y2="781" class="gnd-bar" />
+        
+<text x="1581" y="779" class="text-val" style="font-size:12px;">VSS</text>
+
+        <rect x="1880" y="660" width="240" height="145" class="comp-body" />
+        <text x="1892" y="681" class="text-ref">U4 (SHT31-D)</text>
+        <text x="1892" y="698" class="text-val">Sensirion Humidity/Temp</text>
+        <text x="1892" y="715" class="text-desc">&#177;0.3&#176;C / &#177;2% RH</text>
+        <line x1="1880" y1="725" x2="2120" y2="725" stroke="#999999" stroke-width="0.8" />
+        <text x="1892" y="743" class="text-pin-name" style="font-size:11px;">1: VDD (3.3V)</text>
+        <text x="1892" y="761" class="text-pin-name" style="font-size:11px;">2: GND (VSS)</text>
+        <text x="1892" y="779" class="text-pin-name" style="font-size:11px;">3: SDA (Data)</text>
+        <text x="2010" y="779" class="text-pin-name" style="font-size:11px;">4: SCL (Clock)</text>
+        
+<polyline points="1885,739 1865,739" class="wire" />
+
+        <line x1="1865" y1="739" x2="1865" y2="725" class="wire" />
+        <polygon points="1865,717 1858,725 1872,725" stroke="#005500" stroke-width="1.8" fill="#DFE5D5" />
+        
+<text x="1865" y="713" text-anchor="middle" class="text-val" style="font-size:12px; font-weight:bold;">3V3</text>
+<polyline points="1885,757 1865,757" class="wire" />
+
+        <line x1="1865" y1="757" x2="1865" y2="771" class="wire" />
+        <line x1="1851" y1="771" x2="1879" y2="771" class="gnd-bar" />
+        <line x1="1856" y1="776" x2="1874" y2="776" class="gnd-bar" />
+        <line x1="1861" y1="781" x2="1869" y2="781" class="gnd-bar" />
+        
+<text x="1881" y="779" class="text-val" style="font-size:12px;">VSS</text>
+
+        <rect x="2180" y="660" width="240" height="145" class="comp-body" />
+        <text x="2192" y="681" class="text-ref">U5 (BH1750)</text>
+        <text x="2192" y="698" class="text-val">Digital Lux Sensor</text>
+        <text x="2192" y="715" class="text-desc">1-65535 Lux 16-Bit ADC</text>
+        <line x1="2180" y1="725" x2="2420" y2="725" stroke="#999999" stroke-width="0.8" />
+        <text x="2192" y="743" class="text-pin-name" style="font-size:11px;">1: VDD (3.3V)</text>
+        <text x="2192" y="761" class="text-pin-name" style="font-size:11px;">2: GND (VSS)</text>
+        <text x="2192" y="779" class="text-pin-name" style="font-size:11px;">3: SDA (Data)</text>
+        <text x="2310" y="779" class="text-pin-name" style="font-size:11px;">4: SCL (Clock)</text>
+        
+<polyline points="2185,739 2165,739" class="wire" />
+
+        <line x1="2165" y1="739" x2="2165" y2="725" class="wire" />
+        <polygon points="2165,717 2158,725 2172,725" stroke="#005500" stroke-width="1.8" fill="#DFE5D5" />
+        
+<text x="2165" y="713" text-anchor="middle" class="text-val" style="font-size:12px; font-weight:bold;">3V3</text>
+<polyline points="2185,757 2165,757" class="wire" />
+
+        <line x1="2165" y1="757" x2="2165" y2="771" class="wire" />
+        <line x1="2151" y1="771" x2="2179" y2="771" class="gnd-bar" />
+        <line x1="2156" y1="776" x2="2174" y2="776" class="gnd-bar" />
+        <line x1="2161" y1="781" x2="2169" y2="781" class="gnd-bar" />
+        
+<text x="2181" y="779" class="text-val" style="font-size:12px;">VSS</text>
+
+        <rect x="2480" y="660" width="240" height="145" class="comp-body" />
+        <text x="2492" y="681" class="text-ref">U6 (SSD1306)</text>
+        <text x="2492" y="698" class="text-val">0.96" OLED Display</text>
+        <text x="2492" y="715" class="text-desc">128x64 Enclosure Screen</text>
+        <line x1="2480" y1="725" x2="2720" y2="725" stroke="#999999" stroke-width="0.8" />
+        <text x="2492" y="743" class="text-pin-name" style="font-size:11px;">1: VDD (3.3V)</text>
+        <text x="2492" y="761" class="text-pin-name" style="font-size:11px;">2: GND (VSS)</text>
+        <text x="2492" y="779" class="text-pin-name" style="font-size:11px;">3: SDA (Data)</text>
+        <text x="2610" y="779" class="text-pin-name" style="font-size:11px;">4: SCL (Clock)</text>
+        
+<polyline points="2485,739 2465,739" class="wire" />
+
+        <line x1="2465" y1="739" x2="2465" y2="725" class="wire" />
+        <polygon points="2465,717 2458,725 2472,725" stroke="#005500" stroke-width="1.8" fill="#DFE5D5" />
+        
+<text x="2465" y="713" text-anchor="middle" class="text-val" style="font-size:12px; font-weight:bold;">3V3</text>
+<polyline points="2485,757 2465,757" class="wire" />
+
+        <line x1="2465" y1="757" x2="2465" y2="771" class="wire" />
+        <line x1="2451" y1="771" x2="2479" y2="771" class="gnd-bar" />
+        <line x1="2456" y1="776" x2="2474" y2="776" class="gnd-bar" />
+        <line x1="2461" y1="781" x2="2469" y2="781" class="gnd-bar" />
+        
+<text x="2481" y="779" class="text-val" style="font-size:12px;">VSS</text>
+<polyline points="1440,670 2720,670" class="wire" />
+<polyline points="1490,740 2720,740" class="wire" />
+
+        <line x1="1400" y1="949" x2="1400" y2="965" class="pin-lead" />
+        <polygon points="1391,965 1409,965 1400,983" class="symbol-solid" fill="#009900" />
+        <line x1="1389" y1="983" x2="1411" y2="983" class="symbol-part" />
+        <line x1="1400" y1="983" x2="1400" y2="1001" class="pin-lead" />
+        <!-- Arrows -->
+        <line x1="1411" y1="968" x2="1421" y2="978" stroke="#990000" stroke-width="1.5" />
+        <polyline points="1417,978 1421,978 1421,974" stroke="#990000" stroke-width="1.5" fill="none" />
+        <line x1="1415" y1="962" x2="1425" y2="972" stroke="#990000" stroke-width="1.5" />
+        <polyline points="1421,972 1425,972 1425,968" stroke="#990000" stroke-width="1.5" fill="none" />
+        <text x="1430" y="971" class="text-ref">D1</text>
+        <text x="1430" y="985" class="text-val">FANS LED</text>
+        <text x="1430" y="998" class="text-placeholder">&lt;TEXT&gt;</text>
+        
+
+            <line x1="1400" y1="1006" x2="1400" y2="1018" class="pin-lead" />
+            <rect x="1393" y="1018" width="15" height="24" class="resistor-box" />
+            <line x1="1400" y1="1042" x2="1400" y2="1054" class="pin-lead" />
+            <text x="1413" y="1025" class="text-ref">R3</text>
+            <text x="1413" y="1039" class="text-val">220R</text>
+            <text x="1413" y="1052" class="text-placeholder">&lt;TEXT&gt;</text>
+            
+
+        <line x1="1400" y1="940" x2="1400" y2="926" class="wire" />
+        <polygon points="1400,918 1393,926 1407,926" stroke="#005500" stroke-width="1.8" fill="#DFE5D5" />
+        
+<text x="1400" y="914" text-anchor="middle" class="text-val" style="font-size:12px; font-weight:bold;">+3.3V</text>
+<polyline points="1400,940 1400,949" class="wire" />
+<polyline points="1400,1001 1400,1018" class="wire" />
+<polyline points="1400,1042 1400,1060" class="wire" />
+
+        <line x1="1400" y1="1060" x2="1400" y2="1074" class="wire" />
+        <line x1="1386" y1="1074" x2="1414" y2="1074" class="gnd-bar" />
+        <line x1="1391" y1="1079" x2="1409" y2="1079" class="gnd-bar" />
+        <line x1="1396" y1="1084" x2="1404" y2="1084" class="gnd-bar" />
+        
+<text x="1416" y="1082" class="text-val" style="font-size:12px;">VSS</text>
+
+        <line x1="1550" y1="949" x2="1550" y2="965" class="pin-lead" />
+        <polygon points="1541,965 1559,965 1550,983" class="symbol-solid" fill="#CCAA00" />
+        <line x1="1539" y1="983" x2="1561" y2="983" class="symbol-part" />
+        <line x1="1550" y1="983" x2="1550" y2="1001" class="pin-lead" />
+        <!-- Arrows -->
+        <line x1="1561" y1="968" x2="1571" y2="978" stroke="#990000" stroke-width="1.5" />
+        <polyline points="1567,978 1571,978 1571,974" stroke="#990000" stroke-width="1.5" fill="none" />
+        <line x1="1565" y1="962" x2="1575" y2="972" stroke="#990000" stroke-width="1.5" />
+        <polyline points="1571,972 1575,972 1575,968" stroke="#990000" stroke-width="1.5" fill="none" />
+        <text x="1580" y="971" class="text-ref">D2</text>
+        <text x="1580" y="985" class="text-val">VALVE/CO2</text>
+        <text x="1580" y="998" class="text-placeholder">&lt;TEXT&gt;</text>
+        
+
+            <line x1="1550" y1="1006" x2="1550" y2="1018" class="pin-lead" />
+            <rect x="1543" y="1018" width="15" height="24" class="resistor-box" />
+            <line x1="1550" y1="1042" x2="1550" y2="1054" class="pin-lead" />
+            <text x="1563" y="1025" class="text-ref">R4</text>
+            <text x="1563" y="1039" class="text-val">220R</text>
+            <text x="1563" y="1052" class="text-placeholder">&lt;TEXT&gt;</text>
+            
+
+        <line x1="1550" y1="940" x2="1550" y2="926" class="wire" />
+        <polygon points="1550,918 1543,926 1557,926" stroke="#005500" stroke-width="1.8" fill="#DFE5D5" />
+        
+<text x="1550" y="914" text-anchor="middle" class="text-val" style="font-size:12px; font-weight:bold;">+3.3V</text>
+<polyline points="1550,940 1550,949" class="wire" />
+<polyline points="1550,1001 1550,1018" class="wire" />
+<polyline points="1550,1042 1550,1060" class="wire" />
+
+        <line x1="1550" y1="1060" x2="1550" y2="1074" class="wire" />
+        <line x1="1536" y1="1074" x2="1564" y2="1074" class="gnd-bar" />
+        <line x1="1541" y1="1079" x2="1559" y2="1079" class="gnd-bar" />
+        <line x1="1546" y1="1084" x2="1554" y2="1084" class="gnd-bar" />
+        
+<text x="1566" y="1082" class="text-val" style="font-size:12px;">VSS</text>
+
+        <line x1="1700" y1="949" x2="1700" y2="965" class="pin-lead" />
+        <polygon points="1691,965 1709,965 1700,983" class="symbol-solid" fill="#0066CC" />
+        <line x1="1689" y1="983" x2="1711" y2="983" class="symbol-part" />
+        <line x1="1700" y1="983" x2="1700" y2="1001" class="pin-lead" />
+        <!-- Arrows -->
+        <line x1="1711" y1="968" x2="1721" y2="978" stroke="#990000" stroke-width="1.5" />
+        <polyline points="1717,978 1721,978 1721,974" stroke="#990000" stroke-width="1.5" fill="none" />
+        <line x1="1715" y1="962" x2="1725" y2="972" stroke="#990000" stroke-width="1.5" />
+        <polyline points="1721,972 1725,972 1725,968" stroke="#990000" stroke-width="1.5" fill="none" />
+        <text x="1730" y="971" class="text-ref">D3</text>
+        <text x="1730" y="985" class="text-val">MISTERS</text>
+        <text x="1730" y="998" class="text-placeholder">&lt;TEXT&gt;</text>
+        
+
+            <line x1="1700" y1="1006" x2="1700" y2="1018" class="pin-lead" />
+            <rect x="1693" y="1018" width="15" height="24" class="resistor-box" />
+            <line x1="1700" y1="1042" x2="1700" y2="1054" class="pin-lead" />
+            <text x="1713" y="1025" class="text-ref">R5</text>
+            <text x="1713" y="1039" class="text-val">220R</text>
+            <text x="1713" y="1052" class="text-placeholder">&lt;TEXT&gt;</text>
+            
+
+        <line x1="1700" y1="940" x2="1700" y2="926" class="wire" />
+        <polygon points="1700,918 1693,926 1707,926" stroke="#005500" stroke-width="1.8" fill="#DFE5D5" />
+        
+<text x="1700" y="914" text-anchor="middle" class="text-val" style="font-size:12px; font-weight:bold;">+3.3V</text>
+<polyline points="1700,940 1700,949" class="wire" />
+<polyline points="1700,1001 1700,1018" class="wire" />
+<polyline points="1700,1042 1700,1060" class="wire" />
+
+        <line x1="1700" y1="1060" x2="1700" y2="1074" class="wire" />
+        <line x1="1686" y1="1074" x2="1714" y2="1074" class="gnd-bar" />
+        <line x1="1691" y1="1079" x2="1709" y2="1079" class="gnd-bar" />
+        <line x1="1696" y1="1084" x2="1704" y2="1084" class="gnd-bar" />
+        
+<text x="1716" y="1082" class="text-val" style="font-size:12px;">VSS</text>
+
+        <line x1="1850" y1="949" x2="1850" y2="965" class="pin-lead" />
+        <polygon points="1841,965 1859,965 1850,983" class="symbol-solid" fill="#888888" />
+        <line x1="1839" y1="983" x2="1861" y2="983" class="symbol-part" />
+        <line x1="1850" y1="983" x2="1850" y2="1001" class="pin-lead" />
+        <!-- Arrows -->
+        <line x1="1861" y1="968" x2="1871" y2="978" stroke="#990000" stroke-width="1.5" />
+        <polyline points="1867,978 1871,978 1871,974" stroke="#990000" stroke-width="1.5" fill="none" />
+        <line x1="1865" y1="962" x2="1875" y2="972" stroke="#990000" stroke-width="1.5" />
+        <polyline points="1871,972 1875,972 1875,968" stroke="#990000" stroke-width="1.5" fill="none" />
+        <text x="1880" y="971" class="text-ref">D4</text>
+        <text x="1880" y="985" class="text-val">LIGHTS</text>
+        <text x="1880" y="998" class="text-placeholder">&lt;TEXT&gt;</text>
+        
+
+            <line x1="1850" y1="1006" x2="1850" y2="1018" class="pin-lead" />
+            <rect x="1843" y="1018" width="15" height="24" class="resistor-box" />
+            <line x1="1850" y1="1042" x2="1850" y2="1054" class="pin-lead" />
+            <text x="1863" y="1025" class="text-ref">R6</text>
+            <text x="1863" y="1039" class="text-val">220R</text>
+            <text x="1863" y="1052" class="text-placeholder">&lt;TEXT&gt;</text>
+            
+
+        <line x1="1850" y1="940" x2="1850" y2="926" class="wire" />
+        <polygon points="1850,918 1843,926 1857,926" stroke="#005500" stroke-width="1.8" fill="#DFE5D5" />
+        
+<text x="1850" y="914" text-anchor="middle" class="text-val" style="font-size:12px; font-weight:bold;">+3.3V</text>
+<polyline points="1850,940 1850,949" class="wire" />
+<polyline points="1850,1001 1850,1018" class="wire" />
+<polyline points="1850,1042 1850,1060" class="wire" />
+
+        <line x1="1850" y1="1060" x2="1850" y2="1074" class="wire" />
+        <line x1="1836" y1="1074" x2="1864" y2="1074" class="gnd-bar" />
+        <line x1="1841" y1="1079" x2="1859" y2="1079" class="gnd-bar" />
+        <line x1="1846" y1="1084" x2="1854" y2="1084" class="gnd-bar" />
+        
+<text x="1866" y="1082" class="text-val" style="font-size:12px;">VSS</text>
+
+        <line x1="2030" y1="949" x2="2030" y2="965" class="pin-lead" />
+        <polygon points="2021,965 2039,965 2030,983" class="symbol-solid" fill="#0044FF" />
+        <line x1="2019" y1="983" x2="2041" y2="983" class="symbol-part" />
+        <line x1="2030" y1="983" x2="2030" y2="1001" class="pin-lead" />
+        <!-- Arrows -->
+        <line x1="2041" y1="968" x2="2051" y2="978" stroke="#990000" stroke-width="1.5" />
+        <polyline points="2047,978 2051,978 2051,974" stroke="#990000" stroke-width="1.5" fill="none" />
+        <line x1="2045" y1="962" x2="2055" y2="972" stroke="#990000" stroke-width="1.5" />
+        <polyline points="2051,972 2055,972 2055,968" stroke="#990000" stroke-width="1.5" fill="none" />
+        <text x="2060" y="971" class="text-ref">LED_WF</text>
+        <text x="2060" y="985" class="text-val">WiFi (Blue)</text>
+        <text x="2060" y="998" class="text-placeholder">&lt;TEXT&gt;</text>
+        
+
+            <line x1="2030" y1="1006" x2="2030" y2="1018" class="pin-lead" />
+            <rect x="2023" y="1018" width="15" height="24" class="resistor-box" />
+            <line x1="2030" y1="1042" x2="2030" y2="1054" class="pin-lead" />
+            <text x="2043" y="1025" class="text-ref">R_WF</text>
+            <text x="2043" y="1039" class="text-val">220R</text>
+            <text x="2043" y="1052" class="text-placeholder">&lt;TEXT&gt;</text>
+            
+<polyline points="1305,920 2030,920 2030,949" class="wire" />
+<polyline points="2030,1001 2030,1018" class="wire" />
+<polyline points="2030,1042 2030,1060" class="wire" />
+
+        <line x1="2030" y1="1060" x2="2030" y2="1074" class="wire" />
+        <line x1="2016" y1="1074" x2="2044" y2="1074" class="gnd-bar" />
+        <line x1="2021" y1="1079" x2="2039" y2="1079" class="gnd-bar" />
+        <line x1="2026" y1="1084" x2="2034" y2="1084" class="gnd-bar" />
+        
+<text x="2046" y="1082" class="text-val" style="font-size:12px;">VSS</text>
+
+        <line x1="2180" y1="949" x2="2180" y2="965" class="pin-lead" />
+        <polygon points="2171,965 2189,965 2180,983" class="symbol-solid" fill="#DD0000" />
+        <line x1="2169" y1="983" x2="2191" y2="983" class="symbol-part" />
+        <line x1="2180" y1="983" x2="2180" y2="1001" class="pin-lead" />
+        <!-- Arrows -->
+        <line x1="2191" y1="968" x2="2201" y2="978" stroke="#990000" stroke-width="1.5" />
+        <polyline points="2197,978 2201,978 2201,974" stroke="#990000" stroke-width="1.5" fill="none" />
+        <line x1="2195" y1="962" x2="2205" y2="972" stroke="#990000" stroke-width="1.5" />
+        <polyline points="2201,972 2205,972 2205,968" stroke="#990000" stroke-width="1.5" fill="none" />
+        <text x="2210" y="971" class="text-ref">LED_AL</text>
+        <text x="2210" y="985" class="text-val">Alarm (Red)</text>
+        <text x="2210" y="998" class="text-placeholder">&lt;TEXT&gt;</text>
+        
+
+            <line x1="2180" y1="1006" x2="2180" y2="1018" class="pin-lead" />
+            <rect x="2173" y="1018" width="15" height="24" class="resistor-box" />
+            <line x1="2180" y1="1042" x2="2180" y2="1054" class="pin-lead" />
+            <text x="2193" y="1025" class="text-ref">R_AL</text>
+            <text x="2193" y="1039" class="text-val">220R</text>
+            <text x="2193" y="1052" class="text-placeholder">&lt;TEXT&gt;</text>
+            
+<polyline points="1305,990 2180,990 2180,949" class="wire" />
+<polyline points="2180,1001 2180,1018" class="wire" />
+<polyline points="2180,1042 2180,1060" class="wire" />
+
+        <line x1="2180" y1="1060" x2="2180" y2="1074" class="wire" />
+        <line x1="2166" y1="1074" x2="2194" y2="1074" class="gnd-bar" />
+        <line x1="2171" y1="1079" x2="2189" y2="1079" class="gnd-bar" />
+        <line x1="2176" y1="1084" x2="2184" y2="1084" class="gnd-bar" />
+        
+<text x="2196" y="1082" class="text-val" style="font-size:12px;">VSS</text>
+
+        <rect x="2300" y="912" width="470" height="34" class="comp-body" rx="3" />
+        <text x="2312" y="930" class="text-ref" style="font-size:12px;">PORT 1: [EXHAUST FAN]</text>
+        <text x="2312" y="942" class="text-desc" style="font-size:10.5px;">Pin 1: +12V (Relay 1 NO) | Pin 2: GND | Pin 3-4: Aux</text>
+        <circle cx="2750" cy="929" r="9" fill="#D2D7C4" stroke="#990000" stroke-width="1.5" />
+        <text x="2750" y="933" text-anchor="middle" class="text-pin-num" style="font-size:9px;">GX16</text>
+        
+
+        <rect x="2300" y="952" width="470" height="34" class="comp-body" rx="3" />
+        <text x="2312" y="970" class="text-ref" style="font-size:12px;">PORT 2: [INTAKE FAN]</text>
+        <text x="2312" y="982" class="text-desc" style="font-size:10.5px;">Pin 1: +12V (Relay 2 NO) | Pin 2: GND | Pin 3-4: Aux</text>
+        <circle cx="2750" cy="969" r="9" fill="#D2D7C4" stroke="#990000" stroke-width="1.5" />
+        <text x="2750" y="973" text-anchor="middle" class="text-pin-num" style="font-size:9px;">GX16</text>
+        
+
+        <rect x="2300" y="992" width="470" height="34" class="comp-body" rx="3" />
+        <text x="2312" y="1010" class="text-ref" style="font-size:12px;">PORT 3: [MISTER PUMP]</text>
+        <text x="2312" y="1022" class="text-desc" style="font-size:10.5px;">Pin 1: +12V (Relay 3 NO) | Pin 2: GND | Pin 3-4: Aux</text>
+        <circle cx="2750" cy="1009" r="9" fill="#D2D7C4" stroke="#990000" stroke-width="1.5" />
+        <text x="2750" y="1013" text-anchor="middle" class="text-pin-num" style="font-size:9px;">GX16</text>
+        
+
+        <rect x="2300" y="1032" width="470" height="34" class="comp-body" rx="3" />
+        <text x="2312" y="1050" class="text-ref" style="font-size:12px;">PORT 4: [GROW LIGHTS]</text>
+        <text x="2312" y="1062" class="text-desc" style="font-size:10.5px;">Pin 1: +12V (Relay 4 NO) | Pin 2: GND | Pin 3-4: Aux</text>
+        <circle cx="2750" cy="1049" r="9" fill="#D2D7C4" stroke="#990000" stroke-width="1.5" />
+        <text x="2750" y="1053" text-anchor="middle" class="text-pin-num" style="font-size:9px;">GX16</text>
+        
+
+        <rect x="2300" y="1072" width="470" height="34" class="comp-body" rx="3" />
+        <text x="2312" y="1090" class="text-ref" style="font-size:12px;">PORT 5: [WATER VALVE]</text>
+        <text x="2312" y="1102" class="text-desc" style="font-size:10.5px;">Pin 1: +12V (Relay 5 NO) | Pin 2: GND | Pin 3-4: Flow</text>
+        <circle cx="2750" cy="1089" r="9" fill="#D2D7C4" stroke="#990000" stroke-width="1.5" />
+        <text x="2750" y="1093" text-anchor="middle" class="text-pin-num" style="font-size:9px;">GX16</text>
+        
+
+    <!-- Title Block Outer -->
+    <rect x="1350" y="1240" width="1435" height="405" fill="#D6DECA" stroke="#526048" stroke-width="2.2" />
+
+    <!-- Title Header -->
+    <rect x="1360" y="1250" width="1415" height="70" fill="#E2E8D8" stroke="#7A896F" stroke-width="1.2" />
+    <text x="1375" y="1278" class="title-hdr">KABUTECH HIYAS &#8212; SMART MUSHROOM AUTOMATION SYSTEM</text>
+    <text x="1375" y="1302" class="title-sub">MASTER ELECTRICAL WIRING SCHEMATIC &amp; COMPONENT NETLIST (PROTEUS ISIS SPEC)</text>
+
+    <!-- Meta Fields -->
+    <line x1="1360" y1="1320" x2="2775" y2="1320" stroke="#7A896F" stroke-width="1.2" />
+    <rect x="1360" y="1320" width="1415" height="50" fill="#DFE5D5" />
+    <text x="1375" y="1342" class="text-pin-name">DOC ID: <tspan class="text-ref">KBT-HIYAS-SCH-002</tspan></text>
+    <text x="1375" y="1360" class="text-pin-name">DESIGN: <tspan class="text-val">Zandro2005 / Kabutech R&amp;D</tspan></text>
+    <text x="1800" y="1342" class="text-pin-name">MICROCONTROLLER: <tspan class="text-ref">ESP32-S3 (Xtensa Dual-Core 240MHz)</tspan></text>
+    <text x="1800" y="1360" class="text-pin-name">POWER SPECS: <tspan class="text-val">220VAC In / 12VDC 5A Main / 5VDC / 3.3VDC</tspan></text>
+    <text x="2400" y="1342" class="text-pin-name">REVISION: <tspan class="text-ref">REV 2.4 (MASTER)</tspan></text>
+    <text x="2400" y="1360" class="text-pin-name">STATUS: <tspan class="text-val" style="fill:#006600;">BENCH TESTED &amp; VERIFIED</tspan></text>
+
+    <!-- Pinout Quick Reference Directory -->
+    <line x1="1360" y1="1370" x2="2775" y2="1370" stroke="#7A896F" stroke-width="1.2" />
+    <text x="1375" y="1394" class="text-hdr" style="font-size:14px;">ESP32-S3 COMPLETE PIN ASSIGNMENT REFERENCE</text>
+
+    <text x="1375" y="1420" class="text-pin-name">GPIO 4  &#8594; DHT11 / SHT31 Data (+10k&#937; Pull-up to 3.3V)</text>
+    <text x="1375" y="1442" class="text-pin-name">GPIO 5  &#8594; LDR Light Sensor (10k&#937; Divider Junction to GND)</text>
+    <text x="1375" y="1464" class="text-pin-name">GPIO 6  &#8594; MQ-135 Analog Output AO (ADC1 CH5)</text>
+    <text x="1375" y="1486" class="text-pin-name">GPIO 7  &#8594; Water Level Sensor Signal S (ADC1 CH6)</text>
+    <text x="1375" y="1508" class="text-pin-name">GPIO 8  &#8594; Water Level Power V+ (Anti-Electrolysis Gated Strobe)</text>
+    <text x="1375" y="1530" class="text-pin-name">GPIO 1  &#8594; Shared I2C SDA (SCD41, SHT31, BH1750, OLED)</text>
+    <text x="1375" y="1552" class="text-pin-name">GPIO 2  &#8594; Shared I2C SCL (SCD41, SHT31, BH1750, OLED)</text>
+
+    <text x="1880" y="1420" class="text-pin-name">GPIO 9  &#8594; Relay 1 / D1 LED: Exhaust Fan (12V DC)</text>
+    <text x="1880" y="1442" class="text-pin-name">GPIO 10 &#8594; Relay 2 / D2 LED: Intake Fan / CO2 Valve</text>
+    <text x="1880" y="1464" class="text-pin-name">GPIO 11 &#8594; Relay 3 / D3 LED: Misting Pump (60W 12V)</text>
+    <text x="1880" y="1486" class="text-pin-name">GPIO 12 &#8594; Relay 4 / D4 LED: Grow Light Strip (12V)</text>
+    <text x="1880" y="1508" class="text-pin-name">GPIO 13 &#8594; Relay 5 / D5 LED: Solenoid Water Valve (12V NC)</text>
+    <text x="1880" y="1530" class="text-pin-name">GPIO 14 &#8594; Water Flow Sensor Pulse In (YF-S201 Hall)</text>
+    <text x="1880" y="1552" class="text-pin-name">GPIO 21 &#8594; Capacitive Water Level In (XKC-Y25 Digital)</text>
+
+    <text x="2400" y="1420" class="text-pin-name">GPIO 47 &#8594; WiFi Status LED (Blue)</text>
+    <text x="2400" y="1442" class="text-pin-name">GPIO 48 &#8594; System Alarm LED (Red)</text>
+    <text x="2400" y="1464" class="text-pin-name">GPIO 38 &#8594; Rotary Mode Selector (Auto/Man)</text>
+    <text x="2400" y="1486" class="text-pin-name">GPIO 0  &#8594; Setup / Provisioning Button</text>
+    <text x="2400" y="1508" class="text-pin-name">EN / RST &#8594; Hardware Reset Button</text>
+
+    <!-- Engineering Rules -->
+    <line x1="1360" y1="1570" x2="2775" y2="1570" stroke="#7A896F" stroke-width="1.0" />
+    <text x="1375" y="1592" class="text-desc" style="font-weight:bold;">MANDATORY HARDWARE PROTECTION STANDARDS:</text>
+    <text x="1375" y="1610" class="text-desc">1. Inductive Flyback: Fast 1N4007 recovery diodes MUST be placed across all 12V relay coils, fans, pump motor, and solenoid valve.</text>
+    <text x="1375" y="1628" class="text-desc">2. Anti-Corrosion Strobe: Resistive water level sensor power pin (IO8) is energized ONLY during 15ms sampling cycles to prevent electrolysis.</text>
+    <text x="1375" y="1646" class="text-desc">3. Thermal Isolation: MQ-135 5V internal heater coil must maintain at least 10cm separation from DHT11/SHT31 to prevent radiant heat bias.</text>
+    
+</svg>
+</body>
+</html>

@@ -4,30 +4,30 @@
  *  Reads: DHT11, LDR, MQ-135, Water Level Sensor
  *  Pushes to: Firebase Realtime Database
  * ============================================================
- *
+ 
  *  WIRING:
  *    DHT11 DATA    → GPIO 4   (+ 10kΩ pull-up to 3.3V)
  *    DHT11 VCC     → 3.3V
  *    DHT11 GND     → GND
- *
+ 
  *    LDR           → GPIO 5   (voltage divider: LDR to 3.3V, 10kΩ to GND, junction → GPIO 5)
  *
  *    MQ-135 AO     → GPIO 6   (analog out)
  *    MQ-135 VCC    → 5V (VIN)
  *    MQ-135 GND    → GND
- *
+ 
  *    Water Level S → GPIO 7   (signal/analog)
  *    Water Level + → GPIO 8   (power pin — toggled to prevent corrosion)
  *    Water Level - → GND
- *
+ 
  *  LIBRARIES NEEDED (Install via Arduino Library Manager):
  *    1. Firebase ESP Client      (by mobizt)
  *    2. DHT sensor library       (by Adafruit)
  *    3. Adafruit Unified Sensor  (dependency)
- *
+ 
  *  BOARD:
  *    ESP32S3 Dev Module (esp32 board package by Espressif)
- *
+ 
  *  FIREBASE SETUP:
  *    1. Go to Firebase Console → Authentication → Sign-in method
  *    2. Enable "Anonymous" sign-in

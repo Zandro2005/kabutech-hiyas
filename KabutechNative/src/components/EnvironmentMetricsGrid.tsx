@@ -7,7 +7,9 @@ import { hapticSelection } from '../utils/haptics';
 import { useResponsive } from '../utils/responsive';
 import { useAuth } from '../context/AuthContext';
 import { useSensorHealth } from '../hooks/useSensorHealth';
-import { useSettings } from '../hooks/useFirebaseData';
+import { evaluateParam, ParamEvaluation } from '../utils/environmentRanges';
+import { useHourlyTrend } from '../hooks/useHourlyTrend';
+import { ACTIVE_PROFILE } from '../config/cropProfiles';
 
 interface Props {
   temp: number;
@@ -23,129 +25,75 @@ export default React.memo(function EnvironmentMetricsGrid({ temp, hum, light, co
   const { profile } = useAuth();
   const isStaff = profile?.role === 'staff';
   const health = useSensorHealth();
-  const settings = useSettings();
-
-  // Target Setpoints from Firebase Settings
-  const targetTemp = typeof settings?.setpoints?.temperature === 'number'
-    ? settings.setpoints.temperature
-    : parseFloat(settings?.setpoints?.temperature as any) || 28.0;
-
-  const targetHum = typeof settings?.setpoints?.humidity === 'number'
-    ? settings.setpoints.humidity
-    : parseFloat(settings?.setpoints?.humidity as any) || 85;
-
-  const targetLight = typeof settings?.setpoints?.light === 'number'
-    ? settings.setpoints.light
-    : parseFloat(settings?.setpoints?.light as any) || 580;
-
-  const targetCO2 = typeof settings?.setpoints?.co2 === 'number'
-    ? settings.setpoints.co2
-    : parseFloat(settings?.setpoints?.co2 as any) || 690;
-
-  // Explicit disconnected checks: covers both health flags and direct -999 sentinel
-  const isTempDisconnected = health.tempError || temp === -999 || temp <= 0;
-  const isHumDisconnected = health.humError || hum === -999 || hum <= 0;
-  const isLightDisconnected = health.lightError || light === -999 || light < 0;
-  const isCo2Disconnected = health.co2Error || co2 === -999 || co2 < 0;
+  const trends = useHourlyTrend();
 
   const isControllerOff = !health.isControllerOnline;
+  const isTempFault = health.tempError || temp === -999 || temp <= 0;
+  const isHumFault = health.humError || hum === -999 || hum <= 0;
+  const isLightFault = health.lightError || light === -999 || light < 0;
+  const isCo2Fault = health.co2Error || co2 === -999 || co2 < 0;
 
   // Dedicated constant theme colors for each environmental metric
-  const TEMP_COLOR = '#f97316'; // Constant Warm Orange
-  const HUM_COLOR = '#0ea5e9';  // Constant Water Blue
-  const LIGHT_COLOR = '#f59e0b'; // Constant Solar Amber
-  const CO2_COLOR = '#10b981';  // Constant Botanical Emerald
+  const TEMP_COLOR = '#f97316'; // Warm Orange
+  const HUM_COLOR = '#0ea5e9';  // Sky Blue
+  const LIGHT_COLOR = '#f59e0b'; // Amber Gold
+  const CO2_COLOR = '#10b981';  // Emerald Green
 
-  // Status badge styling helper for offline/fault states
-  const offlineStatus = {
-    label: 'Offline',
-    dotColor: '#94a3b8',
-    badgeBg: isDarkMode ? 'rgba(148, 163, 184, 0.12)' : '#f1f5f9',
-    badgeText: isDarkMode ? '#94a3b8' : '#64748b',
+  const tempEval = evaluateParam('temp', temp, isControllerOff || isTempFault, ACTIVE_PROFILE);
+  const humEval = evaluateParam('hum', hum, isControllerOff || isHumFault, ACTIVE_PROFILE);
+  const lightEval = evaluateParam('light', light, isControllerOff || isLightFault, ACTIVE_PROFILE);
+  const co2Eval = evaluateParam('co2', co2, isControllerOff || isCo2Fault, ACTIVE_PROFILE);
+
+  // Status helper with clean minimal badges
+  const getBadgeStyle = (paramEval: ParamEvaluation, fallbackColor: string) => {
+    if (paramEval.state === 'fault') {
+      if (isControllerOff) {
+        return {
+          label: 'Offline',
+          dotColor: '#94a3b8',
+          badgeBg: isDarkMode ? 'rgba(148, 163, 184, 0.12)' : '#f1f5f9',
+          badgeText: isDarkMode ? '#94a3b8' : '#64748b',
+        };
+      }
+      return {
+        label: 'Fault',
+        dotColor: '#f59e0b',
+        badgeBg: isDarkMode ? 'rgba(245, 158, 11, 0.12)' : '#fffbeb',
+        badgeText: isDarkMode ? '#fbbf24' : '#b45309',
+      };
+    }
+    if (paramEval.state === 'in_range') {
+      return {
+        label: 'Optimal',
+        dotColor: '#10b981',
+        badgeBg: isDarkMode ? 'rgba(16, 185, 129, 0.15)' : '#ecfdf5',
+        badgeText: isDarkMode ? '#34d399' : '#059669',
+      };
+    }
+    if (paramEval.state === 'low') {
+      return {
+        label: 'Low',
+        dotColor: '#f59e0b',
+        badgeBg: isDarkMode ? 'rgba(245, 158, 11, 0.15)' : '#fffbeb',
+        badgeText: isDarkMode ? '#fbbf24' : '#b45309',
+      };
+    }
+    return {
+      label: 'High',
+      dotColor: fallbackColor,
+      badgeBg: isDarkMode ? 'rgba(239, 68, 68, 0.15)' : '#fef2f2',
+      badgeText: isDarkMode ? '#f87171' : '#dc2626',
+    };
   };
 
-  const faultStatus = {
-    label: 'Fault',
-    dotColor: '#f59e0b',
-    badgeBg: isDarkMode ? 'rgba(245, 158, 11, 0.12)' : '#fffbeb',
-    badgeText: isDarkMode ? '#fbbf24' : '#b45309',
-  };
-
-  // Temperature: 15°C to 35°C (Permanent Orange Theme)
-  const tempMin = 15;
-  const tempMax = 35;
-  const tempDiff = isTempDisconnected ? 0 : Number((temp - targetTemp).toFixed(1));
-  const tempStatus = React.useMemo(() => {
-    if (isTempDisconnected) return isControllerOff ? offlineStatus : faultStatus;
-    const isOptimal = Math.abs(tempDiff) <= 0.5;
-    const isHigh = tempDiff > 0.5;
-    return {
-      label: isOptimal ? 'Optimal' : (isHigh ? `+${tempDiff.toFixed(1)}°` : `-${Math.abs(tempDiff).toFixed(1)}°`),
-      dotColor: isOptimal ? '#10b981' : TEMP_COLOR,
-      badgeBg: isDarkMode ? 'rgba(249, 115, 22, 0.16)' : '#fff7ed',
-      badgeText: isDarkMode ? '#fb923c' : '#ea580c',
-    };
-  }, [tempDiff, isTempDisconnected, isControllerOff, isDarkMode]);
-  const tempTargetPercent = Math.min(95, Math.max(5, ((targetTemp - tempMin) / (tempMax - tempMin)) * 100));
-  const tempPercent = isTempDisconnected ? 0 : Math.min(100, Math.max(4, ((temp - tempMin) / (tempMax - tempMin)) * 100));
-
-  // Humidity: 40% to 100% (Permanent Blue Theme)
-  const humMin = 40;
-  const humMax = 100;
-  const humDiff = isHumDisconnected ? 0 : Math.round(hum - targetHum);
-  const humStatus = React.useMemo(() => {
-    if (isHumDisconnected) return isControllerOff ? offlineStatus : faultStatus;
-    const isOptimal = Math.abs(humDiff) <= 2;
-    const isHigh = humDiff > 2;
-    return {
-      label: isOptimal ? 'Optimal' : (isHigh ? `+${humDiff}%` : `-${Math.abs(humDiff)}%`),
-      dotColor: isOptimal ? '#10b981' : HUM_COLOR,
-      badgeBg: isDarkMode ? 'rgba(14, 165, 233, 0.16)' : '#f0f9ff',
-      badgeText: isDarkMode ? '#38bdf8' : '#0284c7',
-    };
-  }, [humDiff, isHumDisconnected, isControllerOff, isDarkMode]);
-  const humTargetPercent = Math.min(95, Math.max(5, ((targetHum - humMin) / (humMax - humMin)) * 100));
-  const humPercent = isHumDisconnected ? 0 : Math.min(100, Math.max(4, ((hum - humMin) / (humMax - humMin)) * 100));
-
-  // Light: 100 to 1000 lx (Permanent Amber Theme)
-  const lightMin = 100;
-  const lightMax = 1000;
-  const lightDiff = isLightDisconnected ? 0 : Math.round(light - targetLight);
-  const lightStatus = React.useMemo(() => {
-    if (isLightDisconnected) return isControllerOff ? offlineStatus : faultStatus;
-    const isOptimal = lightDiff <= 300 && lightDiff >= -200;
-    return {
-      label: isOptimal ? 'Optimal' : (lightDiff > 300 ? 'High' : 'Low'),
-      dotColor: isOptimal ? '#10b981' : LIGHT_COLOR,
-      badgeBg: isDarkMode ? 'rgba(245, 158, 11, 0.16)' : '#fffbeb',
-      badgeText: isDarkMode ? '#fbbf24' : '#b45309',
-    };
-  }, [lightDiff, isLightDisconnected, isControllerOff, isDarkMode]);
-  const lightTargetPercent = Math.min(95, Math.max(5, ((targetLight - lightMin) / (lightMax - lightMin)) * 100));
-  const lightPercent = isLightDisconnected ? 0 : Math.min(100, Math.max(4, ((light - lightMin) / (lightMax - lightMin)) * 100));
-
-  // CO2: 300 to 1200 ppm (Permanent Emerald Theme)
-  const co2Min = 300;
-  const co2Max = 1200;
-  const co2Diff = isCo2Disconnected ? 0 : Math.round(co2 - targetCO2);
-  const co2Status = React.useMemo(() => {
-    if (isCo2Disconnected) return isControllerOff ? offlineStatus : faultStatus;
-    const isOptimal = co2Diff <= 150;
-    return {
-      label: isOptimal ? 'Optimal' : (co2Diff > 350 ? 'High' : 'Elevated'),
-      dotColor: isOptimal ? '#10b981' : CO2_COLOR,
-      badgeBg: isDarkMode ? 'rgba(16, 185, 129, 0.16)' : '#ecfdf5',
-      badgeText: isDarkMode ? '#34d399' : '#059669',
-    };
-  }, [co2Diff, isCo2Disconnected, isControllerOff, isDarkMode]);
-  const co2TargetPercent = Math.min(95, Math.max(5, ((targetCO2 - co2Min) / (co2Max - co2Min)) * 100));
-  const co2Percent = isCo2Disconnected ? 0 : Math.min(100, Math.max(4, ((co2 - co2Min) / (co2Max - co2Min)) * 100));
+  // Track scaling
+  const tempPercent = isTempFault ? 0 : Math.min(100, Math.max(0, ((temp - 15) / 20) * 100));
+  const humPercent = isHumFault ? 0 : Math.min(100, Math.max(0, ((hum - 40) / 60) * 100));
+  const lightPercent = isLightFault ? 0 : Math.min(100, Math.max(0, (light / 1200) * 100));
+  const co2Percent = isCo2Fault ? 0 : Math.min(100, Math.max(0, ((co2 - 300) / 1200) * 100));
 
   const handleCardPress = (tabKey: 'temp' | 'hum' | 'light' | 'co2') => {
-    if (isStaff) {
-      // Staff accounts do not have access to Analytics or Controls
-      return;
-    }
+    if (isStaff) return;
     hapticSelection();
     navigation.navigate('Main', {
       screen: 'Controls',
@@ -153,89 +101,77 @@ export default React.memo(function EnvironmentMetricsGrid({ temp, hum, light, co
     });
   };
 
-  const activeCount = [!isTempDisconnected, !isHumDisconnected, !isLightDisconnected, !isCo2Disconnected].filter(Boolean).length;
+  const activeCount = [!isTempFault, !isHumFault, !isLightFault, !isCo2Fault].filter(Boolean).length;
 
   const metrics = [
     {
       id: 'temp' as const,
       name: 'Temperature',
-      value: isTempDisconnected ? '--' : temp,
-      unit: '°C',
-      icon: (isTempDisconnected ? (isControllerOff ? 'cloud-off-outline' : 'alert-circle-outline') : 'thermometer') as any,
-      iconColor: isTempDisconnected ? '#94a3b8' : TEMP_COLOR,
-      iconBgColor: isTempDisconnected 
-        ? (isDarkMode ? 'rgba(148, 163, 184, 0.1)' : '#f1f5f9') 
+      eval: tempEval,
+      status: getBadgeStyle(tempEval, TEMP_COLOR),
+      icon: (isTempFault ? (isControllerOff ? 'cloud-off-outline' : 'alert-circle-outline') : 'thermometer') as any,
+      iconColor: isTempFault ? '#94a3b8' : TEMP_COLOR,
+      iconBgColor: isTempFault
+        ? (isDarkMode ? 'rgba(148, 163, 184, 0.1)' : '#f1f5f9')
         : (isDarkMode ? 'rgba(249, 115, 22, 0.16)' : '#fff7ed'),
       accentColor: TEMP_COLOR,
-      status: tempStatus,
       percent: tempPercent,
-      targetPercent: tempTargetPercent,
-      targetDisplay: `${targetTemp.toFixed(1)}°C`,
-      hasError: isTempDisconnected,
+      trend: trends.temp,
     },
     {
       id: 'hum' as const,
       name: 'Humidity',
-      value: isHumDisconnected ? '--' : hum,
-      unit: '%',
-      icon: (isHumDisconnected ? (isControllerOff ? 'cloud-off-outline' : 'alert-circle-outline') : 'water-percent') as any,
-      iconColor: isHumDisconnected ? '#94a3b8' : HUM_COLOR,
-      iconBgColor: isHumDisconnected 
-        ? (isDarkMode ? 'rgba(148, 163, 184, 0.1)' : '#f1f5f9') 
+      eval: humEval,
+      status: getBadgeStyle(humEval, HUM_COLOR),
+      icon: (isHumFault ? (isControllerOff ? 'cloud-off-outline' : 'alert-circle-outline') : 'water-percent') as any,
+      iconColor: isHumFault ? '#94a3b8' : HUM_COLOR,
+      iconBgColor: isHumFault
+        ? (isDarkMode ? 'rgba(148, 163, 184, 0.1)' : '#f1f5f9')
         : (isDarkMode ? 'rgba(14, 165, 233, 0.16)' : '#f0f9ff'),
       accentColor: HUM_COLOR,
-      status: humStatus,
       percent: humPercent,
-      targetPercent: humTargetPercent,
-      targetDisplay: `${Math.round(targetHum)}%`,
-      hasError: isHumDisconnected,
+      trend: trends.hum,
     },
     {
       id: 'light' as const,
       name: 'Light Level',
-      value: isLightDisconnected ? '--' : light,
-      unit: 'lx',
-      icon: (isLightDisconnected ? (isControllerOff ? 'cloud-off-outline' : 'alert-circle-outline') : 'white-balance-sunny') as any,
-      iconColor: isLightDisconnected ? '#94a3b8' : LIGHT_COLOR,
-      iconBgColor: isLightDisconnected 
-        ? (isDarkMode ? 'rgba(148, 163, 184, 0.1)' : '#f1f5f9') 
+      eval: lightEval,
+      status: getBadgeStyle(lightEval, LIGHT_COLOR),
+      icon: (isLightFault ? (isControllerOff ? 'cloud-off-outline' : 'alert-circle-outline') : 'white-balance-sunny') as any,
+      iconColor: isLightFault ? '#94a3b8' : LIGHT_COLOR,
+      iconBgColor: isLightFault
+        ? (isDarkMode ? 'rgba(148, 163, 184, 0.1)' : '#f1f5f9')
         : (isDarkMode ? 'rgba(245, 158, 11, 0.16)' : '#fffbeb'),
       accentColor: LIGHT_COLOR,
-      status: lightStatus,
       percent: lightPercent,
-      targetPercent: lightTargetPercent,
-      targetDisplay: `${Math.round(targetLight)} lx`,
-      hasError: isLightDisconnected,
+      trend: trends.light,
     },
     {
       id: 'co2' as const,
       name: 'CO2 Level',
-      value: isCo2Disconnected ? '--' : co2,
-      unit: 'ppm',
-      icon: (isCo2Disconnected ? (isControllerOff ? 'cloud-off-outline' : 'alert-circle-outline') : 'molecule-co2') as any,
-      iconColor: isCo2Disconnected ? '#94a3b8' : CO2_COLOR,
-      iconBgColor: isCo2Disconnected 
-        ? (isDarkMode ? 'rgba(148, 163, 184, 0.1)' : '#f1f5f9') 
+      eval: co2Eval,
+      status: getBadgeStyle(co2Eval, CO2_COLOR),
+      icon: (isCo2Fault ? (isControllerOff ? 'cloud-off-outline' : 'alert-circle-outline') : 'molecule-co2') as any,
+      iconColor: isCo2Fault ? '#94a3b8' : CO2_COLOR,
+      iconBgColor: isCo2Fault
+        ? (isDarkMode ? 'rgba(148, 163, 184, 0.1)' : '#f1f5f9')
         : (isDarkMode ? 'rgba(16, 185, 129, 0.16)' : '#ecfdf5'),
       accentColor: CO2_COLOR,
-      status: co2Status,
       percent: co2Percent,
-      targetPercent: co2TargetPercent,
-      targetDisplay: `${Math.round(targetCO2)} ppm`,
-      hasError: isCo2Disconnected,
+      trend: trends.co2,
     },
   ];
 
   return (
-    <View style={tw`px-5 sm:px-6 pt-6`}>
-      {/* Sleek Header */}
-      <View style={tw`flex-row justify-between items-center mb-3.5`}>
+    <View style={tw`px-5 sm:px-6 pt-5`}>
+      {/* Sleek Minimal Header */}
+      <View style={tw`flex-row justify-between items-center mb-3`}>
         <View style={tw`flex-row items-center gap-2`}>
           <Text style={[tw`text-base sm:text-lg tracking-tight`, { fontFamily: 'PlusJakartaSans_800ExtraBold', color: isDarkMode ? '#f8fafc' : '#0f172a' }]}>
             Environment Metrics
           </Text>
           <View style={[
-            tw`px-2.5 py-0.5 rounded-full border flex-row items-center`,
+            tw`px-2 py-0.5 rounded-full border flex-row items-center`,
             activeCount === 4
               ? (isDarkMode ? tw`bg-emerald-950/50 border-emerald-800/50` : tw`bg-emerald-50 border-emerald-200/60`)
               : (isDarkMode ? tw`bg-slate-800/80 border-slate-700/60` : tw`bg-slate-100 border-slate-200/60`)
@@ -255,7 +191,7 @@ export default React.memo(function EnvironmentMetricsGrid({ temp, hum, light, co
                 }
               ]}
             >
-              {activeCount === 4 ? 'Live' : (activeCount === 0 ? 'Offline' : `${activeCount}/4 Live`)}
+              {activeCount === 4 ? 'Live' : (activeCount === 0 ? 'Offline' : `${activeCount}/4`)}
             </Text>
           </View>
         </View>
@@ -275,119 +211,134 @@ export default React.memo(function EnvironmentMetricsGrid({ temp, hum, light, co
         )}
       </View>
 
-      {/* 2x2 Modern Widget Grid */}
-      <View style={tw`flex-row flex-wrap justify-between gap-y-3.5`}>
-        {metrics.map((item) => (
-          <TouchableOpacity
-            key={item.id}
-            activeOpacity={isStaff ? 1 : 0.78}
-            onPress={() => handleCardPress(item.id)}
-            style={[
-              tw`rounded-[26px] p-4 sm:p-4.5 border justify-between ${
-                item.hasError 
-                  ? (isControllerOff
-                      ? 'bg-white dark:bg-slate-900 border-slate-200/70 dark:border-slate-800'
-                      : 'bg-white dark:bg-slate-900 border-amber-300/60 dark:border-amber-800/60')
-                  : 'bg-white dark:bg-slate-900 border-slate-200/70 dark:border-slate-800'
-              }`,
-              { 
-                width: '48.5%', 
-                minHeight: isSmallDevice ? 140 : 152,
-                shadowColor: '#0f172a',
-                shadowOffset: { width: 0, height: 3 },
-                shadowOpacity: isDarkMode ? 0 : 0.04,
-                shadowRadius: 8,
-                elevation: 2
-              }
-            ]}
-          >
-            {/* Top Bar: Squircle Icon chip + Clean Micro Status badge */}
-            <View style={tw`flex-row justify-between items-center mb-2.5`}>
-              <View 
-                style={[
-                  tw`w-9 h-9 rounded-[14px] items-center justify-center`,
-                  { backgroundColor: item.iconBgColor }
-                ]}
-              >
-                <MaterialCommunityIcons name={item.icon} size={20} color={item.iconColor} />
-              </View>
+      {/* 2x2 Minimal Clean Grid */}
+      <View style={tw`flex-row flex-wrap justify-between gap-y-3`}>
+        {metrics.map((item) => {
+          const isItemFault = item.eval.state === 'fault';
 
-              <View 
-                style={[
-                  tw`flex-row items-center px-2 py-0.5 rounded-full`,
-                  { backgroundColor: item.status.badgeBg }
-                ]}
-              >
-                <View style={[tw`w-1.5 h-1.5 rounded-full mr-1.5`, { backgroundColor: item.status.dotColor }]} />
-                <Text 
-                  numberOfLines={1}
-                  style={[
-                    tw`text-[10px]`,
-                    { 
-                      fontFamily: 'PlusJakartaSans_700Bold',
-                      color: item.status.badgeText
-                    }
-                  ]}
-                >
-                  {item.status.label}
-                </Text>
-              </View>
-            </View>
-
-            {/* Middle: Uppercase Label & Big Hero Value */}
-            <View style={tw`my-auto py-1`}>
-              <Text 
-                numberOfLines={1} 
-                style={[
-                  tw`text-[10px] sm:text-[10.5px] text-slate-400 dark:text-slate-500 uppercase tracking-widest mb-0.5`, 
-                  { fontFamily: 'PlusJakartaSans_700Bold' }
-                ]}
-              >
-                {item.name}
-              </Text>
-              <View style={tw`flex-row items-baseline mt-0.5`}>
-                <Text 
-                  style={[
-                    tw`${item.hasError ? (isControllerOff ? 'text-slate-400 dark:text-slate-500' : 'text-amber-600 dark:text-amber-400') : 'text-slate-900 dark:text-white'}`, 
-                    { 
-                      fontSize: isSmallDevice ? 28 : 32, 
-                      fontFamily: 'PlusJakartaSans_800ExtraBold', 
-                      letterSpacing: -0.8,
-                      lineHeight: isSmallDevice ? 32 : 36
-                    }
-                  ]}
-                >
-                  {item.value}
-                </Text>
-                {item.hasError ? (
-                  <Text style={[tw`text-[11px] ml-1.5`, { color: isControllerOff ? '#94a3b8' : '#ea580c', fontFamily: 'PlusJakartaSans_700Bold' }]}>
-                    {isControllerOff ? 'Off' : 'Fault'}
-                  </Text>
-                ) : (
-                  <Text style={[tw`text-xs sm:text-sm text-slate-400 dark:text-slate-500 ml-1.5`, { fontFamily: 'PlusJakartaSans_700Bold' }]}>
-                    {item.unit}
-                  </Text>
-                )}
-              </View>
-            </View>
-
-            {/* Bottom: Sleek Gauge Track */}
-            <View style={tw`mt-2 mb-0.5`}>
-              <View style={tw`w-full h-[5px] bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden justify-center`}>
-                {/* Current Value Fill Bar */}
+          return (
+            <TouchableOpacity
+              key={item.id}
+              activeOpacity={isStaff ? 1 : 0.78}
+              onPress={() => handleCardPress(item.id)}
+              style={[
+                tw`rounded-[24px] p-4 border justify-between bg-white dark:bg-slate-900 ${
+                  isItemFault 
+                    ? (isControllerOff ? 'border-slate-200/70 dark:border-slate-800' : 'border-amber-300/60 dark:border-amber-800/60')
+                    : 'border-slate-200/70 dark:border-slate-800'
+                }`,
+                { 
+                  width: '48.5%', 
+                  minHeight: isSmallDevice ? 128 : 138,
+                  shadowColor: '#0f172a',
+                  shadowOffset: { width: 0, height: 2 },
+                  shadowOpacity: isDarkMode ? 0 : 0.03,
+                  shadowRadius: 6,
+                  elevation: 1.5
+                }
+              ]}
+            >
+              {/* Top Row: Squircle Icon + Minimal Status Badge */}
+              <View style={tw`flex-row justify-between items-center mb-1.5`}>
                 <View 
                   style={[
-                    tw`h-full rounded-full`, 
-                    { 
-                      width: `${item.percent}%`, 
-                      backgroundColor: item.accentColor 
-                    }
-                  ]} 
-                />
+                    tw`w-8 h-8 rounded-[12px] items-center justify-center`,
+                    { backgroundColor: item.iconBgColor }
+                  ]}
+                >
+                  <MaterialCommunityIcons name={item.icon} size={18} color={item.iconColor} />
+                </View>
+
+                <View 
+                  style={[
+                    tw`flex-row items-center px-2 py-0.5 rounded-full`,
+                    { backgroundColor: item.status.badgeBg }
+                  ]}
+                >
+                  <View style={[tw`w-1.5 h-1.5 rounded-full mr-1.5`, { backgroundColor: item.status.dotColor }]} />
+                  <Text 
+                    numberOfLines={1}
+                    style={[
+                      tw`text-[10px]`,
+                      { 
+                        fontFamily: 'PlusJakartaSans_700Bold',
+                        color: item.status.badgeText
+                      }
+                    ]}
+                  >
+                    {item.status.label}
+                  </Text>
+                </View>
               </View>
-            </View>
-          </TouchableOpacity>
-        ))}
+
+              {/* Middle: Title & Big Hero Value + Subtle Trend */}
+              <View style={tw`my-auto py-0.5`}>
+                <Text 
+                  numberOfLines={1} 
+                  style={[
+                    tw`text-[10px] text-slate-400 dark:text-slate-500 uppercase tracking-wider mb-0.5`, 
+                    { fontFamily: 'PlusJakartaSans_700Bold' }
+                  ]}
+                >
+                  {item.name}
+                </Text>
+
+                <View style={tw`flex-row items-baseline justify-between`}>
+                  <View style={tw`flex-row items-baseline`}>
+                    <Text 
+                      style={[
+                        tw`${isItemFault ? (isControllerOff ? 'text-slate-400 dark:text-slate-500' : 'text-amber-600 dark:text-amber-400') : 'text-slate-900 dark:text-white'}`, 
+                        { 
+                          fontSize: isSmallDevice ? 26 : 29, 
+                          fontFamily: 'PlusJakartaSans_800ExtraBold', 
+                          letterSpacing: -0.6,
+                          lineHeight: isSmallDevice ? 30 : 34
+                        }
+                      ]}
+                    >
+                      {item.eval.formattedValue}
+                    </Text>
+                    {isItemFault ? (
+                      <Text style={[tw`text-[11px] ml-1.5`, { color: isControllerOff ? '#94a3b8' : '#ea580c', fontFamily: 'PlusJakartaSans_700Bold' }]}>
+                        {isControllerOff ? 'Off' : 'Fault'}
+                      </Text>
+                    ) : (
+                      <Text style={[tw`text-xs text-slate-400 dark:text-slate-500 ml-1.5`, { fontFamily: 'PlusJakartaSans_700Bold' }]}>
+                        {item.eval.unit}
+                      </Text>
+                    )}
+                  </View>
+
+                  {/* Clean Mini Trend Icon */}
+                  {!isItemFault && item.trend.direction !== 'none' && item.trend.direction !== 'steady' && (
+                    <View style={tw`flex-row items-center opacity-85`}>
+                      <Ionicons
+                        name={item.trend.direction === 'up' ? 'trending-up' : 'trending-down'}
+                        size={13}
+                        color={item.trend.direction === 'up' ? (item.id === 'hum' ? '#0ea5e9' : '#f97316') : '#64748b'}
+                      />
+                    </View>
+                  )}
+                </View>
+              </View>
+
+              {/* Bottom: Minimal Smooth Rounded Gauge Bar (Zero Black Lines, Zero Footer Text) */}
+              <View style={tw`mt-2`}>
+                <View style={tw`w-full h-1.5 bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden`}>
+                  <View 
+                    style={[
+                      tw`h-full rounded-full`, 
+                      { 
+                        width: `${item.percent}%`, 
+                        backgroundColor: item.accentColor 
+                      }
+                    ]} 
+                  />
+                </View>
+              </View>
+            </TouchableOpacity>
+          );
+        })}
       </View>
     </View>
   );

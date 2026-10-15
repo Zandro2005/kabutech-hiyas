@@ -3,6 +3,9 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useSensors, useSettings, useAlerts } from './useFirebaseData';
 import { useSensorHealth, SensorHealthStatus } from './useSensorHealth';
 import { computeScheduledDevicesState, computeAutoDevicesState } from '../utils/scheduleLogic';
+import { evaluateParam } from '../utils/environmentRanges';
+import { ACTIVE_PROFILE } from '../config/cropProfiles';
+
 
 export interface EnvironmentAlertItem {
   id: string;
@@ -216,188 +219,128 @@ export function useEnvironmentAlerts(): EnvironmentAlertsResult {
     const light = typeof sensors?.light === 'number' ? sensors.light : 500;
     const co2 = typeof sensors?.co2 === 'number' ? sensors.co2 : 600;
 
-    // 4. CO₂ Environmental Alerts (Requires significant deviation; Clears only when target is met)
-    if (!health.co2Error && co2 > 0 && co2 !== -999) {
-      const isCo2Critical = co2 > targetCO2 + 450;
-      const isCo2High = co2 > targetCO2 + 200;
+    const tempEval = evaluateParam('temp', temp, health.tempError || !health.isControllerOnline, ACTIVE_PROFILE);
+    const humEval = evaluateParam('hum', hum, health.humError || !health.isControllerOnline, ACTIVE_PROFILE);
+    const co2Eval = evaluateParam('co2', co2, health.co2Error || !health.isControllerOnline, ACTIVE_PROFILE);
+    const lightEval = evaluateParam('light', light, health.lightError || !health.isControllerOnline, ACTIVE_PROFILE);
 
-      if (isCo2Critical) {
+    // 4. CO₂ Environmental Alerts
+    if (!health.co2Error && co2Eval.state !== 'fault' && co2Eval.state !== 'in_range') {
+      if (co2Eval.state === 'high') {
+        const isCo2Critical = co2Eval.severity === 'critical';
         list.push({
-          id: 'co2-critical',
-          type: 'critical',
-          title: 'Critically High CO₂',
+          id: isCo2Critical ? 'co2-critical' : 'co2-elevated',
+          type: isCo2Critical ? 'critical' : 'warning',
+          title: isCo2Critical ? 'Critically High CO₂' : 'CO₂ Above Crop Range',
           shortLabel: `High CO₂ • ${Math.round(co2)} ppm`,
           currentValue: `${Math.round(co2)} ppm`,
-          targetValue: `${targetCO2} ppm`,
+          targetValue: co2Eval.rangeText,
           action: 'Run exhaust fans to ventilate',
-          message: 'Run exhaust fans to ventilate',
-          icon: 'molecule-co2',
-          metric: 'co2',
-        });
-      } else if (isCo2High) {
-        list.push({
-          id: 'co2-elevated',
-          type: 'warning',
-          title: 'CO₂ Above Target',
-          shortLabel: `High CO₂ • ${Math.round(co2)} ppm`,
-          currentValue: `${Math.round(co2)} ppm`,
-          targetValue: `${targetCO2} ppm`,
-          action: 'Run exhaust fans to ventilate',
-          message: 'Run exhaust fans to ventilate',
+          message: `CO₂ reached ${Math.round(co2)} ppm (Crop range: ${co2Eval.rangeText}). Ventilate chamber immediately.`,
           icon: 'molecule-co2',
           metric: 'co2',
         });
       }
     }
 
-    // 5. Temperature Environmental Alerts (No warnings for 1-2° drift; Warns only on significant deviation)
-    if (!health.tempError && temp > -50 && temp !== -999) {
-      const isTempCriticalHigh = temp > targetTemp + 5.0;
-      const isTempHigh = temp > targetTemp + 3.0; // 1-2° drift is ignored; only warns at +3.0° or above
-      const isTempCriticalLow = temp < targetTemp - 5.5;
-      const isTempLow = temp < targetTemp - 3.5;  // 1-2° drift is ignored; only warns at -3.5° or below
-
-      if (isTempCriticalHigh) {
+    // 5. Temperature Environmental Alerts
+    if (!health.tempError && tempEval.state !== 'fault' && tempEval.state !== 'in_range') {
+      if (tempEval.state === 'high') {
+        const isCritical = tempEval.severity === 'critical';
         list.push({
-          id: 'temp-critical-high',
-          type: 'critical',
-          title: 'Critically High Temp',
+          id: isCritical ? 'temp-critical-high' : 'temp-high',
+          type: isCritical ? 'critical' : 'warning',
+          title: isCritical ? 'Critically High Temp' : 'Temperature Above Crop Range',
           shortLabel: `High Temp • ${temp.toFixed(1)}°C`,
           currentValue: `${temp.toFixed(1)}°C`,
-          targetValue: `${targetTemp.toFixed(1)}°C`,
+          targetValue: tempEval.rangeText,
           action: 'Run exhaust fans to cool chamber',
-          message: 'Run exhaust fans to cool chamber',
-          icon: 'thermometer-alert',
+          message: `Temperature reached ${temp.toFixed(1)}°C (Crop range: ${tempEval.rangeText}). Run exhaust fans to cool chamber.`,
+          icon: isCritical ? 'thermometer-alert' : 'thermometer-chevron-up',
           metric: 'temp',
         });
-      } else if (isTempHigh) {
+      } else if (tempEval.state === 'low') {
+        const isCritical = tempEval.severity === 'critical';
         list.push({
-          id: 'temp-high',
-          type: 'warning',
-          title: 'Temperature Above Target',
-          shortLabel: `High Temp • ${temp.toFixed(1)}°C`,
-          currentValue: `${temp.toFixed(1)}°C`,
-          targetValue: `${targetTemp.toFixed(1)}°C`,
-          action: 'Run exhaust fans to cool chamber',
-          message: 'Run exhaust fans to cool chamber',
-          icon: 'thermometer-chevron-up',
-          metric: 'temp',
-        });
-      } else if (isTempCriticalLow) {
-        list.push({
-          id: 'temp-critical-low',
-          type: 'critical',
-          title: 'Critically Low Temp',
+          id: isCritical ? 'temp-critical-low' : 'temp-low',
+          type: isCritical ? 'critical' : 'warning',
+          title: isCritical ? 'Critically Low Temp' : 'Temperature Below Crop Range',
           shortLabel: `Low Temp • ${temp.toFixed(1)}°C`,
           currentValue: `${temp.toFixed(1)}°C`,
-          targetValue: `${targetTemp.toFixed(1)}°C`,
+          targetValue: tempEval.rangeText,
           action: 'Reduce fan ventilation to retain heat',
-          message: 'Reduce fan ventilation to retain heat',
-          icon: 'snowflake-alert',
-          metric: 'temp',
-        });
-      } else if (isTempLow) {
-        list.push({
-          id: 'temp-low',
-          type: 'warning',
-          title: 'Temperature Below Target',
-          shortLabel: `Low Temp • ${temp.toFixed(1)}°C`,
-          currentValue: `${temp.toFixed(1)}°C`,
-          targetValue: `${targetTemp.toFixed(1)}°C`,
-          action: 'Reduce fan ventilation to retain heat',
-          message: 'Reduce fan ventilation to retain heat',
-          icon: 'thermometer-chevron-down',
+          message: `Temperature dropped to ${temp.toFixed(1)}°C (Crop range: ${tempEval.rangeText}). Reduce fan ventilation to retain heat.`,
+          icon: isCritical ? 'snowflake-alert' : 'thermometer-chevron-down',
           metric: 'temp',
         });
       }
     }
 
-    // 6. Humidity Environmental Alerts (Strictly relative to target setpoint; 1-2% drift is normal)
-    if (!health.humError && hum > 0 && hum !== -999) {
-      // 1-2% drift is ignored; warns only on genuine, significant deviations from user's setpoint
-      const isHumCriticalHigh = hum > targetHum + 12 && hum >= 98;
-      const isHumHigh = hum > targetHum + 6;
-      const isHumCriticalLow = hum < targetHum - 18;
-      const isHumLow = hum < targetHum - 8;
-
-      if (isHumCriticalHigh) {
+    // 6. Humidity Environmental Alerts
+    if (!health.humError && humEval.state !== 'fault' && humEval.state !== 'in_range') {
+      if (humEval.state === 'high') {
+        const isCritical = humEval.severity === 'critical';
         list.push({
-          id: 'hum-critical-high',
-          type: 'critical',
-          title: 'Excessive Humidity Alert',
+          id: isCritical ? 'hum-critical-high' : 'hum-high',
+          type: isCritical ? 'critical' : 'warning',
+          title: isCritical ? 'Excessive Humidity Alert' : 'Humidity Above Crop Range',
           shortLabel: `Saturated • ${Math.round(hum)}%`,
           currentValue: `${Math.round(hum)}%`,
-          targetValue: `${targetHum}%`,
+          targetValue: humEval.rangeText,
           action: 'Run exhaust fans to reduce moisture',
-          message: `Humidity reached ${Math.round(hum)}% (Target: ${targetHum}%). Ventilate chamber immediately.`,
+          message: `Humidity reached ${Math.round(hum)}% (Crop range: ${humEval.rangeText}). Ventilate chamber immediately.`,
           icon: 'water-plus',
           metric: 'hum',
         });
-      } else if (isHumHigh) {
+      } else if (humEval.state === 'low') {
+        const isCritical = humEval.severity === 'critical';
         list.push({
-          id: 'hum-high',
-          type: 'warning',
-          title: 'High Humidity Warning',
-          shortLabel: `High Hum • ${Math.round(hum)}%`,
-          currentValue: `${Math.round(hum)}%`,
-          targetValue: `${targetHum}%`,
-          action: 'Run exhaust fans to reduce moisture',
-          message: `Humidity is at ${Math.round(hum)}% (Target: ${targetHum}%). Run exhaust fans to ventilate.`,
-          icon: 'water-plus',
-          metric: 'hum',
-        });
-      } else if (isHumCriticalLow) {
-        list.push({
-          id: 'hum-critical-low',
-          type: 'critical',
-          title: 'Critically Low Humidity',
+          id: isCritical ? 'hum-critical-low' : 'hum-low',
+          type: isCritical ? 'critical' : 'warning',
+          title: isCritical ? 'Critically Low Humidity' : 'Humidity Below Crop Range',
           shortLabel: `Dry Air • ${Math.round(hum)}%`,
           currentValue: `${Math.round(hum)}%`,
-          targetValue: `${targetHum}%`,
-          action: `Run misters to raise humidity to ${targetHum}%`,
-          message: `Humidity is critically low at ${Math.round(hum)}% (Target: ${targetHum}%). Activate misters.`,
-          icon: 'water-percent-alert',
-          metric: 'hum',
-        });
-      } else if (isHumLow) {
-        list.push({
-          id: 'hum-low',
-          type: 'warning',
-          title: 'Humidity Below Target',
-          shortLabel: `Low Hum • ${Math.round(hum)}%`,
-          currentValue: `${Math.round(hum)}%`,
-          targetValue: `${targetHum}%`,
-          action: `Run misters to raise humidity to ${targetHum}%`,
-          message: `Humidity dropped to ${Math.round(hum)}% (Target: ${targetHum}%). Run misters to balance.`,
-          icon: 'water-minus',
+          targetValue: humEval.rangeText,
+          action: `Run misters to raise humidity to ${humEval.rangeText}`,
+          message: `Humidity dropped to ${Math.round(hum)}% (Crop range: ${humEval.rangeText}). Run misters to balance.`,
+          icon: isCritical ? 'water-percent-alert' : 'water-minus',
           metric: 'hum',
         });
       }
     }
 
-    // 7. Light Environmental Alerts (Warns only on significant over-illumination)
-    if (!health.lightError && light >= 0 && light !== -999) {
-      const isLightHigh = light > targetLight + 400;
-
-      if (isLightHigh) {
+    // 7. Light Environmental Alerts
+    if (!health.lightError && lightEval.state !== 'fault' && lightEval.state !== 'in_range') {
+      if (lightEval.state === 'high') {
         list.push({
           id: 'light-high',
           type: 'warning',
-          title: 'Light Above Target',
+          title: 'Light Above Crop Range',
           shortLabel: `Bright Light • ${Math.round(light)} lx`,
           currentValue: `${Math.round(light)} lx`,
-          targetValue: `${targetLight} lx`,
+          targetValue: lightEval.rangeText,
           action: 'Dim or turn off grow lights',
-          message: 'Dim or turn off grow lights',
+          message: `Light level reached ${Math.round(light)} lx (Crop range: ${lightEval.rangeText}). Dim or turn off grow lights.`,
           icon: 'weather-sunny-alert',
           metric: 'light',
         });
       }
     }
 
-    // 8. Critical unresolved alerts from Firebase Alerts collection
+    // 8. Critical unresolved alerts from Firebase Alerts collection (filtered to active within 24h)
     if (alerts && alerts.length > 0) {
-      const unresolvedCritical = alerts.filter(a => !a.resolved && a.type === 'critical');
+      const now = Date.now();
+      const TWENTY_FOUR_HOURS = 24 * 60 * 60 * 1000;
+      const unresolvedCritical = alerts.filter(a => {
+        if (!a || a.resolved || a.type !== 'critical') return false;
+        if (a.timestamp) {
+          const time = new Date(a.timestamp).getTime();
+          if (!isNaN(time) && (now - time > TWENTY_FOUR_HOURS || time - now > 300_000)) {
+            return false;
+          }
+        }
+        return true;
+      });
       for (const crit of unresolvedCritical) {
         if (!list.some(l => l.title === crit.title || l.id === crit.id)) {
           list.push({

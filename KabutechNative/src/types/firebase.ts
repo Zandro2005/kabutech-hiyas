@@ -82,6 +82,7 @@ export interface BatchData {
 
 export interface AlertData {
   id: string;
+  firebaseKey?: string;
   title?: string;
   type: 'critical' | 'warning' | 'info';
   message: string;
