@@ -21,6 +21,13 @@ import { useTabBarScroll } from '../context/TabBarContext';
 
 type TabId = 'temp' | 'hum' | 'light' | 'co2';
 
+const DEFAULT_DEVICES: { fans: boolean; misters: boolean; lights: boolean; co2: boolean } = {
+  fans: false,
+  misters: false,
+  lights: false,
+  co2: false,
+};
+
 export default function ControlsScreen() {
   const navigation = useNavigation<NativeStackNavigationProp<GlobalNavigationParamList>>();
   const { onScroll: handleTabBarScroll } = useTabBarScroll();
@@ -34,13 +41,20 @@ export default function ControlsScreen() {
   const [isReady, setIsReady] = useState(false);
   const [showStopAiModal, setShowStopAiModal] = useState(false);
   const [pendingMode, setPendingMode] = useState<'auto' | 'manual' | 'scheduled' | null>(null);
+
   useEffect(() => {
-    if (typeof requestIdleCallback !== 'undefined') {
-      const handle = requestIdleCallback(() => setIsReady(true));
-      return () => cancelIdleCallback(handle);
-    }
-    const handle = requestAnimationFrame(() => setIsReady(true));
-    return () => cancelAnimationFrame(handle);
+    let mounted = true;
+    const safety = setTimeout(() => {
+      if (mounted) setIsReady(true);
+    }, 40);
+    const frame = requestAnimationFrame(() => {
+      if (mounted) setIsReady(true);
+    });
+    return () => {
+      mounted = false;
+      clearTimeout(safety);
+      cancelAnimationFrame(frame);
+    };
   }, []);
 
   const temp = typeof sensors.temperature === 'number' ? sensors.temperature : 32.8;
@@ -77,31 +91,47 @@ export default function ControlsScreen() {
   const isAuto = String(settings?.setpoints?.mode).toLowerCase() === 'auto';
   const isScheduled = String(settings?.setpoints?.mode).toLowerCase() === 'scheduled';
   
-  const rawDevices = settings?.setpoints?.devices || { fans: false, misters: false, lights: false, co2: false };
+  const rawDevices = settings?.setpoints?.devices || DEFAULT_DEVICES;
   const [devices, setDevices] = useState(rawDevices);
 
   useEffect(() => {
     if (isScheduled) {
+      setDevices(computeScheduledDevicesState(settings?.schedules));
       const interval = setInterval(() => {
         setDevices(computeScheduledDevicesState(settings?.schedules));
       }, 3000);
-      setDevices(computeScheduledDevicesState(settings?.schedules));
       return () => clearInterval(interval);
     } else if (isAuto) {
+      setDevices(computeAutoDevicesState(sensors, settings?.setpoints));
       const interval = setInterval(() => {
         setDevices(computeAutoDevicesState(sensors, settings?.setpoints));
       }, 3000);
-      setDevices(computeAutoDevicesState(sensors, settings?.setpoints));
       return () => clearInterval(interval);
     } else {
       setDevices(rawDevices);
     }
-  }, [isScheduled, isAuto, settings?.schedules, settings?.setpoints, sensors, rawDevices]);
+  }, [
+    isScheduled,
+    isAuto,
+    settings?.schedules,
+    settings?.setpoints?.mode,
+    rawDevices.fans,
+    rawDevices.misters,
+    rawDevices.lights,
+    rawDevices.co2,
+    sensors?.temperature,
+    sensors?.humidity,
+  ]);
 
+  const isOffline = !health.isControllerOnline;
   const isAiOverride = settings?.setpoints?.aiOverride === true;
-  const isLocked = isAuto || isScheduled || isAiOverride;
+  const isLocked = isAuto || isScheduled || isAiOverride || isOffline;
 
   const updateSetpoint = (key: string, value: number, label?: string, unit?: string) => {
+    if (isOffline) {
+      showToast({ type: 'info', text1: 'Controller Offline', text2: 'Target setpoints cannot be adjusted while offline.' });
+      return;
+    }
     showToast({ type: 'success', text1: `${label || 'Target'} updated to ${value}${unit || ''}` });
     update(ref(db, 'kabutech/settings/setpoints'), {
       [key]: value
@@ -115,6 +145,10 @@ export default function ControlsScreen() {
   };
 
   const toggleDevice = async (key: string, state: boolean) => {
+    if (isOffline) {
+      showToast({ type: 'info', text1: 'Controller Offline', text2: 'Hardware actuators cannot be controlled while offline.' });
+      return;
+    }
     if (isLocked) return;
     hapticMedium();
 
@@ -205,6 +239,10 @@ export default function ControlsScreen() {
 
   const setMode = (mode: 'auto' | 'manual' | 'scheduled') => {
     hapticSelection();
+    if (isOffline) {
+      showToast({ type: 'info', text1: 'Controller Offline', text2: 'Control modes cannot be changed while offline.' });
+      return;
+    }
     if (isAiOverride) {
       setPendingMode(mode);
       setShowStopAiModal(true);
@@ -286,10 +324,7 @@ export default function ControlsScreen() {
 
   const activeTabData = tabs.find(t => t.id === activeTab)!;
   const activeTabDataRef = useRef(activeTabData);
-
-  useEffect(() => {
-    activeTabDataRef.current = activeTabData;
-  }, [activeTabData]);
+  activeTabDataRef.current = activeTabData;
 
   const [localTarget, setLocalTarget] = useState<number>(activeTabData.target);
   const localTargetRef = useRef<number>(activeTabData.target);
@@ -364,6 +399,10 @@ export default function ControlsScreen() {
   };
 
   const startIncrement = () => {
+    if (isOffline) {
+      showToast({ type: 'info', text1: 'Controller Offline', text2: 'Target setpoints cannot be adjusted while offline.' });
+      return;
+    }
     stopTimer();
     isInteractingRef.current = true;
     hapticSelection();
@@ -386,6 +425,10 @@ export default function ControlsScreen() {
   };
 
   const startDecrement = () => {
+    if (isOffline) {
+      showToast({ type: 'info', text1: 'Controller Offline', text2: 'Target setpoints cannot be adjusted while offline.' });
+      return;
+    }
     stopTimer();
     isInteractingRef.current = true;
     hapticSelection();
@@ -445,7 +488,6 @@ export default function ControlsScreen() {
       activeBg: 'bg-emerald-500/15 dark:bg-emerald-500/25',
       activeBorder: 'border-emerald-500/50 dark:border-emerald-500/40',
       activeGlow: 'bg-emerald-500',
-      isLowWater: waterLevel <= 20,
     },
     {
       key: 'lights',
@@ -616,16 +658,20 @@ export default function ControlsScreen() {
           localTarget={localTarget} 
           activeTabData={activeTabData} 
           isDarkMode={isDarkMode} 
+          isOffline={isOffline}
           onValueChange={(val) => {
+            if (isOffline) return;
             isInteractingRef.current = true;
             localTargetRef.current = val;
             setLocalTarget(val);
           }}
           onSlidingStart={() => {
+            if (isOffline) return;
             isInteractingRef.current = true;
             setIsSliding(true);
           }}
           onSlidingComplete={(val) => {
+            if (isOffline) return;
             setIsSliding(false);
             commitTarget(val);
           }}
@@ -640,9 +686,13 @@ export default function ControlsScreen() {
           <TouchableOpacity 
             hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
             activeOpacity={0.7}
+            disabled={isOffline}
             onPressIn={startDecrement}
             onPressOut={stopTimer}
-            style={tw`w-11 h-11 rounded-2xl border border-slate-200/80 dark:border-slate-700 items-center justify-center bg-white dark:bg-slate-800 shadow-sm`}
+            style={[
+              tw`w-11 h-11 rounded-2xl border border-slate-200/80 dark:border-slate-700 items-center justify-center bg-white dark:bg-slate-800 shadow-sm`,
+              isOffline && tw`opacity-40`,
+            ]}
           >
             <MaterialCommunityIcons name="minus" size={22} color={isDarkMode ? '#cbd5e1' : '#475569'} />
           </TouchableOpacity>
@@ -674,6 +724,10 @@ export default function ControlsScreen() {
             <TouchableOpacity 
               hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
               onPress={() => {
+                if (isOffline) {
+                  showToast({ type: 'info', text1: 'Controller Offline', text2: 'Control modes cannot be changed while offline.' });
+                  return;
+                }
                 if (isLocked) DeviceEventEmitter.emit('showManualOverrideModal');
               }}
               style={[tw`px-3.5 py-2 rounded-xl flex-row items-center gap-1.5`, (!isAuto && !isScheduled) ? tw`bg-amber-500 shadow-sm` : tw`bg-transparent`]}
@@ -689,9 +743,13 @@ export default function ControlsScreen() {
           <TouchableOpacity 
             hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
             activeOpacity={0.7}
+            disabled={isOffline}
             onPressIn={startIncrement}
             onPressOut={stopTimer}
-            style={tw`w-11 h-11 rounded-2xl border border-slate-200/80 dark:border-slate-700 items-center justify-center bg-white dark:bg-slate-800 shadow-sm`}
+            style={[
+              tw`w-11 h-11 rounded-2xl border border-slate-200/80 dark:border-slate-700 items-center justify-center bg-white dark:bg-slate-800 shadow-sm`,
+              isOffline && tw`opacity-40`,
+            ]}
           >
             <MaterialCommunityIcons name="plus" size={22} color={isDarkMode ? '#cbd5e1' : '#475569'} />
           </TouchableOpacity>
@@ -750,6 +808,11 @@ export default function ControlsScreen() {
               <TouchableOpacity
                 activeOpacity={isLocked ? 0.75 : 1}
                 onPress={() => {
+                  if (isOffline) {
+                    hapticSelection();
+                    showToast({ type: 'info', text1: 'Controller Offline', text2: 'Equipment cannot be controlled while offline.' });
+                    return;
+                  }
                   if (isLocked) {
                     hapticSelection();
                     DeviceEventEmitter.emit('showManualOverrideModal');
@@ -757,7 +820,9 @@ export default function ControlsScreen() {
                 }}
                 style={[
                   tw`px-2.5 py-1 rounded-full border flex-row items-center gap-1.2`,
-                  isAiOverride
+                  isOffline
+                    ? tw`bg-slate-100 dark:bg-slate-800 border-slate-300 dark:border-slate-700`
+                    : isAiOverride
                     ? tw`bg-blue-50 dark:bg-blue-950/40 border-blue-200 dark:border-blue-800`
                     : isAuto
                     ? tw`bg-emerald-50 dark:bg-emerald-950/40 border-emerald-200 dark:border-emerald-800`
@@ -766,25 +831,27 @@ export default function ControlsScreen() {
                     : tw`bg-slate-100 dark:bg-slate-800 border-slate-200/80 dark:border-slate-700`
                 ]}
               >
-                {isLocked ? (
-                  <View
-                    style={[
-                      tw`w-1.5 h-1.5 rounded-full`,
-                      isAiOverride
-                        ? tw`bg-blue-500`
-                        : isAuto
-                        ? tw`bg-emerald-500`
-                        : tw`bg-purple-500`
-                    ]}
-                  />
-                ) : (
-                  <View style={tw`w-1.5 h-1.5 rounded-full bg-emerald-500`} />
-                )}
+                <View
+                  style={[
+                    tw`w-1.5 h-1.5 rounded-full`,
+                    isOffline
+                      ? tw`bg-slate-400 dark:bg-slate-500`
+                      : isAiOverride
+                      ? tw`bg-blue-500`
+                      : isAuto
+                      ? tw`bg-emerald-500`
+                      : isScheduled
+                      ? tw`bg-purple-500`
+                      : tw`bg-emerald-500`
+                  ]}
+                />
                 <Text
                   style={[
                     tw`text-[9.5px]`,
                     { fontFamily: 'PlusJakartaSans_700Bold' },
-                    isAiOverride
+                    isOffline
+                      ? tw`text-slate-500 dark:text-slate-400`
+                      : isAiOverride
                       ? tw`text-blue-600 dark:text-blue-400`
                       : isAuto
                       ? tw`text-emerald-600 dark:text-emerald-400`
@@ -793,7 +860,7 @@ export default function ControlsScreen() {
                       : tw`text-slate-600 dark:text-slate-400`
                   ]}
                 >
-                  {isAiOverride ? 'AI Locked' : isAuto ? 'AUTO' : isScheduled ? 'TIMED' : `${activeDeviceCount} Active`}
+                  {isOffline ? 'OFFLINE' : isAiOverride ? 'AI Locked' : isAuto ? 'AUTO' : isScheduled ? 'TIMED' : `${activeDeviceCount} Active`}
                 </Text>
               </TouchableOpacity>
             </View>
@@ -818,8 +885,18 @@ export default function ControlsScreen() {
               return (
                 <TouchableOpacity
                   key={device.key}
-                  activeOpacity={0.85}
+                  activeOpacity={isOffline ? 1 : 0.85}
+                  disabled={isOffline}
                   onPress={() => {
+                    if (isOffline) {
+                      hapticLight();
+                      showToast({
+                        type: 'info',
+                        text1: 'Controller Offline',
+                        text2: 'Equipment cannot be controlled while the controller is offline.',
+                      });
+                      return;
+                    }
                     if (isLocked) {
                       hapticLight();
                       showToast({
@@ -834,7 +911,9 @@ export default function ControlsScreen() {
                   style={[
                     tw`flex-1 rounded-2xl py-2 px-1 items-center justify-between border bg-white dark:bg-slate-900 shadow-sm`,
                     { height: 58 },
-                    isHighlightActive
+                    isOffline
+                      ? tw`opacity-50 border-slate-200/60 dark:border-slate-800`
+                      : isHighlightActive
                       ? tw`border-emerald-500 dark:border-emerald-500`
                       : isAutoActive
                       ? tw`border-emerald-500/60 dark:border-emerald-500/50`
@@ -843,22 +922,19 @@ export default function ControlsScreen() {
                 >
                   {/* Top: Icon + Label */}
                   <View style={tw`flex-row items-center gap-1`}>
-                    <View style={tw`relative`}>
-                      <MaterialCommunityIcons
-                        name={device.icon}
-                        size={13}
-                        color={showActive ? '#10b981' : isDarkMode ? '#64748b' : '#94a3b8'}
-                      />
-                      {device.key === 'misters' && device.isLowWater && (
-                        <View style={tw`absolute -top-1 -right-1 w-1.5 h-1.5 rounded-full bg-rose-500`} />
-                      )}
-                    </View>
+                    <MaterialCommunityIcons
+                      name={device.icon}
+                      size={13}
+                      color={isOffline ? (isDarkMode ? '#64748b' : '#94a3b8') : showActive ? '#10b981' : isDarkMode ? '#64748b' : '#94a3b8'}
+                    />
                     <Text
                       numberOfLines={1}
                       style={[
                         tw`text-[10px]`,
                         { fontFamily: 'PlusJakartaSans_700Bold' },
-                        showActive
+                        isOffline
+                          ? (isDarkMode ? tw`text-slate-500` : tw`text-slate-400`)
+                          : showActive
                           ? (isDarkMode ? tw`text-white` : tw`text-slate-900`)
                           : (isDarkMode ? tw`text-slate-400` : tw`text-slate-600`),
                       ]}
@@ -871,7 +947,9 @@ export default function ControlsScreen() {
                   <View
                     style={[
                       tw`w-8.5 h-4.5 rounded-full px-0.5 justify-center`,
-                      showActive
+                      isOffline
+                        ? (isDarkMode ? tw`bg-slate-800 items-start` : tw`bg-slate-200 items-start`)
+                        : showActive
                         ? tw`bg-emerald-500 items-end`
                         : isDarkMode
                         ? tw`bg-slate-700 items-start`
@@ -880,13 +958,14 @@ export default function ControlsScreen() {
                   >
                     <View
                       style={[
-                        tw`w-3.5 h-3.5 rounded-full bg-white`,
+                        tw`w-3.5 h-3.5 rounded-full`,
+                        isOffline ? (isDarkMode ? tw`bg-slate-600` : tw`bg-slate-400`) : tw`bg-white`,
                         {
                           shadowColor: '#000',
                           shadowOffset: { width: 0, height: 1 },
-                          shadowOpacity: 0.2,
+                          shadowOpacity: isOffline ? 0 : 0.2,
                           shadowRadius: 1,
-                          elevation: 2,
+                          elevation: isOffline ? 0 : 2,
                         },
                       ]}
                     />

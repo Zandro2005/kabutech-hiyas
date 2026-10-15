@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { useSensors, useServerTimeOffset } from './useFirebaseData';
+import { useSensors, useServerTimeOffset, useFirebaseConnection } from './useFirebaseData';
 
 export interface SensorHealthStatus {
   isControllerOnline: boolean;
@@ -19,6 +19,7 @@ export interface SensorHealthStatus {
 export function useSensorHealth(): SensorHealthStatus {
   const sensors = useSensors();
   const serverTimeOffset = useServerTimeOffset();
+  const isFirebaseConnected = useFirebaseConnection();
   const [, setTick] = useState(0);
 
   // 1-second pulse to re-evaluate stale timeout in real time
@@ -31,36 +32,61 @@ export function useSensorHealth(): SensorHealthStatus {
 
   // Track the local time when the last snapshot arrived through the WebSocket stream
   const lastPacketReceivedAt = useRef<number>(Date.now());
+  const prevLastSeenRef = useRef<number | null>(null);
+  const detectedIntervalRef = useRef<number>(5000); // Defaults to 5s until measured
+
   useEffect(() => {
     if (sensors && (sensors.temperature != null || sensors.last_seen != null)) {
       lastPacketReceivedAt.current = Date.now();
+
+      // Measure actual push cadence from the ESP32
+      if (typeof sensors.last_seen === 'number') {
+        if (prevLastSeenRef.current !== null && sensors.last_seen > prevLastSeenRef.current) {
+          const delta = sensors.last_seen - prevLastSeenRef.current;
+          // Valid delta range: between 1000ms (1s) and 15000ms (15s)
+          if (delta >= 1000 && delta <= 15000) {
+            detectedIntervalRef.current = delta;
+          }
+        }
+        prevLastSeenRef.current = sensors.last_seen;
+      }
     }
   }, [sensors?.last_seen, sensors?.temperature, sensors?.humidity, sensors?.light, sensors?.co2, sensors?.waterLevel]);
 
   const hasTimestamp = typeof sensors?.last_seen === 'number' && sensors.last_seen > 0;
   
   // Stale detection:
-  // 1. ESP32 pushes every 5s (FIREBASE_PUSH_INTERVAL = 5000).
-  // 2. 35 seconds (~7 missed cycles) provides tolerance against packet drops and network jitter.
+  // 1. ESP32 pushes every 2s (fast firmware) to 5s (legacy).
+  // 2. Dynamic threshold adapts to actual detected push interval:
+  //    - At 2s push interval: threshold is Math.max(3500, 2000 + 1500) = 3500ms (3.5 seconds)!
+  //    - At 5s push interval: threshold is Math.max(3500, 5000 + 1500) = 6500ms (6.5 seconds)!
+  //    - Initial fallback threshold: 6000ms (evaluated instantly on cold boot).
   // 3. Current server time combines device clock + Firebase .info/serverTimeOffset to eliminate clock skew.
+  const dynamicThreshold = Math.max(3500, Math.min(8000, detectedIntervalRef.current + 1500));
+
   const currentServerTime = Date.now() + serverTimeOffset;
-  const timeSinceServerTs = hasTimestamp ? Math.max(0, currentServerTime - (sensors.last_seen || 0)) : Infinity;
+  const rawServerElapsed = hasTimestamp ? currentServerTime - (sensors.last_seen || 0) : Infinity;
+  const localElapsed = lastPacketReceivedAt.current > 0 ? Date.now() - lastPacketReceivedAt.current : Infinity;
+
+  // Protect against client clock skew:
+  // If rawServerElapsed < 0, phone clock is behind the server; fallback to localElapsed.
+  const timeSinceServerTs = hasTimestamp
+    ? Math.max(0, rawServerElapsed < 0 ? localElapsed : rawServerElapsed)
+    : Infinity;
+
   const offlineSeconds = hasTimestamp ? Math.round(timeSinceServerTs / 1000) : 0;
   const secondsSinceUpdate = hasTimestamp
     ? Math.max(0, Math.round(timeSinceServerTs / 1000))
-    : (lastPacketReceivedAt.current > 0 ? Math.max(0, Math.round((Date.now() - lastPacketReceivedAt.current) / 1000)) : null);
+    : (localElapsed !== Infinity ? Math.max(0, Math.round(localElapsed / 1000)) : null);
 
-  const STALE_THRESHOLD_MS = 35000;
-  const timeSinceLocalPacket = lastPacketReceivedAt.current > 0 ? Date.now() - lastPacketReceivedAt.current : Infinity;
-
-  // Resilient stale check: Only consider stale if BOTH the server timestamp AND
-  // local WebSocket stream arrival have exceeded the threshold (guards against phone clock skew)
-  const isServerStale = !hasTimestamp || timeSinceServerTs > STALE_THRESHOLD_MS;
-  const isLocalStale = timeSinceLocalPacket > STALE_THRESHOLD_MS;
-  const isStale = isServerStale && isLocalStale;
+  // Stale check:
+  // Evaluated immediately against currentServerTime + local elapsed timer.
+  // Instantly marks offline when missing or exceeds the fast dynamic threshold.
+  const isServerStale = !hasTimestamp || timeSinceServerTs > dynamicThreshold;
+  const isStale = isServerStale;
   
   const isExplicitOffline = sensors?.esp32_status === 'offline';
-  const isControllerOnline = !isExplicitOffline && !isStale;
+  const isControllerOnline = !isExplicitOffline && !isStale && isFirebaseConnected !== false;
 
   // Helper to check for error flags (handles boolean, string "true", number 1)
   const isErr = (val: any) => val === true || val === 'true' || val === 1;

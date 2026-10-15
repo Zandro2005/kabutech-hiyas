@@ -20,6 +20,7 @@ interface Props {
     label: string;
   };
   isDarkMode: boolean;
+  isOffline?: boolean;
   onValueChange?: (value: number) => void;
   onSlidingStart?: () => void;
   onSlidingComplete?: (value: number) => void;
@@ -29,11 +30,16 @@ export default function CircularSlider({
   localTarget,
   activeTabData,
   isDarkMode,
+  isOffline = false,
   onValueChange,
   onSlidingStart,
   onSlidingComplete,
 }: Props) {
   const { isSmallDevice, isLargeDevice } = useResponsive();
+
+  const dialColor = isOffline
+    ? (isDarkMode ? '#64748b' : '#94a3b8')
+    : activeTabData.color;
 
   // Restored Original Circular Progress Dial Dimensions
   const size = isSmallDevice ? 285 : isLargeDevice ? 345 : 315;
@@ -70,12 +76,14 @@ export default function CircularSlider({
     onValueChange,
     onSlidingStart,
     onSlidingComplete,
+    isOffline,
   });
   propsRef.current = {
     activeTabData,
     onValueChange,
     onSlidingStart,
     onSlidingComplete,
+    isOffline,
   };
 
   const isInteractingWithDial = useRef(false);
@@ -173,32 +181,23 @@ export default function CircularSlider({
   const panResponder = useRef(
     PanResponder.create({
       onStartShouldSetPanResponder: (evt) => {
+        if (propsRef.current.isOffline) return false;
         const dx = evt.nativeEvent.locationX - size / 2;
         const dy = evt.nativeEvent.locationY - size / 2;
         const dist = Math.sqrt(dx * dx + dy * dy);
-        return dist >= radius - 55 && dist <= radius + 65;
-      },
-      onStartShouldSetPanResponderCapture: (evt) => {
-        const dx = evt.nativeEvent.locationX - size / 2;
-        const dy = evt.nativeEvent.locationY - size / 2;
-        const dist = Math.sqrt(dx * dx + dy * dy);
-        return dist >= radius - 55 && dist <= radius + 65;
+        // Only accept touches strictly ON the circular track or knob
+        return Math.abs(dist - radius) <= 24;
       },
       onMoveShouldSetPanResponder: (evt, gestureState) => {
+        if (propsRef.current.isOffline) return false;
         if (isInteractingWithDial.current) return true;
         const dx = evt.nativeEvent.locationX - size / 2;
         const dy = evt.nativeEvent.locationY - size / 2;
         const dist = Math.sqrt(dx * dx + dy * dy);
-        return dist >= radius - 55 && dist <= radius + 65 && (Math.abs(gestureState.dx) > 3 || Math.abs(gestureState.dy) > 3);
-      },
-      onMoveShouldSetPanResponderCapture: (evt, gestureState) => {
-        if (isInteractingWithDial.current) return true;
-        const dx = evt.nativeEvent.locationX - size / 2;
-        const dy = evt.nativeEvent.locationY - size / 2;
-        const dist = Math.sqrt(dx * dx + dy * dy);
-        return dist >= radius - 55 && dist <= radius + 65 && (Math.abs(gestureState.dx) > 3 || Math.abs(gestureState.dy) > 3);
+        return Math.abs(dist - radius) <= 24 && (Math.abs(gestureState.dx) > 6 || Math.abs(gestureState.dy) > 6);
       },
       onPanResponderGrant: (evt) => {
+        if (propsRef.current.isOffline) return;
         isInteractingWithDial.current = true;
         setIsDragging(true);
         propsRef.current.onSlidingStart?.();
@@ -208,7 +207,7 @@ export default function CircularSlider({
         processAngle(startX, startY, true);
       },
       onPanResponderMove: (_, gestureState) => {
-        if (!isInteractingWithDial.current) return;
+        if (propsRef.current.isOffline || !isInteractingWithDial.current) return;
         const curX = touchStartRef.current.x + gestureState.dx;
         const curY = touchStartRef.current.y + gestureState.dy;
         processAngle(curX, curY, false);
@@ -227,7 +226,7 @@ export default function CircularSlider({
           propsRef.current.onSlidingComplete?.(lastValueRef.current);
         }
       },
-      onPanResponderTerminationRequest: () => false,
+      onPanResponderTerminationRequest: () => !isInteractingWithDial.current,
     })
   ).current;
 
@@ -246,48 +245,52 @@ export default function CircularSlider({
         ]}
       >
         {/* 1. Steady Subtle Ambient Glow (Constant, Non-Blinking) */}
-        <View
-          pointerEvents="none"
-          style={[
-            tw`absolute rounded-full`,
-            {
-              width: size - 20,
-              height: size - 20,
-              backgroundColor: activeTabData.color,
-              opacity: isDarkMode ? (isDragging ? 0.18 : 0.12) : (isDragging ? 0.14 : 0.08),
-              shadowColor: activeTabData.color,
-              shadowOffset: { width: 0, height: 0 },
-              shadowOpacity: isDarkMode ? 0.45 : 0.25,
-              shadowRadius: 22,
-            },
-          ]}
-        />
+        {!isOffline && (
+          <View
+            pointerEvents="none"
+            style={[
+              tw`absolute rounded-full`,
+              {
+                width: size - 20,
+                height: size - 20,
+                backgroundColor: dialColor,
+                opacity: isDarkMode ? (isDragging ? 0.18 : 0.12) : (isDragging ? 0.14 : 0.08),
+                shadowColor: dialColor,
+                shadowOffset: { width: 0, height: 0 },
+                shadowOpacity: isDarkMode ? 0.45 : 0.25,
+                shadowRadius: 22,
+              },
+            ]}
+          />
+        )}
 
         {/* 2. Rotating Dashed Orbit Line */}
-        <Animated.View
-          style={[
-            tw`absolute`,
-            {
-              width: size + 16,
-              height: size + 16,
-              transform: [{ rotate: spin }],
-            },
-          ]}
-          pointerEvents="none"
-        >
-          <Svg width={size + 16} height={size + 16} viewBox={`0 0 ${size + 16} ${size + 16}`}>
-            <Circle
-              cx={(size + 16) / 2}
-              cy={(size + 16) / 2}
-              r={radius + (isLargeDevice ? 18 : 16)}
-              stroke={activeTabData.color}
-              strokeWidth={1.2}
-              strokeDasharray="4 8"
-              strokeOpacity={isDarkMode ? 0.32 : 0.25}
-              fill="none"
-            />
-          </Svg>
-        </Animated.View>
+        {!isOffline && (
+          <Animated.View
+            style={[
+              tw`absolute`,
+              {
+                width: size + 16,
+                height: size + 16,
+                transform: [{ rotate: spin }],
+              },
+            ]}
+            pointerEvents="none"
+          >
+            <Svg width={size + 16} height={size + 16} viewBox={`0 0 ${size + 16} ${size + 16}`}>
+              <Circle
+                cx={(size + 16) / 2}
+                cy={(size + 16) / 2}
+                r={radius + (isLargeDevice ? 18 : 16)}
+                stroke={dialColor}
+                strokeWidth={1.2}
+                strokeDasharray="4 8"
+                strokeOpacity={isDarkMode ? 0.32 : 0.25}
+                fill="none"
+              />
+            </Svg>
+          </Animated.View>
+        )}
 
         {/* Background Soft Plate */}
         <View
@@ -298,11 +301,11 @@ export default function CircularSlider({
               width: size - 36,
               height: size - 36,
               backgroundColor: isDarkMode ? '#0f172a' : '#ffffff',
-              shadowColor: activeTabData.color,
+              shadowColor: dialColor,
               shadowOffset: { width: 0, height: 8 },
-              shadowOpacity: isDarkMode ? 0.25 : 0.12,
+              shadowOpacity: isOffline ? 0.05 : isDarkMode ? 0.25 : 0.12,
               shadowRadius: 20,
-              elevation: 6,
+              elevation: isOffline ? 2 : 6,
             },
           ]}
         />
@@ -310,8 +313,8 @@ export default function CircularSlider({
         <Svg pointerEvents="none" width={size} height={size} viewBox={`0 0 ${size} ${size}`}>
           <Defs>
             <SvgGradient id="dialGrad" x1="0%" y1="0%" x2="100%" y2="100%">
-              <Stop offset="0%" stopColor={activeTabData.color} stopOpacity="1" />
-              <Stop offset="100%" stopColor={activeTabData.color} stopOpacity="0.7" />
+              <Stop offset="0%" stopColor={dialColor} stopOpacity="1" />
+              <Stop offset="100%" stopColor={dialColor} stopOpacity={isOffline ? '0.85' : '0.7'} />
             </SvgGradient>
           </Defs>
 
@@ -361,14 +364,14 @@ export default function CircularSlider({
               top: thumbY - knobSize / 2,
               width: knobSize,
               height: knobSize,
-              backgroundColor: activeTabData.color,
+              backgroundColor: dialColor,
               borderWidth: 2.5,
-              borderColor: '#ffffff',
-              shadowColor: activeTabData.color,
+              borderColor: isOffline ? (isDarkMode ? '#334155' : '#cbd5e1') : '#ffffff',
+              shadowColor: dialColor,
               shadowOffset: { width: 0, height: 2 },
-              shadowOpacity: 0.65,
+              shadowOpacity: isOffline ? 0 : 0.65,
               shadowRadius: isDragging ? 6 : 4,
-              elevation: 7,
+              elevation: isOffline ? 0 : 7,
             },
           ]}
         />
@@ -386,14 +389,14 @@ export default function CircularSlider({
         >
           {/* Top Mini Tag: TARGET SETTING */}
           <View style={tw`flex-row items-center gap-1.5 mb-1`}>
-            <View style={[tw`w-1.5 h-1.5 rounded-full`, { backgroundColor: activeTabData.color }]} />
+            <View style={[tw`w-1.5 h-1.5 rounded-full`, { backgroundColor: isOffline ? (isDarkMode ? '#64748b' : '#94a3b8') : activeTabData.color }]} />
             <Text
               style={[
                 tw`text-[10px] sm:text-[11px] text-slate-400 dark:text-slate-500 uppercase tracking-widest`,
                 { fontFamily: 'PlusJakartaSans_800ExtraBold' },
               ]}
             >
-              TARGET SETPOINT
+              {isOffline ? 'CONTROLLER OFFLINE' : 'TARGET SETPOINT'}
             </Text>
           </View>
 
@@ -401,7 +404,7 @@ export default function CircularSlider({
           <View style={tw`flex-row items-baseline justify-center`}>
             <Text
               style={[
-                tw`text-slate-900 dark:text-white`,
+                isOffline ? tw`text-slate-400 dark:text-slate-500` : tw`text-slate-900 dark:text-white`,
                 {
                   fontSize: valueFontSize,
                   fontFamily: 'PlusJakartaSans_800ExtraBold',
@@ -417,7 +420,7 @@ export default function CircularSlider({
                 tw`font-bold ml-1.5`,
                 {
                   fontSize: unitFontSize,
-                  color: activeTabData.color,
+                  color: dialColor,
                   fontFamily: 'PlusJakartaSans_800ExtraBold',
                 },
               ]}
@@ -430,7 +433,19 @@ export default function CircularSlider({
           <View
             style={tw`mt-1.5 sm:mt-2 flex-row items-center gap-1.5 bg-slate-100/90 dark:bg-slate-800/80 px-3 py-1 sm:px-3.5 sm:py-1.2 rounded-full border border-slate-200/60 dark:border-slate-700/60`}
           >
-            {isDisconnected ? (
+            {isOffline ? (
+              <View style={tw`flex-row items-center gap-1.5`}>
+                <View style={tw`w-1.5 h-1.5 rounded-full bg-slate-400 dark:bg-slate-500`} />
+                <Text
+                  style={[
+                    tw`text-[11px] sm:text-[12px] text-slate-500 dark:text-slate-400`,
+                    { fontFamily: 'PlusJakartaSans_700Bold' },
+                  ]}
+                >
+                  Offline (Read-Only)
+                </Text>
+              </View>
+            ) : isDisconnected ? (
               <View style={tw`flex-row items-center gap-1.5`}>
                 <View style={tw`w-1.5 h-1.5 rounded-full bg-rose-500`} />
                 <Text

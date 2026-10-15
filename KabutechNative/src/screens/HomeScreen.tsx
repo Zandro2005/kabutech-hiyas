@@ -36,12 +36,18 @@ export default function HomeScreen() {
   
   const [isReady, setIsReady] = useState(false);
   useEffect(() => {
-    if (typeof requestIdleCallback !== 'undefined') {
-      const handle = requestIdleCallback(() => setIsReady(true));
-      return () => cancelIdleCallback(handle);
-    }
-    const handle = requestAnimationFrame(() => setIsReady(true));
-    return () => cancelAnimationFrame(handle);
+    let mounted = true;
+    const safety = setTimeout(() => {
+      if (mounted) setIsReady(true);
+    }, 40);
+    const frame = requestAnimationFrame(() => {
+      if (mounted) setIsReady(true);
+    });
+    return () => {
+      mounted = false;
+      clearTimeout(safety);
+      cancelAnimationFrame(frame);
+    };
   }, []);
 
   const isControllerOff = !health.isControllerOnline;

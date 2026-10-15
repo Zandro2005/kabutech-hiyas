@@ -78,8 +78,8 @@
 // ═══════════════════════════════════════════════
 
 #define SERIAL_PRINT_INTERVAL   1000   // Print to Serial Monitor every 1s (100% local, ZERO delay)
-#define FIREBASE_PUSH_INTERVAL  5000   // Push to cloud every 5s (relieves radio duty cycle for 24/7 continuous operation)
-#define HEARTBEAT_INTERVAL      30000  // Send "online" heartbeat every 30 seconds
+#define FIREBASE_PUSH_INTERVAL  2000   // Push to cloud every 2s (ultra-fast offline detection & live telemetry)
+#define HEARTBEAT_INTERVAL      15000  // Send "online" heartbeat every 15 seconds
 #define MQ135_WARMUP_MS         10000  // MQ-135 warm-up time (10s)
 #define HOURLY_PUSH_INTERVAL    3600000 // Hourly history push (1 hour = 3,600,000 ms)
 
