@@ -60,10 +60,11 @@ Open `kabutech_prototype.ino` and update your WiFi credentials:
 | **GPIO 7** | Water Level S | Analog signal |
 | **GPIO 8** | Water Level + | Digital power (toggled to prevent electrolysis corrosion) |
 | **GND** | Water Level - | Ground |
-| **GPIO 9** | FANS LED | Connect LED anode (long leg) to GPIO 9. Connect cathode (short leg) to a 220Ω resistor, then to GND. |
+| **GPIO 9** | FAN IN (Air Intake) LED | Connect LED anode (long leg) to GPIO 9. Connect cathode (short leg) to a 220Ω resistor, then to GND. |
 | **GPIO 10**| VALVE (CO2) LED | Connect LED anode to GPIO 10. Connect cathode to a 220Ω resistor, then to GND. |
 | **GPIO 11**| MISTERS LED | Connect LED anode to GPIO 11. Connect cathode to a 220Ω resistor, then to GND. |
 | **GPIO 12**| LIGHTS LED | Connect LED anode to GPIO 12. Connect cathode to a 220Ω resistor, then to GND. |
+| **GPIO 13**| FAN OUT (Air Exhaust) LED | Connect LED anode to GPIO 13. Connect cathode to a 220Ω resistor, then to GND. |
 
 ---
 

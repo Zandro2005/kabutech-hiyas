@@ -4,7 +4,15 @@ import { ScheduleSettings } from '../types/firebase';
  * Computes the expected real-time ON/OFF state of devices based on their schedule and the current time.
  */
 export const computeScheduledDevicesState = (schedules?: ScheduleSettings | null) => {
-  const state = { fans: false, misters: false, lights: false, co2: false };
+  const state = {
+    fanIn: false,
+    fanOut: false,
+    fans: false,
+    misters: false,
+    lights: false,
+    valve: false,
+    co2: false,
+  };
   if (!schedules) return state;
 
   const now = new Date();
@@ -27,11 +35,13 @@ export const computeScheduledDevicesState = (schedules?: ScheduleSettings | null
     }
   };
 
-  // Check Fans
+  // Check Fans (both Fan In and Fan Out run on fan schedule)
   if (schedules.fans?.enabled && schedules.fans.windows) {
     for (const w of schedules.fans.windows) {
       if (isWithinWindow(w.startTime, w.endTime)) {
         state.fans = true;
+        state.fanOut = true;
+        state.fanIn = true;
         break;
       }
     }
@@ -68,11 +78,22 @@ export const computeScheduledDevicesState = (schedules?: ScheduleSettings | null
 };
 
 export interface AutoDecisionResult {
-  states: { fans: boolean; misters: boolean; lights: boolean; co2: boolean };
+  states: {
+    fanIn: boolean;
+    fanOut: boolean;
+    fans: boolean;
+    misters: boolean;
+    lights: boolean;
+    valve: boolean;
+    co2: boolean;
+  };
   reasons: {
     fans?: string;
+    fanIn?: string;
+    fanOut?: string;
     misters?: string;
     lights?: string;
+    valve?: string;
     co2?: string;
     mistersBlocked?: string;
   };
@@ -165,11 +186,20 @@ export const computeAutoDecision = (
     reasons.lights = `Light ${Math.round(currentLight)} lx is below target ${Math.round(targetLight)} lx`;
   }
 
-  // 6. CO₂ VALVE (Closed during oyster fruiting)
+  // 6. SOLENOID VALVE (Closed during oyster fruiting)
+  const valve = false;
   const co2 = false;
 
   return {
-    states: { fans, misters, lights, co2 },
+    states: {
+      fanIn: fans,
+      fanOut: fans,
+      fans,
+      misters,
+      lights,
+      valve,
+      co2,
+    },
     reasons,
   };
 };

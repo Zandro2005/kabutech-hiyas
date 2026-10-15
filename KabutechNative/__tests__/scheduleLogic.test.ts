@@ -80,8 +80,11 @@ describe('scheduleLogic - computeAutoDecision and explainDeviceActivity', () => 
     const states = computeAutoDevicesState(sensors, setpoints);
     expect(states).toEqual({
       fans: true,
+      fanIn: true,
+      fanOut: true,
       misters: true,
       lights: false,
+      valve: false,
       co2: false,
     });
   });

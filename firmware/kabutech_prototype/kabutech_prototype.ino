@@ -19,7 +19,13 @@
  *    Water Level S → GPIO 7   (signal/analog)
  *    Water Level + → GPIO 8   (power pin — toggled to prevent corrosion)
  *    Water Level - → GND
- 
+ *    ACTUATOR LEDs (PROTOTYPE):
+ *      Air In (Fan In) LED   → GPIO 9  (Long pin/Anode -> 220Ω resistor -> GPIO 9, Short pin/Cathode -> GND)
+ *      Valve LED             → GPIO 10 (Long pin/Anode -> 220Ω resistor -> GPIO 10, Short pin/Cathode -> GND)
+ *      Mister / Fogger LED   → GPIO 11 (Long pin/Anode -> 220Ω resistor -> GPIO 11, Short pin/Cathode -> GND)
+ *      Grow Lights LED       → GPIO 12 (Long pin/Anode -> 220Ω resistor -> GPIO 12, Short pin/Cathode -> GND)
+ *      Air Out (Fan Out) LED → GPIO 13 (⭐ NEW ADDED LED: Anode -> 220Ω -> GPIO 13, Cathode -> GND)
+ * 
  *  LIBRARIES NEEDED (Install via Arduino Library Manager):
  *    1. Firebase ESP Client      (by mobizt)
  *    2. DHT sensor library       (by Adafruit)
@@ -48,8 +54,8 @@
 // ═══════════════════════════════════════════════
 
 // WiFi Credentials
-#define WIFI_SSID       "denden"
-#define WIFI_PASSWORD   "jocsing121415"
+#define WIFI_SSID       "Abad_Fam"
+#define WIFI_PASSWORD   "Connecting123"
 
 // Firebase Project Config
 #define API_KEY         "AIzaSyA3rB7rKIrfdJzCnFdnGvk25n0rd_hHI7M"
@@ -67,11 +73,12 @@
 #define WATER_SIG_PIN   7       // Water level signal (ADC)
 #define WATER_PWR_PIN   8       // Water level power (GPIO to prevent corrosion)
 
-// Actuator LEDs
-#define PIN_FAN_EXHAUST 9
-#define PIN_FAN_INTAKE  10
-#define PIN_MISTER      11
-#define PIN_LIGHT       12
+// Actuator Prototype LEDs / Relays
+#define PIN_FAN_INTAKE  9       // GPIO 9:  Air In / Intake Fan LED (CURRENT HARDWARE)
+#define PIN_VALVE       10      // GPIO 10: Solenoid Valve LED (CURRENT HARDWARE)
+#define PIN_MISTER      11      // GPIO 11: Mister / Fogger LED (CURRENT HARDWARE)
+#define PIN_LIGHT       12      // GPIO 12: Grow Lights LED (CURRENT HARDWARE)
+#define PIN_FAN_EXHAUST 13      // GPIO 13: Air Out / Exhaust Fan LED (⭐ NEW ADDED LED)
 
 // ═══════════════════════════════════════════════
 //  TIMING CONFIG
@@ -160,22 +167,57 @@ void streamCallback(FirebaseStream data) {
   
   if (data.dataType() == "boolean") {
     bool state = data.boolData();
-    if (path == "/fans") digitalWrite(PIN_FAN_EXHAUST, state ? HIGH : LOW);
-    else if (path == "/co2") digitalWrite(PIN_FAN_INTAKE, state ? HIGH : LOW);
-    else if (path == "/misters") digitalWrite(PIN_MISTER, state ? HIGH : LOW);
-    else if (path == "/lights") digitalWrite(PIN_LIGHT, state ? HIGH : LOW);
-    
-    Serial.printf("   [Actuator] %s set to %s\n", path.c_str(), state ? "ON" : "OFF");
+    if (path == "/fanOut" || path == "/fans") {
+      digitalWrite(PIN_FAN_EXHAUST, state ? HIGH : LOW);
+      Serial.printf("   💨 [Actuator] Fan Out (Air Exhaust, GPIO %d) -> %s\n", PIN_FAN_EXHAUST, state ? "ON" : "OFF");
+    }
+    else if (path == "/fanIn") {
+      digitalWrite(PIN_FAN_INTAKE, state ? HIGH : LOW);
+      Serial.printf("   🌀 [Actuator] Fan In (Air Intake, GPIO %d) -> %s\n", PIN_FAN_INTAKE, state ? "ON" : "OFF");
+    }
+    else if (path == "/misters") {
+      digitalWrite(PIN_MISTER, state ? HIGH : LOW);
+      Serial.printf("   💧 [Actuator] Mister (GPIO %d) -> %s\n", PIN_MISTER, state ? "ON" : "OFF");
+    }
+    else if (path == "/lights") {
+      digitalWrite(PIN_LIGHT, state ? HIGH : LOW);
+      Serial.printf("   💡 [Actuator] Lights (GPIO %d) -> %s\n", PIN_LIGHT, state ? "ON" : "OFF");
+    }
+    else if (path == "/valve" || path == "/co2") {
+      digitalWrite(PIN_VALVE, state ? HIGH : LOW);
+      Serial.printf("   🚰 [Actuator] Valve (GPIO %d) -> %s\n", PIN_VALVE, state ? "ON" : "OFF");
+    }
   } 
   else if (data.dataType() == "json") {
     // When the whole devices object is updated
     FirebaseJson *json = data.jsonObjectPtr();
     FirebaseJsonData result;
     
-    if (json->get(result, "fans")) digitalWrite(PIN_FAN_EXHAUST, result.to<bool>() ? HIGH : LOW);
-    if (json->get(result, "co2")) digitalWrite(PIN_FAN_INTAKE, result.to<bool>() ? HIGH : LOW);
-    if (json->get(result, "misters")) digitalWrite(PIN_MISTER, result.to<bool>() ? HIGH : LOW);
-    if (json->get(result, "lights")) digitalWrite(PIN_LIGHT, result.to<bool>() ? HIGH : LOW);
+    if (json->get(result, "fanOut") || json->get(result, "fans")) {
+      bool st = result.to<bool>();
+      digitalWrite(PIN_FAN_EXHAUST, st ? HIGH : LOW);
+      Serial.printf("   💨 [Actuator] Initial Fan Out (GPIO %d): %s\n", PIN_FAN_EXHAUST, st ? "ON" : "OFF");
+    }
+    if (json->get(result, "fanIn")) {
+      bool st = result.to<bool>();
+      digitalWrite(PIN_FAN_INTAKE, st ? HIGH : LOW);
+      Serial.printf("   🌀 [Actuator] Initial Fan In (GPIO %d): %s\n", PIN_FAN_INTAKE, st ? "ON" : "OFF");
+    }
+    if (json->get(result, "misters")) {
+      bool st = result.to<bool>();
+      digitalWrite(PIN_MISTER, st ? HIGH : LOW);
+      Serial.printf("   💧 [Actuator] Initial Mister (GPIO %d): %s\n", PIN_MISTER, st ? "ON" : "OFF");
+    }
+    if (json->get(result, "lights")) {
+      bool st = result.to<bool>();
+      digitalWrite(PIN_LIGHT, st ? HIGH : LOW);
+      Serial.printf("   💡 [Actuator] Initial Lights (GPIO %d): %s\n", PIN_LIGHT, st ? "ON" : "OFF");
+    }
+    if (json->get(result, "valve") || json->get(result, "co2")) {
+      bool st = result.to<bool>();
+      digitalWrite(PIN_VALVE, st ? HIGH : LOW);
+      Serial.printf("   🚰 [Actuator] Initial Valve (GPIO %d): %s\n", PIN_VALVE, st ? "ON" : "OFF");
+    }
     
     Serial.println("   [Actuator] Initial states loaded from Firebase.");
   }
@@ -217,12 +259,14 @@ void setup() {
   pinMode(PIN_FAN_INTAKE, OUTPUT);
   pinMode(PIN_MISTER, OUTPUT);
   pinMode(PIN_LIGHT, OUTPUT);
+  pinMode(PIN_VALVE, OUTPUT);
   
   // Start with LEDs off
   digitalWrite(PIN_FAN_EXHAUST, LOW);
   digitalWrite(PIN_FAN_INTAKE, LOW);
   digitalWrite(PIN_MISTER, LOW);
   digitalWrite(PIN_LIGHT, LOW);
+  digitalWrite(PIN_VALVE, LOW);
   
   // ADC resolution (ESP32-S3 supports 12-bit)
   analogReadResolution(12);

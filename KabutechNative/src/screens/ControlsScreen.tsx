@@ -21,10 +21,21 @@ import { useTabBarScroll } from '../context/TabBarContext';
 
 type TabId = 'temp' | 'hum' | 'light' | 'co2';
 
-const DEFAULT_DEVICES: { fans: boolean; misters: boolean; lights: boolean; co2: boolean } = {
+const DEFAULT_DEVICES: {
+  fanIn: boolean;
+  fanOut: boolean;
+  fans: boolean;
+  misters: boolean;
+  lights: boolean;
+  valve: boolean;
+  co2: boolean;
+} = {
+  fanIn: false,
+  fanOut: false,
   fans: false,
   misters: false,
   lights: false,
+  valve: false,
   co2: false,
 };
 
@@ -115,9 +126,12 @@ export default function ControlsScreen() {
     isAuto,
     settings?.schedules,
     settings?.setpoints?.mode,
+    rawDevices.fanIn,
+    rawDevices.fanOut,
     rawDevices.fans,
     rawDevices.misters,
     rawDevices.lights,
+    rawDevices.valve,
     rawDevices.co2,
     sensors?.temperature,
     sensors?.humidity,
@@ -130,6 +144,14 @@ export default function ControlsScreen() {
   const updateSetpoint = (key: string, value: number, label?: string, unit?: string) => {
     if (isOffline) {
       showToast({ type: 'info', text1: 'Controller Offline', text2: 'Target setpoints cannot be adjusted while offline.' });
+      return;
+    }
+    if (activeTabDataRef.current?.isDisconnected) {
+      showToast({
+        type: 'error',
+        text1: 'Sensor at Fault',
+        text2: `Cannot adjust target while the ${label || 'sensor'} is at fault.`,
+      });
       return;
     }
     showToast({ type: 'success', text1: `${label || 'Target'} updated to ${value}${unit || ''}` });
@@ -152,15 +174,19 @@ export default function ControlsScreen() {
     if (isLocked) return;
     hapticMedium();
 
-    const previousState = devices[key as keyof typeof devices];
+    const previousState = Boolean(devices[key as keyof typeof devices]);
 
     if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
       UIManager.setLayoutAnimationEnabledExperimental(true);
     }
     LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
 
-    // ⚡ 0ms Optimistic UI update for instant touch response
-    setDevices(prev => ({ ...prev, [key]: state }));
+    // ⚡ 0ms Optimistic UI update with legacy key mirroring
+    const updatePayload: Record<string, boolean> = { [key]: state };
+    if (key === 'fanOut') updatePayload.fans = state;
+    if (key === 'valve') updatePayload.co2 = state;
+
+    setDevices(prev => ({ ...prev, ...updatePayload }));
 
     const startTime = Date.now();
     let delayTimer: ReturnType<typeof setTimeout> | null = null;
@@ -175,30 +201,38 @@ export default function ControlsScreen() {
       });
     }, 2500);
 
+    const deviceLabel =
+      key === 'fanIn' ? 'Fan In' :
+      key === 'fanOut' ? 'Fan Out' :
+      key === 'misters' ? 'Mister' :
+      key === 'lights' ? 'Grow Lights' :
+      'Valve';
+
     try {
-      await update(ref(db, `kabutech/settings/setpoints/devices`), {
-        [key]: state
-      });
+      await update(ref(db, `kabutech/settings/setpoints/devices`), updatePayload);
       if (delayTimer) clearTimeout(delayTimer);
 
       const elapsed = Date.now() - startTime;
       if (elapsed > 2500) {
         showToast({
           type: 'success',
-          text1: `${key.charAt(0).toUpperCase() + key.slice(1)} turned ${state ? 'ON' : 'OFF'} (${(elapsed / 1000).toFixed(1)}s)`,
+          text1: `${deviceLabel} turned ${state ? 'ON' : 'OFF'} (${(elapsed / 1000).toFixed(1)}s)`,
           text2: 'Delivered after network delay.',
         });
       } else {
-        showToast({ type: 'success', text1: `${key.charAt(0).toUpperCase() + key.slice(1)} turned ${state ? 'ON' : 'OFF'}` });
+        showToast({ type: 'success', text1: `${deviceLabel} turned ${state ? 'ON' : 'OFF'}` });
       }
     } catch (err: any) {
       if (delayTimer) clearTimeout(delayTimer);
       // Revert if network error
-      setDevices(prev => ({ ...prev, [key]: previousState }));
+      const revertPayload: Record<string, boolean> = { [key]: previousState };
+      if (key === 'fanOut') revertPayload.fans = previousState;
+      if (key === 'valve') revertPayload.co2 = previousState;
+      setDevices(prev => ({ ...prev, ...revertPayload }));
       showToast({
         type: 'error',
         text1: 'Command Timed Out / Failed',
-        text2: `Failed to turn ${state ? 'ON' : 'OFF'} ${key}. Check ESP32 power and Wi-Fi connection.`,
+        text2: `Failed to turn ${state ? 'ON' : 'OFF'} ${deviceLabel}. Check ESP32 power and Wi-Fi connection.`,
         duration: 5000,
       });
     }
@@ -208,7 +242,15 @@ export default function ControlsScreen() {
     if (isLocked) return;
     hapticMedium();
     LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
-    const desired = { fans: false, misters: false, lights: false, co2: false };
+    const desired = {
+      fanIn: false,
+      fanOut: false,
+      fans: false,
+      misters: false,
+      lights: false,
+      valve: false,
+      co2: false,
+    };
     setDevices(desired);
     try {
       await update(ref(db, 'kabutech/settings/setpoints/devices'), desired);
@@ -219,7 +261,7 @@ export default function ControlsScreen() {
   };
 
   const executeSetMode = (mode: 'auto' | 'manual' | 'scheduled') => {
-    let nextDevices = settings?.setpoints?.devices || { fans: false, misters: false, lights: false, co2: false };
+    let nextDevices = settings?.setpoints?.devices || DEFAULT_DEVICES;
     if (mode === 'scheduled') {
       nextDevices = computeScheduledDevicesState(settings?.schedules);
     } else if (mode === 'auto') {
@@ -326,6 +368,9 @@ export default function ControlsScreen() {
   const activeTabDataRef = useRef(activeTabData);
   activeTabDataRef.current = activeTabData;
 
+  const isCurrentSensorFault = Boolean(activeTabData.isDisconnected);
+  const isTargetAdjustmentDisabled = isOffline || isCurrentSensorFault;
+
   const [localTarget, setLocalTarget] = useState<number>(activeTabData.target);
   const localTargetRef = useRef<number>(activeTabData.target);
   localTargetRef.current = localTarget;
@@ -366,6 +411,7 @@ export default function ControlsScreen() {
   // Commit target to Firebase only when user finishes interacting (touch released)
   const commitTarget = (val: number) => {
     isInteractingRef.current = false;
+    if (isOffline || activeTabDataRef.current?.isDisconnected) return;
     pendingTargetRef.current = val;
     const dbKey = activeTabDataRef.current.dbKey;
     const label = activeTabDataRef.current.label;
@@ -403,6 +449,14 @@ export default function ControlsScreen() {
       showToast({ type: 'info', text1: 'Controller Offline', text2: 'Target setpoints cannot be adjusted while offline.' });
       return;
     }
+    if (activeTabDataRef.current?.isDisconnected) {
+      showToast({
+        type: 'error',
+        text1: 'Sensor at Fault',
+        text2: `Cannot adjust target while the ${activeTabDataRef.current.label} sensor is at fault.`,
+      });
+      return;
+    }
     stopTimer();
     isInteractingRef.current = true;
     hapticSelection();
@@ -427,6 +481,14 @@ export default function ControlsScreen() {
   const startDecrement = () => {
     if (isOffline) {
       showToast({ type: 'info', text1: 'Controller Offline', text2: 'Target setpoints cannot be adjusted while offline.' });
+      return;
+    }
+    if (activeTabDataRef.current?.isDisconnected) {
+      showToast({
+        type: 'error',
+        text1: 'Sensor at Fault',
+        text2: `Cannot adjust target while the ${activeTabDataRef.current.label} sensor is at fault.`,
+      });
       return;
     }
     stopTimer();
@@ -456,68 +518,49 @@ export default function ControlsScreen() {
     };
   }, []);
 
-  const activeDeviceCount = Object.values(devices).filter(Boolean).length;
+  const activeDeviceCount = [
+    Boolean(devices.fanIn),
+    Boolean(devices.fanOut ?? devices.fans),
+    Boolean(devices.misters),
+    Boolean(devices.lights),
+    Boolean(devices.valve ?? devices.co2),
+  ].filter(Boolean).length;
 
-  const deviceToggles = [
+  const actuatorDevices = [
     {
-      key: 'fans',
-      name: 'Ventilation',
-      tag: 'FANS',
-      roleHint: 'Airflow',
-      subtitle: 'Exhaust & Circulation',
-      icon: 'fan' as const,
-      active: Boolean(devices.fans),
-      color: '#10b981',
-      activeStatus: 'Active Flow',
-      inactiveStatus: 'Standby',
-      activeBg: 'bg-emerald-500/15 dark:bg-emerald-500/25',
-      activeBorder: 'border-emerald-500/50 dark:border-emerald-500/40',
-      activeGlow: 'bg-emerald-500',
+      key: 'fanIn',
+      name: 'Fan In',
+      roleHint: 'Air Intake',
+      icon: 'fan-chevron-down' as const,
+      active: Boolean(devices.fanIn),
+    },
+    {
+      key: 'fanOut',
+      name: 'Fan Out',
+      roleHint: 'Air Exhaust',
+      icon: 'fan-chevron-up' as const,
+      active: Boolean(devices.fanOut ?? devices.fans),
     },
     {
       key: 'misters',
-      name: 'Humidifier',
-      tag: 'MIST',
-      roleHint: 'Fogger',
-      subtitle: 'Ultrasonic Fogger',
+      name: 'Mister',
+      roleHint: 'Humidity',
       icon: 'water-percent' as const,
       active: Boolean(devices.misters),
-      color: '#10b981',
-      activeStatus: 'Misting Active',
-      inactiveStatus: 'Standby',
-      activeBg: 'bg-emerald-500/15 dark:bg-emerald-500/25',
-      activeBorder: 'border-emerald-500/50 dark:border-emerald-500/40',
-      activeGlow: 'bg-emerald-500',
     },
     {
       key: 'lights',
-      name: 'Grow Lights',
-      tag: 'LIGHTS',
-      roleHint: 'LED Array',
-      subtitle: 'Full Spectrum Array',
+      name: 'Lights',
+      roleHint: 'Lighting',
       icon: 'lightbulb-on' as const,
       active: Boolean(devices.lights),
-      color: '#10b981',
-      activeStatus: 'Illuminating',
-      inactiveStatus: 'Dark Cycle',
-      activeBg: 'bg-emerald-500/15 dark:bg-emerald-500/25',
-      activeBorder: 'border-emerald-500/50 dark:border-emerald-500/40',
-      activeGlow: 'bg-emerald-500',
     },
     {
-      key: 'co2',
-      name: 'CO2 Gas Valve',
-      tag: 'VALVE',
-      roleHint: 'Gas Flow',
-      subtitle: 'Aeration Solenoid',
-      icon: 'molecule-co2' as const,
-      active: Boolean(devices.co2),
-      color: '#10b981',
-      activeStatus: 'Valve Open',
-      inactiveStatus: 'Sealed',
-      activeBg: 'bg-emerald-500/15 dark:bg-emerald-500/25',
-      activeBorder: 'border-emerald-500/50 dark:border-emerald-500/40',
-      activeGlow: 'bg-emerald-500',
+      key: 'valve',
+      name: 'Valve',
+      roleHint: 'Solenoid',
+      icon: 'valve' as const,
+      active: Boolean(devices.valve ?? devices.co2),
     },
   ];
 
@@ -554,6 +597,9 @@ export default function ControlsScreen() {
           >
             {tabs.map((tab) => {
               const isActive = activeTab === tab.id;
+              const isTabFault = tab.isDisconnected;
+              const tabColor = isTabFault ? (isDarkMode ? '#64748b' : '#94a3b8') : tab.color;
+
               return (
                 <TouchableOpacity 
                   activeOpacity={0.75}
@@ -570,22 +616,28 @@ export default function ControlsScreen() {
                   style={[
                     tw`px-3.5 py-2.5 rounded-2xl border flex-row items-center gap-2.5 shadow-sm`,
                     isActive 
-                      ? [tw`bg-white dark:bg-slate-800`, { borderColor: tab.color, borderWidth: 1.5 }] 
-                      : tw`bg-white dark:bg-slate-900 border-slate-200/70 dark:border-slate-800`
+                      ? [tw`bg-white dark:bg-slate-800`, { borderColor: tabColor, borderWidth: 1.5 }] 
+                      : tw`bg-white dark:bg-slate-900 border-slate-200/70 dark:border-slate-800`,
+                    isTabFault && !isActive ? tw`opacity-70` : null,
                   ]}
                 >
-                  <View style={[tw`w-8 h-8 rounded-xl items-center justify-center`, { backgroundColor: `${tab.color}18` }]}>
+                  <View style={[tw`w-8 h-8 rounded-xl items-center justify-center`, { backgroundColor: isTabFault ? (isDarkMode ? '#334155' : '#f1f5f9') : `${tab.color}18` }]}>
                     <MaterialCommunityIcons 
                       name={tab.icon as any} 
                       size={18} 
-                      color={tab.color} 
+                      color={tabColor} 
                     />
                   </View>
                   <View>
-                    <Text style={[tw`text-[10px] uppercase tracking-wider text-slate-400 dark:text-slate-500`, { fontFamily: 'PlusJakartaSans_700Bold' }]}>
-                      {tab.label}
-                    </Text>
-                    <Text style={[tw`text-[13px] ${isActive ? 'text-slate-900 dark:text-white' : 'text-slate-700 dark:text-slate-300'}`, { fontFamily: 'PlusJakartaSans_800ExtraBold' }]}>
+                    <View style={tw`flex-row items-center gap-1`}>
+                      <Text style={[tw`text-[10px] uppercase tracking-wider text-slate-400 dark:text-slate-500`, { fontFamily: 'PlusJakartaSans_700Bold' }]}>
+                        {tab.label}
+                      </Text>
+                      {isTabFault && (
+                        <View style={tw`w-1.5 h-1.5 rounded-full bg-rose-500`} />
+                      )}
+                    </View>
+                    <Text style={[tw`text-[13px]`, isTabFault ? tw`text-slate-400 dark:text-slate-500` : (isActive ? tw`text-slate-900 dark:text-white` : tw`text-slate-700 dark:text-slate-300`), { fontFamily: 'PlusJakartaSans_800ExtraBold' }]}>
                       {isActive ? localTarget : tab.target}{tab.unit}
                     </Text>
                   </View>
@@ -659,19 +711,30 @@ export default function ControlsScreen() {
           activeTabData={activeTabData} 
           isDarkMode={isDarkMode} 
           isOffline={isOffline}
+          onDisabledPress={() => {
+            if (isOffline) {
+              showToast({ type: 'info', text1: 'Controller Offline', text2: 'Target setpoints cannot be adjusted while offline.' });
+            } else if (isCurrentSensorFault) {
+              showToast({
+                type: 'error',
+                text1: 'Sensor at Fault',
+                text2: `Cannot adjust target while the ${activeTabData.label} sensor is at fault.`,
+              });
+            }
+          }}
           onValueChange={(val) => {
-            if (isOffline) return;
+            if (isTargetAdjustmentDisabled) return;
             isInteractingRef.current = true;
             localTargetRef.current = val;
             setLocalTarget(val);
           }}
           onSlidingStart={() => {
-            if (isOffline) return;
+            if (isTargetAdjustmentDisabled) return;
             isInteractingRef.current = true;
             setIsSliding(true);
           }}
           onSlidingComplete={(val) => {
-            if (isOffline) return;
+            if (isTargetAdjustmentDisabled) return;
             setIsSliding(false);
             commitTarget(val);
           }}
@@ -685,13 +748,25 @@ export default function ControlsScreen() {
           {/* Decrement Button */}
           <TouchableOpacity 
             hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
-            activeOpacity={0.7}
-            disabled={isOffline}
+            activeOpacity={isTargetAdjustmentDisabled ? 0.9 : 0.7}
             onPressIn={startDecrement}
             onPressOut={stopTimer}
+            onPress={() => {
+              if (isTargetAdjustmentDisabled) {
+                if (isOffline) {
+                  showToast({ type: 'info', text1: 'Controller Offline', text2: 'Target setpoints cannot be adjusted while offline.' });
+                } else if (isCurrentSensorFault) {
+                  showToast({
+                    type: 'error',
+                    text1: 'Sensor at Fault',
+                    text2: `Cannot adjust target while the ${activeTabData.label} sensor is at fault.`,
+                  });
+                }
+              }
+            }}
             style={[
               tw`w-11 h-11 rounded-2xl border border-slate-200/80 dark:border-slate-700 items-center justify-center bg-white dark:bg-slate-800 shadow-sm`,
-              isOffline && tw`opacity-40`,
+              isTargetAdjustmentDisabled && tw`opacity-40`,
             ]}
           >
             <MaterialCommunityIcons name="minus" size={22} color={isDarkMode ? '#cbd5e1' : '#475569'} />
@@ -742,13 +817,25 @@ export default function ControlsScreen() {
           {/* Increment Button */}
           <TouchableOpacity 
             hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
-            activeOpacity={0.7}
-            disabled={isOffline}
+            activeOpacity={isTargetAdjustmentDisabled ? 0.9 : 0.7}
             onPressIn={startIncrement}
             onPressOut={stopTimer}
+            onPress={() => {
+              if (isTargetAdjustmentDisabled) {
+                if (isOffline) {
+                  showToast({ type: 'info', text1: 'Controller Offline', text2: 'Target setpoints cannot be adjusted while offline.' });
+                } else if (isCurrentSensorFault) {
+                  showToast({
+                    type: 'error',
+                    text1: 'Sensor at Fault',
+                    text2: `Cannot adjust target while the ${activeTabData.label} sensor is at fault.`,
+                  });
+                }
+              }
+            }}
             style={[
               tw`w-11 h-11 rounded-2xl border border-slate-200/80 dark:border-slate-700 items-center justify-center bg-white dark:bg-slate-800 shadow-sm`,
-              isOffline && tw`opacity-40`,
+              isTargetAdjustmentDisabled && tw`opacity-40`,
             ]}
           >
             <MaterialCommunityIcons name="plus" size={22} color={isDarkMode ? '#cbd5e1' : '#475569'} />
@@ -866,26 +953,23 @@ export default function ControlsScreen() {
             </View>
           </View>
 
-          {/* Hardware Actuators Minimal Switches (Single Line Layout) */}
-          <View style={tw`flex-row justify-between gap-1.5 mb-2`}>
-            {deviceToggles.map((device) => {
+          {/* Hardware Actuators Console (Minimal Single-Row Dock) */}
+          <View
+            style={[
+              tw`bg-white dark:bg-slate-900 rounded-2xl p-1.5 border border-slate-200/80 dark:border-slate-800 shadow-sm flex-row items-center justify-between mb-2`,
+              { overflow: 'hidden' },
+              isOffline ? tw`opacity-50` : null,
+            ]}
+          >
+            {actuatorDevices.map((device) => {
               const showActive = device.active;
               const isHighlightActive = showActive && !isLocked;
               const isAutoActive = showActive && isLocked;
 
-              const label =
-                device.key === 'fans'
-                  ? 'Fans'
-                  : device.key === 'misters'
-                  ? 'Mist'
-                  : device.key === 'lights'
-                  ? 'Lights'
-                  : 'CO₂';
-
               return (
                 <TouchableOpacity
                   key={device.key}
-                  activeOpacity={isOffline ? 1 : 0.85}
+                  activeOpacity={isOffline ? 1 : 0.7}
                   disabled={isOffline}
                   onPress={() => {
                     if (isOffline) {
@@ -909,67 +993,78 @@ export default function ControlsScreen() {
                     toggleDevice(device.key, !showActive);
                   }}
                   style={[
-                    tw`flex-1 rounded-2xl py-2 px-1 items-center justify-between border bg-white dark:bg-slate-900 shadow-sm`,
-                    { height: 58 },
-                    isOffline
-                      ? tw`opacity-50 border-slate-200/60 dark:border-slate-800`
-                      : isHighlightActive
-                      ? tw`border-emerald-500 dark:border-emerald-500`
+                    tw`flex-1 items-center justify-center py-2 px-0.5 rounded-xl`,
+                    isHighlightActive
+                      ? (isDarkMode ? tw`bg-emerald-500/15` : tw`bg-emerald-50`)
                       : isAutoActive
-                      ? tw`border-emerald-500/60 dark:border-emerald-500/50`
-                      : tw`border-slate-200/80 dark:border-slate-800`,
+                      ? (isDarkMode ? tw`bg-slate-800/80` : tw`bg-slate-100/80`)
+                      : null,
                   ]}
                 >
-                  {/* Top: Icon + Label */}
-                  <View style={tw`flex-row items-center gap-1`}>
+                  {/* Icon with Glowing Tactile LED Status Dot */}
+                  <View style={tw`relative items-center justify-center`}>
                     <MaterialCommunityIcons
                       name={device.icon}
-                      size={13}
-                      color={isOffline ? (isDarkMode ? '#64748b' : '#94a3b8') : showActive ? '#10b981' : isDarkMode ? '#64748b' : '#94a3b8'}
-                    />
-                    <Text
-                      numberOfLines={1}
-                      style={[
-                        tw`text-[10px]`,
-                        { fontFamily: 'PlusJakartaSans_700Bold' },
+                      size={19}
+                      color={
                         isOffline
-                          ? (isDarkMode ? tw`text-slate-500` : tw`text-slate-400`)
-                          : showActive
-                          ? (isDarkMode ? tw`text-white` : tw`text-slate-900`)
-                          : (isDarkMode ? tw`text-slate-400` : tw`text-slate-600`),
-                      ]}
-                    >
-                      {label}
-                    </Text>
-                  </View>
-
-                  {/* Bottom: Tactile Switch (Solid Pill Track + Solid White Thumb) */}
-                  <View
-                    style={[
-                      tw`w-8.5 h-4.5 rounded-full px-0.5 justify-center`,
-                      isOffline
-                        ? (isDarkMode ? tw`bg-slate-800 items-start` : tw`bg-slate-200 items-start`)
-                        : showActive
-                        ? tw`bg-emerald-500 items-end`
-                        : isDarkMode
-                        ? tw`bg-slate-700 items-start`
-                        : tw`bg-slate-200 items-start`,
-                    ]}
-                  >
+                          ? (isDarkMode ? '#64748b' : '#94a3b8')
+                          : isHighlightActive
+                          ? '#059669'
+                          : isAutoActive
+                          ? (isDarkMode ? '#34d399' : '#059669')
+                          : (isDarkMode ? '#64748b' : '#94a3b8')
+                      }
+                    />
+                    {/* Minimal LED Indicator Dot */}
                     <View
                       style={[
-                        tw`w-3.5 h-3.5 rounded-full`,
-                        isOffline ? (isDarkMode ? tw`bg-slate-600` : tw`bg-slate-400`) : tw`bg-white`,
+                        tw`absolute -top-1 -right-1.5 w-2 h-2 rounded-full border border-white dark:border-slate-900`,
                         {
-                          shadowColor: '#000',
-                          shadowOffset: { width: 0, height: 1 },
-                          shadowOpacity: isOffline ? 0 : 0.2,
-                          shadowRadius: 1,
-                          elevation: isOffline ? 0 : 2,
+                          backgroundColor: isOffline
+                            ? (isDarkMode ? '#475569' : '#cbd5e1')
+                            : showActive
+                            ? (isDarkMode ? '#34d399' : '#10b981')
+                            : (isDarkMode ? '#475569' : '#cbd5e1'),
                         },
                       ]}
                     />
                   </View>
+
+                  {/* Actuator Name */}
+                  <Text
+                    numberOfLines={1}
+                    style={[
+                      tw`text-[10px] mt-1 text-center`,
+                      { fontFamily: 'PlusJakartaSans_700Bold' },
+                      isOffline
+                        ? (isDarkMode ? tw`text-slate-500` : tw`text-slate-400`)
+                        : isHighlightActive
+                        ? (isDarkMode ? tw`text-white` : tw`text-slate-900`)
+                        : isAutoActive
+                        ? (isDarkMode ? tw`text-slate-300` : tw`text-slate-700`)
+                        : (isDarkMode ? tw`text-slate-400` : tw`text-slate-600`),
+                    ]}
+                  >
+                    {device.name}
+                  </Text>
+
+                  {/* Micro-State: ON / OFF with Dot Status */}
+                  <Text
+                    style={[
+                      tw`text-[8.5px] uppercase tracking-wider mt-0.5`,
+                      { fontFamily: 'PlusJakartaSans_800ExtraBold' },
+                      isOffline
+                        ? tw`text-slate-400 dark:text-slate-600`
+                        : isHighlightActive
+                        ? (isDarkMode ? tw`text-emerald-400` : tw`text-emerald-600`)
+                        : isAutoActive
+                        ? (isDarkMode ? tw`text-slate-400` : tw`text-slate-500`)
+                        : tw`text-slate-400 dark:text-slate-500`,
+                    ]}
+                  >
+                    {showActive ? 'ON' : 'OFF'}
+                  </Text>
                 </TouchableOpacity>
               );
             })}

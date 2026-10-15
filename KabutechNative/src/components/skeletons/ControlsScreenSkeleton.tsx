@@ -76,18 +76,18 @@ export default function ControlsScreenSkeleton() {
           <Skeleton width={64} height={18} borderRadius={9} />
         </View>
 
-        {/* Single Line Actuator Switches Skeleton */}
-        <View style={tw`flex-row justify-between gap-1.5`}>
-          {[0, 1, 2, 3].map((idx) => (
-            <View
-              key={idx}
-              style={[
-                tw`flex-1 bg-white dark:bg-slate-900 rounded-2xl py-2 px-1 items-center justify-between border border-slate-200/70 dark:border-slate-800 shadow-sm`,
-                { height: 58 },
-              ]}
-            >
-              <Skeleton width={38} height={12} borderRadius={4} />
-              <Skeleton width={28} height={18} borderRadius={9} />
+        {/* Single-Row 5-Actuator Console Skeleton */}
+        <View
+          style={[
+            tw`bg-white dark:bg-slate-900 rounded-2xl p-1.5 border border-slate-200/70 dark:border-slate-800 shadow-sm flex-row items-center justify-between mb-2`,
+            { height: 58 },
+          ]}
+        >
+          {[0, 1, 2, 3, 4].map((idx) => (
+            <View key={idx} style={tw`flex-1 items-center justify-center py-1 gap-1`}>
+              <Skeleton width={20} height={20} borderRadius={10} />
+              <Skeleton width={36} height={10} borderRadius={3} />
+              <Skeleton width={22} height={8} borderRadius={2} />
             </View>
           ))}
         </View>

@@ -53,7 +53,7 @@ export default React.memo(function DeviceQuickControls({
     { key: 'fans' as const, label: 'Fans', active: fansActive, icon: 'fan' as const },
     { key: 'misters' as const, label: 'Mister', active: misterActive, icon: 'water' as const },
     { key: 'lights' as const, label: 'Lights', active: lightActive, icon: 'lightbulb-on' as const },
-    { key: 'co2' as const, label: 'Valve', active: valveActive, icon: 'weather-windy' as const },
+    { key: 'co2' as const, label: 'Valve', active: valveActive, icon: 'valve' as const },
   ];
 
   return (

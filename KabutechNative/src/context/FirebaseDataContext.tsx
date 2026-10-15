@@ -22,7 +22,15 @@ const defaultSettings: SettingsData = {
     light: 400,
     co2: 800,
     mode: 'auto',
-    devices: { fans: false, misters: false, lights: false, co2: false }
+    devices: {
+      fanIn: false,
+      fanOut: false,
+      fans: false,
+      misters: false,
+      lights: false,
+      valve: false,
+      co2: false,
+    }
   }
 };
 
@@ -189,19 +197,30 @@ export const FirebaseDataProvider: React.FC<{ children: React.ReactNode }> = ({ 
     if (mode !== 'auto' && mode !== 'scheduled') return;
 
     const syncActuators = () => {
-      const currentDevices = settings?.setpoints?.devices || { fans: false, misters: false, lights: false, co2: false };
+      const currentDevices = settings?.setpoints?.devices || {
+        fanIn: false,
+        fanOut: false,
+        fans: false,
+        misters: false,
+        lights: false,
+        valve: false,
+        co2: false,
+      };
       let desiredDevices = { ...currentDevices };
 
       if (mode === 'scheduled') {
-        desiredDevices = computeScheduledDevicesState(settings?.schedules);
+        desiredDevices = { ...desiredDevices, ...computeScheduledDevicesState(settings?.schedules) };
       } else if (mode === 'auto') {
-        desiredDevices = computeAutoDevicesState(sensors, settings?.setpoints);
+        desiredDevices = { ...desiredDevices, ...computeAutoDevicesState(sensors, settings?.setpoints) };
       }
 
       const changed =
+        desiredDevices.fanIn !== currentDevices.fanIn ||
+        desiredDevices.fanOut !== currentDevices.fanOut ||
         desiredDevices.fans !== currentDevices.fans ||
         desiredDevices.misters !== currentDevices.misters ||
         desiredDevices.lights !== currentDevices.lights ||
+        desiredDevices.valve !== currentDevices.valve ||
         desiredDevices.co2 !== currentDevices.co2;
 
       if (changed) {

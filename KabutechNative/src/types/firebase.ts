@@ -16,10 +16,13 @@ export interface SensorData {
 }
 
 export interface DeviceStates {
-  fans: boolean;
-  misters: boolean;
-  lights: boolean;
-  co2: boolean;
+  fanIn?: boolean;
+  fanOut?: boolean;
+  fans?: boolean;
+  misters?: boolean;
+  lights?: boolean;
+  valve?: boolean;
+  co2?: boolean;
 }
 
 export interface Setpoints {

@@ -24,6 +24,7 @@ interface Props {
   onValueChange?: (value: number) => void;
   onSlidingStart?: () => void;
   onSlidingComplete?: (value: number) => void;
+  onDisabledPress?: () => void;
 }
 
 export default function CircularSlider({
@@ -34,10 +35,18 @@ export default function CircularSlider({
   onValueChange,
   onSlidingStart,
   onSlidingComplete,
+  onDisabledPress,
 }: Props) {
   const { isSmallDevice, isLargeDevice } = useResponsive();
 
-  const dialColor = isOffline
+  const isDisconnected = Boolean(
+    activeTabData.isDisconnected ||
+    activeTabData.current === '--' ||
+    activeTabData.current === -999
+  );
+  const isDialDisabled = isOffline || isDisconnected;
+
+  const dialColor = isDialDisabled
     ? (isDarkMode ? '#64748b' : '#94a3b8')
     : activeTabData.color;
 
@@ -60,7 +69,6 @@ export default function CircularSlider({
   const thumbX = size / 2 + radius * Math.cos(thumbAngle);
   const thumbY = size / 2 + radius * Math.sin(thumbAngle);
 
-  const isDisconnected = activeTabData.isDisconnected || activeTabData.current === '--' || activeTabData.current === -999;
   const numCurrent = typeof activeTabData.current === 'number' ? activeTabData.current : parseFloat(String(activeTabData.current));
   const diff = !isDisconnected && !isNaN(numCurrent) ? Number((numCurrent - localTarget).toFixed(1)) : 0;
   const isNearTarget = !isDisconnected && Math.abs(diff) <= 0.5;
@@ -71,12 +79,15 @@ export default function CircularSlider({
 
   // Passive Orbiting Rotation Animation
   const rotateAnim = useRef(new Animated.Value(0)).current;
+  const lastDisabledToastRef = useRef<number>(0);
   const propsRef = useRef({
     activeTabData,
     onValueChange,
     onSlidingStart,
     onSlidingComplete,
     isOffline,
+    isDialDisabled,
+    onDisabledPress,
   });
   propsRef.current = {
     activeTabData,
@@ -84,6 +95,8 @@ export default function CircularSlider({
     onSlidingStart,
     onSlidingComplete,
     isOffline,
+    isDialDisabled,
+    onDisabledPress,
   };
 
   const isInteractingWithDial = useRef(false);
@@ -119,6 +132,7 @@ export default function CircularSlider({
   });
 
   const processAngle = (curX: number, curY: number, isInitialTouch: boolean = false) => {
+    if (propsRef.current.isDialDisabled) return;
     const currentTab = propsRef.current.activeTabData;
     const onValChange = propsRef.current.onValueChange;
     const dx = curX - size / 2;
@@ -181,7 +195,19 @@ export default function CircularSlider({
   const panResponder = useRef(
     PanResponder.create({
       onStartShouldSetPanResponder: (evt) => {
-        if (propsRef.current.isOffline) return false;
+        if (propsRef.current.isDialDisabled) {
+          const dx = evt.nativeEvent.locationX - size / 2;
+          const dy = evt.nativeEvent.locationY - size / 2;
+          const dist = Math.sqrt(dx * dx + dy * dy);
+          if (Math.abs(dist - radius) <= 28) {
+            const now = Date.now();
+            if (now - lastDisabledToastRef.current > 1500) {
+              lastDisabledToastRef.current = now;
+              propsRef.current.onDisabledPress?.();
+            }
+          }
+          return false;
+        }
         const dx = evt.nativeEvent.locationX - size / 2;
         const dy = evt.nativeEvent.locationY - size / 2;
         const dist = Math.sqrt(dx * dx + dy * dy);
@@ -189,7 +215,7 @@ export default function CircularSlider({
         return Math.abs(dist - radius) <= 24;
       },
       onMoveShouldSetPanResponder: (evt, gestureState) => {
-        if (propsRef.current.isOffline) return false;
+        if (propsRef.current.isDialDisabled) return false;
         if (isInteractingWithDial.current) return true;
         const dx = evt.nativeEvent.locationX - size / 2;
         const dy = evt.nativeEvent.locationY - size / 2;
@@ -197,7 +223,7 @@ export default function CircularSlider({
         return Math.abs(dist - radius) <= 24 && (Math.abs(gestureState.dx) > 6 || Math.abs(gestureState.dy) > 6);
       },
       onPanResponderGrant: (evt) => {
-        if (propsRef.current.isOffline) return;
+        if (propsRef.current.isDialDisabled) return;
         isInteractingWithDial.current = true;
         setIsDragging(true);
         propsRef.current.onSlidingStart?.();
@@ -207,7 +233,7 @@ export default function CircularSlider({
         processAngle(startX, startY, true);
       },
       onPanResponderMove: (_, gestureState) => {
-        if (propsRef.current.isOffline || !isInteractingWithDial.current) return;
+        if (propsRef.current.isDialDisabled || !isInteractingWithDial.current) return;
         const curX = touchStartRef.current.x + gestureState.dx;
         const curY = touchStartRef.current.y + gestureState.dy;
         processAngle(curX, curY, false);
@@ -245,7 +271,7 @@ export default function CircularSlider({
         ]}
       >
         {/* 1. Steady Subtle Ambient Glow (Constant, Non-Blinking) */}
-        {!isOffline && (
+        {!isDialDisabled && (
           <View
             pointerEvents="none"
             style={[
@@ -265,7 +291,7 @@ export default function CircularSlider({
         )}
 
         {/* 2. Rotating Dashed Orbit Line */}
-        {!isOffline && (
+        {!isDialDisabled && (
           <Animated.View
             style={[
               tw`absolute`,
@@ -303,9 +329,9 @@ export default function CircularSlider({
               backgroundColor: isDarkMode ? '#0f172a' : '#ffffff',
               shadowColor: dialColor,
               shadowOffset: { width: 0, height: 8 },
-              shadowOpacity: isOffline ? 0.05 : isDarkMode ? 0.25 : 0.12,
+              shadowOpacity: isDialDisabled ? 0.05 : isDarkMode ? 0.25 : 0.12,
               shadowRadius: 20,
-              elevation: isOffline ? 2 : 6,
+              elevation: isDialDisabled ? 2 : 6,
             },
           ]}
         />
@@ -314,7 +340,7 @@ export default function CircularSlider({
           <Defs>
             <SvgGradient id="dialGrad" x1="0%" y1="0%" x2="100%" y2="100%">
               <Stop offset="0%" stopColor={dialColor} stopOpacity="1" />
-              <Stop offset="100%" stopColor={dialColor} stopOpacity={isOffline ? '0.85' : '0.7'} />
+              <Stop offset="100%" stopColor={dialColor} stopOpacity={isDialDisabled ? '0.85' : '0.7'} />
             </SvgGradient>
           </Defs>
 
@@ -366,12 +392,12 @@ export default function CircularSlider({
               height: knobSize,
               backgroundColor: dialColor,
               borderWidth: 2.5,
-              borderColor: isOffline ? (isDarkMode ? '#334155' : '#cbd5e1') : '#ffffff',
+              borderColor: isDialDisabled ? (isDarkMode ? '#334155' : '#cbd5e1') : '#ffffff',
               shadowColor: dialColor,
               shadowOffset: { width: 0, height: 2 },
-              shadowOpacity: isOffline ? 0 : 0.65,
+              shadowOpacity: isDialDisabled ? 0 : 0.65,
               shadowRadius: isDragging ? 6 : 4,
-              elevation: isOffline ? 0 : 7,
+              elevation: isDialDisabled ? 0 : 7,
             },
           ]}
         />
@@ -389,14 +415,14 @@ export default function CircularSlider({
         >
           {/* Top Mini Tag: TARGET SETTING */}
           <View style={tw`flex-row items-center gap-1.5 mb-1`}>
-            <View style={[tw`w-1.5 h-1.5 rounded-full`, { backgroundColor: isOffline ? (isDarkMode ? '#64748b' : '#94a3b8') : activeTabData.color }]} />
+            <View style={[tw`w-1.5 h-1.5 rounded-full`, { backgroundColor: isDialDisabled ? (isDarkMode ? '#64748b' : '#94a3b8') : activeTabData.color }]} />
             <Text
               style={[
                 tw`text-[10px] sm:text-[11px] text-slate-400 dark:text-slate-500 uppercase tracking-widest`,
                 { fontFamily: 'PlusJakartaSans_800ExtraBold' },
               ]}
             >
-              {isOffline ? 'CONTROLLER OFFLINE' : 'TARGET SETPOINT'}
+              {isDisconnected ? 'SENSOR AT FAULT' : isOffline ? 'CONTROLLER OFFLINE' : 'TARGET SETPOINT'}
             </Text>
           </View>
 
@@ -404,7 +430,7 @@ export default function CircularSlider({
           <View style={tw`flex-row items-baseline justify-center`}>
             <Text
               style={[
-                isOffline ? tw`text-slate-400 dark:text-slate-500` : tw`text-slate-900 dark:text-white`,
+                isDialDisabled ? tw`text-slate-400 dark:text-slate-500` : tw`text-slate-900 dark:text-white`,
                 {
                   fontSize: valueFontSize,
                   fontFamily: 'PlusJakartaSans_800ExtraBold',
@@ -433,7 +459,19 @@ export default function CircularSlider({
           <View
             style={tw`mt-1.5 sm:mt-2 flex-row items-center gap-1.5 bg-slate-100/90 dark:bg-slate-800/80 px-3 py-1 sm:px-3.5 sm:py-1.2 rounded-full border border-slate-200/60 dark:border-slate-700/60`}
           >
-            {isOffline ? (
+            {isDisconnected ? (
+              <View style={tw`flex-row items-center gap-1.5`}>
+                <View style={tw`w-1.5 h-1.5 rounded-full bg-slate-400 dark:bg-slate-500`} />
+                <Text
+                  style={[
+                    tw`text-[11px] sm:text-[12px] text-slate-500 dark:text-slate-400`,
+                    { fontFamily: 'PlusJakartaSans_700Bold' },
+                  ]}
+                >
+                  Sensor at Fault
+                </Text>
+              </View>
+            ) : isOffline ? (
               <View style={tw`flex-row items-center gap-1.5`}>
                 <View style={tw`w-1.5 h-1.5 rounded-full bg-slate-400 dark:bg-slate-500`} />
                 <Text
@@ -443,18 +481,6 @@ export default function CircularSlider({
                   ]}
                 >
                   Offline (Read-Only)
-                </Text>
-              </View>
-            ) : isDisconnected ? (
-              <View style={tw`flex-row items-center gap-1.5`}>
-                <View style={tw`w-1.5 h-1.5 rounded-full bg-rose-500`} />
-                <Text
-                  style={[
-                    tw`text-[11px] sm:text-[12px] text-rose-600 dark:text-rose-400`,
-                    { fontFamily: 'PlusJakartaSans_700Bold' },
-                  ]}
-                >
-                  Sensor Not Connected
                 </Text>
               </View>
             ) : (

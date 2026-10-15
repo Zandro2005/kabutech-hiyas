@@ -47,19 +47,11 @@ export default React.memo(function EnvironmentMetricsGrid({ temp, hum, light, co
   // Status helper with clean minimal badges
   const getBadgeStyle = (paramEval: ParamEvaluation, fallbackColor: string) => {
     if (paramEval.state === 'fault') {
-      if (isControllerOff) {
-        return {
-          label: 'Offline',
-          dotColor: '#94a3b8',
-          badgeBg: isDarkMode ? 'rgba(148, 163, 184, 0.12)' : '#f1f5f9',
-          badgeText: isDarkMode ? '#94a3b8' : '#64748b',
-        };
-      }
       return {
         label: 'Fault',
-        dotColor: '#f59e0b',
-        badgeBg: isDarkMode ? 'rgba(245, 158, 11, 0.12)' : '#fffbeb',
-        badgeText: isDarkMode ? '#fbbf24' : '#b45309',
+        dotColor: isDarkMode ? '#94a3b8' : '#64748b',
+        badgeBg: isDarkMode ? 'rgba(148, 163, 184, 0.12)' : '#f1f5f9',
+        badgeText: isDarkMode ? '#94a3b8' : '#64748b',
       };
     }
     if (paramEval.state === 'in_range') {
@@ -109,8 +101,8 @@ export default React.memo(function EnvironmentMetricsGrid({ temp, hum, light, co
       name: 'Temperature',
       eval: tempEval,
       status: getBadgeStyle(tempEval, TEMP_COLOR),
-      icon: (isTempFault ? (isControllerOff ? 'cloud-off-outline' : 'alert-circle-outline') : 'thermometer') as any,
-      iconColor: isTempFault ? '#94a3b8' : TEMP_COLOR,
+      icon: (isTempFault ? 'alert-circle-outline' : 'thermometer') as any,
+      iconColor: isTempFault ? (isDarkMode ? '#64748b' : '#94a3b8') : TEMP_COLOR,
       iconBgColor: isTempFault
         ? (isDarkMode ? 'rgba(148, 163, 184, 0.1)' : '#f1f5f9')
         : (isDarkMode ? 'rgba(249, 115, 22, 0.16)' : '#fff7ed'),
@@ -123,8 +115,8 @@ export default React.memo(function EnvironmentMetricsGrid({ temp, hum, light, co
       name: 'Humidity',
       eval: humEval,
       status: getBadgeStyle(humEval, HUM_COLOR),
-      icon: (isHumFault ? (isControllerOff ? 'cloud-off-outline' : 'alert-circle-outline') : 'water-percent') as any,
-      iconColor: isHumFault ? '#94a3b8' : HUM_COLOR,
+      icon: (isHumFault ? 'alert-circle-outline' : 'water-percent') as any,
+      iconColor: isHumFault ? (isDarkMode ? '#64748b' : '#94a3b8') : HUM_COLOR,
       iconBgColor: isHumFault
         ? (isDarkMode ? 'rgba(148, 163, 184, 0.1)' : '#f1f5f9')
         : (isDarkMode ? 'rgba(14, 165, 233, 0.16)' : '#f0f9ff'),
@@ -137,8 +129,8 @@ export default React.memo(function EnvironmentMetricsGrid({ temp, hum, light, co
       name: 'Light Level',
       eval: lightEval,
       status: getBadgeStyle(lightEval, LIGHT_COLOR),
-      icon: (isLightFault ? (isControllerOff ? 'cloud-off-outline' : 'alert-circle-outline') : 'white-balance-sunny') as any,
-      iconColor: isLightFault ? '#94a3b8' : LIGHT_COLOR,
+      icon: (isLightFault ? 'alert-circle-outline' : 'white-balance-sunny') as any,
+      iconColor: isLightFault ? (isDarkMode ? '#64748b' : '#94a3b8') : LIGHT_COLOR,
       iconBgColor: isLightFault
         ? (isDarkMode ? 'rgba(148, 163, 184, 0.1)' : '#f1f5f9')
         : (isDarkMode ? 'rgba(245, 158, 11, 0.16)' : '#fffbeb'),
@@ -151,8 +143,8 @@ export default React.memo(function EnvironmentMetricsGrid({ temp, hum, light, co
       name: 'CO2 Level',
       eval: co2Eval,
       status: getBadgeStyle(co2Eval, CO2_COLOR),
-      icon: (isCo2Fault ? (isControllerOff ? 'cloud-off-outline' : 'alert-circle-outline') : 'molecule-co2') as any,
-      iconColor: isCo2Fault ? '#94a3b8' : CO2_COLOR,
+      icon: (isCo2Fault ? 'alert-circle-outline' : 'molecule-co2') as any,
+      iconColor: isCo2Fault ? (isDarkMode ? '#64748b' : '#94a3b8') : CO2_COLOR,
       iconBgColor: isCo2Fault
         ? (isDarkMode ? 'rgba(148, 163, 184, 0.1)' : '#f1f5f9')
         : (isDarkMode ? 'rgba(16, 185, 129, 0.16)' : '#ecfdf5'),
@@ -191,7 +183,7 @@ export default React.memo(function EnvironmentMetricsGrid({ temp, hum, light, co
                 }
               ]}
             >
-              {activeCount === 4 ? 'Live' : (activeCount === 0 ? 'Offline' : `${activeCount}/4`)}
+              {activeCount === 4 ? 'Live' : `${activeCount}/4 Active`}
             </Text>
           </View>
         </View>
@@ -222,11 +214,8 @@ export default React.memo(function EnvironmentMetricsGrid({ temp, hum, light, co
               activeOpacity={isStaff ? 1 : 0.78}
               onPress={() => handleCardPress(item.id)}
               style={[
-                tw`rounded-[24px] p-4 border justify-between bg-white dark:bg-slate-900 ${
-                  isItemFault 
-                    ? (isControllerOff ? 'border-slate-200/70 dark:border-slate-800' : 'border-amber-300/60 dark:border-amber-800/60')
-                    : 'border-slate-200/70 dark:border-slate-800'
-                }`,
+                tw`rounded-[24px] p-4 border justify-between bg-white dark:bg-slate-900 border-slate-200/70 dark:border-slate-800`,
+                isItemFault && tw`opacity-80`,
                 { 
                   width: '48.5%', 
                   minHeight: isSmallDevice ? 128 : 138,
@@ -287,7 +276,7 @@ export default React.memo(function EnvironmentMetricsGrid({ temp, hum, light, co
                   <View style={tw`flex-row items-baseline`}>
                     <Text 
                       style={[
-                        tw`${isItemFault ? (isControllerOff ? 'text-slate-400 dark:text-slate-500' : 'text-amber-600 dark:text-amber-400') : 'text-slate-900 dark:text-white'}`, 
+                        tw`${isItemFault ? 'text-slate-400 dark:text-slate-500' : 'text-slate-900 dark:text-white'}`, 
                         { 
                           fontSize: isSmallDevice ? 26 : 29, 
                           fontFamily: 'PlusJakartaSans_800ExtraBold', 
@@ -299,8 +288,8 @@ export default React.memo(function EnvironmentMetricsGrid({ temp, hum, light, co
                       {item.eval.formattedValue}
                     </Text>
                     {isItemFault ? (
-                      <Text style={[tw`text-[11px] ml-1.5`, { color: isControllerOff ? '#94a3b8' : '#ea580c', fontFamily: 'PlusJakartaSans_700Bold' }]}>
-                        {isControllerOff ? 'Off' : 'Fault'}
+                      <Text style={[tw`text-[11px] ml-1.5 text-slate-400 dark:text-slate-500`, { fontFamily: 'PlusJakartaSans_700Bold' }]}>
+                        Fault
                       </Text>
                     ) : (
                       <Text style={[tw`text-xs text-slate-400 dark:text-slate-500 ml-1.5`, { fontFamily: 'PlusJakartaSans_700Bold' }]}>
@@ -329,8 +318,8 @@ export default React.memo(function EnvironmentMetricsGrid({ temp, hum, light, co
                     style={[
                       tw`h-full rounded-full`, 
                       { 
-                        width: `${item.percent}%`, 
-                        backgroundColor: item.accentColor 
+                        width: isItemFault ? '0%' : `${item.percent}%`, 
+                        backgroundColor: isItemFault ? (isDarkMode ? '#334155' : '#cbd5e1') : item.accentColor 
                       }
                     ]} 
                   />

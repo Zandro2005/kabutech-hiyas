@@ -791,11 +791,11 @@ def build_schematic_svg():
     <text x="{TB_X+25}" y="{TB_Y+290}" class="text-pin-name">GPIO 1  &#8594; Shared I2C SDA (SCD41, SHT31, BH1750, OLED)</text>
     <text x="{TB_X+25}" y="{TB_Y+312}" class="text-pin-name">GPIO 2  &#8594; Shared I2C SCL (SCD41, SHT31, BH1750, OLED)</text>
 
-    <text x="{TB_X+530}" y="{TB_Y+180}" class="text-pin-name">GPIO 9  &#8594; Relay 1 / D1 LED: Exhaust Fan (12V DC)</text>
-    <text x="{TB_X+530}" y="{TB_Y+202}" class="text-pin-name">GPIO 10 &#8594; Relay 2 / D2 LED: Intake Fan / CO2 Valve</text>
+    <text x="{TB_X+530}" y="{TB_Y+180}" class="text-pin-name">GPIO 9  &#8594; Relay 1 / D1 LED: Intake Fan (Air In)</text>
+    <text x="{TB_X+530}" y="{TB_Y+202}" class="text-pin-name">GPIO 10 &#8594; Relay 2 / D2 LED: Solenoid Valve (12V)</text>
     <text x="{TB_X+530}" y="{TB_Y+224}" class="text-pin-name">GPIO 11 &#8594; Relay 3 / D3 LED: Misting Pump (60W 12V)</text>
     <text x="{TB_X+530}" y="{TB_Y+246}" class="text-pin-name">GPIO 12 &#8594; Relay 4 / D4 LED: Grow Light Strip (12V)</text>
-    <text x="{TB_X+530}" y="{TB_Y+268}" class="text-pin-name">GPIO 13 &#8594; Relay 5 / D5 LED: Solenoid Water Valve (12V NC)</text>
+    <text x="{TB_X+530}" y="{TB_Y+268}" class="text-pin-name">GPIO 13 &#8594; Relay 5 / D5 LED: Exhaust Fan (Air Out)</text>
     <text x="{TB_X+530}" y="{TB_Y+290}" class="text-pin-name">GPIO 14 &#8594; Water Flow Sensor Pulse In (YF-S201 Hall)</text>
     <text x="{TB_X+530}" y="{TB_Y+312}" class="text-pin-name">GPIO 21 &#8594; Capacitive Water Level In (XKC-Y25 Digital)</text>
 
