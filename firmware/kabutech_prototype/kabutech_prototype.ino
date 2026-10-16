@@ -1,48 +1,47 @@
 /*
  * ============================================================
- *  KABUTECH HIYAS — ESP32-S3 Sensor Prototype Firmware
- *  Reads: DHT11, LDR, MQ-135, Water Level Sensor
- *  Pushes to: Firebase Realtime Database
+ *  KABUTECH HIYAS — ESP32-S3 High-Precision Sensor Firmware
+ *  Sensors: SHT3x (Temp/Hum), BH1750 (Lux), SCD41 (True NDIR CO2), Water Level
+ *  Actuators: 5-Channel LED Simulation (Intake, Exhaust, Mister, Light, Valve)
+ *  Communication: I2C Digital Bus (GPIO 4: SDA, GPIO 5: SCL)
+ *  Cloud: Firebase Realtime Database
  * ============================================================
- 
- *  WIRING:
- *    DHT11 DATA    → GPIO 4   (+ 10kΩ pull-up to 3.3V)
- *    DHT11 VCC     → 3.3V
- *    DHT11 GND     → GND
- 
- *    LDR           → GPIO 5   (voltage divider: LDR to 3.3V, 10kΩ to GND, junction → GPIO 5)
  *
- *    MQ-135 AO     → GPIO 6   (analog out)
- *    MQ-135 VCC    → 5V (VIN)
- *    MQ-135 GND    → GND
- 
- *    Water Level S → GPIO 7   (signal/analog)
- *    Water Level + → GPIO 8   (power pin — toggled to prevent corrosion)
- *    Water Level - → GND
- *    ACTUATOR LEDs (PROTOTYPE):
- *      Air In (Fan In) LED   → GPIO 9  (Long pin/Anode -> 220Ω resistor -> GPIO 9, Short pin/Cathode -> GND)
- *      Valve LED             → GPIO 10 (Long pin/Anode -> 220Ω resistor -> GPIO 10, Short pin/Cathode -> GND)
- *      Mister / Fogger LED   → GPIO 11 (Long pin/Anode -> 220Ω resistor -> GPIO 11, Short pin/Cathode -> GND)
- *      Grow Lights LED       → GPIO 12 (Long pin/Anode -> 220Ω resistor -> GPIO 12, Short pin/Cathode -> GND)
- *      Air Out (Fan Out) LED → GPIO 13 (⭐ NEW ADDED LED: Anode -> 220Ω -> GPIO 13, Cathode -> GND)
- * 
- *  LIBRARIES NEEDED (Install via Arduino Library Manager):
- *    1. Firebase ESP Client      (by mobizt)
- *    2. DHT sensor library       (by Adafruit)
- *    3. Adafruit Unified Sensor  (dependency)
- 
- *  BOARD:
- *    ESP32S3 Dev Module (esp32 board package by Espressif)
- 
- *  FIREBASE SETUP:
- *    1. Go to Firebase Console → Authentication → Sign-in method
- *    2. Enable "Anonymous" sign-in
- *    3. That's it — the ESP32 will authenticate anonymously
+ *  I2C SENSOR WIRING (All 3 sensors share the 3.3V power and I2C lines):
+ *    ESP32-S3 3.3V  ──► Breadboard (+) Red Rail ──► SHT3x VIN  + BH1750 VCC  + SCD41 VIN
+ *    ESP32-S3 GND   ──► Breadboard (-) Blue Rail──► SHT3x GND  + BH1750 GND  + SCD41 GND
+ *    ESP32-S3 GPIO 4──► I2C SDA Bus Row         ──► SHT3x SDA  + BH1750 SDA  + SCD41 SDA
+ *    ESP32-S3 GPIO 5──► I2C SCL Bus Row         ──► SHT3x SCL  + BH1750 SCL  + SCD41 SCL
+ *
+ *  WATER LEVEL SENSOR:
+ *    Water Level Signal (S) ──► GPIO 7
+ *    Water Level Power  (+) ──► GPIO 8 (Toggled to eliminate corrosion/electrolysis)
+ *    Water Level Ground (-) ──► GND
+ *
+ *  ACTUATOR LEDs (RETAINED & UNCHANGED):
+ *    Air In (Intake Fan) LED ──► GPIO 9  (Anode -> 220Ω resistor -> GPIO 9, Cathode -> GND)
+ *    Water Valve LED         ──► GPIO 10 (Anode -> 220Ω resistor -> GPIO 10, Cathode -> GND)
+ *    Mister / Fogger LED     ──► GPIO 11 (Anode -> 220Ω resistor -> GPIO 11, Cathode -> GND)
+ *    Grow Lights LED         ──► GPIO 12 (Anode -> 220Ω resistor -> GPIO 12, Cathode -> GND)
+ *    Air Out (Exhaust Fan)LED──► GPIO 13 (Anode -> 220Ω resistor -> GPIO 13, Cathode -> GND)
+ *
+ *  LIBRARIES NEEDED (Install via Arduino IDE Library Manager):
+ *    1. "Firebase ESP Client" by mobizt
+ *    2. "Adafruit SHT31 Library" by Adafruit
+ *    3. "BH1750" by Christopher Laws
+ *    4. "Sensirion I2C SCD4x" by Sensirion
+ *
+ *  BOARD SETTING:
+ *    Board: ESP32S3 Dev Module
+ *    USB CDC On Boot: Enabled
  */
 
 #include <WiFi.h>
+#include <Wire.h>
 #include <Firebase_ESP_Client.h>
-#include <DHT.h>
+#include <Adafruit_SHT31.h>
+#include <BH1750.h>
+#include <SensirionI2cScd4x.h>
 #include <time.h>
 
 // ─── Addons for Firebase token management ───
@@ -65,45 +64,77 @@
 //  PIN DEFINITIONS
 // ═══════════════════════════════════════════════
 
-#define DHT_PIN         4       // DHT11 data pin
-#define DHT_TYPE        DHT11   // Change to DHT22 for final
+// Shared I2C Bus for SHT3x, BH1750, SCD41
+#define I2C_SDA_PIN     4       // GPIO 4: Shared I2C Data
+#define I2C_SCL_PIN     5       // GPIO 5: Shared I2C Clock
 
-#define LDR_PIN         5       // LDR analog input (ADC)
-#define MQ135_PIN       6       // MQ-135 analog output (ADC)
+// Water Level Sensor Pins
 #define WATER_SIG_PIN   7       // Water level signal (ADC)
 #define WATER_PWR_PIN   8       // Water level power (GPIO to prevent corrosion)
 
-// Actuator Prototype LEDs / Relays
-#define PIN_FAN_INTAKE  9       // GPIO 9:  Air In / Intake Fan LED (CURRENT HARDWARE)
-#define PIN_VALVE       10      // GPIO 10: Solenoid Valve LED (CURRENT HARDWARE)
-#define PIN_MISTER      11      // GPIO 11: Mister / Fogger LED (CURRENT HARDWARE)
-#define PIN_LIGHT       12      // GPIO 12: Grow Lights LED (CURRENT HARDWARE)
-#define PIN_FAN_EXHAUST 13      // GPIO 13: Air Out / Exhaust Fan LED (⭐ NEW ADDED LED)
+// Actuator Prototype LEDs / Relays (Retained exactly as before)
+#define PIN_FAN_INTAKE  9       // GPIO 9:  Air In / Intake Fan LED
+#define PIN_VALVE       10      // GPIO 10: Solenoid Valve LED
+#define PIN_MISTER      11      // GPIO 11: Mister / Fogger LED
+#define PIN_LIGHT       12      // GPIO 12: Grow Lights LED
+#define PIN_FAN_EXHAUST 13      // GPIO 13: Air Out / Exhaust Fan LED
 
 // ═══════════════════════════════════════════════
 //  TIMING CONFIG
 // ═══════════════════════════════════════════════
 
-#define SERIAL_PRINT_INTERVAL   1000   // Print to Serial Monitor every 1s (100% local, ZERO delay)
-#define FIREBASE_PUSH_INTERVAL  2000   // Push to cloud every 2s (ultra-fast offline detection & live telemetry)
-#define HEARTBEAT_INTERVAL      15000  // Send "online" heartbeat every 15 seconds
-#define MQ135_WARMUP_MS         10000  // MQ-135 warm-up time (10s)
+#define SERIAL_PRINT_INTERVAL   1000    // Print to Serial Monitor every 1s (100% local, ZERO delay)
+#define FIREBASE_PUSH_INTERVAL  2000    // Push to cloud every 2s (ultra-fast offline detection & live telemetry)
+#define HEARTBEAT_INTERVAL      15000   // Send "online" heartbeat every 15 seconds
 #define HOURLY_PUSH_INTERVAL    3600000 // Hourly history push (1 hour = 3,600,000 ms)
 
 // ═══════════════════════════════════════════════
 //  WATER LEVEL CALIBRATION
-//  Dip sensor in water and note the ADC reading → WATER_WET_VALUE
-//  Hold sensor in air and note the ADC reading   → WATER_DRY_VALUE
 // ═══════════════════════════════════════════════
 
 #define WATER_DRY_VALUE     20      // Typical ADC reading when sensor is completely dry
 #define WATER_WET_VALUE     1500    // Typical ADC reading when sensor is submerged in water
 
 // ═══════════════════════════════════════════════
-//  GLOBAL OBJECTS
+//  GLOBAL SENSOR OBJECTS
 // ═══════════════════════════════════════════════
 
-DHT dht(DHT_PIN, DHT_TYPE);
+Adafruit_SHT31  sht31;
+BH1750          lightMeter;
+SensirionI2cScd4x scd4x;
+
+bool sht31Ready  = false;
+bool bh1750Ready = false;
+bool scd4xReady  = false;
+
+int lastValidCO2 = 420; // Default outdoor clean baseline until first SCD41 read
+
+// ── Sensor Reading Structures ──
+struct SHTReading {
+  float temperature;
+  float humidity;
+  bool valid;
+};
+
+struct LightReading {
+  int lux;
+  bool valid;
+};
+
+struct CO2Reading {
+  int ppm;
+  bool valid;
+};
+
+struct WaterReading {
+  int percent;
+  bool valid;
+};
+
+SHTReading readSHT3x();
+LightReading readBH1750();
+CO2Reading readSCD41();
+WaterReading readWaterLevel();
 
 FirebaseData fbdo;
 FirebaseData streamDO; // For listening to actuator changes
@@ -113,113 +144,122 @@ FirebaseConfig config;
 unsigned long lastSerialPrint  = 0;
 unsigned long lastFirebasePush = 0;
 unsigned long lastHeartbeat    = 0;
-unsigned long bootTime         = 0;
-bool firebaseReady             = false;
-bool mq135WarmedUp             = false;
-
-// ── Hourly History Logging & 90-Day Pruning ──
 unsigned long lastHourlyPush   = 0;
-int lastLoggedHour             = -1;
-int lastPrunedDay              = -1;
-bool initialHistoryLogged      = false;
-double hourlyTempSum           = 0.0;
-double hourlyHumSum            = 0.0;
-double hourlyLightSum          = 0.0;
-double hourlyCO2Sum            = 0.0;
-unsigned long hourlyDHTCount   = 0;
+unsigned long bootTime         = 0;
+
+bool firebaseReady = false;
+
+// Live cached telemetry values
+float currentTemp  = -999.0;
+float currentHum   = -999.0;
+int   currentLight = -999;
+int   currentCO2   = -999;
+int   currentWater = -999;
+
+// Fault flags
+bool shtFault   = true;
+bool lightFault = true;
+bool co2Fault   = true;
+bool waterFault = true;
+
+// Debouncing streaks (2 consecutive reads to latch/clear fault)
+#define STREAK_TO_LATCH_FAULT 2
+#define STREAK_TO_CLEAR_FAULT 2
+
+int shtFailStreak = 0,   shtValidStreak = 0;
+int lightFailStreak = 0, lightValidStreak = 0;
+int co2FailStreak = 0,   co2ValidStreak = 0;
+int waterFailStreak = 0, waterValidStreak = 0;
+
+// Hourly history accumulators
+double hourlyTempSum   = 0.0;
+double hourlyHumSum    = 0.0;
+double hourlyLightSum  = 0.0;
+double hourlyCO2Sum    = 0.0;
+unsigned long hourlySHTCount   = 0;
 unsigned long hourlyLightCount = 0;
 unsigned long hourlyCO2Count   = 0;
-
-// Live readings & health flags (-999 indicates disconnected/error)
-float currentTemp   = -999.0;
-float currentHum    = -999.0;
-int currentLight    = -999;
-int currentCO2      = -999;
-int currentWater    = -999;
-
-bool dhtFault       = false;
-bool lightFault     = false;
-bool co2Fault       = false;
-bool waterFault     = false;
-
-// Hysteresis & Debouncing:
-// Requires 2 consecutive valid reads to clear a fault,
-// and 2 consecutive failed reads to latch a fault.
-// This completely eliminates fluctuating "connected/not connected" false alarms from single dropped bits,
-// while latching faults within 2 seconds when unplugged.
-int dhtValidStreak   = 0;
-int dhtFailStreak    = 0;
-int lightValidStreak = 0;
-int lightFailStreak  = 0;
-int co2ValidStreak   = 0;
-int co2FailStreak    = 0;
-int waterValidStreak = 0;
-int waterFailStreak  = 0;
-const int STREAK_TO_CLEAR_FAULT = 2;
-const int STREAK_TO_LATCH_FAULT = 2;
+int lastLoggedHour = -1;
+int lastPrunedDay  = -1;
+bool initialHistoryLogged = false;
 
 // ═══════════════════════════════════════════════
-//  FIREBASE STREAM CALLBACKS
+//  FIREBASE STREAM CALLBACKS (ACTUATOR CONTROL)
 // ═══════════════════════════════════════════════
 
 void streamCallback(FirebaseStream data) {
   String path = data.dataPath();
-  
-  if (data.dataType() == "boolean") {
-    bool state = data.boolData();
-    if (path == "/fanOut" || path == "/fans") {
-      digitalWrite(PIN_FAN_EXHAUST, state ? HIGH : LOW);
-      Serial.printf("   💨 [Actuator] Fan Out (Air Exhaust, GPIO %d) -> %s\n", PIN_FAN_EXHAUST, state ? "ON" : "OFF");
-    }
-    else if (path == "/fanIn") {
-      digitalWrite(PIN_FAN_INTAKE, state ? HIGH : LOW);
-      Serial.printf("   🌀 [Actuator] Fan In (Air Intake, GPIO %d) -> %s\n", PIN_FAN_INTAKE, state ? "ON" : "OFF");
-    }
-    else if (path == "/misters") {
-      digitalWrite(PIN_MISTER, state ? HIGH : LOW);
-      Serial.printf("   💧 [Actuator] Mister (GPIO %d) -> %s\n", PIN_MISTER, state ? "ON" : "OFF");
-    }
-    else if (path == "/lights") {
-      digitalWrite(PIN_LIGHT, state ? HIGH : LOW);
-      Serial.printf("   💡 [Actuator] Lights (GPIO %d) -> %s\n", PIN_LIGHT, state ? "ON" : "OFF");
-    }
-    else if (path == "/valve" || path == "/co2") {
-      digitalWrite(PIN_VALVE, state ? HIGH : LOW);
-      Serial.printf("   🚰 [Actuator] Valve (GPIO %d) -> %s\n", PIN_VALVE, state ? "ON" : "OFF");
-    }
-  } 
-  else if (data.dataType() == "json") {
-    // When the whole devices object is updated
+  String type = data.dataType();
+
+  // Handle entire JSON object load on first connection
+  if (path == "/" && type == "json") {
     FirebaseJson *json = data.jsonObjectPtr();
     FirebaseJsonData result;
-    
-    if (json->get(result, "fanOut") || json->get(result, "fans")) {
-      bool st = result.to<bool>();
-      digitalWrite(PIN_FAN_EXHAUST, st ? HIGH : LOW);
-      Serial.printf("   💨 [Actuator] Initial Fan Out (GPIO %d): %s\n", PIN_FAN_EXHAUST, st ? "ON" : "OFF");
+    if (json != nullptr) {
+      if (json->get(result, "fans") || json->get(result, "exhaust") || json->get(result, "fanOut")) {
+        bool st = result.to<bool>();
+        digitalWrite(PIN_FAN_EXHAUST, st ? HIGH : LOW);
+        Serial.printf("   🌀 [Actuator] Initial Exhaust Fan (GPIO %d): %s\n", PIN_FAN_EXHAUST, st ? "ON" : "OFF");
+      }
+      if (json->get(result, "fanIn") || json->get(result, "intake")) {
+        bool st = result.to<bool>();
+        digitalWrite(PIN_FAN_INTAKE, st ? HIGH : LOW);
+        Serial.printf("   🌀 [Actuator] Initial Intake Fan (GPIO %d): %s\n", PIN_FAN_INTAKE, st ? "ON" : "OFF");
+      }
+      if (json->get(result, "misters")) {
+        bool st = result.to<bool>();
+        digitalWrite(PIN_MISTER, st ? HIGH : LOW);
+        Serial.printf("   💧 [Actuator] Initial Mister (GPIO %d): %s\n", PIN_MISTER, st ? "ON" : "OFF");
+      }
+      if (json->get(result, "lights")) {
+        bool st = result.to<bool>();
+        digitalWrite(PIN_LIGHT, st ? HIGH : LOW);
+        Serial.printf("   💡 [Actuator] Initial Lights (GPIO %d): %s\n", PIN_LIGHT, st ? "ON" : "OFF");
+      }
+      if (json->get(result, "valve") || json->get(result, "waterValve") || json->get(result, "co2")) {
+        bool st = result.to<bool>();
+        digitalWrite(PIN_VALVE, st ? HIGH : LOW);
+        Serial.printf("   🚰 [Actuator] Initial Valve (GPIO %d): %s\n", PIN_VALVE, st ? "ON" : "OFF");
+      }
+      Serial.println("   [Actuator] Initial states loaded from Firebase.");
     }
-    if (json->get(result, "fanIn")) {
-      bool st = result.to<bool>();
-      digitalWrite(PIN_FAN_INTAKE, st ? HIGH : LOW);
-      Serial.printf("   🌀 [Actuator] Initial Fan In (GPIO %d): %s\n", PIN_FAN_INTAKE, st ? "ON" : "OFF");
-    }
-    if (json->get(result, "misters")) {
-      bool st = result.to<bool>();
-      digitalWrite(PIN_MISTER, st ? HIGH : LOW);
-      Serial.printf("   💧 [Actuator] Initial Mister (GPIO %d): %s\n", PIN_MISTER, st ? "ON" : "OFF");
-    }
-    if (json->get(result, "lights")) {
-      bool st = result.to<bool>();
-      digitalWrite(PIN_LIGHT, st ? HIGH : LOW);
-      Serial.printf("   💡 [Actuator] Initial Lights (GPIO %d): %s\n", PIN_LIGHT, st ? "ON" : "OFF");
-    }
-    if (json->get(result, "valve") || json->get(result, "co2")) {
-      bool st = result.to<bool>();
-      digitalWrite(PIN_VALVE, st ? HIGH : LOW);
-      Serial.printf("   🚰 [Actuator] Initial Valve (GPIO %d): %s\n", PIN_VALVE, st ? "ON" : "OFF");
-    }
-    
-    Serial.println("   [Actuator] Initial states loaded from Firebase.");
+    return;
+  }
+
+  // Parse state for child property change
+  bool state = false;
+  if (type == "boolean") {
+    state = data.boolData();
+  } else if (type == "string") {
+    state = (data.stringData() == "true" || data.stringData() == "1");
+  } else if (type == "int") {
+    state = (data.intData() > 0);
+  }
+
+  // Fan Exhaust (air out)
+  if (path == "/fans" || path == "/exhaust" || path == "/fanOut") {
+    digitalWrite(PIN_FAN_EXHAUST, state ? HIGH : LOW);
+    Serial.printf("   🌀 [Actuator] Exhaust Fan (GPIO %d) -> %s\n", PIN_FAN_EXHAUST, state ? "ON" : "OFF");
+  }
+  // Fan Intake (air in)
+  else if (path == "/fanIn" || path == "/intake") {
+    digitalWrite(PIN_FAN_INTAKE, state ? HIGH : LOW);
+    Serial.printf("   🌀 [Actuator] Intake Fan (GPIO %d) -> %s\n", PIN_FAN_INTAKE, state ? "ON" : "OFF");
+  }
+  // Mister / Fogger
+  else if (path == "/misters") {
+    digitalWrite(PIN_MISTER, state ? HIGH : LOW);
+    Serial.printf("   💧 [Actuator] Misters (GPIO %d) -> %s\n", PIN_MISTER, state ? "ON" : "OFF");
+  }
+  // Grow Lights
+  else if (path == "/lights") {
+    digitalWrite(PIN_LIGHT, state ? HIGH : LOW);
+    Serial.printf("   💡 [Actuator] Grow Light (GPIO %d) -> %s\n", PIN_LIGHT, state ? "ON" : "OFF");
+  }
+  // Solenoid Valve
+  else if (path == "/valve" || path == "/waterValve" || path == "/co2") {
+    digitalWrite(PIN_VALVE, state ? HIGH : LOW);
+    Serial.printf("   🚰 [Actuator] Solenoid Valve (GPIO %d) -> %s\n", PIN_VALVE, state ? "ON" : "OFF");
   }
 }
 
@@ -234,25 +274,56 @@ void streamTimeoutCallback(bool timeout) {
 void setup() {
   Serial.begin(115200);
 #if defined(ARDUINO_USB_CDC_ON_BOOT) && (ARDUINO_USB_CDC_ON_BOOT != 0)
-  Serial.setTxTimeoutMs(0); // CRITICAL: Never block on Serial when USB cable is disconnected from PC!
+  Serial.setTxTimeoutMs(0); // Never block when disconnected from PC
 #endif
 
-  // Run at 160MHz: Fast hardware TLS/SSL cryptography while maintaining thermal efficiency
-  setCpuFrequencyMhz(160);
+  setCpuFrequencyMhz(160); // 160MHz: Fast cryptography, cool operation
 
   Serial.println();
-  Serial.println("╔══════════════════════════════════════╗");
-  Serial.println("║   KABUTECH HIYAS — Sensor Prototype  ║");
-  Serial.println("╚══════════════════════════════════════╝");
+  Serial.println("╔══════════════════════════════════════════════════╗");
+  Serial.println("║   KABUTECH HIYAS — Digital I2C Sensor Suite      ║");
+  Serial.println("║   SHT3x (Temp/Hum) | BH1750 (Lux) | SCD41 (CO₂)  ║");
+  Serial.println("╚══════════════════════════════════════════════════╝");
   Serial.println();
 
-  // ── Initialize sensor pins ──
-  dht.begin();
-  pinMode(LDR_PIN, INPUT_PULLDOWN);
-  pinMode(MQ135_PIN, INPUT_PULLDOWN);
+  // ── Initialize I2C Bus on GPIO 4 (SDA) and GPIO 5 (SCL) ──
+  Wire.begin(I2C_SDA_PIN, I2C_SCL_PIN);
+  Wire.setClock(100000); // 100 kHz Standard Mode (rock-solid over breadboard/cables)
+
+  // 1. Initialize SHT3x (Default address 0x44, fallback 0x45)
+  if (sht31.begin(0x44)) {
+    Serial.println("✅ SHT3x Temp & Humidity sensor initialized! (I2C: 0x44)");
+    sht31Ready = true;
+  } else if (sht31.begin(0x45)) {
+    Serial.println("✅ SHT3x Temp & Humidity sensor initialized! (I2C: 0x45)");
+    sht31Ready = true;
+  } else {
+    Serial.println("❌ SHT3x sensor NOT detected. Verify SDA=4, SCL=5, 3.3V, GND.");
+  }
+
+  // 2. Initialize BH1750 Light Sensor
+  if (lightMeter.begin(BH1750::CONTINUOUS_HIGH_RES_MODE)) {
+    Serial.println("✅ BH1750 Digital Light sensor initialized! (I2C: 0x23)");
+    bh1750Ready = true;
+  } else {
+    Serial.println("❌ BH1750 light sensor NOT detected. Check wiring.");
+  }
+
+  // 3. Initialize Sensirion SCD41 True NDIR CO₂
+  scd4x.begin(Wire, 0x62);
+  scd4x.stopPeriodicMeasurement(); // Clean previous state
+  uint16_t scdErr = scd4x.startPeriodicMeasurement(); // Starts 5-second sampling
+  if (scdErr) {
+    Serial.printf("❌ SCD41 CO₂ sensor error starting periodic measurement: %u\n", scdErr);
+  } else {
+    Serial.println("✅ Sensirion SCD41 True NDIR CO₂ sensor initialized!");
+    scd4xReady = true;
+  }
+
+  // ── Initialize Water Level Sensor pins ──
   pinMode(WATER_SIG_PIN, INPUT_PULLDOWN);
   pinMode(WATER_PWR_PIN, OUTPUT);
-  digitalWrite(WATER_PWR_PIN, LOW);  // Keep water sensor powered off by default
+  digitalWrite(WATER_PWR_PIN, LOW); // Off by default to prevent electrolysis
   
   // ── Initialize Actuator LEDs ──
   pinMode(PIN_FAN_EXHAUST, OUTPUT);
@@ -268,7 +339,7 @@ void setup() {
   digitalWrite(PIN_LIGHT, LOW);
   digitalWrite(PIN_VALVE, LOW);
   
-  // ADC resolution (ESP32-S3 supports 12-bit)
+  // ADC resolution for water sensor (12-bit: 0-4095)
   analogReadResolution(12);
 
   // ── Connect to WiFi ──
@@ -287,16 +358,14 @@ void setup() {
     Serial.println();
     Serial.print("✅ WiFi connected! IP: ");
     Serial.println(WiFi.localIP());
-    // Keep WiFi active (disable modem sleep) to maintain persistent Firebase RTDB TLS stream without dropping packets
-    WiFi.setSleep(false);
+    WiFi.setSleep(false); // Maintain persistent TLS stream without dropping packets
 
-    // Sync NTP Time (UTC+8 for Philippines: 8 * 3600 = 28800s offset, 0 daylight savings)
+    // Sync NTP Time (UTC+8 for Philippines: 8 * 3600 = 28800s offset)
     configTime(8 * 3600, 0, "pool.ntp.org", "time.nist.gov");
     Serial.println("⏰ NTP time sync configured (UTC+8 Philippine Standard Time)");
   } else {
     Serial.println();
-    Serial.println("❌ WiFi connection FAILED. Check SSID/password.");
-    Serial.println("   Continuing in offline mode (Serial Monitor only)...");
+    Serial.println("❌ WiFi connection FAILED. Operating in local offline mode.");
   }
 
   // ── Configure Firebase ──
@@ -311,191 +380,135 @@ void setup() {
     Serial.printf("❌ Firebase sign-in failed: %s\n", config.signer.signupError.message.c_str());
   }
 
-  // Token status callback
-  config.token_status_callback = tokenStatusCallback;  // from TokenHelper.h
-
-  // Initialize Firebase
+  config.token_status_callback = tokenStatusCallback;
   Firebase.begin(&config, &auth);
   Firebase.reconnectNetwork(true);
 
-  // Allow large payloads
   fbdo.setBSSLBufferSize(4096, 1024);
   streamDO.setBSSLBufferSize(4096, 1024);
 
-  // Start stream for actuator settings
+  // Start stream for remote actuator controls from mobile app
   if (!Firebase.RTDB.beginStream(&streamDO, "/kabutech/settings/setpoints/devices")) {
     Serial.printf("❌ Stream begin error: %s\n", streamDO.errorReason().c_str());
   }
   Firebase.RTDB.setStreamCallback(&streamDO, streamCallback, streamTimeoutCallback);
 
   bootTime = millis();
-
   Serial.println();
-  Serial.println("⏳ Warming up MQ-135 gas sensor...");
-  Serial.print("   (Waiting ");
-  Serial.print(MQ135_WARMUP_MS / 1000);
-  Serial.println(" seconds)");
-  Serial.println();
-  Serial.println("🔄 Sensor readings will start shortly...");
-  Serial.println("────────────────────────────────────────");
+  Serial.println("🚀 System fully initialized! Sampling sensors every 1s...");
+  Serial.println("────────────────────────────────────────────────────────");
 }
 
 // ═══════════════════════════════════════════════
-//  SENSOR READING FUNCTIONS (ACTIVE ANTI-FLOAT & DISCONNECT DETECTION)
+//  SENSOR READING FUNCTIONS
 // ═══════════════════════════════════════════════
 
-// ── Active Dynamic Impedance Interrogation (Definitive Disconnect & Anti-Float Detection) ──
-// Returns the valid ADC reading (0–4095) if a real sensor is connected, or -999 if unplugged/open.
-// Uses active charge injection to test if a physical low-impedance sensor is connected.
-// An unplugged/floating pin has zero restoring force: when driven LOW it stays near 0, and
-// when driven HIGH it stays near 4095. The delta |sampleHigh - sampleLow| is massive (> 350 counts).
-// A real sensor has low source impedance and instantly restores its voltage (< 250 counts delta).
-int probeAnalogPin(int pin) {
-  // Step 1: Force discharge pin to 0V (GND)
-  pinMode(pin, OUTPUT);
-  digitalWrite(pin, LOW);
-  delayMicroseconds(100);
-
-  // Step 2: Release to high-impedance INPUT
-  pinMode(pin, INPUT);
-  delay(3); // 3ms settle time: allows real sensor with 1k-50k ohm to recharge/drive the wire
-  int sampleLow = analogRead(pin);
-
-  // Step 3: Force charge pin to 3.3V (VCC)
-  pinMode(pin, OUTPUT);
-  digitalWrite(pin, HIGH);
-  delayMicroseconds(100);
-
-  // Step 4: Release to high-impedance INPUT
-  pinMode(pin, INPUT);
-  delay(3); // 3ms settle time: allows real sensor to pull back down to its actual voltage
-  int sampleHigh = analogRead(pin);
-
-  // Return pin to clean INPUT
-  pinMode(pin, INPUT);
-
-  // EVALUATION:
-  // - Open / Unplugged Wire:
-  //   Has no restoring impedance. After being forced LOW it stays near 0 (sampleLow < 350).
-  //   After being forced HIGH it stays near 4095 (sampleHigh > 3500).
-  //   The difference |sampleHigh - sampleLow| is HUGE (typically > 1500 counts).
-  //
-  // - Connected Sensor:
-  //   The sensor drives the line continuously back to its analog voltage.
-  //   Both sampleLow and sampleHigh settle to the same sensor voltage (|sampleHigh - sampleLow| < 250 counts).
-  int diff = abs(sampleHigh - sampleLow);
-
-  if (diff > 350 || (sampleHigh > 3800 && sampleLow < 300)) {
-    // Definitive open circuit / unplugged wire!
-    return -999;
+// ── Read SHT3x: Temperature (°C) and Humidity (% RH) ──
+SHTReading readSHT3x() {
+  SHTReading r;
+  if (!sht31Ready) {
+    // Attempt auto-recovery
+    if (sht31.begin(0x44) || sht31.begin(0x45)) {
+      sht31Ready = true;
+    } else {
+      r.temperature = -999.0;
+      r.humidity    = -999.0;
+      r.valid       = false;
+      return r;
+    }
   }
 
-  // Real physical sensor connected: return average of settled samples
-  return (sampleLow + sampleHigh) / 2;
-}
+  float t = sht31.readTemperature();
+  float h = sht31.readHumidity();
 
-// ── Read DHT11: Temperature (°C) and Humidity (%) ──
-struct DHTReading {
-  float temperature;
-  float humidity;
-  bool valid;
-};
-
-DHTReading readDHT();
-
-DHTReading readDHT() {
-  DHTReading r;
-  pinMode(DHT_PIN, INPUT_PULLUP);
-  r.humidity = dht.readHumidity(false);
-  r.temperature = dht.readTemperature(false);  // Celsius
-
-  // Plausibility check: In Philippine ambient / mushroom chamber, 
-  // valid range is 12°C - 55°C and 15% - 99.5%. Floating / unplugged pins return NaN, 0, or corrupt numbers.
-  if (isnan(r.humidity) || isnan(r.temperature) || 
-      r.humidity < 15.0 || r.humidity > 99.5 || 
-      r.temperature < 12.0 || r.temperature > 55.0) {
-    r.valid = false;
+  // Validate plausible ranges
+  if (isnan(t) || isnan(h) || t < -20.0 || t > 80.0 || h < 1.0 || h > 100.0) {
     r.temperature = -999.0;
-    r.humidity = -999.0;
+    r.humidity    = -999.0;
+    r.valid       = false;
   } else {
-    r.valid = true;
+    r.temperature = t;
+    r.humidity    = h;
+    r.valid       = true;
   }
   return r;
 }
 
-// ── Read LDR: Light Level (estimated lux) ──
-struct LightReading {
-  int lux;
-  bool valid;
-};
-
-LightReading readLight();
-
-LightReading readLight() {
+// ── Read BH1750: Ambient Light (lux) ──
+LightReading readBH1750() {
   LightReading r;
-  int raw = probeAnalogPin(LDR_PIN);
+  if (!bh1750Ready) {
+    if (lightMeter.begin(BH1750::CONTINUOUS_HIGH_RES_MODE)) {
+      bh1750Ready = true;
+    } else {
+      r.lux   = -999;
+      r.valid = false;
+      return r;
+    }
+  }
 
-  if (raw == -999 || raw < 100) {
-    r.lux = -999;
+  float lux = lightMeter.readLightLevel();
+  if (isnan(lux) || lux < 0.0) {
+    r.lux   = -999;
     r.valid = false;
   } else {
+    r.lux   = (int)constrain(lux, 0.0, 65535.0);
     r.valid = true;
-    int lux = map(raw, 150, 3200, 10, 1000);
-    r.lux = constrain(lux, 10, 1000);
   }
   return r;
 }
 
-// ── Read MQ-135: CO₂ estimate (ppm) ──
-struct CO2Reading {
-  int ppm;
-  bool valid;
-};
-
-CO2Reading readCO2();
-
-CO2Reading readCO2() {
+// ── Read SCD41: True NDIR CO₂ (ppm) ──
+CO2Reading readSCD41() {
   CO2Reading r;
-  int raw = probeAnalogPin(MQ135_PIN);
-
-  if (raw == -999 || raw < 120) {
-    r.ppm = -999;
+  if (!scd4xReady) {
+    r.ppm   = -999;
     r.valid = false;
-  } else {
+    return r;
+  }
+
+  bool isDataReady = false;
+  int16_t error = scd4x.getDataReadyStatus(isDataReady);
+  
+  if (error == 0 && isDataReady) {
+    uint16_t co2 = 0;
+    float temp = 0.0f;
+    float hum = 0.0f;
+    error = scd4x.readMeasurement(co2, temp, hum);
+    
+    if (error == 0 && co2 >= 350 && co2 <= 5000) {
+      r.ppm = (int)co2;
+      r.valid = true;
+      lastValidCO2 = r.ppm;
+      return r;
+    }
+  }
+
+  // If no new sample ready during this 1s tick, reuse last valid reading
+  if (lastValidCO2 > 0) {
+    r.ppm   = lastValidCO2;
     r.valid = true;
-    int ppm = map(raw, 250, 2400, 350, 2200);
-    r.ppm = constrain(ppm, 350, 3000);
+  } else {
+    r.ppm   = -999;
+    r.valid = false;
   }
   return r;
 }
 
-// ── Read Water Level Sensor: Percentage (0–100%) ──
-struct WaterReading {
-  int percent;
-  bool valid;
-};
-
-WaterReading readWaterLevel();
-
+// ── Read Water Level Sensor (Analog or Capacitive Digital) ──
 WaterReading readWaterLevel() {
   WaterReading r;
-  // Power ON the sensor briefly to prevent electrode corrosion
   digitalWrite(WATER_PWR_PIN, HIGH);
   delay(15); // Allow water power trace to stabilize
 
-  int raw = probeAnalogPin(WATER_SIG_PIN);
-
-  // Power OFF immediately
+  int raw = analogRead(WATER_SIG_PIN);
   digitalWrite(WATER_PWR_PIN, LOW);
 
-  if (raw == -999) {
-    r.percent = -999;
-    r.valid = false;
-  } else if (raw < WATER_DRY_VALUE) {
-    r.percent = 0; // Connected, but sensor is dry
-    r.valid = true;
+  if (raw < 10) {
+    r.percent = 0;    // Sensor dry
+    r.valid   = true;
   } else {
-    r.valid = true;
+    r.valid   = true;
     int percent = map(raw, WATER_DRY_VALUE, WATER_WET_VALUE, 0, 100);
     r.percent = constrain(percent, 0, 100);
   }
@@ -507,20 +520,19 @@ WaterReading readWaterLevel() {
 // ═══════════════════════════════════════════════
 
 void pushToFirebase(float temp, float hum, int light, int co2, int waterLevel,
-                    bool dhtErr, bool lightErr, bool co2Err, bool waterErr) {
+                    bool shtErr, bool lightErr, bool co2Err, bool waterErr) {
   if (!Firebase.ready()) {
     Serial.println("   ⏳ Firebase not ready yet...");
     return;
   }
 
   // Strictly push -999 whenever a sensor is faulted or unplugged
-  float sendTemp = dhtErr ? -999.0 : temp;
-  float sendHum  = dhtErr ? -999.0 : hum;
+  float sendTemp = shtErr ? -999.0 : temp;
+  float sendHum  = shtErr ? -999.0 : hum;
   int sendLight  = lightErr ? -999 : light;
   int sendCO2    = co2Err ? -999 : co2;
   int sendWater  = waterErr ? -999 : waterLevel;
 
-  // Build a JSON object with all sensor values
   FirebaseJson json;
   json.set("temperature", sendTemp);
   json.set("humidity", sendHum);
@@ -530,30 +542,27 @@ void pushToFirebase(float temp, float hum, int light, int co2, int waterLevel,
   json.set("esp32_status", "online");
   json.set("chip_temperature", temperatureRead());
 
-  // Granular individual error flags
-  json.set("dht_error", dhtErr);
-  json.set("temp_error", dhtErr);
-  json.set("hum_error", dhtErr);
+  // Error flags (dht_error maintained for mobile app backward-compatibility)
+  json.set("dht_error", shtErr);
+  json.set("temp_error", shtErr);
+  json.set("hum_error", shtErr);
   json.set("light_error", lightErr);
   json.set("co2_error", co2Err);
   json.set("water_error", waterErr);
 
-  // Real-time server timestamp from Firebase
   FirebaseJson ts;
   ts.set(".sv", "timestamp");
   json.set("last_seen", ts);
 
-  // Push all values at once (atomic update)
   if (Firebase.RTDB.updateNode(&fbdo, "/kabutech/sensors/live", &json)) {
     Serial.println("   ☁️  Firebase synced ✓");
   } else {
-    Serial.print("   ❌ Firebase sync error: ");
-    Serial.println(fbdo.errorReason().c_str());
+    Serial.printf("   ❌ Firebase sync error: %s\n", fbdo.errorReason().c_str());
   }
 }
 
 // ═══════════════════════════════════════════════
-//  HEARTBEAT — keep esp32_status "online"
+//  HEARTBEAT — Keep esp32_status "online"
 // ═══════════════════════════════════════════════
 
 void sendHeartbeat() {
@@ -576,9 +585,8 @@ void sendHeartbeat() {
 
 void pruneOldHistory() {
   time_t nowSec = time(NULL);
-  if (nowSec < 1600000000) return; // NTP not synced yet
+  if (nowSec < 1600000000) return;
 
-  // Calculate 90 days ago in seconds (90 days * 24 hrs * 3600 secs)
   time_t ninetyDaysAgo = nowSec - (90L * 24L * 3600L);
   struct tm oldTime;
   localtime_r(&ninetyDaysAgo, &oldTime);
@@ -599,33 +607,26 @@ void pruneOldHistory() {
 void pushHourlyHistory() {
   if (!Firebase.ready()) return;
 
+  time_t nowSec = time(NULL);
   struct tm timeinfo;
-  char dateStr[12] = "unknown";
-  char hourStr[4] = "00";
-  bool timeValid = false;
+  bool timeValid = (getLocalTime(&timeinfo, 100) && timeinfo.tm_year > 120);
 
-  if (getLocalTime(&timeinfo, 100) && timeinfo.tm_year > 120) {
+  char dateStr[12];
+  char hourStr[4];
+  if (timeValid) {
     strftime(dateStr, sizeof(dateStr), "%Y-%m-%d", &timeinfo);
     strftime(hourStr, sizeof(hourStr), "%H", &timeinfo);
-    timeValid = true;
+  } else {
+    snprintf(dateStr, sizeof(dateStr), "offline");
+    snprintf(hourStr, sizeof(hourStr), "%02lu", (millis() / 3600000) % 24);
   }
-
-  if (!timeValid) {
-    Serial.println("   ⚠️ Cannot log hourly history: NTP time not synced yet");
-    return;
-  }
-
-  // Calculate averages; fallback to current live readings if count is zero
-  float avgTemp = hourlyDHTCount > 0 ? (float)(hourlyTempSum / hourlyDHTCount) : currentTemp;
-  float avgHum  = hourlyDHTCount > 0 ? (float)(hourlyHumSum / hourlyDHTCount) : currentHum;
-  int avgLight  = hourlyLightCount > 0 ? (int)(hourlyLightSum / hourlyLightCount) : currentLight;
-  int avgCO2    = hourlyCO2Count > 0 ? (int)(hourlyCO2Sum / hourlyCO2Count) : currentCO2;
-
-  // Round temp and hum to 1 decimal place
-  if (avgTemp != -999.0f) avgTemp = roundf(avgTemp * 10.0f) / 10.0f;
-  if (avgHum != -999.0f)  avgHum  = roundf(avgHum * 10.0f) / 10.0f;
 
   String historyPath = String("/kabutech/sensors/history/") + dateStr + "/" + hourStr;
+
+  float avgTemp  = (hourlySHTCount > 0)   ? (float)(hourlyTempSum / hourlySHTCount) : currentTemp;
+  float avgHum   = (hourlySHTCount > 0)   ? (float)(hourlyHumSum / hourlySHTCount)   : currentHum;
+  int   avgLight = (hourlyLightCount > 0) ? (int)(hourlyLightSum / hourlyLightCount) : currentLight;
+  int   avgCO2   = (hourlyCO2Count > 0)   ? (int)(hourlyCO2Sum / hourlyCO2Count)     : currentCO2;
 
   FirebaseJson historyJson;
   FirebaseJson ts;
@@ -636,8 +637,7 @@ void pushHourlyHistory() {
   historyJson.set("light", avgLight);
   historyJson.set("co2", avgCO2);
 
-  Serial.printf("   📅 Logging hourly history to %s (Samples: DHT=%lu, LDR=%lu, CO2=%lu)...\n",
-                historyPath.c_str(), hourlyDHTCount, hourlyLightCount, hourlyCO2Count);
+  Serial.printf("   📅 Logging hourly history to %s...\n", historyPath.c_str());
 
   if (Firebase.RTDB.updateNode(&fbdo, historyPath.c_str(), &historyJson)) {
     Serial.println("   ✅ Hourly history logged successfully!");
@@ -645,16 +645,15 @@ void pushHourlyHistory() {
     Serial.printf("   ❌ Failed to log hourly history: %s\n", fbdo.errorReason().c_str());
   }
 
-  // Reset accumulator
+  // Reset hourly accumulators
   hourlyTempSum = 0.0;
-  hourlyHumSum = 0.0;
+  hourlyHumSum  = 0.0;
   hourlyLightSum = 0.0;
-  hourlyCO2Sum = 0.0;
-  hourlyDHTCount = 0;
+  hourlyCO2Sum  = 0.0;
+  hourlySHTCount = 0;
   hourlyLightCount = 0;
   hourlyCO2Count = 0;
 
-  // Prune history older than 90 days once daily
   if (timeValid && timeinfo.tm_mday != lastPrunedDay) {
     lastPrunedDay = timeinfo.tm_mday;
     pruneOldHistory();
@@ -668,120 +667,113 @@ void pushHourlyHistory() {
 void loop() {
   unsigned long now = millis();
 
-  // ── Check MQ-135 warm-up status ──
-  if (!mq135WarmedUp && (now - bootTime >= MQ135_WARMUP_MS)) {
-    mq135WarmedUp = true;
-    Serial.println("✅ MQ-135 warm-up complete! CO₂ readings active.");
-  }
-
-  // ── Read sensors and print to Serial Monitor every 1s (LOCAL, ZERO DELAY) ──
+  // ── Read sensors and print to Serial Monitor every 1s ──
   if (now - lastSerialPrint >= SERIAL_PRINT_INTERVAL) {
     lastSerialPrint = now;
 
-    // Read DHT11 with 2-strike Fault Debouncing
-    DHTReading dhtData = readDHT();
-    if (dhtData.valid) {
-      dhtFailStreak = 0;
-      dhtValidStreak++;
-      if (dhtValidStreak >= STREAK_TO_CLEAR_FAULT) {
-        dhtFault = false;
-        currentTemp = dhtData.temperature;
-        currentHum  = dhtData.humidity;
+    // 1. Read SHT3x
+    SHTReading shtData = readSHT3x();
+    if (shtData.valid) {
+      shtFailStreak = 0;
+      shtValidStreak++;
+      if (shtValidStreak >= STREAK_TO_CLEAR_FAULT) {
+        shtFault    = false;
+        currentTemp = shtData.temperature;
+        currentHum  = shtData.humidity;
       }
     } else {
-      dhtValidStreak = 0;
-      dhtFailStreak++;
-      if (dhtFailStreak >= STREAK_TO_LATCH_FAULT) {
-        dhtFault = true;
+      shtValidStreak = 0;
+      shtFailStreak++;
+      if (shtFailStreak >= STREAK_TO_LATCH_FAULT) {
+        shtFault    = true;
         currentTemp = -999.0;
         currentHum  = -999.0;
       }
     }
 
-    // Read LDR with 2-strike Fault Debouncing
-    LightReading lightData = readLight();
+    // 2. Read BH1750
+    LightReading lightData = readBH1750();
     if (lightData.valid) {
       lightFailStreak = 0;
       lightValidStreak++;
       if (lightValidStreak >= STREAK_TO_CLEAR_FAULT) {
-        lightFault = false;
+        lightFault   = false;
         currentLight = lightData.lux;
       }
     } else {
       lightValidStreak = 0;
       lightFailStreak++;
       if (lightFailStreak >= STREAK_TO_LATCH_FAULT) {
-        lightFault = true;
+        lightFault   = true;
         currentLight = -999;
       }
     }
 
-    // Read MQ-135 with 2-strike Fault Debouncing
-    CO2Reading co2Data = readCO2();
+    // 3. Read SCD41
+    CO2Reading co2Data = readSCD41();
     if (co2Data.valid) {
       co2FailStreak = 0;
       co2ValidStreak++;
       if (co2ValidStreak >= STREAK_TO_CLEAR_FAULT) {
-        co2Fault = false;
+        co2Fault   = false;
         currentCO2 = co2Data.ppm;
       }
     } else {
       co2ValidStreak = 0;
       co2FailStreak++;
       if (co2FailStreak >= STREAK_TO_LATCH_FAULT) {
-        co2Fault = true;
+        co2Fault   = true;
         currentCO2 = -999;
       }
     }
 
-    // Read Water Level with 2-strike Fault Debouncing
+    // 4. Read Water Level
     WaterReading waterData = readWaterLevel();
     if (waterData.valid) {
       waterFailStreak = 0;
       waterValidStreak++;
       if (waterValidStreak >= STREAK_TO_CLEAR_FAULT) {
-        waterFault = false;
+        waterFault   = false;
         currentWater = waterData.percent;
       }
     } else {
       waterValidStreak = 0;
       waterFailStreak++;
       if (waterFailStreak >= STREAK_TO_LATCH_FAULT) {
-        waterFault = true;
+        waterFault   = true;
         currentWater = -999;
       }
     }
 
     // ── Instant Local Serial Monitor Output ──
-    Serial.println("📊 ── Live Sensor Readings ─────────────");
-    if (dhtFault) {
-      Serial.println("   🌡️  Temperature:  [⚠️ UNPLUGGED / DISCONNECTED]");
-      Serial.println("   💧 Humidity:     [⚠️ UNPLUGGED / DISCONNECTED]");
+    Serial.println("📊 ── Live Sensor Readings (Digital I2C) ─────────────");
+    if (shtFault) {
+      Serial.println("   🌡️  Temperature:  [⚠️ UNPLUGGED / FAULT]");
+      Serial.println("   💧 Humidity:     [⚠️ UNPLUGGED / FAULT]");
     } else {
-      Serial.printf("   🌡️  Temperature:  %.1f °C\n", currentTemp);
-      Serial.printf("   💧 Humidity:     %.1f %%\n", currentHum);
+      Serial.printf("   🌡️  Temperature:  %.2f °C\n", currentTemp);
+      Serial.printf("   💧 Humidity:     %.2f %% RH\n", currentHum);
     }
 
     if (lightFault) {
-      Serial.println("   ☀️  Light Level:  [⚠️ UNPLUGGED / DISCONNECTED]");
+      Serial.println("   ☀️  Light Level:  [⚠️ UNPLUGGED / FAULT]");
     } else {
-      Serial.printf("   ☀️  Light Level:  %d lux (est.)\n", currentLight);
+      Serial.printf("   ☀️  Light Level:  %d lux (Digital 16-bit)\n", currentLight);
     }
 
     if (co2Fault) {
-      Serial.println("   🌬️  CO₂ Level:    [⚠️ UNPLUGGED / DISCONNECTED]");
+      Serial.println("   🌬️  CO₂ Level:    [⚠️ UNPLUGGED / FAULT]");
     } else {
-      Serial.printf("   🌬️  CO₂ Level:    %d ppm\n", currentCO2);
+      Serial.printf("   🌬️  CO₂ Level:    %d ppm (Sensirion NDIR)\n", currentCO2);
     }
 
     if (waterFault) {
-      Serial.println("   🫧 Water Level:  [⚠️ UNPLUGGED / DISCONNECTED]");
+      Serial.println("   🫧 Water Level:  [⚠️ UNPLUGGED / FAULT]");
     } else {
       Serial.printf("   🫧 Water Level:  %d %%\n", currentWater);
     }
-    Serial.printf("   🔥 ESP32 Chip Temp: %.1f °C (On-die junction)\n", temperatureRead());
-    Serial.printf("   ⚡ CPU Frequency:   %d MHz\n", getCpuFrequencyMhz());
-    Serial.println("────────────────────────────────────────");
+    Serial.printf("   🔥 ESP32 Chip Temp: %.1f °C\n", temperatureRead());
+    Serial.println("──────────────────────────────────────────────────────");
   }
 
   // ── Auto Wi-Fi Reconnection Watchdog ──
@@ -795,18 +787,18 @@ void loop() {
     }
   }
 
-  // ── Push to Cloud every 5 seconds ──
+  // ── Push to Cloud every 2 seconds ──
   if (now - lastFirebasePush >= FIREBASE_PUSH_INTERVAL) {
     lastFirebasePush = now;
     if (WiFi.status() == WL_CONNECTED) {
       pushToFirebase(currentTemp, currentHum, currentLight, currentCO2, currentWater,
-                     dhtFault, lightFault, co2Fault, waterFault);
+                     shtFault, lightFault, co2Fault, waterFault);
 
       // Accumulate for hourly history averages if sensor is not faulted
-      if (!dhtFault && currentTemp > 0 && currentHum > 0) {
+      if (!shtFault && currentTemp > 0 && currentHum > 0) {
         hourlyTempSum += currentTemp;
-        hourlyHumSum += currentHum;
-        hourlyDHTCount++;
+        hourlyHumSum  += currentHum;
+        hourlySHTCount++;
       }
       if (!lightFault && currentLight >= 0) {
         hourlyLightSum += currentLight;
@@ -819,20 +811,7 @@ void loop() {
     }
   }
 
-  // ── Initial History Push on Boot (after 30s warmup & NTP sync) ──
-  if (!initialHistoryLogged && mq135WarmedUp && (now - bootTime >= 30000) && Firebase.ready()) {
-    struct tm initTime;
-    if (getLocalTime(&initTime, 50) && initTime.tm_year > 120) {
-      initialHistoryLogged = true;
-      lastLoggedHour = initTime.tm_hour;
-      lastHourlyPush = now;
-      pushHourlyHistory();
-      Serial.println("   🚀 Initial boot history point saved to Firebase!");
-    }
-  }
-
   // ── Periodic Hourly History Push ──
-  // Triggers either when clock hour rolls over (NTP synced) or every HOURLY_PUSH_INTERVAL
   struct tm loopTime;
   if (getLocalTime(&loopTime, 10) && loopTime.tm_year > 120) {
     if (lastLoggedHour == -1) {
@@ -854,6 +833,5 @@ void loop() {
     sendHeartbeat();
   }
 
-  // Yield to FreeRTOS idle task so CPU cores can enter low-power wait state (waiti)
   delay(15);
 }

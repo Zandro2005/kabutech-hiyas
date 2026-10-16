@@ -1,6 +1,6 @@
 # Kabutech Hiyas — Current Prototype Guide (Breadboard)
 
-> **Note:** This guide is for the initial sensor-only breadboard prototype currently running on `kabutech_prototype.ino`. For the plug-and-play production plan, see [IMPLEMENTATION_PLAN.md](../IMPLEMENTATION_PLAN.md).
+> **Note:** This guide is for the sensor breadboard prototype running on `kabutech_prototype.ino` using digital I2C sensors (SHT3x, BH1750, SCD41) and simulated actuator LEDs. For the plug-and-play production plan, see [IMPLEMENTATION_PLAN.md](../IMPLEMENTATION_PLAN.md).
 
 ---
 
@@ -21,8 +21,9 @@ Download from [arduino.cc](https://www.arduino.cc/en/software)
 ### 3. Install Required Libraries
 Go to **Sketch → Include Library → Manage Libraries** and install:
 - `Firebase ESP Client` (by mobizt)
-- `DHT sensor library` (by Adafruit)
-- `Adafruit Unified Sensor` (by Adafruit)
+- `Adafruit SHT31 Library` (by Adafruit)
+- `BH1750` (by Christopher Laws)
+- `Sensirion I2C SCD4x` (by Sensirion)
 
 ### 4. Enable Anonymous Auth in Firebase
 - Go to [Firebase Console](https://console.firebase.google.com/)
@@ -46,42 +47,55 @@ Open `kabutech_prototype.ino` and update your WiFi credentials:
 
 ---
 
-## 2. Wiring Diagram (Breadboard Prototype)
+## 2. Wiring Diagram (Digital I2C Prototype)
 
+### Shared I2C Sensor Bus (GPIO 4 = SDA, GPIO 5 = SCL)
+All 3 digital sensors connect in parallel to the same 3.3V power rails and I2C lines:
+
+| Sensor Module | Sensor Pin | ESP32-S3 Connection |
+|---|---|---|
+| **SHT3x (Temp & Humidity)** | `VIN` | **3.3V** (Red Breadboard Rail) |
+| | `GND` | **GND** (Blue Breadboard Rail) |
+| | `SDA` | **GPIO 4** (Shared I2C Data) |
+| | `SCL` | **GPIO 5** (Shared I2C Clock) |
+| **BH1750 (Digital Lux)** | `VCC` | **3.3V** (Red Breadboard Rail) |
+| | `GND` | **GND** (Blue Breadboard Rail) |
+| | `SDA` | **GPIO 4** (Shared I2C Data) |
+| | `SCL` | **GPIO 5** (Shared I2C Clock) |
+| **SCD41 (True NDIR CO₂)** | `VIN` / `VDD` | **3.3V** (Red Breadboard Rail) |
+| | `GND` | **GND** (Blue Breadboard Rail) |
+| | `SDA` | **GPIO 4** (Shared I2C Data) |
+| | `SCL` | **GPIO 5** (Shared I2C Clock) |
+
+### Water Level Sensor
 | ESP32-S3 Pin | Sensor Pin | Connection Details |
 |---|---|---|
-| **GPIO 4** | DHT11 DATA | Connect with 10kΩ pull-up resistor to 3.3V |
-| **3.3V** | DHT11 VCC | Power |
-| **GND** | DHT11 GND | Ground |
-| **GPIO 5** | LDR Junction | Voltage divider: LDR to 3.3V, 10kΩ to GND |
-| **GPIO 6** | MQ-135 AO | Analog output |
-| **5V / VIN** | MQ-135 VCC | Needs 5V for internal heater coil *(Keep MQ-135 at least 5-10cm away from the ESP32 and DHT11 to avoid radiant heating)* |
-| **GND** | MQ-135 GND | Ground |
-| **GPIO 7** | Water Level S | Analog signal |
-| **GPIO 8** | Water Level + | Digital power (toggled to prevent electrolysis corrosion) |
-| **GND** | Water Level - | Ground |
-| **GPIO 9** | FAN IN (Air Intake) LED | Connect LED anode (long leg) to GPIO 9. Connect cathode (short leg) to a 220Ω resistor, then to GND. |
-| **GPIO 10**| VALVE (CO2) LED | Connect LED anode to GPIO 10. Connect cathode to a 220Ω resistor, then to GND. |
-| **GPIO 11**| MISTERS LED | Connect LED anode to GPIO 11. Connect cathode to a 220Ω resistor, then to GND. |
-| **GPIO 12**| LIGHTS LED | Connect LED anode to GPIO 12. Connect cathode to a 220Ω resistor, then to GND. |
-| **GPIO 13**| FAN OUT (Air Exhaust) LED | Connect LED anode to GPIO 13. Connect cathode to a 220Ω resistor, then to GND. |
+| **GPIO 7** | Signal (S) | Analog/Digital liquid level signal |
+| **GPIO 8** | Power (+) | Digital power toggle (prevents electrode electrolysis) |
+| **GND** | Ground (-) | System Ground |
+
+### Actuator Simulation LEDs (Retained Unchanged)
+| ESP32-S3 Pin | Actuator Function | Wiring |
+|---|---|---|
+| **GPIO 9** | FAN IN (Air Intake Fan) | Anode (long pin) to GPIO 9 → 220Ω resistor → GND |
+| **GPIO 10**| VALVE (Solenoid Water Valve) | Anode (long pin) to GPIO 10 → 220Ω resistor → GND |
+| **GPIO 11**| MISTERS (Misting Pump / Fogger) | Anode (long pin) to GPIO 11 → 220Ω resistor → GND |
+| **GPIO 12**| LIGHTS (Grow LED Strip) | Anode (long pin) to GPIO 12 → 220Ω resistor → GND |
+| **GPIO 13**| FAN OUT (Exhaust Fan) | Anode (long pin) to GPIO 13 → 220Ω resistor → GND |
 
 ---
 
-## 3. Sensor Calibration
+## 3. Sensor Calibration & Operation
 
-### Water Level Sensor
-1. Hold sensor dry in air → note Serial Monitor raw reading → set as `WATER_DRY_VALUE` in code.
-2. Submerge sensor to maximum mark in water → note raw reading → set as `WATER_WET_VALUE` in code.
+### SCD41 (True NDIR CO₂)
+- Takes 5 seconds per measurement cycle (continuous periodic mode).
+- Factory calibrated by Sensirion. For field check: outdoor clean fresh air reads ~400–430 ppm.
 
-### MQ-135 Gas Sensor
-- **First-time use:** Requires a 24–48 hour continuous burn-in period.
-- **Each boot:** Requires ~30 seconds preheat before readings stabilize.
-- Calibrate baseline `R0` against a known reference meter if possible.
+### SHT3x (Temperature & Humidity)
+- Factory calibrated (±0.3°C, ±2% RH). No manual potentiometer or calibration curve needed.
 
-### LDR Light Sensor
-- Configured for 0–1000 lux estimation.
-- Adjust `map()` calibration range in `readLight()` if using different ambient lighting.
+### BH1750 (Digital Lux Meter)
+- Calibrated directly in standard SI Lux (1–65,535 lux). No analog mapping needed.
 
 ---
 
@@ -97,5 +111,5 @@ npx expo start
 ```
 
 ### 2. Test the Integration
-- **Monitoring**: Open the **Controls** or **Live Farm** screen in the app. You should see the Temperature, Humidity, Light, CO2, and Water Level updating in real-time.
-- **Actuators**: Tap the **FANS**, **MISTERS**, **LIGHTS**, or **VALVE** buttons in the app. The corresponding LED on your breadboard should instantly turn ON or OFF!
+- **Monitoring**: Open the **Controls** or **Live Farm** screen in the app. You should see the Temperature, Humidity, Light, CO2, and Water Level updating in real-time with high-precision digital readings.
+- **Actuators**: Tap the **FANS**, **MISTERS**, **LIGHTS**, or **VALVE** buttons in the app. The corresponding LED on your breadboard will instantly turn ON or OFF!
