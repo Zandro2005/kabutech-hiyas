@@ -68,18 +68,13 @@ All 3 digital sensors connect in parallel to the same 3.3V power rails and I2C l
 | | `SCL` | **GPIO 5** (Shared I2C Clock) |
 
 ### Water Level Sensor
-| ESP32-S3 Pin | Sensor Pin | Connection Details |
-|---|---|---|
-| **GPIO 7** | Signal (S) | Analog/Digital liquid level signal |
-| **GPIO 8** | Power (+) | Digital power toggle (prevents electrode electrolysis) |
-| **GND** | Ground (-) | System Ground |
+*(Temporarily removed from prototype)*
 
-### Actuator Simulation LEDs (Retained Unchanged)
+### Actuator Simulation LEDs
 | ESP32-S3 Pin | Actuator Function | Wiring |
 |---|---|---|
 | **GPIO 9** | FAN IN (Air Intake Fan) | Anode (long pin) to GPIO 9 → 220Ω resistor → GND |
-| **GPIO 10**| VALVE (Solenoid Water Valve) | Anode (long pin) to GPIO 10 → 220Ω resistor → GND |
-| **GPIO 11**| MISTERS (Misting Pump / Fogger) | Anode (long pin) to GPIO 11 → 220Ω resistor → GND |
+| **GPIO 11**| MISTERS (Misting Pump + Valve) | Anode (long pin) to GPIO 11 → 220Ω resistor → GND *(Valve operates directly on Misters)* |
 | **GPIO 12**| LIGHTS (Grow LED Strip) | Anode (long pin) to GPIO 12 → 220Ω resistor → GND |
 | **GPIO 13**| FAN OUT (Exhaust Fan) | Anode (long pin) to GPIO 13 → 220Ω resistor → GND |
 

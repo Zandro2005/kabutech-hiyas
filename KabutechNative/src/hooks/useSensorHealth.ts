@@ -129,24 +129,18 @@ export function useSensorHealth(): SensorHealthStatus {
     sensors.co2 > 5000 || 
     sensors.co2 === -999;
 
-  const waterError = !isControllerOnline || 
-    isErr(sensors?.water_error) || 
-    sensors?.waterLevel == null || 
-    typeof sensors?.waterLevel !== 'number' || 
-    isNaN(sensors.waterLevel) || 
-    sensors.waterLevel === -999 || 
-    sensors.waterLevel < 0;
+  // Water level sensor is temporarily removed from hardware/code
+  const waterError = false;
 
   // Generate list of disconnected / faulty sensors for alert banners
   const faultySensorsList: string[] = [];
   if (isControllerOnline) {
-    if (tempError || humError) faultySensorsList.push('DHT11 Temp/Humidity (GPIO 4)');
-    if (lightError) faultySensorsList.push('LDR Light Sensor (GPIO 5)');
-    if (co2Error) faultySensorsList.push('MQ-135 Gas Sensor (GPIO 6)');
-    if (waterError) faultySensorsList.push('Water Level Sensor (GPIO 7)');
+    if (tempError || humError) faultySensorsList.push('SHT3x Temp/Humidity (I2C)');
+    if (lightError) faultySensorsList.push('BH1750 Light Sensor (I2C)');
+    if (co2Error) faultySensorsList.push('SCD41 CO₂ Sensor (I2C)');
   }
 
-  const hasAnyError = !isControllerOnline || tempError || humError || lightError || co2Error || waterError;
+  const hasAnyError = !isControllerOnline || tempError || humError || lightError || co2Error;
 
   return {
     isControllerOnline,

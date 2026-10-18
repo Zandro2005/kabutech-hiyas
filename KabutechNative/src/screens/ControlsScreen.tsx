@@ -9,7 +9,9 @@ import { useSensorHealth } from '../hooks/useSensorHealth';
 import { ref, update } from 'firebase/database';
 import { db } from '../services/firebase';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
-import CircularSlider from '../components/CircularSlider';
+import RangeGauge from '../components/RangeGauge';
+import { ACTIVE_PROFILE } from '../config/cropProfiles';
+import { formatRangeText } from '../utils/environmentRanges';
 import ScreenHeader from '../components/ScreenHeader';
 import ControlsScreenSkeleton from '../components/skeletons/ControlsScreenSkeleton';
 import { useTheme } from '../context/ThemeContext';
@@ -72,32 +74,11 @@ export default function ControlsScreen() {
   const hum = typeof sensors.humidity === 'number' ? sensors.humidity : 51;
   const light = typeof sensors.light === 'number' ? sensors.light : 71;
   const co2 = typeof sensors.co2 === 'number' ? sensors.co2 : 583;
-  const waterLevel = typeof sensors.waterLevel === 'number' ? sensors.waterLevel : 75;
 
   const isTempDisconnected = health.tempError || temp === -999 || temp <= 0;
   const isHumDisconnected = health.humError || hum === -999 || hum <= 0;
   const isLightDisconnected = health.lightError || light === -999 || light < 0;
   const isCo2Disconnected = health.co2Error || co2 === -999 || co2 < 0;
-
-  const rawTargetTemp = typeof settings?.setpoints?.temperature === 'number'
-    ? settings.setpoints.temperature
-    : parseFloat(settings?.setpoints?.temperature as any) || 28.0;
-  const targetTemp = Math.max(18, Math.min(35, rawTargetTemp));
-
-  const rawTargetHum = typeof settings?.setpoints?.humidity === 'number'
-    ? settings.setpoints.humidity
-    : parseFloat(settings?.setpoints?.humidity as any) || 85;
-  const targetHum = Math.max(50, Math.min(95, rawTargetHum));
-
-  const rawTargetLight = typeof settings?.setpoints?.light === 'number'
-    ? settings.setpoints.light
-    : parseFloat(settings?.setpoints?.light as any) || 580;
-  const targetLight = Math.max(200, Math.min(800, rawTargetLight));
-
-  const rawTargetCO2 = typeof settings?.setpoints?.co2 === 'number'
-    ? settings.setpoints.co2
-    : parseFloat(settings?.setpoints?.co2 as any) || 690;
-  const targetCO2 = Math.max(300, Math.min(1200, rawTargetCO2));
 
   const isAuto = String(settings?.setpoints?.mode).toLowerCase() === 'auto';
   const isScheduled = String(settings?.setpoints?.mode).toLowerCase() === 'scheduled';
@@ -113,9 +94,9 @@ export default function ControlsScreen() {
       }, 3000);
       return () => clearInterval(interval);
     } else if (isAuto) {
-      setDevices(computeAutoDevicesState(sensors, settings?.setpoints));
+      setDevices(computeAutoDevicesState(sensors, rawDevices));
       const interval = setInterval(() => {
-        setDevices(computeAutoDevicesState(sensors, settings?.setpoints));
+        setDevices(computeAutoDevicesState(sensors, rawDevices));
       }, 3000);
       return () => clearInterval(interval);
     } else {
@@ -135,36 +116,13 @@ export default function ControlsScreen() {
     rawDevices.co2,
     sensors?.temperature,
     sensors?.humidity,
+    sensors?.co2,
+    sensors?.light,
   ]);
 
   const isOffline = !health.isControllerOnline;
   const isAiOverride = settings?.setpoints?.aiOverride === true;
   const isLocked = isAuto || isScheduled || isAiOverride || isOffline;
-
-  const updateSetpoint = (key: string, value: number, label?: string, unit?: string) => {
-    if (isOffline) {
-      showToast({ type: 'info', text1: 'Controller Offline', text2: 'Target setpoints cannot be adjusted while offline.' });
-      return;
-    }
-    if (activeTabDataRef.current?.isDisconnected) {
-      showToast({
-        type: 'error',
-        text1: 'Sensor at Fault',
-        text2: `Cannot adjust target while the ${label || 'sensor'} is at fault.`,
-      });
-      return;
-    }
-    showToast({ type: 'success', text1: `${label || 'Target'} updated to ${value}${unit || ''}` });
-    update(ref(db, 'kabutech/settings/setpoints'), {
-      [key]: value
-    }).catch(err => {
-      Alert.alert("Error Saving", err.message);
-      if (pendingTargetRef.current !== null) {
-        pendingTargetRef.current = null;
-        setLocalTarget(activeTabDataRef.current.target);
-      }
-    });
-  };
 
   const toggleDevice = async (key: string, state: boolean) => {
     if (isOffline) {
@@ -184,7 +142,6 @@ export default function ControlsScreen() {
     // ⚡ 0ms Optimistic UI update with legacy key mirroring
     const updatePayload: Record<string, boolean> = { [key]: state };
     if (key === 'fanOut') updatePayload.fans = state;
-    if (key === 'valve') updatePayload.co2 = state;
 
     setDevices(prev => ({ ...prev, ...updatePayload }));
 
@@ -206,7 +163,7 @@ export default function ControlsScreen() {
       key === 'fanOut' ? 'Fan Out' :
       key === 'misters' ? 'Mister' :
       key === 'lights' ? 'Grow Lights' :
-      'Valve';
+      'Device';
 
     try {
       await update(ref(db, `kabutech/settings/setpoints/devices`), updatePayload);
@@ -227,7 +184,6 @@ export default function ControlsScreen() {
       // Revert if network error
       const revertPayload: Record<string, boolean> = { [key]: previousState };
       if (key === 'fanOut') revertPayload.fans = previousState;
-      if (key === 'valve') revertPayload.co2 = previousState;
       setDevices(prev => ({ ...prev, ...revertPayload }));
       showToast({
         type: 'error',
@@ -294,10 +250,58 @@ export default function ControlsScreen() {
   };
 
   const tabs = [
-    { id: 'temp' as TabId, label: 'Temperature', icon: 'thermometer', color: '#f97316', unit: '°C', min: 18, max: 35, step: 0.5, current: isTempDisconnected ? '--' : temp, isDisconnected: isTempDisconnected, target: targetTemp, optimal: '24-28', dbKey: 'temperature' },
-    { id: 'hum' as TabId, label: 'Humidity', icon: 'water-opacity', color: '#3b82f6', unit: '%', min: 50, max: 95, step: 1, current: isHumDisconnected ? '--' : hum, isDisconnected: isHumDisconnected, target: targetHum, optimal: '80-90', dbKey: 'humidity' },
-    { id: 'light' as TabId, label: 'Light Level', icon: 'white-balance-sunny', color: '#eab308', unit: 'Lx', min: 200, max: 800, step: 10, current: isLightDisconnected ? '--' : light, isDisconnected: isLightDisconnected, target: targetLight, optimal: '500-800', dbKey: 'light' },
-    { id: 'co2' as TabId, label: 'CO2 Level', icon: 'molecule-co2', color: '#10b981', unit: 'ppm', min: 300, max: 1200, step: 10, current: isCo2Disconnected ? '--' : co2, isDisconnected: isCo2Disconnected, target: targetCO2, optimal: '< 800', dbKey: 'co2' },
+    {
+      id: 'temp' as TabId,
+      label: 'Temperature',
+      icon: 'thermometer',
+      color: '#f97316',
+      unit: '°C',
+      scaleMin: 10,
+      scaleMax: 35,
+      band: ACTIVE_PROFILE.temp,
+      current: isTempDisconnected ? '--' : temp,
+      isDisconnected: isTempDisconnected,
+      rangeText: formatRangeText(ACTIVE_PROFILE.temp),
+    },
+    {
+      id: 'hum' as TabId,
+      label: 'Humidity',
+      icon: 'water-opacity',
+      color: '#3b82f6',
+      unit: '%',
+      scaleMin: 40,
+      scaleMax: 100,
+      band: ACTIVE_PROFILE.hum,
+      current: isHumDisconnected ? '--' : hum,
+      isDisconnected: isHumDisconnected,
+      rangeText: formatRangeText(ACTIVE_PROFILE.hum),
+    },
+    {
+      id: 'light' as TabId,
+      label: 'Light Level',
+      icon: 'white-balance-sunny',
+      color: '#eab308',
+      unit: 'Lx',
+      scaleMin: 0,
+      scaleMax: 1200,
+      band: ACTIVE_PROFILE.light,
+      current: isLightDisconnected ? '--' : light,
+      isDisconnected: isLightDisconnected,
+      rangeText: formatRangeText(ACTIVE_PROFILE.light),
+    },
+    {
+      id: 'co2' as TabId,
+      label: 'CO2 Level',
+      icon: 'molecule-co2',
+      color: '#10b981',
+      unit: 'ppm',
+      scaleMin: 300,
+      scaleMax: 1600,
+      band: ACTIVE_PROFILE.co2,
+      current: isCo2Disconnected ? '--' : co2,
+      isDisconnected: isCo2Disconnected,
+      rangeText: formatRangeText(ACTIVE_PROFILE.co2),
+    },
   ];
   const tabScrollRef = useRef<ScrollView>(null);
   const tabLayouts = useRef<Record<string, { x: number; width: number }>>({});
@@ -310,7 +314,6 @@ export default function ControlsScreen() {
     }
   };
 
-  const [isSliding, setIsSliding] = useState(false);
   const [activeTab, setActiveTab] = useState<TabId>(route.params?.tab || 'temp');
   const activeTabRef = useRef<TabId>(activeTab);
   activeTabRef.current = activeTab;
@@ -321,13 +324,6 @@ export default function ControlsScreen() {
     activeTabRef.current = tabId;
     setActiveTab(tabId);
     scrollToTab(tabId);
-    const targetTab = tabs.find(t => t.id === tabId);
-    if (targetTab) {
-      pendingTargetRef.current = null;
-      isInteractingRef.current = false;
-      setLocalTarget(targetTab.target);
-      localTargetRef.current = targetTab.target;
-    }
   };
 
   useEffect(() => {
@@ -368,162 +364,11 @@ export default function ControlsScreen() {
   const activeTabDataRef = useRef(activeTabData);
   activeTabDataRef.current = activeTabData;
 
-  const isCurrentSensorFault = Boolean(activeTabData.isDisconnected);
-  const isTargetAdjustmentDisabled = isOffline || isCurrentSensorFault;
-
-  const [localTarget, setLocalTarget] = useState<number>(activeTabData.target);
-  const localTargetRef = useRef<number>(activeTabData.target);
-  localTargetRef.current = localTarget;
-  const pendingTargetRef = useRef<number | null>(null);
-  const isInteractingRef = useRef<boolean>(false);
-  const lastActiveTabRef = useRef<TabId>(activeTab);
-
-  // Sync from Firebase only when active tab changes, or when not currently interacting/pending
-  useEffect(() => {
-    // Tab switched: always reset and display new tab's target
-    if (lastActiveTabRef.current !== activeTab) {
-      lastActiveTabRef.current = activeTab;
-      pendingTargetRef.current = null;
-      isInteractingRef.current = false;
-      setLocalTarget(activeTabData.target);
-      localTargetRef.current = activeTabData.target;
-      return;
-    }
-
-    // If incoming Firebase target matches our pending target, it has been confirmed by the server
-    if (pendingTargetRef.current !== null) {
-      if (Math.abs(activeTabData.target - pendingTargetRef.current) < 0.01) {
-        pendingTargetRef.current = null;
-      }
-      return; // Ignore stale intermediate snapshots while pending
-    }
-
-    // Do not let background snapshots override while user is actively pressing buttons or dragging
-    if (isInteractingRef.current) {
-      return;
-    }
-
-    // Otherwise keep localTarget in sync with remote target
-    setLocalTarget(activeTabData.target);
-    localTargetRef.current = activeTabData.target;
-  }, [activeTabData.target, activeTab]);
-
-  // Commit target to Firebase only when user finishes interacting (touch released)
-  const commitTarget = (val: number) => {
-    isInteractingRef.current = false;
-    if (isOffline || activeTabDataRef.current?.isDisconnected) return;
-    pendingTargetRef.current = val;
-    const dbKey = activeTabDataRef.current.dbKey;
-    const label = activeTabDataRef.current.label;
-    const unit = activeTabDataRef.current.unit;
-    updateSetpoint(dbKey, val, label, unit);
-
-    setTimeout(() => {
-      if (pendingTargetRef.current === val) {
-        pendingTargetRef.current = null;
-      }
-    }, 2500);
-  };
-
-  const repeatTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
-
-  const stopTimer = () => {
-    const wasInteracting = isInteractingRef.current;
-    isInteractingRef.current = false;
-    if (repeatTimeoutRef.current) {
-      clearTimeout(repeatTimeoutRef.current);
-      repeatTimeoutRef.current = null;
-    }
-    if (timerRef.current) {
-      clearInterval(timerRef.current);
-      timerRef.current = null;
-    }
-    if (wasInteracting) {
-      commitTarget(localTargetRef.current);
-    }
-  };
-
-  const startIncrement = () => {
-    if (isOffline) {
-      showToast({ type: 'info', text1: 'Controller Offline', text2: 'Target setpoints cannot be adjusted while offline.' });
-      return;
-    }
-    if (activeTabDataRef.current?.isDisconnected) {
-      showToast({
-        type: 'error',
-        text1: 'Sensor at Fault',
-        text2: `Cannot adjust target while the ${activeTabDataRef.current.label} sensor is at fault.`,
-      });
-      return;
-    }
-    stopTimer();
-    isInteractingRef.current = true;
-    hapticSelection();
-    const current = Number(localTargetRef.current) || activeTabDataRef.current.min;
-    const step = activeTabDataRef.current.step ?? 1;
-    const decimals = step < 1 ? 1 : 0;
-    const next = Math.min(activeTabDataRef.current.max, Number((current + step).toFixed(decimals)));
-    localTargetRef.current = next;
-    setLocalTarget(next);
-
-    repeatTimeoutRef.current = setTimeout(() => {
-      timerRef.current = setInterval(() => {
-        hapticLight();
-        const cur = Number(localTargetRef.current) || activeTabDataRef.current.min;
-        const nxt = Math.min(activeTabDataRef.current.max, Number((cur + step).toFixed(decimals)));
-        localTargetRef.current = nxt;
-        setLocalTarget(nxt);
-      }, 100);
-    }, 380);
-  };
-
-  const startDecrement = () => {
-    if (isOffline) {
-      showToast({ type: 'info', text1: 'Controller Offline', text2: 'Target setpoints cannot be adjusted while offline.' });
-      return;
-    }
-    if (activeTabDataRef.current?.isDisconnected) {
-      showToast({
-        type: 'error',
-        text1: 'Sensor at Fault',
-        text2: `Cannot adjust target while the ${activeTabDataRef.current.label} sensor is at fault.`,
-      });
-      return;
-    }
-    stopTimer();
-    isInteractingRef.current = true;
-    hapticSelection();
-    const current = Number(localTargetRef.current) || activeTabDataRef.current.min;
-    const step = activeTabDataRef.current.step ?? 1;
-    const decimals = step < 1 ? 1 : 0;
-    const next = Math.max(activeTabDataRef.current.min, Number((current - step).toFixed(decimals)));
-    localTargetRef.current = next;
-    setLocalTarget(next);
-
-    repeatTimeoutRef.current = setTimeout(() => {
-      timerRef.current = setInterval(() => {
-        hapticLight();
-        const cur = Number(localTargetRef.current) || activeTabDataRef.current.min;
-        const nxt = Math.max(activeTabDataRef.current.min, Number((cur - step).toFixed(decimals)));
-        localTargetRef.current = nxt;
-        setLocalTarget(nxt);
-      }, 100);
-    }, 380);
-  };
-
-  useEffect(() => {
-    return () => {
-      stopTimer();
-    };
-  }, []);
-
   const activeDeviceCount = [
     Boolean(devices.fanIn),
     Boolean(devices.fanOut ?? devices.fans),
     Boolean(devices.misters),
     Boolean(devices.lights),
-    Boolean(devices.valve ?? devices.co2),
   ].filter(Boolean).length;
 
   const actuatorDevices = [
@@ -555,13 +400,6 @@ export default function ControlsScreen() {
       icon: 'lightbulb-on' as const,
       active: Boolean(devices.lights),
     },
-    {
-      key: 'valve',
-      name: 'Valve',
-      roleHint: 'Solenoid',
-      icon: 'valve' as const,
-      active: Boolean(devices.valve ?? devices.co2),
-    },
   ];
 
   return (
@@ -573,7 +411,6 @@ export default function ControlsScreen() {
         <ControlsScreenSkeleton />
       ) : (
       <ScrollView
-        scrollEnabled={!isSliding}
         contentContainerStyle={tw`pb-40 pt-2`}
         showsVerticalScrollIndicator={false}
         onScroll={handleTabBarScroll}
@@ -638,7 +475,7 @@ export default function ControlsScreen() {
                       )}
                     </View>
                     <Text style={[tw`text-[13px]`, isTabFault ? tw`text-slate-400 dark:text-slate-500` : (isActive ? tw`text-slate-900 dark:text-white` : tw`text-slate-700 dark:text-slate-300`), { fontFamily: 'PlusJakartaSans_800ExtraBold' }]}>
-                      {isActive ? localTarget : tab.target}{tab.unit}
+                      {tab.rangeText}
                     </Text>
                   </View>
                 </TouchableOpacity>
@@ -705,79 +542,29 @@ export default function ControlsScreen() {
           </ScrollView>
         </View>
 
-        {/* Central Interactive Dial Area */}
-        <CircularSlider 
-          localTarget={localTarget} 
-          activeTabData={activeTabData} 
-          isDarkMode={isDarkMode} 
-          isOffline={isOffline}
-          onDisabledPress={() => {
-            if (isOffline) {
-              showToast({ type: 'info', text1: 'Controller Offline', text2: 'Target setpoints cannot be adjusted while offline.' });
-            } else if (isCurrentSensorFault) {
-              showToast({
-                type: 'error',
-                text1: 'Sensor at Fault',
-                text2: `Cannot adjust target while the ${activeTabData.label} sensor is at fault.`,
-              });
-            }
-          }}
-          onValueChange={(val) => {
-            if (isTargetAdjustmentDisabled) return;
-            isInteractingRef.current = true;
-            localTargetRef.current = val;
-            setLocalTarget(val);
-          }}
-          onSlidingStart={() => {
-            if (isTargetAdjustmentDisabled) return;
-            isInteractingRef.current = true;
-            setIsSliding(true);
-          }}
-          onSlidingComplete={(val) => {
-            if (isTargetAdjustmentDisabled) return;
-            setIsSliding(false);
-            commitTarget(val);
-          }}
-        />
+        {/* Central Read-Only Range Gauge (Research Band + Grace Bearing + Live Marker) */}
+        <View {...swipePanResponder.panHandlers}>
+          <RangeGauge 
+            scaleMin={activeTabData.scaleMin}
+            scaleMax={activeTabData.scaleMax}
+            band={activeTabData.band}
+            current={activeTabData.current}
+            color={activeTabData.color}
+            unit={activeTabData.unit}
+            label={activeTabData.label}
+            isDarkMode={isDarkMode}
+            isOffline={isOffline}
+            isDisconnected={activeTabData.isDisconnected}
+          />
+        </View>
 
-        {/* Precision Stepper & Mode Switcher Row (Swipe left/right to change parameter) */}
-        <View 
-          {...swipePanResponder.panHandlers}
-          style={tw`flex-row items-center justify-center px-5 mb-3 sm:mb-4 gap-3`}
-        >
-          {/* Decrement Button */}
-          <TouchableOpacity 
-            hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
-            activeOpacity={isTargetAdjustmentDisabled ? 0.9 : 0.7}
-            onPressIn={startDecrement}
-            onPressOut={stopTimer}
-            onPress={() => {
-              if (isTargetAdjustmentDisabled) {
-                if (isOffline) {
-                  showToast({ type: 'info', text1: 'Controller Offline', text2: 'Target setpoints cannot be adjusted while offline.' });
-                } else if (isCurrentSensorFault) {
-                  showToast({
-                    type: 'error',
-                    text1: 'Sensor at Fault',
-                    text2: `Cannot adjust target while the ${activeTabData.label} sensor is at fault.`,
-                  });
-                }
-              }
-            }}
-            style={[
-              tw`w-11 h-11 rounded-2xl border border-slate-200/80 dark:border-slate-700 items-center justify-center bg-white dark:bg-slate-800 shadow-sm`,
-              isTargetAdjustmentDisabled && tw`opacity-40`,
-            ]}
-          >
-            <MaterialCommunityIcons name="minus" size={22} color={isDarkMode ? '#cbd5e1' : '#475569'} />
-          </TouchableOpacity>
-
-          {/* Mode Selector Pill */}
+        {/* Mode Selector Pill */}
+        <View style={tw`flex-row justify-center px-5 mb-4`}>
           <View style={tw`flex-row bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 rounded-2xl p-1 shadow-sm`}>
             <TouchableOpacity 
               hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
               onPress={() => setMode('auto')}
-              style={[tw`px-3.5 py-2 rounded-xl flex-row items-center gap-1.5`, isAuto ? tw`bg-emerald-500 shadow-sm` : tw`bg-transparent`]}
+              style={[tw`px-4 py-2 rounded-xl flex-row items-center gap-1.5`, isAuto ? tw`bg-emerald-500 shadow-sm` : tw`bg-transparent`]}
             >
               {isAuto && <View style={tw`w-1.5 h-1.5 rounded-full bg-white`} />}
               <Text style={[tw`text-[11px]`, isAuto ? tw`text-white` : tw`text-slate-500 dark:text-slate-400`, { fontFamily: 'PlusJakartaSans_800ExtraBold', letterSpacing: 0.3 }]}>
@@ -788,7 +575,7 @@ export default function ControlsScreen() {
             <TouchableOpacity 
               hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
               onPress={() => setMode('scheduled')}
-              style={[tw`px-3.5 py-2 rounded-xl flex-row items-center gap-1.5`, isScheduled ? tw`bg-purple-600 shadow-sm` : tw`bg-transparent`]}
+              style={[tw`px-4 py-2 rounded-xl flex-row items-center gap-1.5`, isScheduled ? tw`bg-purple-600 shadow-sm` : tw`bg-transparent`]}
             >
               {isScheduled && <View style={tw`w-1.5 h-1.5 rounded-full bg-white`} />}
               <Text style={[tw`text-[11px]`, isScheduled ? tw`text-white` : tw`text-slate-500 dark:text-slate-400`, { fontFamily: 'PlusJakartaSans_800ExtraBold', letterSpacing: 0.3 }]}>
@@ -805,7 +592,7 @@ export default function ControlsScreen() {
                 }
                 if (isLocked) DeviceEventEmitter.emit('showManualOverrideModal');
               }}
-              style={[tw`px-3.5 py-2 rounded-xl flex-row items-center gap-1.5`, (!isAuto && !isScheduled) ? tw`bg-amber-500 shadow-sm` : tw`bg-transparent`]}
+              style={[tw`px-4 py-2 rounded-xl flex-row items-center gap-1.5`, (!isAuto && !isScheduled) ? tw`bg-amber-500 shadow-sm` : tw`bg-transparent`]}
             >
               {(!isAuto && !isScheduled) && <View style={tw`w-1.5 h-1.5 rounded-full bg-white`} />}
               <Text style={[tw`text-[11px]`, (!isAuto && !isScheduled) ? tw`text-white` : tw`text-slate-500 dark:text-slate-400`, { fontFamily: 'PlusJakartaSans_800ExtraBold', letterSpacing: 0.3 }]}>
@@ -813,33 +600,6 @@ export default function ControlsScreen() {
               </Text>
             </TouchableOpacity>
           </View>
-
-          {/* Increment Button */}
-          <TouchableOpacity 
-            hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
-            activeOpacity={isTargetAdjustmentDisabled ? 0.9 : 0.7}
-            onPressIn={startIncrement}
-            onPressOut={stopTimer}
-            onPress={() => {
-              if (isTargetAdjustmentDisabled) {
-                if (isOffline) {
-                  showToast({ type: 'info', text1: 'Controller Offline', text2: 'Target setpoints cannot be adjusted while offline.' });
-                } else if (isCurrentSensorFault) {
-                  showToast({
-                    type: 'error',
-                    text1: 'Sensor at Fault',
-                    text2: `Cannot adjust target while the ${activeTabData.label} sensor is at fault.`,
-                  });
-                }
-              }
-            }}
-            style={[
-              tw`w-11 h-11 rounded-2xl border border-slate-200/80 dark:border-slate-700 items-center justify-center bg-white dark:bg-slate-800 shadow-sm`,
-              isTargetAdjustmentDisabled && tw`opacity-40`,
-            ]}
-          >
-            <MaterialCommunityIcons name="plus" size={22} color={isDarkMode ? '#cbd5e1' : '#475569'} />
-          </TouchableOpacity>
         </View>
 
         {/* AI / Lock Status Notification */}

@@ -8,7 +8,6 @@ import { useResponsive } from '../utils/responsive';
 import { useAuth } from '../context/AuthContext';
 import { useSensorHealth } from '../hooks/useSensorHealth';
 import { evaluateParam, ParamEvaluation } from '../utils/environmentRanges';
-import { useHourlyTrend } from '../hooks/useHourlyTrend';
 import { ACTIVE_PROFILE } from '../config/cropProfiles';
 
 interface Props {
@@ -25,7 +24,6 @@ export default React.memo(function EnvironmentMetricsGrid({ temp, hum, light, co
   const { profile } = useAuth();
   const isStaff = profile?.role === 'staff';
   const health = useSensorHealth();
-  const trends = useHourlyTrend();
 
   const isControllerOff = !health.isControllerOnline;
   const isTempFault = health.tempError || temp === -999 || temp <= 0;
@@ -108,7 +106,6 @@ export default React.memo(function EnvironmentMetricsGrid({ temp, hum, light, co
         : (isDarkMode ? 'rgba(249, 115, 22, 0.16)' : '#fff7ed'),
       accentColor: TEMP_COLOR,
       percent: tempPercent,
-      trend: trends.temp,
     },
     {
       id: 'hum' as const,
@@ -122,7 +119,6 @@ export default React.memo(function EnvironmentMetricsGrid({ temp, hum, light, co
         : (isDarkMode ? 'rgba(14, 165, 233, 0.16)' : '#f0f9ff'),
       accentColor: HUM_COLOR,
       percent: humPercent,
-      trend: trends.hum,
     },
     {
       id: 'light' as const,
@@ -136,7 +132,6 @@ export default React.memo(function EnvironmentMetricsGrid({ temp, hum, light, co
         : (isDarkMode ? 'rgba(245, 158, 11, 0.16)' : '#fffbeb'),
       accentColor: LIGHT_COLOR,
       percent: lightPercent,
-      trend: trends.light,
     },
     {
       id: 'co2' as const,
@@ -150,7 +145,6 @@ export default React.memo(function EnvironmentMetricsGrid({ temp, hum, light, co
         : (isDarkMode ? 'rgba(16, 185, 129, 0.16)' : '#ecfdf5'),
       accentColor: CO2_COLOR,
       percent: co2Percent,
-      trend: trends.co2,
     },
   ];
 
@@ -272,41 +266,28 @@ export default React.memo(function EnvironmentMetricsGrid({ temp, hum, light, co
                   {item.name}
                 </Text>
 
-                <View style={tw`flex-row items-baseline justify-between`}>
-                  <View style={tw`flex-row items-baseline`}>
-                    <Text 
-                      style={[
-                        tw`${isItemFault ? 'text-slate-400 dark:text-slate-500' : 'text-slate-900 dark:text-white'}`, 
-                        { 
-                          fontSize: isSmallDevice ? 26 : 29, 
-                          fontFamily: 'PlusJakartaSans_800ExtraBold', 
-                          letterSpacing: -0.6,
-                          lineHeight: isSmallDevice ? 30 : 34
-                        }
-                      ]}
-                    >
-                      {item.eval.formattedValue}
+                <View style={tw`flex-row items-baseline`}>
+                  <Text 
+                    style={[
+                      tw`${isItemFault ? 'text-slate-400 dark:text-slate-500' : 'text-slate-900 dark:text-white'}`, 
+                      { 
+                        fontSize: isSmallDevice ? 26 : 29, 
+                        fontFamily: 'PlusJakartaSans_800ExtraBold', 
+                        letterSpacing: -0.6,
+                        lineHeight: isSmallDevice ? 30 : 34
+                      }
+                    ]}
+                  >
+                    {item.eval.formattedValue}
+                  </Text>
+                  {isItemFault ? (
+                    <Text style={[tw`text-[11px] ml-1.5 text-slate-400 dark:text-slate-500`, { fontFamily: 'PlusJakartaSans_700Bold' }]}>
+                      Fault
                     </Text>
-                    {isItemFault ? (
-                      <Text style={[tw`text-[11px] ml-1.5 text-slate-400 dark:text-slate-500`, { fontFamily: 'PlusJakartaSans_700Bold' }]}>
-                        Fault
-                      </Text>
-                    ) : (
-                      <Text style={[tw`text-xs text-slate-400 dark:text-slate-500 ml-1.5`, { fontFamily: 'PlusJakartaSans_700Bold' }]}>
-                        {item.eval.unit}
-                      </Text>
-                    )}
-                  </View>
-
-                  {/* Clean Mini Trend Icon */}
-                  {!isItemFault && item.trend.direction !== 'none' && item.trend.direction !== 'steady' && (
-                    <View style={tw`flex-row items-center opacity-85`}>
-                      <Ionicons
-                        name={item.trend.direction === 'up' ? 'trending-up' : 'trending-down'}
-                        size={13}
-                        color={item.trend.direction === 'up' ? (item.id === 'hum' ? '#0ea5e9' : '#f97316') : '#64748b'}
-                      />
-                    </View>
+                  ) : (
+                    <Text style={[tw`text-xs text-slate-400 dark:text-slate-500 ml-1.5`, { fontFamily: 'PlusJakartaSans_700Bold' }]}>
+                      {item.eval.unit}
+                    </Text>
                   )}
                 </View>
               </View>

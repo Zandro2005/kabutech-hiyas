@@ -1,5 +1,5 @@
 import { evaluateParam, evaluateChamber } from '../src/utils/environmentRanges';
-import { ACTIVE_PROFILE, CropProfile } from '../src/config/cropProfiles';
+import { ACTIVE_PROFILE } from '../src/config/cropProfiles';
 
 describe('environmentRanges - evaluateParam', () => {
   it('correctly classifies values inside the crop profile range', () => {
@@ -26,7 +26,6 @@ describe('environmentRanges - evaluateParam', () => {
   });
 
   it('correctly handles exact boundary values (inclusive)', () => {
-    // Exact min & max
     expect(evaluateParam('temp', 18, false, ACTIVE_PROFILE).state).toBe('in_range');
     expect(evaluateParam('temp', 25, false, ACTIVE_PROFILE).state).toBe('in_range');
     expect(evaluateParam('hum', 80, false, ACTIVE_PROFILE).state).toBe('in_range');
@@ -35,24 +34,51 @@ describe('environmentRanges - evaluateParam', () => {
     expect(evaluateParam('light', 150, false, ACTIVE_PROFILE).state).toBe('in_range');
   });
 
-  it('identifies mild out-of-range deviations as warnings', () => {
-    // Temp: 26.5°C (1.5°C above max 25, criticalMargin is 3.0)
-    const tempHigh = evaluateParam('temp', 26.5, false, ACTIVE_PROFILE);
+  it('keeps values within the grace bearing buffer classified as in_range (Optimal)', () => {
+    // Temp: 26.5°C is above 25°C but within the +2.0°C grace buffer (up to 27.0°C)
+    const tempGrace = evaluateParam('temp', 26.5, false, ACTIVE_PROFILE);
+    expect(tempGrace.state).toBe('in_range');
+    expect(tempGrace.severity).toBe('ok');
+
+    // Temp: 16.5°C is below 18°C but within the -2.0°C grace buffer (down to 16.0°C)
+    const tempLowGrace = evaluateParam('temp', 16.5, false, ACTIVE_PROFILE);
+    expect(tempLowGrace.state).toBe('in_range');
+    expect(tempLowGrace.severity).toBe('ok');
+
+    // Humidity: 78% is below 80% but within the -5.0% grace buffer (down to 75%)
+    const humGrace = evaluateParam('hum', 78, false, ACTIVE_PROFILE);
+    expect(humGrace.state).toBe('in_range');
+    expect(humGrace.severity).toBe('ok');
+
+    // CO2: 1100 ppm is above 1000 ppm but within the +150 ppm grace buffer (up to 1150 ppm)
+    const co2Grace = evaluateParam('co2', 1100, false, ACTIVE_PROFILE);
+    expect(co2Grace.state).toBe('in_range');
+    expect(co2Grace.severity).toBe('ok');
+
+    // Light: 120 lx is below 150 lx but within the -50 lx grace buffer (down to 100 lx)
+    const lightGrace = evaluateParam('light', 120, false, ACTIVE_PROFILE);
+    expect(lightGrace.state).toBe('in_range');
+    expect(lightGrace.severity).toBe('ok');
+  });
+
+  it('identifies deviations that exceed the grace bearing as warnings', () => {
+    // Temp: 27.5°C (> 25 + 2.0 grace, deviation is 2.5°C, criticalMargin is 3.0)
+    const tempHigh = evaluateParam('temp', 27.5, false, ACTIVE_PROFILE);
     expect(tempHigh.state).toBe('high');
     expect(tempHigh.severity).toBe('warning');
-    expect(tempHigh.deviation).toBe(1.5);
+    expect(tempHigh.deviation).toBe(2.5);
 
-    // Humidity: 75% (5% below min 80, criticalMargin is 10)
-    const humLow = evaluateParam('hum', 75, false, ACTIVE_PROFILE);
+    // Humidity: 72% (< 80 - 5 grace, deviation is 8%, criticalMargin is 10)
+    const humLow = evaluateParam('hum', 72, false, ACTIVE_PROFILE);
     expect(humLow.state).toBe('low');
     expect(humLow.severity).toBe('warning');
-    expect(humLow.deviation).toBe(5);
+    expect(humLow.deviation).toBe(8);
 
-    // CO2: 1200 ppm (200 above max 1000, criticalMargin is 500)
-    const co2High = evaluateParam('co2', 1200, false, ACTIVE_PROFILE);
+    // CO2: 1250 ppm (> 1000 + 150 grace, deviation is 250 ppm, criticalMargin is 500)
+    const co2High = evaluateParam('co2', 1250, false, ACTIVE_PROFILE);
     expect(co2High.state).toBe('high');
     expect(co2High.severity).toBe('warning');
-    expect(co2High.deviation).toBe(200);
+    expect(co2High.deviation).toBe(250);
   });
 
   it('identifies severe deviations exceeding criticalMargin as critical', () => {
@@ -87,9 +113,10 @@ describe('environmentRanges - evaluateParam', () => {
 });
 
 describe('environmentRanges - evaluateChamber', () => {
-  it('returns 4/4 and Optimal when all parameters are in crop range', () => {
+  it('returns 4/4 and Optimal when all parameters are in crop range or within grace bearing', () => {
+    // Temp 26.0 (grace), hum 78 (grace), co2 1050 (grace), light 500 (optimal)
     const chamber = evaluateChamber(
-      { temp: 24.5, hum: 90, co2: 700, light: 500 },
+      { temp: 26.0, hum: 78, co2: 1050, light: 500 },
       { temp: false, hum: false, co2: false, light: false, isControllerOffline: false },
       ACTIVE_PROFILE
     );
@@ -102,10 +129,10 @@ describe('environmentRanges - evaluateChamber', () => {
     expect(chamber.summary).toBe('All 4 parameters within crop range');
   });
 
-  it('accurately identifies parameters out of range in summary text', () => {
-    // Low humidity (78%) and high CO2 (1200 ppm)
+  it('accurately identifies parameters out of range (beyond grace) in summary text', () => {
+    // Low humidity (72% < 75%) and high CO2 (1250 ppm > 1150 ppm)
     const chamber = evaluateChamber(
-      { temp: 25.0, hum: 78, co2: 1200, light: 500 },
+      { temp: 25.0, hum: 72, co2: 1250, light: 500 },
       {},
       ACTIVE_PROFILE
     );

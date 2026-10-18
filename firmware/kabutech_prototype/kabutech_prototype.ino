@@ -1,8 +1,8 @@
 /*
  * ============================================================
  *  KABUTECH HIYAS — ESP32-S3 High-Precision Sensor Firmware
- *  Sensors: SHT3x (Temp/Hum), BH1750 (Lux), SCD41 (True NDIR CO2), Water Level
- *  Actuators: 5-Channel LED Simulation (Intake, Exhaust, Mister, Light, Valve)
+ *  Sensors: SHT3x (Temp/Hum), BH1750 (Lux), SCD41 (True NDIR CO2)
+ *  Actuators: 4-Channel LED Simulation (Intake, Exhaust, Mister, Light)
  *  Communication: I2C Digital Bus (GPIO 4: SDA, GPIO 5: SCL)
  *  Cloud: Firebase Realtime Database
  * ============================================================
@@ -12,18 +12,17 @@
  *    ESP32-S3 GND   ──► Breadboard (-) Blue Rail──► SHT3x GND  + BH1750 GND  + SCD41 GND
  *    ESP32-S3 GPIO 4──► I2C SDA Bus Row         ──► SHT3x SDA  + BH1750 SDA  + SCD41 SDA
  *    ESP32-S3 GPIO 5──► I2C SCL Bus Row         ──► SHT3x SCL  + BH1750 SCL  + SCD41 SCL
+ *  SENSORS (Digital I2C Bus):
+ *    SDA ──► GPIO 4
+ *    SCL ──► GPIO 5
+ *    (Water level sensor temporarily removed)
  *
- *  WATER LEVEL SENSOR:
- *    Water Level Signal (S) ──► GPIO 7
- *    Water Level Power  (+) ──► GPIO 8 (Toggled to eliminate corrosion/electrolysis)
- *    Water Level Ground (-) ──► GND
- *
- *  ACTUATOR LEDs (RETAINED & UNCHANGED):
+ *  ACTUATOR LEDs / RELAYS:
  *    Air In (Intake Fan) LED ──► GPIO 9  (Anode -> 220Ω resistor -> GPIO 9, Cathode -> GND)
- *    Water Valve LED         ──► GPIO 10 (Anode -> 220Ω resistor -> GPIO 10, Cathode -> GND)
  *    Mister / Fogger LED     ──► GPIO 11 (Anode -> 220Ω resistor -> GPIO 11, Cathode -> GND)
  *    Grow Lights LED         ──► GPIO 12 (Anode -> 220Ω resistor -> GPIO 12, Cathode -> GND)
  *    Air Out (Exhaust Fan)LED──► GPIO 13 (Anode -> 220Ω resistor -> GPIO 13, Cathode -> GND)
+ *    (Valve is connected directly with Misters on GPIO 11)
  *
  *  LIBRARIES NEEDED (Install via Arduino IDE Library Manager):
  *    1. "Firebase ESP Client" by mobizt
@@ -34,7 +33,7 @@
  *  BOARD SETTING:
  *    Board: ESP32S3 Dev Module
  *    USB CDC On Boot: Enabled
- */
+ *  */
 
 #include <WiFi.h>
 #include <Wire.h>
@@ -68,16 +67,19 @@
 #define I2C_SDA_PIN     4       // GPIO 4: Shared I2C Data
 #define I2C_SCL_PIN     5       // GPIO 5: Shared I2C Clock
 
-// Water Level Sensor Pins
-#define WATER_SIG_PIN   7       // Water level signal (ADC)
-#define WATER_PWR_PIN   8       // Water level power (GPIO to prevent corrosion)
-
-// Actuator Prototype LEDs / Relays (Retained exactly as before)
+// Actuator Prototype LEDs / Relays
 #define PIN_FAN_INTAKE  9       // GPIO 9:  Air In / Intake Fan LED
-#define PIN_VALVE       10      // GPIO 10: Solenoid Valve LED
-#define PIN_MISTER      11      // GPIO 11: Mister / Fogger LED
+#define PIN_MISTER      11      // GPIO 11: Mister / Fogger LED (Valve runs with misters)
 #define PIN_LIGHT       12      // GPIO 12: Grow Lights LED
 #define PIN_FAN_EXHAUST 13      // GPIO 13: Air Out / Exhaust Fan LED
+
+// ═══════════════════════════════════════════════
+//  SENSOR CALIBRATION OFFSETS
+//  Compensates for ESP32 / breadboard self-heating
+// ═══════════════════════════════════════════════
+
+#define TEMP_OFFSET     -4.0    // Adjust temperature in °C (e.g. -3.0 lowers reading by 3°C)
+#define HUM_OFFSET       +5.0    // Adjust humidity in % RH (e.g. +2.0 or 0.0)
 
 // ═══════════════════════════════════════════════
 //  TIMING CONFIG
@@ -87,13 +89,6 @@
 #define FIREBASE_PUSH_INTERVAL  2000    // Push to cloud every 2s (ultra-fast offline detection & live telemetry)
 #define HEARTBEAT_INTERVAL      15000   // Send "online" heartbeat every 15 seconds
 #define HOURLY_PUSH_INTERVAL    3600000 // Hourly history push (1 hour = 3,600,000 ms)
-
-// ═══════════════════════════════════════════════
-//  WATER LEVEL CALIBRATION
-// ═══════════════════════════════════════════════
-
-#define WATER_DRY_VALUE     20      // Typical ADC reading when sensor is completely dry
-#define WATER_WET_VALUE     1500    // Typical ADC reading when sensor is submerged in water
 
 // ═══════════════════════════════════════════════
 //  GLOBAL SENSOR OBJECTS
@@ -108,6 +103,7 @@ bool bh1750Ready = false;
 bool scd4xReady  = false;
 
 int lastValidCO2 = 420; // Default outdoor clean baseline until first SCD41 read
+unsigned long lastCO2SuccessTime = 0; // Timestamp of last successful SCD41 reading
 
 // ── Sensor Reading Structures ──
 struct SHTReading {
@@ -126,15 +122,9 @@ struct CO2Reading {
   bool valid;
 };
 
-struct WaterReading {
-  int percent;
-  bool valid;
-};
-
 SHTReading readSHT3x();
 LightReading readBH1750();
 CO2Reading readSCD41();
-WaterReading readWaterLevel();
 
 FirebaseData fbdo;
 FirebaseData streamDO; // For listening to actuator changes
@@ -154,13 +144,11 @@ float currentTemp  = -999.0;
 float currentHum   = -999.0;
 int   currentLight = -999;
 int   currentCO2   = -999;
-int   currentWater = -999;
 
 // Fault flags
 bool shtFault   = true;
 bool lightFault = true;
 bool co2Fault   = true;
-bool waterFault = true;
 
 // Debouncing streaks (2 consecutive reads to latch/clear fault)
 #define STREAK_TO_LATCH_FAULT 2
@@ -169,7 +157,6 @@ bool waterFault = true;
 int shtFailStreak = 0,   shtValidStreak = 0;
 int lightFailStreak = 0, lightValidStreak = 0;
 int co2FailStreak = 0,   co2ValidStreak = 0;
-int waterFailStreak = 0, waterValidStreak = 0;
 
 // Hourly history accumulators
 double hourlyTempSum   = 0.0;
@@ -216,11 +203,6 @@ void streamCallback(FirebaseStream data) {
         digitalWrite(PIN_LIGHT, st ? HIGH : LOW);
         Serial.printf("   💡 [Actuator] Initial Lights (GPIO %d): %s\n", PIN_LIGHT, st ? "ON" : "OFF");
       }
-      if (json->get(result, "valve") || json->get(result, "waterValve") || json->get(result, "co2")) {
-        bool st = result.to<bool>();
-        digitalWrite(PIN_VALVE, st ? HIGH : LOW);
-        Serial.printf("   🚰 [Actuator] Initial Valve (GPIO %d): %s\n", PIN_VALVE, st ? "ON" : "OFF");
-      }
       Serial.println("   [Actuator] Initial states loaded from Firebase.");
     }
     return;
@@ -246,7 +228,7 @@ void streamCallback(FirebaseStream data) {
     digitalWrite(PIN_FAN_INTAKE, state ? HIGH : LOW);
     Serial.printf("   🌀 [Actuator] Intake Fan (GPIO %d) -> %s\n", PIN_FAN_INTAKE, state ? "ON" : "OFF");
   }
-  // Mister / Fogger
+  // Mister / Fogger (Valve operates simultaneously with misters)
   else if (path == "/misters") {
     digitalWrite(PIN_MISTER, state ? HIGH : LOW);
     Serial.printf("   💧 [Actuator] Misters (GPIO %d) -> %s\n", PIN_MISTER, state ? "ON" : "OFF");
@@ -255,11 +237,6 @@ void streamCallback(FirebaseStream data) {
   else if (path == "/lights") {
     digitalWrite(PIN_LIGHT, state ? HIGH : LOW);
     Serial.printf("   💡 [Actuator] Grow Light (GPIO %d) -> %s\n", PIN_LIGHT, state ? "ON" : "OFF");
-  }
-  // Solenoid Valve
-  else if (path == "/valve" || path == "/waterValve" || path == "/co2") {
-    digitalWrite(PIN_VALVE, state ? HIGH : LOW);
-    Serial.printf("   🚰 [Actuator] Solenoid Valve (GPIO %d) -> %s\n", PIN_VALVE, state ? "ON" : "OFF");
   }
 }
 
@@ -289,14 +266,36 @@ void setup() {
   // ── Initialize I2C Bus on GPIO 4 (SDA) and GPIO 5 (SCL) ──
   Wire.begin(I2C_SDA_PIN, I2C_SCL_PIN);
   Wire.setClock(100000); // 100 kHz Standard Mode (rock-solid over breadboard/cables)
+  Wire.setTimeOut(100);  // 100ms timeout for SCD41 clock-stretching support
+  delay(100);            // Allow sensor voltage rails to stabilize
+
+  // ── Live I2C Bus Scanner for Immediate Debugging ──
+  Serial.println("🔍 Scanning I2C Bus on GPIO 4 (SDA) & GPIO 5 (SCL)...");
+  int foundCount = 0;
+  for (uint8_t addr = 1; addr < 127; addr++) {
+    Wire.beginTransmission(addr);
+    if (Wire.endTransmission() == 0) {
+      foundCount++;
+      Serial.printf("   📍 Found I2C device at 0x%02X", addr);
+      if (addr == 0x44 || addr == 0x45) Serial.print(" → SHT3x (Temp/Hum)");
+      else if (addr == 0x23 || addr == 0x5C) Serial.print(" → BH1750 (Lux)");
+      else if (addr == 0x62) Serial.print(" → SCD41 (True NDIR CO₂)");
+      Serial.println();
+    }
+  }
+  if (foundCount == 0) {
+    Serial.println("   ⚠️ No I2C devices found! Check 3.3V/VIN, GND, SDA (GPIO 4), and SCL (GPIO 5).");
+  }
 
   // 1. Initialize SHT3x (Default address 0x44, fallback 0x45)
   if (sht31.begin(0x44)) {
     Serial.println("✅ SHT3x Temp & Humidity sensor initialized! (I2C: 0x44)");
     sht31Ready = true;
+    sht31.heater(false); // Ensure internal defogging heater is OFF
   } else if (sht31.begin(0x45)) {
     Serial.println("✅ SHT3x Temp & Humidity sensor initialized! (I2C: 0x45)");
     sht31Ready = true;
+    sht31.heater(false); // Ensure internal defogging heater is OFF
   } else {
     Serial.println("❌ SHT3x sensor NOT detected. Verify SDA=4, SCL=5, 3.3V, GND.");
   }
@@ -312,35 +311,26 @@ void setup() {
   // 3. Initialize Sensirion SCD41 True NDIR CO₂
   scd4x.begin(Wire, 0x62);
   scd4x.stopPeriodicMeasurement(); // Clean previous state
+  delay(500); // ⚠️ CRITICAL: Sensirion SCD41 requires 500ms to stop periodic measurement!
   uint16_t scdErr = scd4x.startPeriodicMeasurement(); // Starts 5-second sampling
   if (scdErr) {
-    Serial.printf("❌ SCD41 CO₂ sensor error starting periodic measurement: %u\n", scdErr);
+    Serial.printf("❌ SCD41 CO₂ sensor error starting periodic measurement: %u (check wiring to GPIO 4/5)\n", scdErr);
   } else {
     Serial.println("✅ Sensirion SCD41 True NDIR CO₂ sensor initialized!");
     scd4xReady = true;
   }
 
-  // ── Initialize Water Level Sensor pins ──
-  pinMode(WATER_SIG_PIN, INPUT_PULLDOWN);
-  pinMode(WATER_PWR_PIN, OUTPUT);
-  digitalWrite(WATER_PWR_PIN, LOW); // Off by default to prevent electrolysis
-  
   // ── Initialize Actuator LEDs ──
   pinMode(PIN_FAN_EXHAUST, OUTPUT);
   pinMode(PIN_FAN_INTAKE, OUTPUT);
   pinMode(PIN_MISTER, OUTPUT);
   pinMode(PIN_LIGHT, OUTPUT);
-  pinMode(PIN_VALVE, OUTPUT);
   
   // Start with LEDs off
   digitalWrite(PIN_FAN_EXHAUST, LOW);
   digitalWrite(PIN_FAN_INTAKE, LOW);
   digitalWrite(PIN_MISTER, LOW);
   digitalWrite(PIN_LIGHT, LOW);
-  digitalWrite(PIN_VALVE, LOW);
-  
-  // ADC resolution for water sensor (12-bit: 0-4095)
-  analogReadResolution(12);
 
   // ── Connect to WiFi ──
   Serial.print("📶 Connecting to WiFi: ");
@@ -427,8 +417,9 @@ SHTReading readSHT3x() {
     r.humidity    = -999.0;
     r.valid       = false;
   } else {
-    r.temperature = t;
-    r.humidity    = h;
+    // Apply calibration offset to compensate for ESP32/breadboard self-heating
+    r.temperature = t + TEMP_OFFSET;
+    r.humidity    = constrain(h + HUM_OFFSET, 1.0, 100.0);
     r.valid       = true;
   }
   return r;
@@ -461,14 +452,30 @@ LightReading readBH1750() {
 // ── Read SCD41: True NDIR CO₂ (ppm) ──
 CO2Reading readSCD41() {
   CO2Reading r;
+
+  // 1. Auto-recovery: If not initialized or stalled >25s, automatically re-initialize
+  if (!scd4xReady || (lastCO2SuccessTime > 0 && millis() - lastCO2SuccessTime > 25000)) {
+    static unsigned long lastRecoveryAttempt = 0;
+    if (millis() - lastRecoveryAttempt >= 5000) {
+      lastRecoveryAttempt = millis();
+      scd4x.stopPeriodicMeasurement();
+      delay(500); // 500ms required by Sensirion before restart
+      if (scd4x.startPeriodicMeasurement() == 0) {
+        scd4xReady = true;
+        Serial.println("🔄 [SCD41] Auto-recovered & restarted periodic measurement!");
+      }
+    }
+  }
+
   if (!scd4xReady) {
     r.ppm   = -999;
     r.valid = false;
     return r;
   }
 
+  // 2. Check if a new 5-second sample is available
   bool isDataReady = false;
-  int16_t error = scd4x.getDataReadyStatus(isDataReady);
+  uint16_t error = scd4x.getDataReadyStatus(isDataReady);
   
   if (error == 0 && isDataReady) {
     uint16_t co2 = 0;
@@ -476,16 +483,17 @@ CO2Reading readSCD41() {
     float hum = 0.0f;
     error = scd4x.readMeasurement(co2, temp, hum);
     
-    if (error == 0 && co2 >= 350 && co2 <= 5000) {
+    if (error == 0 && co2 > 0 && co2 <= 5000) {
       r.ppm = (int)co2;
       r.valid = true;
       lastValidCO2 = r.ppm;
+      lastCO2SuccessTime = millis();
       return r;
     }
   }
 
-  // If no new sample ready during this 1s tick, reuse last valid reading
-  if (lastValidCO2 > 0) {
+  // 3. Keep latest reading active between 5-second sampling cycles (up to 25s watchdog)
+  if (lastValidCO2 > 0 && (lastCO2SuccessTime == 0 || millis() - lastCO2SuccessTime < 25000)) {
     r.ppm   = lastValidCO2;
     r.valid = true;
   } else {
@@ -495,32 +503,12 @@ CO2Reading readSCD41() {
   return r;
 }
 
-// ── Read Water Level Sensor (Analog or Capacitive Digital) ──
-WaterReading readWaterLevel() {
-  WaterReading r;
-  digitalWrite(WATER_PWR_PIN, HIGH);
-  delay(15); // Allow water power trace to stabilize
-
-  int raw = analogRead(WATER_SIG_PIN);
-  digitalWrite(WATER_PWR_PIN, LOW);
-
-  if (raw < 10) {
-    r.percent = 0;    // Sensor dry
-    r.valid   = true;
-  } else {
-    r.valid   = true;
-    int percent = map(raw, WATER_DRY_VALUE, WATER_WET_VALUE, 0, 100);
-    r.percent = constrain(percent, 0, 100);
-  }
-  return r;
-}
-
 // ═══════════════════════════════════════════════
 //  FIREBASE PUSH FUNCTION
 // ═══════════════════════════════════════════════
 
-void pushToFirebase(float temp, float hum, int light, int co2, int waterLevel,
-                    bool shtErr, bool lightErr, bool co2Err, bool waterErr) {
+void pushToFirebase(float temp, float hum, int light, int co2,
+                    bool shtErr, bool lightErr, bool co2Err) {
   if (!Firebase.ready()) {
     Serial.println("   ⏳ Firebase not ready yet...");
     return;
@@ -531,14 +519,12 @@ void pushToFirebase(float temp, float hum, int light, int co2, int waterLevel,
   float sendHum  = shtErr ? -999.0 : hum;
   int sendLight  = lightErr ? -999 : light;
   int sendCO2    = co2Err ? -999 : co2;
-  int sendWater  = waterErr ? -999 : waterLevel;
 
   FirebaseJson json;
   json.set("temperature", sendTemp);
   json.set("humidity", sendHum);
   json.set("light", sendLight);
   json.set("co2", sendCO2);
-  json.set("waterLevel", sendWater);
   json.set("esp32_status", "online");
   json.set("chip_temperature", temperatureRead());
 
@@ -548,7 +534,6 @@ void pushToFirebase(float temp, float hum, int light, int co2, int waterLevel,
   json.set("hum_error", shtErr);
   json.set("light_error", lightErr);
   json.set("co2_error", co2Err);
-  json.set("water_error", waterErr);
 
   FirebaseJson ts;
   ts.set(".sv", "timestamp");
@@ -727,24 +712,6 @@ void loop() {
       }
     }
 
-    // 4. Read Water Level
-    WaterReading waterData = readWaterLevel();
-    if (waterData.valid) {
-      waterFailStreak = 0;
-      waterValidStreak++;
-      if (waterValidStreak >= STREAK_TO_CLEAR_FAULT) {
-        waterFault   = false;
-        currentWater = waterData.percent;
-      }
-    } else {
-      waterValidStreak = 0;
-      waterFailStreak++;
-      if (waterFailStreak >= STREAK_TO_LATCH_FAULT) {
-        waterFault   = true;
-        currentWater = -999;
-      }
-    }
-
     // ── Instant Local Serial Monitor Output ──
     Serial.println("📊 ── Live Sensor Readings (Digital I2C) ─────────────");
     if (shtFault) {
@@ -767,11 +734,6 @@ void loop() {
       Serial.printf("   🌬️  CO₂ Level:    %d ppm (Sensirion NDIR)\n", currentCO2);
     }
 
-    if (waterFault) {
-      Serial.println("   🫧 Water Level:  [⚠️ UNPLUGGED / FAULT]");
-    } else {
-      Serial.printf("   🫧 Water Level:  %d %%\n", currentWater);
-    }
     Serial.printf("   🔥 ESP32 Chip Temp: %.1f °C\n", temperatureRead());
     Serial.println("──────────────────────────────────────────────────────");
   }
@@ -791,8 +753,8 @@ void loop() {
   if (now - lastFirebasePush >= FIREBASE_PUSH_INTERVAL) {
     lastFirebasePush = now;
     if (WiFi.status() == WL_CONNECTED) {
-      pushToFirebase(currentTemp, currentHum, currentLight, currentCO2, currentWater,
-                     shtFault, lightFault, co2Fault, waterFault);
+      pushToFirebase(currentTemp, currentHum, currentLight, currentCO2,
+                     shtFault, lightFault, co2Fault);
 
       // Accumulate for hourly history averages if sensor is not faulted
       if (!shtFault && currentTemp > 0 && currentHum > 0) {

@@ -1,4 +1,6 @@
 import { ScheduleSettings } from '../types/firebase';
+import { ACTIVE_PROFILE, CropProfile } from '../config/cropProfiles';
+import { getControlBands } from '../config/controlBands';
 
 /**
  * Computes the expected real-time ON/OFF state of devices based on their schedule and the current time.
@@ -101,24 +103,28 @@ export interface AutoDecisionResult {
 
 /**
  * Computes automatic device states AND explicit rationales for why devices are active or blocked.
- * Grounded in agricultural control thresholds and setpoints.
+ * Grounded directly in literature crop profile bands with grace bearing and hysteresis.
  */
 export const computeAutoDecision = (
   sensors?: { temperature?: number; humidity?: number; light?: number; co2?: number; waterLevel?: number } | null,
-  setpoints?: { temperature?: number; humidity?: number; light?: number; co2?: number } | null
+  previousDevicesOrSetpoints?: { fans?: boolean; misters?: boolean; lights?: boolean; fanIn?: boolean; fanOut?: boolean; [key: string]: any } | null,
+  profile: CropProfile = ACTIVE_PROFILE
 ): AutoDecisionResult => {
-  const targetTemp = typeof setpoints?.temperature === 'number'
-    ? setpoints.temperature
-    : parseFloat(setpoints?.temperature as any) || 28.0;
-  const targetHum = typeof setpoints?.humidity === 'number'
-    ? setpoints.humidity
-    : parseFloat(setpoints?.humidity as any) || 85.0;
-  const targetLight = typeof setpoints?.light === 'number'
-    ? setpoints.light
-    : parseFloat(setpoints?.light as any) || 580;
-  const targetCO2 = typeof setpoints?.co2 === 'number'
-    ? setpoints.co2
-    : parseFloat(setpoints?.co2 as any) || 690;
+  const bands = getControlBands(profile);
+
+  // Check if second argument is previous device states for hysteresis
+  const isPreviousDevices =
+    previousDevicesOrSetpoints &&
+    ('fans' in previousDevicesOrSetpoints ||
+      'misters' in previousDevicesOrSetpoints ||
+      'lights' in previousDevicesOrSetpoints ||
+      'fanOut' in previousDevicesOrSetpoints);
+
+  const prevFans = Boolean(
+    isPreviousDevices && (previousDevicesOrSetpoints?.fans || previousDevicesOrSetpoints?.fanOut)
+  );
+  const prevMisters = Boolean(isPreviousDevices && previousDevicesOrSetpoints?.misters);
+  const prevLights = Boolean(isPreviousDevices && previousDevicesOrSetpoints?.lights);
 
   const currentTemp = typeof sensors?.temperature === 'number'
     ? sensors.temperature
@@ -145,48 +151,60 @@ export const computeAutoDecision = (
 
   const reasons: AutoDecisionResult['reasons'] = {};
 
-  // 1. CO₂ PURGING & AIR VENTILATION (Exhaust Fans)
-  const needFansForCo2 = isCo2Valid && currentCO2 > (targetCO2 + 25);
+  // Cold temperature lockout: Shuts fans OFF to preserve room heat
+  const isTempCold = isTempValid && currentTemp < bands.tempColdBelow;
 
-  // 2. HUMIDITY REGULATION (Exhaust Fans & Misters)
-  const needFansForHum = isHumValid && currentHum > (targetHum + 2.5);
-  const needMistersForHum = isHumValid && currentHum < (targetHum - 2.0);
+  // 1. CO₂ PURGING & AIR VENTILATION (Exhaust Fans with Hysteresis & Grace)
+  // ON at >= 1150 ppm, stays ON until <= 900 ppm
+  const needFansForCo2 = isCo2Valid && (prevFans ? currentCO2 > bands.exhaustCo2Off : currentCO2 >= bands.exhaustCo2On);
+
+  // 2. HUMIDITY REGULATION (Exhaust Fans & Misters with Hysteresis & Grace)
+  // High humidity exhaust: ON at >= 100%, stays ON until <= 92%
+  const needFansForHum = isHumValid && (prevFans ? currentHum > bands.exhaustHumOff : currentHum >= bands.exhaustHumOn);
+
+  // Misters: ON when hum < 75%, stays ON until >= 88%
+  const needMistersForHum = isHumValid && (prevMisters ? currentHum < bands.misterOff : currentHum < bands.misterOn);
 
   let misters = false;
   if (needMistersForHum) {
     if (isWaterSafe) {
       misters = true;
-      reasons.misters = `Humidity ${Math.round(currentHum)}% is below target ${Math.round(targetHum)}%`;
+      reasons.misters = `Humidity ${Math.round(currentHum)}% below research threshold (< ${bands.misterOn}%) • Islam et al. (2022)`;
     } else {
       reasons.mistersBlocked = `Water at ${Math.round(currentWater)}%: misting paused to protect pump`;
     }
   }
 
-  // 3. TEMPERATURE REGULATION (Exhaust Fans)
-  const needFansForTemp = isTempValid && currentTemp > (targetTemp + 0.5);
-  const isTempCold = isTempValid && currentTemp < (targetTemp - 2.0);
+  // 3. TEMPERATURE REGULATION (Exhaust Fans with Hysteresis & Grace)
+  // ON when temp > 27.0 °C, stays ON until <= 25.0 °C
+  const needFansForTemp = isTempValid && (prevFans ? currentTemp > bands.exhaustTempOff : currentTemp > bands.exhaustTempOn);
 
   // 4. UNIFIED EXHAUST FAN STATE
   let fans = false;
-  if (needFansForCo2) {
+  if (isTempCold) {
+    fans = false;
+    reasons.fans = `Ambient temp ${currentTemp.toFixed(1)}°C below safe biological floor (< ${bands.tempColdBelow}°C): fans locked OFF to retain heat`;
+  } else if (needFansForTemp) {
     fans = true;
-    reasons.fans = `CO₂ ${Math.round(currentCO2)} ppm is above target ${Math.round(targetCO2)} ppm`;
+    reasons.fans = `Temp ${currentTemp.toFixed(1)}°C exceeds research limit with grace (> ${bands.exhaustTempOn}°C) • Islam et al. (2022)`;
+  } else if (needFansForCo2) {
+    fans = true;
+    reasons.fans = `CO₂ ${Math.round(currentCO2)} ppm exceeds allowable threshold with grace (≥ ${bands.exhaustCo2On} ppm) • Bellettini et al. (2019)`;
   } else if (needFansForHum) {
     fans = true;
-    reasons.fans = `Humidity ${Math.round(currentHum)}% is above target ${Math.round(targetHum)}%`;
-  } else if (needFansForTemp && !isTempCold) {
-    fans = true;
-    reasons.fans = `Temp ${currentTemp.toFixed(1)}°C is above target ${targetTemp.toFixed(1)}°C`;
+    reasons.fans = `Humidity ${Math.round(currentHum)}% saturated • ventilating chamber`;
   }
 
-  // 5. GROW LIGHT REGULATION
+  // 5. GROW LIGHT REGULATION (with Hysteresis & Grace)
+  // ON when light < 100 lx, stays ON until >= 300 lx
+  const needLights = isLightValid && (prevLights ? currentLight < bands.lightsOff : currentLight < bands.lightsOn);
   let lights = false;
-  if (isLightValid && currentLight < (targetLight - 50)) {
+  if (needLights) {
     lights = true;
-    reasons.lights = `Light ${Math.round(currentLight)} lx is below target ${Math.round(targetLight)} lx`;
+    reasons.lights = `Light ${Math.round(currentLight)} lx below minimum (< ${bands.lightsOn} lx) • Bellettini et al. (2019)`;
   }
 
-  // 6. SOLENOID VALVE (Closed during oyster fruiting)
+  // 6. SOLENOID VALVE & CO2 (Closed during oyster fruiting)
   const valve = false;
   const co2 = false;
 
@@ -205,13 +223,14 @@ export const computeAutoDecision = (
 };
 
 /**
- * Backwards-compatible wrapper returning only the device states.
+ * Returns the computed automatic device states.
  */
 export const computeAutoDevicesState = (
   sensors?: { temperature?: number; humidity?: number; light?: number; co2?: number; waterLevel?: number } | null,
-  setpoints?: { temperature?: number; humidity?: number; light?: number; co2?: number } | null
+  previousDevicesOrSetpoints?: any,
+  profile: CropProfile = ACTIVE_PROFILE
 ) => {
-  return computeAutoDecision(sensors, setpoints).states;
+  return computeAutoDecision(sensors, previousDevicesOrSetpoints, profile).states;
 };
 
 export interface DeviceActivityExplanation {
@@ -236,7 +255,7 @@ export const explainDeviceActivity = (
   const list: DeviceActivityExplanation[] = [];
 
   if (normMode === 'auto') {
-    const { reasons } = computeAutoDecision(sensors, setpoints);
+    const { reasons } = computeAutoDecision(sensors, activeDevices);
 
     if (activeDevices.fans) {
       list.push({

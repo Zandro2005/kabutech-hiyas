@@ -8,6 +8,7 @@ export interface LiteratureCitation {
 export interface ParamRange {
   min?: number;
   max?: number;
+  graceBearing: number; // Tolerance buffer before state switches to 'low' or 'high'
   criticalMargin: number; // Deviation past min/max to trigger critical tier
   unit: string;
   source: string; // Compact citation string for badges / compact text
@@ -92,6 +93,7 @@ export const OYSTER_FRUITING: CropProfile = {
   temp: {
     min: 18,
     max: 25,
+    graceBearing: 2.0, // Safe zone: 16.0–27.0 °C
     criticalMargin: 3.0,
     unit: '°C',
     source: 'Islam et al. (2022); Hu et al. (2023); Girmay et al. (2016)',
@@ -101,6 +103,7 @@ export const OYSTER_FRUITING: CropProfile = {
   hum: {
     min: 80,
     max: 95,
+    graceBearing: 5.0, // Safe zone: 75–100 %
     criticalMargin: 10,
     unit: '%',
     source: 'Islam et al. (2022); Chong et al. (2023)',
@@ -109,6 +112,7 @@ export const OYSTER_FRUITING: CropProfile = {
   },
   co2: {
     max: 1000,
+    graceBearing: 150, // Safe zone: <= 1150 ppm
     criticalMargin: 500,
     unit: 'ppm',
     source: 'Bellettini et al. (2019); Mohammed et al. (2018); Lin et al. (2022)',
@@ -118,6 +122,7 @@ export const OYSTER_FRUITING: CropProfile = {
   light: {
     min: 150,
     max: 1000,
+    graceBearing: 50, // Safe zone: 100–1050 lx
     criticalMargin: 300,
     unit: 'lx',
     source: 'Bellettini et al. (2019); Arjona et al. (2009)',

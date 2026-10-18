@@ -10,7 +10,6 @@ import { useTheme } from '../../context/ThemeContext';
 import ScreenHeader from '../../components/ScreenHeader';
 import CriticalSystemAlerts from '../../components/CriticalSystemAlerts';
 import EnvironmentMetricsGrid from '../../components/EnvironmentMetricsGrid';
-import WaterLevelCard from '../../components/WaterLevelCard';
 import ChamberStatusHero from '../../components/ChamberStatusHero';
 import HomeScreenSkeleton from '../../components/skeletons/HomeScreenSkeleton';
 import { useEnvironmentAlerts } from '../../hooks/useEnvironmentAlerts';
@@ -52,7 +51,6 @@ export default function StaffHomeScreen() {
   const hum = !isControllerOff && typeof sensors.humidity === 'number' && sensors.humidity !== -999 && sensors.humidity > 0 ? sensors.humidity : -999;
   const light = !isControllerOff && typeof sensors.light === 'number' && sensors.light !== -999 && sensors.light >= 0 ? sensors.light : -999;
   const co2 = !isControllerOff && typeof sensors.co2 === 'number' && sensors.co2 !== -999 && sensors.co2 > 0 ? sensors.co2 : -999;
-  const waterLevel = !isControllerOff && typeof sensors.waterLevel === 'number' && sensors.waterLevel !== -999 && sensors.waterLevel >= 0 ? sensors.waterLevel : -999;
 
   const isAuto = String(settings?.setpoints?.mode).toLowerCase() === 'auto';
   const isScheduled = String(settings?.setpoints?.mode).toLowerCase() === 'scheduled';
@@ -118,10 +116,7 @@ export default function StaffHomeScreen() {
           {/* 3. Health Metrics (2x2 Minimal Clean Grid) */}
           <EnvironmentMetricsGrid temp={temp} hum={hum} light={light} co2={co2} navigation={navigation} />
 
-          {/* 4. Water Reservoir Level Indicator */}
-          <WaterLevelCard waterLevel={waterLevel} navigation={navigation} readOnly={true} />
-
-          {/* 5. Critical System Alerts */}
+          {/* 4. Critical System Alerts */}
           <CriticalSystemAlerts alerts={alerts} onAlertPress={() => navigation.navigate('Alerts' as any)} />
 
         </ScrollView>

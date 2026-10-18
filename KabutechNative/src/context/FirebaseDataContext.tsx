@@ -211,7 +211,7 @@ export const FirebaseDataProvider: React.FC<{ children: React.ReactNode }> = ({ 
       if (mode === 'scheduled') {
         desiredDevices = { ...desiredDevices, ...computeScheduledDevicesState(settings?.schedules) };
       } else if (mode === 'auto') {
-        desiredDevices = { ...desiredDevices, ...computeAutoDevicesState(sensors, settings?.setpoints) };
+        desiredDevices = { ...desiredDevices, ...computeAutoDevicesState(sensors, currentDevices) };
       }
 
       const changed =

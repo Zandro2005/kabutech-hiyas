@@ -107,23 +107,6 @@ export function useEnvironmentAlerts(): EnvironmentAlertsResult {
   const result = useMemo(() => {
     const list: EnvironmentAlertItem[] = [];
 
-    // Target Setpoints from Settings (Strictly numeric parsing)
-    const targetTemp = typeof settings?.setpoints?.temperature === 'number'
-      ? settings.setpoints.temperature
-      : parseFloat(settings?.setpoints?.temperature as any) || 28.0;
-
-    const targetHum = typeof settings?.setpoints?.humidity === 'number'
-      ? settings.setpoints.humidity
-      : parseFloat(settings?.setpoints?.humidity as any) || 85;
-
-    const targetLight = typeof settings?.setpoints?.light === 'number'
-      ? settings.setpoints.light
-      : parseFloat(settings?.setpoints?.light as any) || 580;
-
-    const targetCO2 = typeof settings?.setpoints?.co2 === 'number'
-      ? settings.setpoints.co2
-      : parseFloat(settings?.setpoints?.co2 as any) || 690;
-
     // Active device states (Auto mode, Scheduled mode, or Manual switches)
     const mode = settings?.setpoints?.mode || 'auto';
     const isAuto = mode === 'auto';
@@ -132,7 +115,7 @@ export function useEnvironmentAlerts(): EnvironmentAlertsResult {
     const activeDevices = isScheduled
       ? computeScheduledDevicesState(settings?.schedules)
       : isAuto
-      ? computeAutoDevicesState(sensors, settings?.setpoints)
+      ? computeAutoDevicesState(sensors, settings?.setpoints?.devices)
       : {
           fans: Boolean(settings?.setpoints?.devices?.fans),
           misters: Boolean(settings?.setpoints?.devices?.misters),
@@ -182,37 +165,8 @@ export function useEnvironmentAlerts(): EnvironmentAlertsResult {
       });
     }
 
-    // 3. Water Reservoir Level Alerts
-    const waterLevel = typeof sensors?.waterLevel === 'number' ? sensors.waterLevel : 75;
-    if (!health.waterError) {
-      if (waterLevel <= 10) {
-        list.push({
-          id: 'water-critical',
-          type: 'critical',
-          title: 'Water Depleted',
-          shortLabel: `Water Empty • ${Math.round(waterLevel)}%`,
-          currentValue: `${Math.round(waterLevel)}%`,
-          targetValue: '> 25%',
-          action: 'Refill reservoir tank immediately',
-          message: 'Refill reservoir tank immediately',
-          icon: 'water-alert',
-          metric: 'water',
-        });
-      } else if (waterLevel <= 20) {
-        list.push({
-          id: 'water-low',
-          type: 'warning',
-          title: 'Water Level Low',
-          shortLabel: `Water Low • ${Math.round(waterLevel)}%`,
-          currentValue: `${Math.round(waterLevel)}%`,
-          targetValue: '> 25%',
-          action: 'Refill reservoir tank',
-          message: 'Refill reservoir tank',
-          icon: 'water-alert',
-          metric: 'water',
-        });
-      }
-    }
+    // 3. Water Reservoir Level Alerts (Temporarily omitted while sensor is removed)
+    const waterLevel = typeof sensors?.waterLevel === 'number' ? sensors.waterLevel : -999;
 
     const temp = typeof sensors?.temperature === 'number' ? sensors.temperature : 25;
     const hum = typeof sensors?.humidity === 'number' ? sensors.humidity : 80;

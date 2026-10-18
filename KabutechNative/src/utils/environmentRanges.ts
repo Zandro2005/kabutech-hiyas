@@ -98,9 +98,14 @@ export function evaluateParam(
       ? Math.round(value).toString()
       : Math.round(value).toString();
 
-  // Range evaluation (inclusive: min <= value <= max is in_range)
-  if (range.min !== undefined && value < range.min) {
-    const deviation = Number((range.min - value).toFixed(1));
+  // Range evaluation with grace bearing buffer
+  // The system only switches state to 'low' or 'high' when the reading crosses beyond the graceBearing buffer
+  const grace = range.graceBearing || 0;
+  const minThreshold = range.min !== undefined ? range.min - grace : undefined;
+  const maxThreshold = range.max !== undefined ? range.max + grace : undefined;
+
+  if (minThreshold !== undefined && value < minThreshold) {
+    const deviation = Number((range.min! - value).toFixed(1));
     const severity: ParamSeverity = deviation >= range.criticalMargin ? 'critical' : 'warning';
     return {
       key,
@@ -120,8 +125,8 @@ export function evaluateParam(
     };
   }
 
-  if (range.max !== undefined && value > range.max) {
-    const deviation = Number((value - range.max).toFixed(1));
+  if (maxThreshold !== undefined && value > maxThreshold) {
+    const deviation = Number((value - range.max!).toFixed(1));
     const severity: ParamSeverity = deviation >= range.criticalMargin ? 'critical' : 'warning';
     return {
       key,
@@ -141,6 +146,7 @@ export function evaluateParam(
     };
   }
 
+  // Value is strictly within [min, max] OR within allowable grace bearing buffer -> 'in_range' / 'ok'
   return {
     key,
     label,
