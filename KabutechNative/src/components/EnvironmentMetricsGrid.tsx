@@ -189,10 +189,12 @@ export default React.memo(function EnvironmentMetricsGrid({ temp, hum, light, co
               hapticSelection();
               navigation.navigate('Analytics' as never);
             }}
-            style={tw`flex-row items-center py-1 px-2.5 rounded-full bg-emerald-500/10 dark:bg-emerald-500/15`}
+            style={tw`flex-row items-center py-1 px-2.5 rounded-full bg-emerald-100/60 dark:bg-emerald-950/40 border border-emerald-200/60 dark:border-emerald-800/60`}
           >
-            <Text style={[tw`text-xs text-[#10b981] mr-1`, { fontFamily: 'PlusJakartaSans_700Bold' }]}>Analytics</Text>
-            <Ionicons name="chevron-forward" size={12} color="#10b981" />
+            <Text style={[tw`text-xs text-[#064e3b] dark:text-[#34d399] mr-1`, { fontFamily: 'PlusJakartaSans_800ExtraBold' }]}>
+              Analytics
+            </Text>
+            <Ionicons name="chevron-forward" size={12} color={isDarkMode ? '#34d399' : '#064e3b'} />
           </TouchableOpacity>
         )}
       </View>

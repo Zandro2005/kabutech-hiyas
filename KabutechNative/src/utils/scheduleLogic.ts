@@ -84,6 +84,9 @@ export interface AutoDecisionResult {
     fanIn: boolean;
     fanOut: boolean;
     fans: boolean;
+    fansCo2?: boolean;
+    fansTemp?: boolean;
+    fansHum?: boolean;
     misters: boolean;
     lights: boolean;
     valve: boolean;
@@ -112,19 +115,28 @@ export const computeAutoDecision = (
 ): AutoDecisionResult => {
   const bands = getControlBands(profile);
 
-  // Check if second argument is previous device states for hysteresis
-  const isPreviousDevices =
+  // Support both direct device maps and setpoints containers ({ mode, devices: { ... } })
+  const actualPrev =
     previousDevicesOrSetpoints &&
-    ('fans' in previousDevicesOrSetpoints ||
-      'misters' in previousDevicesOrSetpoints ||
-      'lights' in previousDevicesOrSetpoints ||
-      'fanOut' in previousDevicesOrSetpoints);
+    typeof previousDevicesOrSetpoints === 'object' &&
+    'devices' in previousDevicesOrSetpoints &&
+    previousDevicesOrSetpoints.devices
+      ? previousDevicesOrSetpoints.devices
+      : previousDevicesOrSetpoints;
+
+  // Check if argument provides previous device states for hysteresis
+  const isPreviousDevices =
+    actualPrev &&
+    ('fans' in actualPrev ||
+      'misters' in actualPrev ||
+      'lights' in actualPrev ||
+      'fanOut' in actualPrev);
 
   const prevFans = Boolean(
-    isPreviousDevices && (previousDevicesOrSetpoints?.fans || previousDevicesOrSetpoints?.fanOut)
+    isPreviousDevices && (actualPrev?.fans || actualPrev?.fanOut)
   );
-  const prevMisters = Boolean(isPreviousDevices && previousDevicesOrSetpoints?.misters);
-  const prevLights = Boolean(isPreviousDevices && previousDevicesOrSetpoints?.lights);
+  const prevMisters = Boolean(isPreviousDevices && actualPrev?.misters);
+  const prevLights = Boolean(isPreviousDevices && actualPrev?.lights);
 
   const currentTemp = typeof sensors?.temperature === 'number'
     ? sensors.temperature
@@ -154,15 +166,37 @@ export const computeAutoDecision = (
   // Cold temperature lockout: Shuts fans OFF to preserve room heat
   const isTempCold = isTempValid && currentTemp < bands.tempColdBelow;
 
+  // Independent previous state tracking (prevents cross-trigger latching between CO2, Temp, and Humidity)
+  const prevFansCo2 = Boolean(
+    isPreviousDevices &&
+      (actualPrev?.fansCo2 !== undefined
+        ? actualPrev.fansCo2
+        : prevFans && currentCO2 > bands.exhaustCo2Off)
+  );
+
+  const prevFansTemp = Boolean(
+    isPreviousDevices &&
+      (actualPrev?.fansTemp !== undefined
+        ? actualPrev.fansTemp
+        : prevFans && currentTemp > bands.exhaustTempOff)
+  );
+
+  const prevFansHum = Boolean(
+    isPreviousDevices &&
+      (actualPrev?.fansHum !== undefined
+        ? actualPrev.fansHum
+        : prevFans && currentHum > bands.exhaustHumOff)
+  );
+
   // 1. CO₂ PURGING & AIR VENTILATION (Exhaust Fans with Hysteresis & Grace)
-  // ON at >= 1150 ppm, stays ON until <= 900 ppm
-  const needFansForCo2 = isCo2Valid && (prevFans ? currentCO2 > bands.exhaustCo2Off : currentCO2 >= bands.exhaustCo2On);
+  // ON at >= 1150 ppm, turns OFF when <= 1000 ppm (returns to optimal target)
+  const needFansForCo2 = isCo2Valid && (prevFansCo2 ? currentCO2 > bands.exhaustCo2Off : currentCO2 >= bands.exhaustCo2On);
 
   // 2. HUMIDITY REGULATION (Exhaust Fans & Misters with Hysteresis & Grace)
-  // High humidity exhaust: ON at >= 100%, stays ON until <= 92%
-  const needFansForHum = isHumValid && (prevFans ? currentHum > bands.exhaustHumOff : currentHum >= bands.exhaustHumOn);
+  // High humidity exhaust: ON at >= 100%, turns OFF when <= 95% (returns to normal crop range)
+  const needFansForHum = isHumValid && (prevFansHum ? currentHum > bands.exhaustHumOff : currentHum >= bands.exhaustHumOn);
 
-  // Misters: ON when hum < 75%, stays ON until >= 88%
+  // Misters: ON when hum < 75%, turns OFF when >= 84% (safely inside optimal 80-95% band)
   const needMistersForHum = isHumValid && (prevMisters ? currentHum < bands.misterOff : currentHum < bands.misterOn);
 
   let misters = false;
@@ -176,27 +210,36 @@ export const computeAutoDecision = (
   }
 
   // 3. TEMPERATURE REGULATION (Exhaust Fans with Hysteresis & Grace)
-  // ON when temp > 27.0 °C, stays ON until <= 25.0 °C
-  const needFansForTemp = isTempValid && (prevFans ? currentTemp > bands.exhaustTempOff : currentTemp > bands.exhaustTempOn);
+  // ON when temp > 27.0 °C, turns OFF when <= 26.0 °C (returns to safe optimal zone; avoids tropical lock-on)
+  const needFansForTemp = isTempValid && (prevFansTemp ? currentTemp > bands.exhaustTempOff : currentTemp > bands.exhaustTempOn);
 
   // 4. UNIFIED EXHAUST FAN STATE
   let fans = false;
+  let fansCo2 = false;
+  let fansTemp = false;
+  let fansHum = false;
+
   if (isTempCold) {
     fans = false;
     reasons.fans = `Ambient temp ${currentTemp.toFixed(1)}°C below safe biological floor (< ${bands.tempColdBelow}°C): fans locked OFF to retain heat`;
-  } else if (needFansForTemp) {
-    fans = true;
-    reasons.fans = `Temp ${currentTemp.toFixed(1)}°C exceeds research limit with grace (> ${bands.exhaustTempOn}°C) • Islam et al. (2022)`;
-  } else if (needFansForCo2) {
-    fans = true;
-    reasons.fans = `CO₂ ${Math.round(currentCO2)} ppm exceeds allowable threshold with grace (≥ ${bands.exhaustCo2On} ppm) • Bellettini et al. (2019)`;
-  } else if (needFansForHum) {
-    fans = true;
-    reasons.fans = `Humidity ${Math.round(currentHum)}% saturated • ventilating chamber`;
+  } else {
+    if (needFansForTemp) {
+      fans = true;
+      fansTemp = true;
+      reasons.fans = `Temp ${currentTemp.toFixed(1)}°C exceeds research limit with grace (> ${bands.exhaustTempOn}°C) • Islam et al. (2022)`;
+    } else if (needFansForCo2) {
+      fans = true;
+      fansCo2 = true;
+      reasons.fans = `CO₂ ${Math.round(currentCO2)} ppm exceeds allowable threshold with grace (≥ ${bands.exhaustCo2On} ppm) • Bellettini et al. (2019)`;
+    } else if (needFansForHum) {
+      fans = true;
+      fansHum = true;
+      reasons.fans = `Humidity ${Math.round(currentHum)}% saturated • ventilating chamber`;
+    }
   }
 
   // 5. GROW LIGHT REGULATION (with Hysteresis & Grace)
-  // ON when light < 100 lx, stays ON until >= 300 lx
+  // ON when light < 100 lx, turns OFF as soon as light reaches >= 150 lx (optimal research target)
   const needLights = isLightValid && (prevLights ? currentLight < bands.lightsOff : currentLight < bands.lightsOn);
   let lights = false;
   if (needLights) {
@@ -213,6 +256,9 @@ export const computeAutoDecision = (
       fanIn: fans,
       fanOut: fans,
       fans,
+      fansCo2,
+      fansTemp,
+      fansHum,
       misters,
       lights,
       valve,
@@ -230,7 +276,16 @@ export const computeAutoDevicesState = (
   previousDevicesOrSetpoints?: any,
   profile: CropProfile = ACTIVE_PROFILE
 ) => {
-  return computeAutoDecision(sensors, previousDevicesOrSetpoints, profile).states;
+  const { states } = computeAutoDecision(sensors, previousDevicesOrSetpoints, profile);
+  return {
+    fans: states.fans,
+    fanIn: states.fanIn,
+    fanOut: states.fanOut,
+    misters: states.misters,
+    lights: states.lights,
+    valve: states.valve,
+    co2: states.co2,
+  };
 };
 
 export interface DeviceActivityExplanation {

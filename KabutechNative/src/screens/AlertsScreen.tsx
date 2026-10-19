@@ -18,6 +18,7 @@ import { ref, update, set, remove } from 'firebase/database';
 import tw from '../tailwind';
 import { useTheme } from '../context/ThemeContext';
 import { useAlerts } from '../hooks/useFirebaseData';
+import { useEnvironmentAlerts, dismissEnvironmentAlert, dismissAllEnvironmentAlerts } from '../hooks/useEnvironmentAlerts';
 import { db } from '../services/firebase';
 import { AlertData } from '../types/firebase';
 import { GlobalNavigationParamList } from '../types/navigation';
@@ -44,6 +45,7 @@ export default function AlertsScreen() {
   const insets = useSafeAreaInsets();
   const { isDarkMode } = useTheme();
   const rawAlerts = useAlerts();
+  const { unreadAlerts } = useEnvironmentAlerts();
 
   const [activeFilter, setActiveFilter] = useState<FilterType>('active');
   const [activeSort, setActiveSort] = useState<SortOption>('newest');
@@ -54,19 +56,47 @@ export default function AlertsScreen() {
   const [isDeleting, setIsDeleting] = useState(false);
   const [deletingId, setDeletingId] = useState<string | null>(null);
 
-  // Normalize alerts array
+  // Normalize alerts array and seamlessly merge any unread environment alerts with 0ms delay
   const alertsList: AlertData[] = useMemo(() => {
-    if (!rawAlerts) return [];
-    if (Array.isArray(rawAlerts)) return rawAlerts.filter(Boolean);
-    if (typeof rawAlerts === 'object') {
-      return Object.entries(rawAlerts).map(([key, val]: [string, any]) => ({
+    let list: AlertData[] = [];
+    if (Array.isArray(rawAlerts)) {
+      list = rawAlerts.filter(Boolean);
+    } else if (typeof rawAlerts === 'object' && rawAlerts !== null) {
+      list = Object.entries(rawAlerts).map(([key, val]: [string, any]) => ({
         ...val,
         id: val?.id || key,
         firebaseKey: key,
       }));
     }
-    return [];
-  }, [rawAlerts]);
+
+    // Merge in any active unread environment alerts so there is 0ms delay between banner and subpage
+    if (unreadAlerts && unreadAlerts.length > 0) {
+      for (const envAlert of unreadAlerts) {
+        const alreadyListed = list.some(
+          (a) => !a.resolved && (a.metadata?.alertId === envAlert.id || a.title === envAlert.title)
+        );
+        if (!alreadyListed) {
+          list.unshift({
+            id: envAlert.id,
+            firebaseKey: `live-${envAlert.id}`,
+            title: envAlert.title,
+            type: envAlert.type,
+            message: envAlert.message,
+            timestamp: new Date().toISOString(),
+            resolved: false,
+            metadata: {
+              alertId: envAlert.id,
+              metric: envAlert.metric,
+              currentValue: envAlert.currentValue || '',
+              targetValue: envAlert.targetValue || '',
+            },
+          });
+        }
+      }
+    }
+
+    return list;
+  }, [rawAlerts, unreadAlerts]);
 
   // Counts for tabs & summary
   const counts = useMemo(() => {
@@ -148,19 +178,18 @@ export default function AlertsScreen() {
     try {
       setIsClearing(true);
       hapticSuccess();
+      dismissAllEnvironmentAlerts();
 
       const updates: Record<string, boolean> = {};
       alertsList.forEach((alert, idx) => {
         const key = alert.firebaseKey || alert.id || String(idx);
-        updates[`kabutech/alerts/${key}/resolved`] = true;
+        if (!key.startsWith('live-')) {
+          updates[`kabutech/alerts/${key}/resolved`] = true;
+        }
       });
 
       if (Object.keys(updates).length > 0) {
         await update(ref(db), updates);
-      } else {
-        // Fallback for array format
-        const resolvedList = alertsList.map(a => ({ ...a, resolved: true }));
-        await set(ref(db, 'kabutech/alerts'), resolvedList);
       }
 
       showToast({
@@ -190,9 +219,18 @@ export default function AlertsScreen() {
       setResolvingId(key);
       hapticMedium();
 
-      await update(ref(db), {
-        [`kabutech/alerts/${key}/resolved`]: true,
-      });
+      if (alert.metadata?.alertId) {
+        dismissEnvironmentAlert(String(alert.metadata.alertId));
+      } else if (alert.id) {
+        dismissEnvironmentAlert(alert.id);
+      }
+
+      if (!key.startsWith('live-')) {
+        await update(ref(db), {
+          [`kabutech/alerts/${key}/resolved`]: true,
+          [`kabutech/alerts/${key}/resolvedAt`]: new Date().toISOString(),
+        });
+      }
 
       showToast({
         type: 'success',

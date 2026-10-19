@@ -5,6 +5,7 @@ import { useNavigation } from '@react-navigation/native';
 import tw from '../tailwind';
 import { useTheme } from '../context/ThemeContext';
 import { AlertData } from '../types/firebase';
+import { useEnvironmentAlerts, dismissEnvironmentAlert, dismissAllEnvironmentAlerts } from '../hooks/useEnvironmentAlerts';
 import { hapticLight, hapticSelection, hapticSuccess } from '../utils/haptics';
 import { ref, set, update } from 'firebase/database';
 import { db } from '../services/firebase';
@@ -19,20 +20,48 @@ export default React.memo(function CriticalSystemAlerts({ alerts, onAlertPress }
   const navigation = useNavigation<any>();
   const { isDarkMode } = useTheme();
   const [isClearing, setIsClearing] = useState(false);
+  const { unreadAlerts } = useEnvironmentAlerts();
 
-  // Normalize alerts array
+  // Normalize alerts array and merge active environment alerts with 0ms delay
   const rawList = useMemo(() => {
-    if (!alerts) return [];
-    if (Array.isArray(alerts)) return alerts.filter(Boolean);
-    if (typeof alerts === 'object') {
-      return Object.entries(alerts).map(([key, val]: [string, any]) => ({
+    let list: AlertData[] = [];
+    if (Array.isArray(alerts)) {
+      list = alerts.filter(Boolean);
+    } else if (typeof alerts === 'object' && alerts !== null) {
+      list = Object.entries(alerts).map(([key, val]: [string, any]) => ({
         ...val,
         id: val?.id || key,
         firebaseKey: key,
       }));
     }
-    return [];
-  }, [alerts]);
+
+    if (unreadAlerts && unreadAlerts.length > 0) {
+      for (const envAlert of unreadAlerts) {
+        const alreadyListed = list.some(
+          (a) => !a.resolved && (a.metadata?.alertId === envAlert.id || a.title === envAlert.title)
+        );
+        if (!alreadyListed) {
+          list.unshift({
+            id: envAlert.id,
+            firebaseKey: `live-${envAlert.id}`,
+            title: envAlert.title,
+            type: envAlert.type,
+            message: envAlert.message,
+            timestamp: new Date().toISOString(),
+            resolved: false,
+            metadata: {
+              alertId: envAlert.id,
+              metric: envAlert.metric,
+              currentValue: envAlert.currentValue || '',
+              targetValue: envAlert.targetValue || '',
+            },
+          });
+        }
+      }
+    }
+
+    return list;
+  }, [alerts, unreadAlerts]);
 
   // Filter only genuine, active alerts from the last 24 hours, deduplicated
   const unresolvedAlerts = useMemo(() => {
@@ -88,18 +117,19 @@ export default React.memo(function CriticalSystemAlerts({ alerts, onAlertPress }
     try {
       setIsClearing(true);
       hapticSuccess();
+      dismissAllEnvironmentAlerts();
       
-      const updates: Record<string, boolean> = {};
+      const updates: Record<string, any> = {};
       rawList.forEach((a, idx) => {
         const key = a.firebaseKey || a.id || String(idx);
-        updates[`kabutech/alerts/${key}/resolved`] = true;
+        if (!key.startsWith('live-')) {
+          updates[`kabutech/alerts/${key}/resolved`] = true;
+          updates[`kabutech/alerts/${key}/resolvedAt`] = new Date().toISOString();
+        }
       });
 
       if (Object.keys(updates).length > 0) {
         await update(ref(db), updates);
-      } else if (Array.isArray(alerts)) {
-        const resolvedList = alerts.map(a => ({ ...a, resolved: true }));
-        await set(ref(db, 'kabutech/alerts'), resolvedList);
       }
 
       showToast({

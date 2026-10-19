@@ -34,16 +34,16 @@ export const getControlBands = (p: CropProfile = ACTIVE_PROFILE): ControlBands =
   const lightGrace = p.light.graceBearing ?? 50;
 
   return {
-    exhaustTempOn: tempMax + tempGrace, // 27.0 °C
-    exhaustTempOff: tempMax,            // 25.0 °C
-    exhaustCo2On: co2Max + co2Grace,    // 1150 ppm
-    exhaustCo2Off: co2Max - 100,        // 900 ppm
-    exhaustHumOn: humMax + humGrace,    // 100 %
-    exhaustHumOff: humMax - 3,          // 92 %
-    misterOn: humMin - humGrace,        // 75 %
-    misterOff: humMin + 8,              // 88 %
-    lightsOn: lightMin - lightGrace,    // 100 lx
-    lightsOff: lightMin + 150,          // 300 lx
-    tempColdBelow: tempMin - tempGrace, // 16.0 °C
+    exhaustTempOn: tempMax + tempGrace,        // 27.0 °C (ON beyond grace)
+    exhaustTempOff: tempMax + tempGrace,       // 27.0 °C (OFF as soon as returned to optimal <= 27.0 °C)
+    exhaustCo2On: co2Max + co2Grace,           // 1150 ppm (ON beyond grace)
+    exhaustCo2Off: co2Max + co2Grace,          // 1150 ppm (OFF as soon as returned to optimal <= 1150 ppm)
+    exhaustHumOn: humMax + humGrace,           // 100 % (ON only if 100% saturated)
+    exhaustHumOff: humMax + humGrace,          // 100 % (OFF once inside normal crop range <= 100 %)
+    misterOn: humMin - humGrace,               // 75 % (ON when dry)
+    misterOff: humMin - humGrace,              // 75 % (OFF as soon as returned to optimal >= 75 %)
+    lightsOn: lightMin - lightGrace,           // 100 lx (ON when dark)
+    lightsOff: lightMin - lightGrace,          // 100 lx (OFF as soon as returned to optimal target >= 100 lx; was 300 lx)
+    tempColdBelow: tempMin - tempGrace,        // 16.0 °C
   };
 };

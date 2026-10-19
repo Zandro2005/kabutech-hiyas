@@ -5,7 +5,7 @@ import {
 } from '../src/utils/scheduleLogic';
 
 describe('scheduleLogic - computeAutoDecision and hysteresis', () => {
-  it('turns fans ON when temperature exceeds research max + grace (> 27.0°C) and stays ON until <= 25.0°C', () => {
+  it('turns fans ON when temperature exceeds research max + grace (> 27.0°C) and turns OFF at <= 27.0°C', () => {
     // 1. Initially OFF, temp at 26.5°C (within grace buffer) -> stays OFF
     const sensorsAtGrace = {
       temperature: 26.5,
@@ -26,24 +26,16 @@ describe('scheduleLogic - computeAutoDecision and hysteresis', () => {
     expect(decisionHigh.states.fans).toBe(true);
     expect(decisionHigh.reasons.fans).toContain('Islam et al. (2022)');
 
-    // 3. Hysteresis: Cooling down to 26.0°C (between 25.0°C and 27.0°C) while previously ON -> stays ON
-    const sensorsCooling = {
-      ...sensorsAtGrace,
-      temperature: 26.0,
-    };
-    const decisionCooling = computeAutoDecision(sensorsCooling, { fans: true });
-    expect(decisionCooling.states.fans).toBe(true);
-
-    // 4. Cooled down to 24.8°C (<= 25.0°C) -> turns OFF
+    // 3. Cooled down to 26.8°C (<= 27.0°C, returned to optimal zone) -> turns OFF
     const sensorsCooled = {
       ...sensorsAtGrace,
-      temperature: 24.8,
+      temperature: 26.8,
     };
-    const decisionCooled = computeAutoDecision(sensorsCooled, { fans: true });
+    const decisionCooled = computeAutoDecision(sensorsCooled, { fans: true, fansTemp: true });
     expect(decisionCooled.states.fans).toBe(false);
   });
 
-  it('turns fans ON when CO2 exceeds research limit + grace (>= 1150 ppm) and stays ON until <= 900 ppm', () => {
+  it('turns fans ON when CO2 exceeds research limit + grace (>= 1150 ppm) and turns OFF at <= 1150 ppm', () => {
     // CO2 at 1200 ppm (>= 1150 ppm) -> fans ON
     const sensorsHighCO2 = {
       temperature: 24.0,
@@ -56,16 +48,37 @@ describe('scheduleLogic - computeAutoDecision and hysteresis', () => {
     expect(decision.states.fans).toBe(true);
     expect(decision.reasons.fans).toContain('Bellettini et al. (2019)');
 
-    // Hysteresis: drops to 950 ppm while previously ON -> stays ON
-    const decisionHysteresis = computeAutoDecision({ ...sensorsHighCO2, co2: 950 }, { fans: true });
-    expect(decisionHysteresis.states.fans).toBe(true);
-
-    // Drops to 850 ppm (<= 900 ppm) -> turns OFF
-    const decisionCleared = computeAutoDecision({ ...sensorsHighCO2, co2: 850 }, { fans: true });
+    // Drops to 1100 ppm (<= 1150 ppm, returned to optimal zone) -> turns OFF
+    const decisionCleared = computeAutoDecision({ ...sensorsHighCO2, co2: 1100 }, { fans: true, fansCo2: true });
     expect(decisionCleared.states.fans).toBe(false);
   });
 
-  it('turns misters ON when humidity drops below min - grace (< 75%) and stays ON until >= 88%', () => {
+  it('prevents cross-trigger latching: CO2 spike turns fans ON, clearing CO2 turns fans OFF even with ambient temp at 26.5°C', () => {
+    const ambientSensors = {
+      temperature: 26.5, // Normal tropical ambient, safely <= 27.0°C
+      humidity: 85.0,
+      light: 600,
+      co2: 1250,        // CO2 spike!
+      waterLevel: 80,
+    };
+
+    // 1. Spiked CO2 turns fans ON
+    const spikedDecision = computeAutoDecision(ambientSensors, { fans: false });
+    expect(spikedDecision.states.fans).toBe(true);
+    expect(spikedDecision.states.fansCo2).toBe(true);
+    expect(spikedDecision.states.fansTemp).toBe(false);
+
+    // 2. CO2 purges down to 950 ppm (optimal target). Ambient temp remains 26.5°C.
+    // Fans must turn OFF because Temp was never the trigger that turned fans ON!
+    const normalizedDecision = computeAutoDecision(
+      { ...ambientSensors, co2: 950 },
+      spikedDecision.states
+    );
+    expect(normalizedDecision.states.fans).toBe(false);
+    expect(normalizedDecision.states.fansCo2).toBe(false);
+  });
+
+  it('turns misters ON when humidity drops below min - grace (< 75%) and turns OFF when optimal (>= 75%)', () => {
     // 1. Humidity at 78% (within 75-80% grace buffer) -> stays OFF
     const sensorsInGrace = {
       temperature: 24.0,
@@ -83,12 +96,8 @@ describe('scheduleLogic - computeAutoDecision and hysteresis', () => {
     expect(decisionLow.states.misters).toBe(true);
     expect(decisionLow.reasons.misters).toContain('Islam et al. (2022)');
 
-    // 3. Hysteresis: rises to 82% while previously ON -> stays ON
-    const decisionRising = computeAutoDecision({ ...sensorsInGrace, humidity: 82.0 }, { misters: true });
-    expect(decisionRising.states.misters).toBe(true);
-
-    // 4. Rises to 89% (>= 88%) -> turns OFF
-    const decisionTargetReached = computeAutoDecision({ ...sensorsInGrace, humidity: 89.0 }, { misters: true });
+    // 3. Rises back to 76% (>= 75%, optimal) -> turns OFF
+    const decisionTargetReached = computeAutoDecision({ ...sensorsInGrace, humidity: 76.0 }, { misters: true });
     expect(decisionTargetReached.states.misters).toBe(false);
   });
 
@@ -106,8 +115,8 @@ describe('scheduleLogic - computeAutoDecision and hysteresis', () => {
     expect(decision.reasons.mistersBlocked).toContain('misting paused to protect pump');
   });
 
-  it('turns lights ON when light drops below research min - grace (< 100 lx) and turns OFF at >= 300 lx', () => {
-    // Light at 70 lx (< 100 lx) -> lights ON
+  it('turns lights ON when light drops below research min - grace (< 100 lx) and turns OFF as soon as light is optimal (>= 100 lx)', () => {
+    // 1. Light at 70 lx (< 100 lx) -> lights ON
     const sensorsDark = {
       temperature: 24.0,
       humidity: 85.0,
@@ -120,12 +129,12 @@ describe('scheduleLogic - computeAutoDecision and hysteresis', () => {
     expect(decision.states.lights).toBe(true);
     expect(decision.reasons.lights).toContain('Bellettini et al. (2019)');
 
-    // Hysteresis: rises to 200 lx while previously ON -> stays ON
-    const decisionRising = computeAutoDecision({ ...sensorsDark, light: 200 }, { lights: true });
-    expect(decisionRising.states.lights).toBe(true);
+    // 2. Returns to optimal threshold (100 lx) -> turns OFF immediately
+    const decisionOptimal = computeAutoDecision({ ...sensorsDark, light: 100 }, { lights: true });
+    expect(decisionOptimal.states.lights).toBe(false);
 
-    // Reaches 350 lx (>= 300 lx) -> turns OFF
-    const decisionBright = computeAutoDecision({ ...sensorsDark, light: 350 }, { lights: true });
+    // 3. In bright room (200 lx) -> remains OFF
+    const decisionBright = computeAutoDecision({ ...sensorsDark, light: 200 }, { lights: true });
     expect(decisionBright.states.lights).toBe(false);
   });
 
