@@ -95,8 +95,8 @@ export function evaluateParam(
     key === 'temp'
       ? value.toFixed(1)
       : key === 'hum'
-      ? Math.round(value).toString()
-      : Math.round(value).toString();
+        ? Math.round(value).toString()
+        : Math.round(value).toString();
 
   // Range evaluation with grace bearing buffer
   // The system only switches state to 'low' or 'high' when the reading crosses beyond the graceBearing buffer

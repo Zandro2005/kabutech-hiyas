@@ -27,7 +27,7 @@ export const computeScheduledDevicesState = (schedules?: ScheduleSettings | null
     const [eh, em] = endTime.split(':').map(Number);
     const startMins = sh * 60 + sm;
     const endMins = eh * 60 + em;
-    
+
     if (endMins > startMins) {
       // Normal day window (e.g., 08:00 to 17:00)
       return currentMinutes >= startMins && currentMinutes < endMins;
@@ -64,7 +64,7 @@ export const computeScheduledDevicesState = (schedules?: ScheduleSettings | null
     const durationMins = schedules.misters.durationMins || 30;
     const intervalHours = schedules.misters.intervalHours || 2;
     const intervalMins = intervalHours * 60;
-    
+
     // Simplistic modulus approach based on minutes since midnight
     // e.g. interval = 120m, duration = 30m. 
     // From 00:00 to 00:30 it's ON. 02:00 to 02:30 it's ON.
@@ -110,7 +110,7 @@ export interface AutoDecisionResult {
  */
 export const computeAutoDecision = (
   sensors?: { temperature?: number; humidity?: number; light?: number; co2?: number; waterLevel?: number } | null,
-  previousDevicesOrSetpoints?: { fans?: boolean; misters?: boolean; lights?: boolean; fanIn?: boolean; fanOut?: boolean; [key: string]: any } | null,
+  previousDevicesOrSetpoints?: { fans?: boolean; misters?: boolean; lights?: boolean; fanIn?: boolean; fanOut?: boolean;[key: string]: any } | null,
   profile: CropProfile = ACTIVE_PROFILE
 ): AutoDecisionResult => {
   const bands = getControlBands(profile);
@@ -118,9 +118,9 @@ export const computeAutoDecision = (
   // Support both direct device maps and setpoints containers ({ mode, devices: { ... } })
   const actualPrev =
     previousDevicesOrSetpoints &&
-    typeof previousDevicesOrSetpoints === 'object' &&
-    'devices' in previousDevicesOrSetpoints &&
-    previousDevicesOrSetpoints.devices
+      typeof previousDevicesOrSetpoints === 'object' &&
+      'devices' in previousDevicesOrSetpoints &&
+      previousDevicesOrSetpoints.devices
       ? previousDevicesOrSetpoints.devices
       : previousDevicesOrSetpoints;
 
@@ -169,23 +169,23 @@ export const computeAutoDecision = (
   // Independent previous state tracking (prevents cross-trigger latching between CO2, Temp, and Humidity)
   const prevFansCo2 = Boolean(
     isPreviousDevices &&
-      (actualPrev?.fansCo2 !== undefined
-        ? actualPrev.fansCo2
-        : prevFans && currentCO2 > bands.exhaustCo2Off)
+    (actualPrev?.fansCo2 !== undefined
+      ? actualPrev.fansCo2
+      : prevFans && currentCO2 > bands.exhaustCo2Off)
   );
 
   const prevFansTemp = Boolean(
     isPreviousDevices &&
-      (actualPrev?.fansTemp !== undefined
-        ? actualPrev.fansTemp
-        : prevFans && currentTemp > bands.exhaustTempOff)
+    (actualPrev?.fansTemp !== undefined
+      ? actualPrev.fansTemp
+      : prevFans && currentTemp > bands.exhaustTempOff)
   );
 
   const prevFansHum = Boolean(
     isPreviousDevices &&
-      (actualPrev?.fansHum !== undefined
-        ? actualPrev.fansHum
-        : prevFans && currentHum > bands.exhaustHumOff)
+    (actualPrev?.fansHum !== undefined
+      ? actualPrev.fansHum
+      : prevFans && currentHum > bands.exhaustHumOff)
   );
 
   // 1. CO₂ PURGING & AIR VENTILATION (Exhaust Fans with Hysteresis & Grace)

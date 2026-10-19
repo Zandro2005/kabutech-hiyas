@@ -99,8 +99,8 @@ export default React.memo(function ChamberStatusHero({
               { fontFamily: 'PlusJakartaSans_500Medium' }
             ]}
           >
-            {isOffline 
-              ? 'Chamber A • Controller Offline' 
+            {isOffline
+              ? 'Chamber A • Controller Offline'
               : (hasWarning ? 'Chamber A • Attention Required' : 'Chamber A • All Systems Active')}
           </Text>
         </View>
@@ -126,8 +126,8 @@ export default React.memo(function ChamberStatusHero({
             isAuto
               ? (isDarkMode ? tw`bg-emerald-950/40 border-emerald-700/50` : tw`bg-emerald-50 border-emerald-200/80`)
               : isScheduled
-              ? (isDarkMode ? tw`bg-purple-950/40 border-purple-700/50` : tw`bg-purple-50 border-purple-200/80`)
-              : (isDarkMode ? tw`bg-amber-950/40 border-amber-700/50` : tw`bg-amber-50 border-amber-200/80`)
+                ? (isDarkMode ? tw`bg-purple-950/40 border-purple-700/50` : tw`bg-purple-50 border-purple-200/80`)
+                : (isDarkMode ? tw`bg-amber-950/40 border-amber-700/50` : tw`bg-amber-50 border-amber-200/80`)
           ]}
         >
           <View
@@ -144,8 +144,8 @@ export default React.memo(function ChamberStatusHero({
                 color: isAuto
                   ? (isDarkMode ? '#34d399' : '#059669')
                   : isScheduled
-                  ? (isDarkMode ? '#c084fc' : '#7e22ce')
-                  : (isDarkMode ? '#fbbf24' : '#d97706')
+                    ? (isDarkMode ? '#c084fc' : '#7e22ce')
+                    : (isDarkMode ? '#fbbf24' : '#d97706')
               }
             ]}
           >
@@ -300,7 +300,7 @@ export default React.memo(function ChamberStatusHero({
                   tw`text-[10px]`,
                   {
                     fontFamily: 'PlusJakartaSans_700Bold',
-                    color: isOffline 
+                    color: isOffline
                       ? (isDarkMode ? '#94a3b8' : '#64748b')
                       : (isDarkMode ? '#e2e8f0' : '#1e293b')
                   }
@@ -415,10 +415,10 @@ export default React.memo(function ChamberStatusHero({
                                 backgroundColor: isItemFault
                                   ? '#94a3b8'
                                   : isItemInRange
-                                  ? '#10b981'
-                                  : item.eval.severity === 'critical'
-                                  ? '#ef4444'
-                                  : '#f59e0b',
+                                    ? '#10b981'
+                                    : item.eval.severity === 'critical'
+                                      ? '#ef4444'
+                                      : '#f59e0b',
                               }
                             ]}
                           />
@@ -436,8 +436,8 @@ export default React.memo(function ChamberStatusHero({
                               isItemFault
                                 ? tw`text-slate-400`
                                 : isItemInRange
-                                ? tw`text-emerald-600 dark:text-emerald-400`
-                                : tw`text-amber-600 dark:text-amber-400`,
+                                  ? tw`text-emerald-600 dark:text-emerald-400`
+                                  : tw`text-amber-600 dark:text-amber-400`,
                               { fontFamily: 'PlusJakartaSans_700Bold' }
                             ]}
                           >

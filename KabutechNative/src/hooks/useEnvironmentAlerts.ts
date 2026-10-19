@@ -50,10 +50,10 @@ AsyncStorage.getItem(DISMISSED_STORAGE_KEY)
           globalDismissedIds = new Set(parsed);
           subscribers.forEach(cb => cb());
         }
-      } catch (_) {}
+      } catch (_) { }
     }
   })
-  .catch(() => {});
+  .catch(() => { });
 
 function notifySubscribers() {
   subscribers.forEach(cb => cb());
@@ -63,7 +63,7 @@ function persistDismissedIds() {
   AsyncStorage.setItem(
     DISMISSED_STORAGE_KEY,
     JSON.stringify(Array.from(globalDismissedIds))
-  ).catch(() => {});
+  ).catch(() => { });
 }
 
 export function dismissEnvironmentAlert(id: string) {
@@ -115,8 +115,8 @@ export function useEnvironmentAlerts(): EnvironmentAlertsResult {
     const activeDevices = isScheduled
       ? computeScheduledDevicesState(settings?.schedules)
       : isAuto
-      ? computeAutoDevicesState(sensors, settings?.setpoints?.devices)
-      : {
+        ? computeAutoDevicesState(sensors, settings?.setpoints?.devices)
+        : {
           fans: Boolean(settings?.setpoints?.devices?.fans),
           misters: Boolean(settings?.setpoints?.devices?.misters),
           lights: Boolean(settings?.setpoints?.devices?.lights),
