@@ -81,6 +81,7 @@ static LGFX_KabuTech tft;
 #define COLOR_RED         0xD944  // #DC2626 Critical
 #define COLOR_CYAN        0x05B9  // #06B6D4 Mister Cyan
 #define COLOR_YELLOW      0xFFE0  // Grow Lights Bright Yellow
+#define COLOR_PURPLE      0xC43F  // #C084FC Timed / Scheduled Violet
 #define COLOR_WHITE       0xFFFF  // Text Main
 #define COLOR_MUTED       0x9536  // #94A3B8 Slate-400
 #define COLOR_MUTED_GREEN 0x6776  // Light mint text
@@ -92,10 +93,10 @@ static float prevT = -999.0;
 static float prevH = -999.0;
 static int   prevC = -999;
 static int   prevL = -999;
-static bool  prevExh = false;
-static bool  prevInt = false;
-static bool  prevMist = false;
-static bool  prevLight = false;
+static int   prevExh = -1;
+static int   prevInt = -1;
+static int   prevMist = -1;
+static int   prevLight = -1;
 static String prevMode = "";
 static bool  prevWifi = false;
 static bool  prevFb = false;
@@ -196,6 +197,13 @@ void drawStaticDashboard() {
   // Top header divider line (Y: 26)
   tft.drawLine(0, 26, 320, 26, COLOR_CARD_BORDER);
 
+  // Static Brand Header (Left)
+  tft.setFont(nullptr);
+  tft.setTextDatum(textdatum_t::middle_left);
+  tft.setTextSize(2);
+  tft.setTextColor(COLOR_EMERALD, COLOR_BG);
+  tft.drawString("KABUTECH", 8, 13);
+
   // Card 1: Temp (Col 1, Row 1) -> X: 6, Y: 30, W: 152, H: 82
   tft.fillRoundRect(6, 30, 152, 82, 6, COLOR_CARD_BG);
   tft.drawRoundRect(6, 30, 152, 82, 6, COLOR_CARD_BORDER);
@@ -215,6 +223,13 @@ void drawStaticDashboard() {
   // Bottom Actuator & Info Container (Y: 202 to 236)
   tft.fillRoundRect(6, 202, 308, 32, 6, COLOR_CARD_BG);
   tft.drawRoundRect(6, 202, 308, 32, 6, COLOR_CARD_BORDER);
+
+  // Force clean redraw of dynamic chips and mode on next refresh
+  prevExh = -1;
+  prevInt = -1;
+  prevMist = -1;
+  prevLight = -1;
+  prevMode = "";
 
   baseDrawn = true;
 }
@@ -297,17 +312,19 @@ void drawDashboard(float temp, float hum, int light, int co2,
   tft.setTextDatum(textdatum_t::middle_left);
   tft.setTextSize(2);
   tft.setTextColor(COLOR_EMERALD, COLOR_BG);
+  tft.drawString("KABUTECH", 8, 13);
+
   // ── Calculate In-Range Count exactly matching mobile app dashboard ──
   int inRangeCount = 0;
-  // Literature Oyster Fruiting Safe Zones (matching environmentRanges.ts evaluateParam):
-  // Temp: 18 - 25 °C (Grace: 16.0 - 27.0 °C)
-  // Hum:  80 - 95 %  (Grace: 75.0 - 100.0 %)
-  // CO2:  < 1000 ppm (Grace: <= 1150 ppm)
-  // Light:150 - 1000 lx (Grace: 100 - 1050 lx)
-  bool tempInRange  = (!shtErr   && temp >= 16.0 && temp <= 27.0);
-  bool humInRange   = (!shtErr   && hum >= 75.0  && hum <= 100.0);
-  bool co2InRange   = (!co2Err   && co2 > 0      && co2 <= 1150);
-  bool lightInRange = (!lightErr && light >= 100 && light <= 1050);
+  // Literature Oyster Fruiting Target Bands (matching environmentRanges.ts evaluateParam):
+  // Temp: 18 - 25 °C
+  // Hum:  80 - 95 %
+  // CO2:  < 1000 ppm
+  // Light: 150 - 1000 lx
+  bool tempInRange  = (!shtErr   && temp >= 18.0 && temp <= 25.0);
+  bool humInRange   = (!shtErr   && hum >= 80.0  && hum <= 95.0);
+  bool co2InRange   = (!co2Err   && co2 > 0      && co2 <= 1000);
+  bool lightInRange = (!lightErr && light >= 150 && light <= 1000);
 
   if (tempInRange) inRangeCount++;
   if (humInRange) inRangeCount++;
@@ -484,7 +501,7 @@ void drawDashboard(float temp, float hum, int light, int co2,
     drawMetricCard(162, 116, 152, 82, "LIGHT LEVEL", valBuf, "lx", pillTxt, pillCol, "Target: 150-1000 lx");
   }
 
-  // 3. ACTUATOR STATUS CHIPS (Y: 207, H: 22)
+  // 3. ACTUATOR STATUS CHIPS (Y: 207, H: 22) - Unified single active color
   if (exhOn != prevExh || intOn != prevInt || mistOn != prevMist || lightOn != prevLight) {
     prevExh = exhOn;
     prevInt = intOn;
@@ -493,8 +510,8 @@ void drawDashboard(float temp, float hum, int light, int co2,
 
     drawActuatorChip(12,  207, 44, 22, "EXH", exhOn, COLOR_EMERALD);
     drawActuatorChip(60,  207, 44, 22, "INT", intOn, COLOR_EMERALD);
-    drawActuatorChip(108, 207, 46, 22, "MIST", mistOn, COLOR_CYAN);
-    drawActuatorChip(158, 207, 48, 22, "LIGHT", lightOn, COLOR_YELLOW);
+    drawActuatorChip(108, 207, 46, 22, "MIST", mistOn, COLOR_EMERALD);
+    drawActuatorChip(158, 207, 48, 22, "LIGHT", lightOn, COLOR_EMERALD);
   }
 
   // 4. FOOTER INFO: Mode & Uptime (Right side of bottom container)
@@ -506,6 +523,9 @@ void drawDashboard(float temp, float hum, int light, int co2,
     if (mode == "MANUAL") {
       tft.setTextColor(COLOR_AMBER, COLOR_CARD_BG);
       tft.drawString("MANUAL", 212, 218);
+    } else if (mode == "TIMED" || mode == "SCHEDULED") {
+      tft.setTextColor(COLOR_PURPLE, COLOR_CARD_BG);
+      tft.drawString("TIMED", 212, 218);
     } else {
       tft.setTextColor(COLOR_EMERALD, COLOR_CARD_BG);
       tft.drawString("AUTO", 212, 218);

@@ -58,7 +58,7 @@ export default function HomeScreen() {
   const light = !isControllerOff && typeof sensors.light === 'number' && sensors.light !== -999 && sensors.light >= 0 ? sensors.light : -999;
 
   const isAuto = String(settings?.setpoints?.mode).toLowerCase() === 'auto';
-  const isScheduled = String(settings?.setpoints?.mode).toLowerCase() === 'scheduled';
+  const isScheduled = String(settings?.setpoints?.mode).toLowerCase() === 'scheduled' || String(settings?.setpoints?.mode).toLowerCase() === 'timed';
 
   // Chamber evaluation against cited agricultural crop profile
   const chamberEval = useMemo(() => {

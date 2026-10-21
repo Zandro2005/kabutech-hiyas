@@ -93,8 +93,8 @@ export const OYSTER_FRUITING: CropProfile = {
   temp: {
     min: 18,
     max: 25,
-    graceBearing: 2.0, // Safe zone: 16.0–27.0 °C
-    criticalMargin: 3.0,
+    graceBearing: 2.0, // Used by auto-regulation buffer
+    criticalMargin: 2.0, // < 16.0 or > 27.0 triggers critical tier
     unit: '°C',
     source: 'Islam et al. (2022); Hu et al. (2023); Girmay et al. (2016)',
     refs: ['Islam et al. (2022)', 'Hu et al. (2023)', 'Girmay et al. (2016)', 'Chong et al. (2023)'],
@@ -103,8 +103,8 @@ export const OYSTER_FRUITING: CropProfile = {
   hum: {
     min: 80,
     max: 95,
-    graceBearing: 5.0, // Safe zone: 75–100 %
-    criticalMargin: 10,
+    graceBearing: 5.0, // Used by auto-regulation buffer
+    criticalMargin: 5.0, // < 75% triggers critical tier (desiccation risk)
     unit: '%',
     source: 'Islam et al. (2022); Chong et al. (2023)',
     refs: ['Islam et al. (2022)', 'Chong et al. (2023)'],
@@ -112,8 +112,8 @@ export const OYSTER_FRUITING: CropProfile = {
   },
   co2: {
     max: 1000,
-    graceBearing: 150, // Safe zone: <= 1150 ppm
-    criticalMargin: 500,
+    graceBearing: 150, // Used by auto-regulation buffer
+    criticalMargin: 500, // > 1500 ppm triggers critical tier
     unit: 'ppm',
     source: 'Bellettini et al. (2019); Mohammed et al. (2018); Lin et al. (2022)',
     refs: ['Bellettini et al. (2019)', 'Mohammed et al. (2018)', 'Lin et al. (2022)'],
@@ -122,8 +122,8 @@ export const OYSTER_FRUITING: CropProfile = {
   light: {
     min: 150,
     max: 1000,
-    graceBearing: 50, // Safe zone: 100–1050 lx
-    criticalMargin: 300,
+    graceBearing: 50, // Used by auto-regulation buffer
+    criticalMargin: 50, // < 100 lx triggers critical tier
     unit: 'lx',
     source: 'Bellettini et al. (2019); Arjona et al. (2009)',
     refs: ['Bellettini et al. (2019)', 'Arjona et al. (2009)'],

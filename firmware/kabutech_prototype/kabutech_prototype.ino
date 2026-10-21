@@ -191,7 +191,20 @@ bool stateExhaust = false;
 bool stateIntake  = false;
 bool stateMister  = false;
 bool stateLight   = false;
-String stateMode  = "AUTO"; // Tracks AUTO vs MANUAL control
+String stateMode  = "AUTO"; // Tracks AUTO vs TIMED vs MANUAL control
+
+// Normalizes Firebase mode string to canonical stateMode ("AUTO", "TIMED", "MANUAL")
+String normalizeMode(String raw) {
+  raw.trim();
+  raw.toLowerCase();
+  if (raw == "manual") {
+    return "MANUAL";
+  } else if (raw == "scheduled" || raw == "timed") {
+    return "TIMED";
+  } else {
+    return "AUTO";
+  }
+}
 
 // TFT Display refresh timer (non-blocking 500ms)
 unsigned long lastDisplayRefresh = 0;
@@ -232,7 +245,7 @@ void streamCallback(FirebaseStream data) {
     FirebaseJsonData result;
     if (json != nullptr) {
       if (json->get(result, "mode")) {
-        stateMode = (result.to<String>() == "manual") ? "MANUAL" : "AUTO";
+        stateMode = normalizeMode(result.to<String>());
         Serial.printf("   ⚙️ [Control] Mode: %s\n", stateMode.c_str());
       }
       if (json->get(result, "devices/fans") || json->get(result, "fans")) applyActuator("fans", result.to<bool>());
@@ -248,7 +261,7 @@ void streamCallback(FirebaseStream data) {
 
   // 2. Control Mode string change
   if (path.indexOf("mode") >= 0) {
-    stateMode = (data.stringData() == "manual") ? "MANUAL" : "AUTO";
+    stateMode = normalizeMode(data.stringData());
     Serial.printf("   ⚙️ [Control] Mode changed to: %s\n", stateMode.c_str());
     return;
   }
@@ -281,47 +294,57 @@ void streamTimeoutCallback(bool timeout) {
 void runAutoRegulation() {
   if (stateMode != "AUTO") return;
 
+  // Sensor validity checks
+  bool isTempValid  = (!shtFault   && currentTemp > -50 && currentTemp != -999 && currentTemp != 0);
+  bool isHumValid   = (!shtFault   && currentHum > 0    && currentHum != -999);
+  bool isLightValid = (!lightFault && currentLight >= 0 && currentLight != -999);
+  bool isCo2Valid   = (!co2Fault   && currentCO2 > 0    && currentCO2 != -999);
+
   bool nextExhaust = stateExhaust;
   bool nextIntake  = stateIntake;
   bool nextMister  = stateMister;
   bool nextLight   = stateLight;
 
-  // 1. Ventilation (CO2 & Temperature Control with Hysteresis)
-  // Oyster fruiting requires CO2 < 1000 ppm and Temp 18 - 25 °C.
-  // Purge when CO2 > 1000 ppm OR Temp > 25.0 °C
-  // Idle when CO2 <= 900 ppm AND Temp <= 24.0 °C
-  bool co2Elevated  = (!co2Fault && currentCO2 > 1000);
-  bool tempElevated = (!shtFault && currentTemp > 25.0);
-  bool ventClear    = (co2Fault || currentCO2 <= 900) && (shtFault || currentTemp <= 24.0);
+  // Cold lockout: if temp < 16.0 °C, lock fans OFF to prevent chilling the mushroom mycelium
+  bool isTempCold = (isTempValid && currentTemp < 16.0);
 
-  if (co2Elevated || tempElevated) {
+  // 1. CO2 Ventilation (Literature: Bellettini et al., 2019)
+  // Turn ON when CO2 > 1150 ppm (exceeds grace), turn OFF when <= 1000 ppm (returns to optimal target)
+  bool needFansForCo2 = isCo2Valid && (stateExhaust ? currentCO2 > 1000 : currentCO2 > 1150);
+
+  // 2. High Humidity Purge Exhaust (Islam et al., 2022)
+  // Turn ON when Humidity >= 100 % (saturated), turn OFF when <= 95 %
+  bool needFansForHum = isHumValid && (stateExhaust ? currentHum > 95.0 : currentHum >= 100.0);
+
+  // 3. High Temperature Cooling (Hu et al., 2023)
+  // Turn ON when Temp > 27.0 °C (exceeds 25°C + 2°C grace), turn OFF when <= 26.0 °C (prevents tropical lock-on)
+  bool needFansForTemp = isTempValid && (stateExhaust ? currentTemp > 26.0 : currentTemp > 27.0);
+
+  // Combined Fan Actuation
+  if (!isTempCold && (needFansForCo2 || needFansForHum || needFansForTemp)) {
     nextExhaust = true;
-    nextIntake  = true; // Fresh air intake assists exhaust in purging stale CO2 and cooling
-  } else if (ventClear) {
+    nextIntake  = true; // Fresh air intake runs with exhaust to purge stale air and cool chamber
+  } else {
     nextExhaust = false;
     nextIntake  = false;
   }
 
-  // 2. Ultrasonic Humidity Control (with Hysteresis)
-  // Oyster fruiting requires 80 - 95 % RH.
-  // Humidify when Humidity < 80 %
-  // Turn off when Humidity >= 85 %
-  if (!shtFault && currentHum > 0) {
-    if (currentHum < 80.0) {
+  // 4. Ultrasonic Misters (Islam et al., 2022)
+  // Turn ON when Humidity < 75 % (dry air), turn OFF when >= 85 % (returned to 80-95% optimal band)
+  if (isHumValid) {
+    if (currentHum < 75.0) {
       nextMister = true;
     } else if (currentHum >= 85.0) {
       nextMister = false;
     }
   }
 
-  // 3. Grow Lights Photoperiod / Illumination (with Hysteresis)
-  // Oyster fruiting requires 150 - 1000 lx for primordia differentiation.
-  // Turn on lights when illumination < 150 lx
-  // Turn off lights when illumination >= 200 lx
-  if (!lightFault && currentLight >= 0) {
-    if (currentLight < 150) {
+  // 5. Grow Lights Photoperiod / Illumination (Bellettini et al., 2019)
+  // Turn ON when Light < 100 lx, turn OFF when >= 150 lx
+  if (isLightValid) {
+    if (currentLight < 100) {
       nextLight = true;
-    } else if (currentLight >= 200) {
+    } else if (currentLight >= 150) {
       nextLight = false;
     }
   }
@@ -524,6 +547,25 @@ void setup() {
     Serial.printf("❌ Stream begin error: %s\n", streamDO.errorReason().c_str());
   }
   Firebase.RTDB.setStreamCallback(&streamDO, streamCallback, streamTimeoutCallback);
+
+  // Initial synchronization of mode & actuators from cloud
+  if (Firebase.ready()) {
+    if (Firebase.RTDB.getJSON(&fbdo, "/kabutech/settings/setpoints")) {
+      FirebaseJsonData d;
+      FirebaseJson *json = fbdo.jsonObjectPtr();
+      if (json != nullptr) {
+        if (json->get(d, "mode")) {
+          stateMode = normalizeMode(d.to<String>());
+          Serial.printf("   ⚙️ [Control] Initial Cloud Mode: %s\n", stateMode.c_str());
+        }
+        if (json->get(d, "devices/fans") || json->get(d, "fans")) applyActuator("fans", d.to<bool>());
+        if (json->get(d, "devices/fanOut") || json->get(d, "fanOut")) applyActuator("fanOut", d.to<bool>());
+        if (json->get(d, "devices/fanIn") || json->get(d, "fanIn")) applyActuator("fanIn", d.to<bool>());
+        if (json->get(d, "devices/misters") || json->get(d, "misters")) applyActuator("misters", d.to<bool>());
+        if (json->get(d, "devices/lights") || json->get(d, "lights")) applyActuator("lights", d.to<bool>());
+      }
+    }
+  }
 
   // Short pause to show checklist before dashboard transition
   delay(800);

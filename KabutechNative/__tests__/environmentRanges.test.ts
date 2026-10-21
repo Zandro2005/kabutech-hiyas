@@ -34,68 +34,74 @@ describe('environmentRanges - evaluateParam', () => {
     expect(evaluateParam('light', 150, false, ACTIVE_PROFILE).state).toBe('in_range');
   });
 
-  it('keeps values within the grace bearing buffer classified as in_range (Optimal)', () => {
-    // Temp: 26.5°C is above 25°C but within the +2.0°C grace buffer (up to 27.0°C)
-    const tempGrace = evaluateParam('temp', 26.5, false, ACTIVE_PROFILE);
-    expect(tempGrace.state).toBe('in_range');
-    expect(tempGrace.severity).toBe('ok');
-
-    // Temp: 16.5°C is below 18°C but within the -2.0°C grace buffer (down to 16.0°C)
-    const tempLowGrace = evaluateParam('temp', 16.5, false, ACTIVE_PROFILE);
-    expect(tempLowGrace.state).toBe('in_range');
-    expect(tempLowGrace.severity).toBe('ok');
-
-    // Humidity: 78% is below 80% but within the -5.0% grace buffer (down to 75%)
-    const humGrace = evaluateParam('hum', 78, false, ACTIVE_PROFILE);
-    expect(humGrace.state).toBe('in_range');
-    expect(humGrace.severity).toBe('ok');
-
-    // CO2: 1100 ppm is above 1000 ppm but within the +150 ppm grace buffer (up to 1150 ppm)
-    const co2Grace = evaluateParam('co2', 1100, false, ACTIVE_PROFILE);
-    expect(co2Grace.state).toBe('in_range');
-    expect(co2Grace.severity).toBe('ok');
-
-    // Light: 120 lx is below 150 lx but within the -50 lx grace buffer (down to 100 lx)
-    const lightGrace = evaluateParam('light', 120, false, ACTIVE_PROFILE);
-    expect(lightGrace.state).toBe('in_range');
-    expect(lightGrace.severity).toBe('ok');
-  });
-
-  it('identifies deviations that exceed the grace bearing as warnings', () => {
-    // Temp: 27.5°C (> 25 + 2.0 grace, deviation is 2.5°C, criticalMargin is 3.0)
-    const tempHigh = evaluateParam('temp', 27.5, false, ACTIVE_PROFILE);
+  it('identifies values outside [min, max] as low or high with exact TFT status labels', () => {
+    // Temp: 26.5°C is above 25°C -> High warning (deviation 1.5°C)
+    const tempHigh = evaluateParam('temp', 26.5, false, ACTIVE_PROFILE);
     expect(tempHigh.state).toBe('high');
     expect(tempHigh.severity).toBe('warning');
-    expect(tempHigh.deviation).toBe(2.5);
+    expect(tempHigh.statusLabel).toBe('High');
 
-    // Humidity: 72% (< 80 - 5 grace, deviation is 8%, criticalMargin is 10)
-    const humLow = evaluateParam('hum', 72, false, ACTIVE_PROFILE);
+    // Temp: 16.5°C is below 18°C -> Low warning (deviation 1.5°C)
+    const tempLow = evaluateParam('temp', 16.5, false, ACTIVE_PROFILE);
+    expect(tempLow.state).toBe('low');
+    expect(tempLow.severity).toBe('warning');
+    expect(tempLow.statusLabel).toBe('Low');
+
+    // Humidity: 78% is below 80% -> Low warning (deviation 2%)
+    const humLow = evaluateParam('hum', 78, false, ACTIVE_PROFILE);
     expect(humLow.state).toBe('low');
     expect(humLow.severity).toBe('warning');
-    expect(humLow.deviation).toBe(8);
+    expect(humLow.statusLabel).toBe('Low');
 
-    // CO2: 1250 ppm (> 1000 + 150 grace, deviation is 250 ppm, criticalMargin is 500)
-    const co2High = evaluateParam('co2', 1250, false, ACTIVE_PROFILE);
+    // Humidity: 98% is above 95% -> Sat (Amber)
+    const humSat = evaluateParam('hum', 98, false, ACTIVE_PROFILE);
+    expect(humSat.state).toBe('high');
+    expect(humSat.severity).toBe('warning');
+    expect(humSat.statusLabel).toBe('Sat');
+
+    // CO2: 1100 ppm is above 1000 ppm -> High warning (deviation 100 ppm)
+    const co2High = evaluateParam('co2', 1100, false, ACTIVE_PROFILE);
     expect(co2High.state).toBe('high');
     expect(co2High.severity).toBe('warning');
-    expect(co2High.deviation).toBe(250);
+    expect(co2High.statusLabel).toBe('High');
+
+    // Light: 120 lx is below 150 lx -> Low warning
+    const lightLow = evaluateParam('light', 120, false, ACTIVE_PROFILE);
+    expect(lightLow.state).toBe('low');
+    expect(lightLow.severity).toBe('warning');
+    expect(lightLow.statusLabel).toBe('Low');
+
+    // Light: 100 lx is exactly in Low band (100–149 lx)
+    const light100 = evaluateParam('light', 100, false, ACTIVE_PROFILE);
+    expect(light100.state).toBe('low');
+    expect(light100.severity).toBe('warning');
+    expect(light100.statusLabel).toBe('Low');
   });
 
-  it('identifies severe deviations exceeding criticalMargin as critical', () => {
-    // Temp: 29.0°C (> 25 + 3.0)
+  it('identifies severe deviations exceeding criticalMargin as critical (Dark, Dry, Crit)', () => {
+    // Temp: 29.0°C (> 25 + 2.0 criticalMargin)
     const tempCrit = evaluateParam('temp', 29.0, false, ACTIVE_PROFILE);
     expect(tempCrit.state).toBe('high');
     expect(tempCrit.severity).toBe('critical');
+    expect(tempCrit.statusLabel).toBe('Crit');
 
-    // Humidity: 65% (< 80 - 10)
-    const humCrit = evaluateParam('hum', 65, false, ACTIVE_PROFILE);
+    // Humidity: 72% (< 80 - 5.0 criticalMargin) -> Dry
+    const humCrit = evaluateParam('hum', 72, false, ACTIVE_PROFILE);
     expect(humCrit.state).toBe('low');
     expect(humCrit.severity).toBe('critical');
+    expect(humCrit.statusLabel).toBe('Dry');
 
-    // CO2: 1600 ppm (> 1000 + 500)
+    // CO2: 1600 ppm (> 1000 + 500 criticalMargin) -> Crit
     const co2Crit = evaluateParam('co2', 1600, false, ACTIVE_PROFILE);
     expect(co2Crit.state).toBe('high');
     expect(co2Crit.severity).toBe('critical');
+    expect(co2Crit.statusLabel).toBe('Crit');
+
+    // Light: 80 lx (< 100 lx) -> Dark
+    const lightCrit = evaluateParam('light', 80, false, ACTIVE_PROFILE);
+    expect(lightCrit.state).toBe('low');
+    expect(lightCrit.severity).toBe('critical');
+    expect(lightCrit.statusLabel).toBe('Dark');
   });
 
   it('handles sensor faults, -999, null, and offline status gracefully', () => {
@@ -113,10 +119,10 @@ describe('environmentRanges - evaluateParam', () => {
 });
 
 describe('environmentRanges - evaluateChamber', () => {
-  it('returns 4/4 and Optimal when all parameters are in crop range or within grace bearing', () => {
-    // Temp 26.0 (grace), hum 78 (grace), co2 1050 (grace), light 500 (optimal)
+  it('returns 4/4 and Optimal when all parameters are in crop range', () => {
+    // Temp 22.0, hum 88, co2 600, light 500 (all optimal)
     const chamber = evaluateChamber(
-      { temp: 26.0, hum: 78, co2: 1050, light: 500 },
+      { temp: 22.0, hum: 88, co2: 600, light: 500 },
       { temp: false, hum: false, co2: false, light: false, isControllerOffline: false },
       ACTIVE_PROFILE
     );
@@ -129,10 +135,10 @@ describe('environmentRanges - evaluateChamber', () => {
     expect(chamber.summary).toBe('All 4 parameters within crop range');
   });
 
-  it('accurately identifies parameters out of range (beyond grace) in summary text', () => {
-    // Low humidity (72% < 75%) and high CO2 (1250 ppm > 1150 ppm)
+  it('accurately identifies parameters out of range in summary text', () => {
+    // Low humidity (72%) and high CO2 (1250 ppm)
     const chamber = evaluateChamber(
-      { temp: 25.0, hum: 72, co2: 1250, light: 500 },
+      { temp: 22.0, hum: 72, co2: 1250, light: 500 },
       {},
       ACTIVE_PROFILE
     );

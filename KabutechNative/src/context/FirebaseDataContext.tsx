@@ -194,7 +194,7 @@ export const FirebaseDataProvider: React.FC<{ children: React.ReactNode }> = ({ 
     if (!user) return;
     const rawMode = settings?.setpoints?.mode;
     const mode = String(rawMode || '').trim().toLowerCase();
-    if (mode !== 'auto' && mode !== 'scheduled') return;
+    if (mode !== 'auto' && mode !== 'scheduled' && mode !== 'timed') return;
 
     const syncActuators = () => {
       const currentDevices = settings?.setpoints?.devices || {
@@ -208,7 +208,7 @@ export const FirebaseDataProvider: React.FC<{ children: React.ReactNode }> = ({ 
       };
       let desiredDevices = { ...currentDevices };
 
-      if (mode === 'scheduled') {
+      if (mode === 'scheduled' || mode === 'timed') {
         desiredDevices = { ...desiredDevices, ...computeScheduledDevicesState(settings?.schedules) };
       } else if (mode === 'auto') {
         desiredDevices = { ...desiredDevices, ...computeAutoDevicesState(sensors, currentDevices) };

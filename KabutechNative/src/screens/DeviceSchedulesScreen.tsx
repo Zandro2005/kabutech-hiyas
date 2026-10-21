@@ -61,7 +61,7 @@ export default function DeviceSchedulesScreen() {
   const settings = useSettings();
   const schedules = settings?.schedules;
   const currentMode = settings?.setpoints?.mode || 'manual';
-  const isScheduledMode = currentMode === 'scheduled';
+  const isScheduledMode = currentMode === 'scheduled' || currentMode === 'timed';
 
   const [mistersOn, setMistersOn] = useState(false);
   const [misterDuration, setMisterDuration] = useState(30);

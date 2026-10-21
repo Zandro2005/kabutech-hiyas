@@ -81,7 +81,7 @@ export default function ControlsScreen() {
   const isCo2Disconnected = health.co2Error || co2 === -999 || co2 < 0;
 
   const isAuto = String(settings?.setpoints?.mode).toLowerCase() === 'auto';
-  const isScheduled = String(settings?.setpoints?.mode).toLowerCase() === 'scheduled';
+  const isScheduled = String(settings?.setpoints?.mode).toLowerCase() === 'scheduled' || String(settings?.setpoints?.mode).toLowerCase() === 'timed';
   
   const rawDevices = settings?.setpoints?.devices || DEFAULT_DEVICES;
   const [devices, setDevices] = useState(rawDevices);

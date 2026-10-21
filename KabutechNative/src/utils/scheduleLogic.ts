@@ -361,7 +361,7 @@ export const explainDeviceActivity = (
         reason: 'All devices idle • Chamber readings within setpoints',
       });
     }
-  } else if (normMode === 'scheduled') {
+  } else if (normMode === 'scheduled' || normMode === 'timed') {
     if (activeDevices.fans) {
       list.push({ device: 'fans', label: 'Fans', isActive: true, reason: 'Active on schedule window' });
     }

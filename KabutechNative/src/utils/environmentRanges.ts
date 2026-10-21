@@ -9,6 +9,7 @@ export interface ParamEvaluation {
   label: string;
   state: ParamState;
   severity: ParamSeverity;
+  statusLabel: string; // TFT-aligned: "Optimal" | "Low" | "High" | "Dark" | "Dry" | "Sat" | "Crit" | "Fault"
   value: number | null;
   formattedValue: string;
   unit: string;
@@ -77,6 +78,7 @@ export function evaluateParam(
       label,
       state: 'fault',
       severity: 'fault',
+      statusLabel: 'Fault',
       value: null,
       formattedValue: '--',
       unit,
@@ -98,67 +100,111 @@ export function evaluateParam(
         ? Math.round(value).toString()
         : Math.round(value).toString();
 
-  // Range evaluation with grace bearing buffer
-  // The system only switches state to 'low' or 'high' when the reading crosses beyond the graceBearing buffer
-  const grace = range.graceBearing || 0;
-  const minThreshold = range.min !== undefined ? range.min - grace : undefined;
-  const maxThreshold = range.max !== undefined ? range.max + grace : undefined;
+  // Determine specific TFT-matching status label: "Dark", "Dry", "Sat", "Low", "High", "Crit", "Optimal"
+  let statusLabel = 'Optimal';
+  let state: ParamState = 'in_range';
+  let severity: ParamSeverity = 'ok';
+  let deviation = 0;
 
-  if (minThreshold !== undefined && value < minThreshold) {
-    const deviation = Number((range.min! - value).toFixed(1));
-    const severity: ParamSeverity = deviation >= range.criticalMargin ? 'critical' : 'warning';
-    return {
-      key,
-      label,
-      state: 'low',
-      severity,
-      value,
-      formattedValue,
-      unit,
-      rangeText,
-      min: range.min,
-      max: range.max,
-      deviation,
-      source: range.source,
-      refs: range.refs || [],
-      description: range.description,
-    };
+  if (key === 'temp') {
+    if (value < 18.0) {
+      state = 'low';
+      deviation = Number((18.0 - value).toFixed(1));
+      if (value < 16.0) {
+        severity = 'critical';
+        statusLabel = 'Crit';
+      } else {
+        severity = 'warning';
+        statusLabel = 'Low';
+      }
+    } else if (value > 25.0) {
+      state = 'high';
+      deviation = Number((value - 25.0).toFixed(1));
+      if (value > 27.0) {
+        severity = 'critical';
+        statusLabel = 'Crit';
+      } else {
+        severity = 'warning';
+        statusLabel = 'High';
+      }
+    } else {
+      state = 'in_range';
+      severity = 'ok';
+      statusLabel = 'Optimal';
+    }
+  } else if (key === 'hum') {
+    if (value < 80.0) {
+      state = 'low';
+      deviation = Number((80.0 - value).toFixed(1));
+      if (value < 75.0) {
+        severity = 'critical';
+        statusLabel = 'Dry';
+      } else {
+        severity = 'warning';
+        statusLabel = 'Low';
+      }
+    } else if (value > 95.0) {
+      state = 'high';
+      deviation = Number((value - 95.0).toFixed(1));
+      severity = 'warning';
+      statusLabel = 'Sat';
+    } else {
+      state = 'in_range';
+      severity = 'ok';
+      statusLabel = 'Optimal';
+    }
+  } else if (key === 'co2') {
+    if (value > 1000) {
+      state = 'high';
+      deviation = Number((value - 1000).toFixed(1));
+      if (value > 1500) {
+        severity = 'critical';
+        statusLabel = 'Crit';
+      } else {
+        severity = 'warning';
+        statusLabel = 'High';
+      }
+    } else {
+      state = 'in_range';
+      severity = 'ok';
+      statusLabel = 'Optimal';
+    }
+  } else if (key === 'light') {
+    if (value < 150) {
+      state = 'low';
+      deviation = Number((150 - value).toFixed(1));
+      if (value < 100) {
+        severity = 'critical';
+        statusLabel = 'Dark';
+      } else {
+        severity = 'warning';
+        statusLabel = 'Low';
+      }
+    } else if (value > 1000) {
+      state = 'high';
+      deviation = Number((value - 1000).toFixed(1));
+      severity = 'warning';
+      statusLabel = 'High';
+    } else {
+      state = 'in_range';
+      severity = 'ok';
+      statusLabel = 'Optimal';
+    }
   }
 
-  if (maxThreshold !== undefined && value > maxThreshold) {
-    const deviation = Number((value - range.max!).toFixed(1));
-    const severity: ParamSeverity = deviation >= range.criticalMargin ? 'critical' : 'warning';
-    return {
-      key,
-      label,
-      state: 'high',
-      severity,
-      value,
-      formattedValue,
-      unit,
-      rangeText,
-      min: range.min,
-      max: range.max,
-      deviation,
-      source: range.source,
-      refs: range.refs || [],
-      description: range.description,
-    };
-  }
-
-  // Value is strictly within [min, max] OR within allowable grace bearing buffer -> 'in_range' / 'ok'
   return {
     key,
     label,
-    state: 'in_range',
-    severity: 'ok',
+    state,
+    severity,
+    statusLabel,
     value,
     formattedValue,
     unit,
     rangeText,
     min: range.min,
     max: range.max,
-    deviation: 0,
+    deviation,
     source: range.source,
     refs: range.refs || [],
     description: range.description,

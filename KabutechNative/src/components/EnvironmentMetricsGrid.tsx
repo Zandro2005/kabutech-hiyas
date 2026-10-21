@@ -42,11 +42,11 @@ export default React.memo(function EnvironmentMetricsGrid({ temp, hum, light, co
   const lightEval = evaluateParam('light', light, isControllerOff || isLightFault, ACTIVE_PROFILE);
   const co2Eval = evaluateParam('co2', co2, isControllerOff || isCo2Fault, ACTIVE_PROFILE);
 
-  // Status helper with clean minimal badges
+  // Status helper with clean minimal badges matching TFT display
   const getBadgeStyle = (paramEval: ParamEvaluation, fallbackColor: string) => {
     if (paramEval.state === 'fault') {
       return {
-        label: 'Fault',
+        label: paramEval.statusLabel || 'Fault',
         dotColor: isDarkMode ? '#94a3b8' : '#64748b',
         badgeBg: isDarkMode ? 'rgba(148, 163, 184, 0.12)' : '#f1f5f9',
         badgeText: isDarkMode ? '#94a3b8' : '#64748b',
@@ -54,25 +54,22 @@ export default React.memo(function EnvironmentMetricsGrid({ temp, hum, light, co
     }
     if (paramEval.state === 'in_range') {
       return {
-        label: 'Optimal',
+        label: paramEval.statusLabel || 'Optimal',
         dotColor: '#10b981',
         badgeBg: isDarkMode ? 'rgba(16, 185, 129, 0.15)' : '#ecfdf5',
         badgeText: isDarkMode ? '#34d399' : '#059669',
       };
     }
-    if (paramEval.state === 'low') {
-      return {
-        label: 'Low',
-        dotColor: '#f59e0b',
-        badgeBg: isDarkMode ? 'rgba(245, 158, 11, 0.15)' : '#fffbeb',
-        badgeText: isDarkMode ? '#fbbf24' : '#b45309',
-      };
-    }
+    const isCrit = paramEval.severity === 'critical';
     return {
-      label: 'High',
-      dotColor: fallbackColor,
-      badgeBg: isDarkMode ? 'rgba(239, 68, 68, 0.15)' : '#fef2f2',
-      badgeText: isDarkMode ? '#f87171' : '#dc2626',
+      label: paramEval.statusLabel || (paramEval.state === 'low' ? 'Low' : 'High'),
+      dotColor: isCrit ? '#ef4444' : '#f59e0b',
+      badgeBg: isCrit
+        ? (isDarkMode ? 'rgba(239, 68, 68, 0.15)' : '#fef2f2')
+        : (isDarkMode ? 'rgba(245, 158, 11, 0.15)' : '#fffbeb'),
+      badgeText: isCrit
+        ? (isDarkMode ? '#f87171' : '#dc2626')
+        : (isDarkMode ? '#fbbf24' : '#b45309'),
     };
   };
 

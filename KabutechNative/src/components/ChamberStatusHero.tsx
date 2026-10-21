@@ -115,7 +115,7 @@ export default React.memo(function ChamberStatusHero({
             } else {
               showToast({
                 type: 'info',
-                text1: `System Mode: ${isAuto ? 'AUTO' : isScheduled ? 'SCHEDULED' : 'MANUAL'}`,
+                text1: `System Mode: ${isAuto ? 'AUTO' : isScheduled ? 'TIMED' : 'MANUAL'}`,
                 text2: 'System mode is managed by Farm Administrators.',
                 duration: 2500,
               });
@@ -149,7 +149,7 @@ export default React.memo(function ChamberStatusHero({
               }
             ]}
           >
-            {isAuto ? 'AUTO' : isScheduled ? 'SCHEDULED' : 'MANUAL'}
+            {isAuto ? 'AUTO' : isScheduled ? 'TIMED' : 'MANUAL'}
           </Text>
         </TouchableOpacity>
       </View>

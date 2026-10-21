@@ -53,7 +53,7 @@ export default function StaffHomeScreen() {
   const co2 = !isControllerOff && typeof sensors.co2 === 'number' && sensors.co2 !== -999 && sensors.co2 > 0 ? sensors.co2 : -999;
 
   const isAuto = String(settings?.setpoints?.mode).toLowerCase() === 'auto';
-  const isScheduled = String(settings?.setpoints?.mode).toLowerCase() === 'scheduled';
+  const isScheduled = String(settings?.setpoints?.mode).toLowerCase() === 'scheduled' || String(settings?.setpoints?.mode).toLowerCase() === 'timed';
 
   // Chamber evaluation against cited crop profile
   const chamberEval = useMemo(() => {

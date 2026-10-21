@@ -39,7 +39,7 @@ export default React.memo(function DeviceQuickControls({
       hapticSelection();
       showToast({
         type: 'info',
-        text1: `${isAuto ? 'Auto' : 'Scheduled'} Mode Active`,
+        text1: `${isAuto ? 'Auto' : 'Timed'} Mode Active`,
         text2: `Switch to Manual Mode in Controls to adjust ${label}.`,
         duration: 3000,
       });

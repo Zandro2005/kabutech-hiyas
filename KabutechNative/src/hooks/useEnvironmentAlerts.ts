@@ -110,7 +110,7 @@ export function useEnvironmentAlerts(): EnvironmentAlertsResult {
     // Active device states (Auto mode, Scheduled mode, or Manual switches)
     const mode = settings?.setpoints?.mode || 'auto';
     const isAuto = mode === 'auto';
-    const isScheduled = mode === 'scheduled';
+    const isScheduled = mode === 'scheduled' || mode === 'timed';
 
     const activeDevices = isScheduled
       ? computeScheduledDevicesState(settings?.schedules)

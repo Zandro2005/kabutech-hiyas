@@ -4,7 +4,8 @@ import Svg, { Circle, Defs, LinearGradient as SvgGradient, Stop } from 'react-na
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import tw from '../tailwind';
 import { useResponsive } from '../utils/responsive';
-import { ParamRange } from '../config/cropProfiles';
+import { ParamRange, ACTIVE_PROFILE } from '../config/cropProfiles';
+import { evaluateParam, ParamKey } from '../utils/environmentRanges';
 
 interface Props {
   scaleMin: number;
@@ -83,27 +84,42 @@ export default React.memo(function RangeGauge({
   const markerX = size / 2 + radius * Math.cos(currentAngle);
   const markerY = size / 2 + radius * Math.sin(currentAngle);
 
-  // Status classification
+  // Status classification matching exact TFT display pills
   let statusText = 'Optimal';
   let statusColor = '#10b981';
   let statusBg = isDarkMode ? 'rgba(16, 185, 129, 0.15)' : '#ecfdf5';
+
+  const paramKey: ParamKey | null =
+    label === 'Temperature' ? 'temp' :
+    label === 'Humidity' ? 'hum' :
+    label.toLowerCase().includes('light') ? 'light' :
+    label.toLowerCase().includes('co2') ? 'co2' : null;
 
   if (isFault) {
     statusText = isOffline ? 'Offline' : 'Fault';
     statusColor = '#94a3b8';
     statusBg = isDarkMode ? 'rgba(148, 163, 184, 0.12)' : '#f1f5f9';
-  } else if (numCurrent < safeMin) {
-    statusText = 'Below Range';
+  } else if (paramKey && !isNaN(numCurrent)) {
+    const evaluation = evaluateParam(paramKey, numCurrent, false, ACTIVE_PROFILE);
+    statusText = evaluation.statusLabel;
+    if (evaluation.state === 'in_range') {
+      statusColor = '#10b981';
+      statusBg = isDarkMode ? 'rgba(16, 185, 129, 0.15)' : '#ecfdf5';
+    } else {
+      const isCrit = evaluation.severity === 'critical';
+      statusColor = isCrit ? '#ef4444' : '#f59e0b';
+      statusBg = isCrit
+        ? (isDarkMode ? 'rgba(239, 68, 68, 0.15)' : '#fef2f2')
+        : (isDarkMode ? 'rgba(245, 158, 11, 0.15)' : '#fffbeb');
+    }
+  } else if (numCurrent < bandMin) {
+    statusText = 'Low';
     statusColor = '#f59e0b';
     statusBg = isDarkMode ? 'rgba(245, 158, 11, 0.15)' : '#fffbeb';
-  } else if (numCurrent > safeMax) {
-    statusText = 'Above Range';
+  } else if (numCurrent > bandMax) {
+    statusText = 'High';
     statusColor = '#ef4444';
     statusBg = isDarkMode ? 'rgba(239, 68, 68, 0.15)' : '#fef2f2';
-  } else {
-    statusText = 'Optimal';
-    statusColor = '#10b981';
-    statusBg = isDarkMode ? 'rgba(16, 185, 129, 0.15)' : '#ecfdf5';
   }
 
   // Smooth rotating orbit animation
