@@ -140,7 +140,7 @@ describe('environmentRanges - evaluateChamber', () => {
     expect(chamber.inRangeCount).toBe(2);
     expect(chamber.allInRange).toBe(false);
     expect(chamber.summary).toContain('Humidity low');
-    expect(chamber.summary).toContain('CO₂ high');
+    expect(chamber.summary).toContain('CO2 high');
   });
 
   it('keeps denominator at 4 and indicates sensor faults', () => {

@@ -30,18 +30,25 @@
  *    3. "BH1750" by Christopher Laws
  *    4. "Sensirion I2C SCD4x" by Sensirion
  *
- *  BOARD SETTING:
+ *  BOARD SETTING (Arduino IDE -> Tools):
  *    Board: ESP32S3 Dev Module
  *    USB CDC On Boot: Enabled
+ *    Partition Scheme: "Huge APP (3MB No OTA/1MB SPIFFS)"
  *  */
 
 #include <WiFi.h>
 #include <Wire.h>
+
+// ─── Optimize Flash Footprint ───
+#define FIREBASE_ENABLE_RTDB // Only link Realtime Database engine
 #include <Firebase_ESP_Client.h>
 #include <Adafruit_SHT31.h>
 #include <BH1750.h>
 #include <SensirionI2cScd4x.h>
 #include <time.h>
+
+// ─── TFT SPI Display Driver (LovyanGFX ILI9341 240x320) ───
+#include "tft_display.h"
 
 // ─── Addons for Firebase token management ───
 #include <addons/TokenHelper.h>
@@ -72,6 +79,15 @@
 #define PIN_MISTER      11      // GPIO 11: Mister / Fogger LED (Valve runs with misters)
 #define PIN_LIGHT       12      // GPIO 12: Grow Lights LED
 #define PIN_FAN_EXHAUST 13      // GPIO 13: Air Out / Exhaust Fan LED
+
+// 3.2" SPI TFT Display (ILI9341 240x320)
+// VCC -> 5VIN, GND -> GND, SDO -> GPIO 16 (Optional)
+#define TFT_CS_PIN      10      // GPIO 10: TFT Chip Select
+#define TFT_DC_PIN      15      // GPIO 15: TFT Data / Command
+#define TFT_RST_PIN     6       // GPIO 6:  TFT Hardware Reset
+#define TFT_MOSI_PIN    17      // GPIO 17: TFT SDI (MOSI)
+#define TFT_SCK_PIN     18      // GPIO 18: TFT SCK (Clock)
+#define TFT_LED_PIN     2       // GPIO 2:  TFT Backlight (or direct to 3.3V)
 
 // ═══════════════════════════════════════════════
 //  SENSOR CALIBRATION OFFSETS
@@ -170,78 +186,181 @@ int lastLoggedHour = -1;
 int lastPrunedDay  = -1;
 bool initialHistoryLogged = false;
 
+// ─── Actuator States (synced with Firebase, GPIO outputs, and TFT) ───
+bool stateExhaust = false;
+bool stateIntake  = false;
+bool stateMister  = false;
+bool stateLight   = false;
+String stateMode  = "AUTO"; // Tracks AUTO vs MANUAL control
+
+// TFT Display refresh timer (non-blocking 500ms)
+unsigned long lastDisplayRefresh = 0;
+#define DISPLAY_REFRESH_INTERVAL 500
+
 // ═══════════════════════════════════════════════
 //  FIREBASE STREAM CALLBACKS (ACTUATOR CONTROL)
 // ═══════════════════════════════════════════════
 
-void streamCallback(FirebaseStream data) {
-  String path = data.dataPath();
-  String type = data.dataType();
-
-  // Handle entire JSON object load on first connection
-  if (path == "/" && type == "json") {
-    FirebaseJson *json = data.jsonObjectPtr();
-    FirebaseJsonData result;
-    if (json != nullptr) {
-      if (json->get(result, "fans") || json->get(result, "exhaust") || json->get(result, "fanOut")) {
-        bool st = result.to<bool>();
-        digitalWrite(PIN_FAN_EXHAUST, st ? HIGH : LOW);
-        Serial.printf("   🌀 [Actuator] Initial Exhaust Fan (GPIO %d): %s\n", PIN_FAN_EXHAUST, st ? "ON" : "OFF");
-      }
-      if (json->get(result, "fanIn") || json->get(result, "intake")) {
-        bool st = result.to<bool>();
-        digitalWrite(PIN_FAN_INTAKE, st ? HIGH : LOW);
-        Serial.printf("   🌀 [Actuator] Initial Intake Fan (GPIO %d): %s\n", PIN_FAN_INTAKE, st ? "ON" : "OFF");
-      }
-      if (json->get(result, "misters")) {
-        bool st = result.to<bool>();
-        digitalWrite(PIN_MISTER, st ? HIGH : LOW);
-        Serial.printf("   💧 [Actuator] Initial Mister (GPIO %d): %s\n", PIN_MISTER, st ? "ON" : "OFF");
-      }
-      if (json->get(result, "lights")) {
-        bool st = result.to<bool>();
-        digitalWrite(PIN_LIGHT, st ? HIGH : LOW);
-        Serial.printf("   💡 [Actuator] Initial Lights (GPIO %d): %s\n", PIN_LIGHT, st ? "ON" : "OFF");
-      }
-      Serial.println("   [Actuator] Initial states loaded from Firebase.");
-    }
-    return;
-  }
-
-  // Parse state for child property change
-  bool state = false;
-  if (type == "boolean") {
-    state = data.boolData();
-  } else if (type == "string") {
-    state = (data.stringData() == "true" || data.stringData() == "1");
-  } else if (type == "int") {
-    state = (data.intData() > 0);
-  }
-
-  // Fan Exhaust (air out)
-  if (path == "/fans" || path == "/exhaust" || path == "/fanOut") {
+// Helper to set actuator state and update GPIO pin output
+void applyActuator(const String& key, bool state) {
+  if (key == "fans" || key == "exhaust" || key == "fanOut") {
+    stateExhaust = state;
     digitalWrite(PIN_FAN_EXHAUST, state ? HIGH : LOW);
     Serial.printf("   🌀 [Actuator] Exhaust Fan (GPIO %d) -> %s\n", PIN_FAN_EXHAUST, state ? "ON" : "OFF");
-  }
-  // Fan Intake (air in)
-  else if (path == "/fanIn" || path == "/intake") {
+  } else if (key == "fanIn" || key == "intake") {
+    stateIntake = state;
     digitalWrite(PIN_FAN_INTAKE, state ? HIGH : LOW);
     Serial.printf("   🌀 [Actuator] Intake Fan (GPIO %d) -> %s\n", PIN_FAN_INTAKE, state ? "ON" : "OFF");
-  }
-  // Mister / Fogger (Valve operates simultaneously with misters)
-  else if (path == "/misters") {
+  } else if (key == "misters") {
+    stateMister = state;
     digitalWrite(PIN_MISTER, state ? HIGH : LOW);
     Serial.printf("   💧 [Actuator] Misters (GPIO %d) -> %s\n", PIN_MISTER, state ? "ON" : "OFF");
-  }
-  // Grow Lights
-  else if (path == "/lights") {
+  } else if (key == "lights") {
+    stateLight = state;
     digitalWrite(PIN_LIGHT, state ? HIGH : LOW);
     Serial.printf("   💡 [Actuator] Grow Light (GPIO %d) -> %s\n", PIN_LIGHT, state ? "ON" : "OFF");
   }
 }
 
+void streamCallback(FirebaseStream data) {
+  String path = data.dataPath();
+  String type = data.dataType();
+
+  // 1. Full or partial JSON object payload (handles initial connect and /devices updates)
+  if (type == "json") {
+    FirebaseJson *json = data.jsonObjectPtr();
+    FirebaseJsonData result;
+    if (json != nullptr) {
+      if (json->get(result, "mode")) {
+        stateMode = (result.to<String>() == "manual") ? "MANUAL" : "AUTO";
+        Serial.printf("   ⚙️ [Control] Mode: %s\n", stateMode.c_str());
+      }
+      if (json->get(result, "devices/fans") || json->get(result, "fans")) applyActuator("fans", result.to<bool>());
+      if (json->get(result, "devices/exhaust") || json->get(result, "exhaust")) applyActuator("exhaust", result.to<bool>());
+      if (json->get(result, "devices/fanOut") || json->get(result, "fanOut")) applyActuator("fanOut", result.to<bool>());
+      if (json->get(result, "devices/fanIn") || json->get(result, "fanIn")) applyActuator("fanIn", result.to<bool>());
+      if (json->get(result, "devices/intake") || json->get(result, "intake")) applyActuator("intake", result.to<bool>());
+      if (json->get(result, "devices/misters") || json->get(result, "misters")) applyActuator("misters", result.to<bool>());
+      if (json->get(result, "devices/lights") || json->get(result, "lights")) applyActuator("lights", result.to<bool>());
+    }
+    return;
+  }
+
+  // 2. Control Mode string change
+  if (path.indexOf("mode") >= 0) {
+    stateMode = (data.stringData() == "manual") ? "MANUAL" : "AUTO";
+    Serial.printf("   ⚙️ [Control] Mode changed to: %s\n", stateMode.c_str());
+    return;
+  }
+
+  // 3. Child property change (boolean / string / int)
+  bool state = false;
+  if (type == "boolean") state = data.boolData();
+  else if (type == "string") state = (data.stringData() == "true" || data.stringData() == "1");
+  else if (type == "int") state = (data.intData() > 0);
+
+  if (path.indexOf("fanIn") >= 0 || path.indexOf("intake") >= 0) {
+    applyActuator("fanIn", state);
+  } else if (path.indexOf("fans") >= 0 || path.indexOf("exhaust") >= 0 || path.indexOf("fanOut") >= 0) {
+    applyActuator("fans", state);
+  } else if (path.indexOf("misters") >= 0) {
+    applyActuator("misters", state);
+  } else if (path.indexOf("lights") >= 0) {
+    applyActuator("lights", state);
+  }
+}
+
 void streamTimeoutCallback(bool timeout) {
   if (timeout) Serial.println("   [Stream] Firebase connection timeout, resuming...");
+}
+
+// ═══════════════════════════════════════════════
+//  AUTOMATIC REGULATION ENGINE (Oyster Mushroom)
+// ═══════════════════════════════════════════════
+
+void runAutoRegulation() {
+  if (stateMode != "AUTO") return;
+
+  bool nextExhaust = stateExhaust;
+  bool nextIntake  = stateIntake;
+  bool nextMister  = stateMister;
+  bool nextLight   = stateLight;
+
+  // 1. Ventilation (CO2 & Temperature Control with Hysteresis)
+  // Oyster fruiting requires CO2 < 1000 ppm and Temp 18 - 25 °C.
+  // Purge when CO2 > 1000 ppm OR Temp > 25.0 °C
+  // Idle when CO2 <= 900 ppm AND Temp <= 24.0 °C
+  bool co2Elevated  = (!co2Fault && currentCO2 > 1000);
+  bool tempElevated = (!shtFault && currentTemp > 25.0);
+  bool ventClear    = (co2Fault || currentCO2 <= 900) && (shtFault || currentTemp <= 24.0);
+
+  if (co2Elevated || tempElevated) {
+    nextExhaust = true;
+    nextIntake  = true; // Fresh air intake assists exhaust in purging stale CO2 and cooling
+  } else if (ventClear) {
+    nextExhaust = false;
+    nextIntake  = false;
+  }
+
+  // 2. Ultrasonic Humidity Control (with Hysteresis)
+  // Oyster fruiting requires 80 - 95 % RH.
+  // Humidify when Humidity < 80 %
+  // Turn off when Humidity >= 85 %
+  if (!shtFault && currentHum > 0) {
+    if (currentHum < 80.0) {
+      nextMister = true;
+    } else if (currentHum >= 85.0) {
+      nextMister = false;
+    }
+  }
+
+  // 3. Grow Lights Photoperiod / Illumination (with Hysteresis)
+  // Oyster fruiting requires 150 - 1000 lx for primordia differentiation.
+  // Turn on lights when illumination < 150 lx
+  // Turn off lights when illumination >= 200 lx
+  if (!lightFault && currentLight >= 0) {
+    if (currentLight < 150) {
+      nextLight = true;
+    } else if (currentLight >= 200) {
+      nextLight = false;
+    }
+  }
+
+  // If any state adjusted, apply to pins and immediately push to Firebase!
+  bool changed = (nextExhaust != stateExhaust ||
+                  nextIntake  != stateIntake  ||
+                  nextMister  != stateMister  ||
+                  nextLight   != stateLight);
+
+  if (changed) {
+    stateExhaust = nextExhaust;
+    stateIntake  = nextIntake;
+    stateMister  = nextMister;
+    stateLight   = nextLight;
+
+    digitalWrite(PIN_FAN_EXHAUST, stateExhaust ? HIGH : LOW);
+    digitalWrite(PIN_FAN_INTAKE,  stateIntake  ? HIGH : LOW);
+    digitalWrite(PIN_MISTER,      stateMister  ? HIGH : LOW);
+    digitalWrite(PIN_LIGHT,       stateLight   ? HIGH : LOW);
+
+    Serial.printf("🤖 [Auto Regulation] Actuators adjusted: EXH=%s INT=%s MIST=%s LIGHT=%s\n",
+                  stateExhaust ? "ON" : "OFF",
+                  stateIntake  ? "ON" : "OFF",
+                  stateMister  ? "ON" : "OFF",
+                  stateLight   ? "ON" : "OFF");
+
+    if (Firebase.ready() && WiFi.status() == WL_CONNECTED) {
+      FirebaseJson devJson;
+      devJson.set("fans",    stateExhaust);
+      devJson.set("fanOut",  stateExhaust);
+      devJson.set("fanIn",   stateIntake);
+      devJson.set("misters", stateMister);
+      devJson.set("lights",  stateLight);
+      devJson.set("valve",   stateMister);
+      devJson.set("co2",     false);
+      Firebase.RTDB.updateNode(&fbdo, "/kabutech/settings/setpoints/devices", &devJson);
+    }
+  }
 }
 
 // ═══════════════════════════════════════════════
@@ -255,6 +374,9 @@ void setup() {
 #endif
 
   setCpuFrequencyMhz(160); // 160MHz: Fast cryptography, cool operation
+
+  // ── Initialize 3.2" SPI TFT Display & Boot Splash ──
+  initDisplay();
 
   Serial.println();
   Serial.println("╔══════════════════════════════════════════════════╗");
@@ -299,6 +421,7 @@ void setup() {
   } else {
     Serial.println("❌ SHT3x sensor NOT detected. Verify SDA=4, SCL=5, 3.3V, GND.");
   }
+  updateBootStep("SHT3x Temp/Hum", sht31Ready);
 
   // 2. Initialize BH1750 Light Sensor
   if (lightMeter.begin(BH1750::CONTINUOUS_HIGH_RES_MODE)) {
@@ -307,6 +430,7 @@ void setup() {
   } else {
     Serial.println("❌ BH1750 light sensor NOT detected. Check wiring.");
   }
+  updateBootStep("BH1750 Light", bh1750Ready);
 
   // 3. Initialize Sensirion SCD41 True NDIR CO₂
   scd4x.begin(Wire, 0x62);
@@ -319,6 +443,7 @@ void setup() {
     Serial.println("✅ Sensirion SCD41 True NDIR CO₂ sensor initialized!");
     scd4xReady = true;
   }
+  updateBootStep("SCD41 NDIR CO2", scd4xReady);
 
   // ── Initialize Actuator LEDs ──
   pinMode(PIN_FAN_EXHAUST, OUTPUT);
@@ -351,11 +476,27 @@ void setup() {
     WiFi.setSleep(false); // Maintain persistent TLS stream without dropping packets
 
     // Sync NTP Time (UTC+8 for Philippines: 8 * 3600 = 28800s offset)
-    configTime(8 * 3600, 0, "pool.ntp.org", "time.nist.gov");
-    Serial.println("⏰ NTP time sync configured (UTC+8 Philippine Standard Time)");
+    configTime(8 * 3600, 0, "time.google.com", "time.cloudflare.com", "pool.ntp.org");
+    setenv("TZ", "PST-8", 1);
+    tzset();
+    Serial.print("⏰ Synchronizing Philippine Standard Time (PST)...");
+    struct tm ntpInfo;
+    int ntpAttempts = 0;
+    while (!getLocalTime(&ntpInfo, 250) && ntpAttempts < 24) {
+      Serial.print(".");
+      delay(250);
+      ntpAttempts++;
+    }
+    if (ntpInfo.tm_year > 120) {
+      Serial.printf(" ✓ Synced: %02d:%02d PST\n", ntpInfo.tm_hour, ntpInfo.tm_min);
+    } else {
+      Serial.println(" (Syncing in background)");
+    }
+    updateBootStep("WiFi & Time Synced", true);
   } else {
     Serial.println();
     Serial.println("❌ WiFi connection FAILED. Operating in local offline mode.");
+    updateBootStep("WiFi Offline", false);
   }
 
   // ── Configure Firebase ──
@@ -369,6 +510,7 @@ void setup() {
   } else {
     Serial.printf("❌ Firebase sign-in failed: %s\n", config.signer.signupError.message.c_str());
   }
+  updateBootStep("Firebase Cloud", firebaseReady);
 
   config.token_status_callback = tokenStatusCallback;
   Firebase.begin(&config, &auth);
@@ -377,11 +519,15 @@ void setup() {
   fbdo.setBSSLBufferSize(4096, 1024);
   streamDO.setBSSLBufferSize(4096, 1024);
 
-  // Start stream for remote actuator controls from mobile app
-  if (!Firebase.RTDB.beginStream(&streamDO, "/kabutech/settings/setpoints/devices")) {
+  // Start stream for remote actuator & mode controls from mobile app
+  if (!Firebase.RTDB.beginStream(&streamDO, "/kabutech/settings/setpoints")) {
     Serial.printf("❌ Stream begin error: %s\n", streamDO.errorReason().c_str());
   }
   Firebase.RTDB.setStreamCallback(&streamDO, streamCallback, streamTimeoutCallback);
+
+  // Short pause to show checklist before dashboard transition
+  delay(800);
+  drawStaticDashboard();
 
   bootTime = millis();
   Serial.println();
@@ -534,6 +680,13 @@ void pushToFirebase(float temp, float hum, int light, int co2,
   json.set("hum_error", shtErr);
   json.set("light_error", lightErr);
   json.set("co2_error", co2Err);
+
+  // Live hardware actuator states so the mobile app stays in 100% sync
+  json.set("actuator_fans", stateExhaust);
+  json.set("actuator_fanIn", stateIntake);
+  json.set("actuator_misters", stateMister);
+  json.set("actuator_lights", stateLight);
+  json.set("mode", stateMode);
 
   FirebaseJson ts;
   ts.set(".sv", "timestamp");
@@ -736,6 +889,9 @@ void loop() {
 
     Serial.printf("   🔥 ESP32 Chip Temp: %.1f °C\n", temperatureRead());
     Serial.println("──────────────────────────────────────────────────────");
+
+    // ── Local Autonomous Environmental Regulation (AUTO Mode) ──
+    runAutoRegulation();
   }
 
   // ── Auto Wi-Fi Reconnection Watchdog ──
@@ -746,6 +902,33 @@ void loop() {
       Serial.println("🔄 Wi-Fi link lost, attempting reconnection...");
       WiFi.disconnect();
       WiFi.reconnect();
+    }
+  }
+
+  // ── Philippine Standard Time (PST UTC+8) Sync Watchdog ──
+  static unsigned long lastNtpCheck = 0;
+  if (now - lastNtpCheck >= 15000) {
+    lastNtpCheck = now;
+    if (WiFi.status() == WL_CONNECTED) {
+      struct tm chkTime;
+      if (!getLocalTime(&chkTime, 50) || chkTime.tm_year <= 120) {
+        configTime(8 * 3600, 0, "time.google.com", "time.cloudflare.com", "pool.ntp.org");
+        setenv("TZ", "PST-8", 1);
+        tzset();
+      }
+    }
+  }
+
+  // ── Firebase Stream Watchdog (Auto-reconnect if dropped) ──
+  static unsigned long lastStreamCheck = 0;
+  if (now - lastStreamCheck >= 10000) {
+    lastStreamCheck = now;
+    if (firebaseReady && WiFi.status() == WL_CONNECTED) {
+      if (!streamDO.httpConnected()) {
+        Serial.println("🔄 Stream lost connection, re-subscribing to /kabutech/settings/setpoints...");
+        Firebase.RTDB.beginStream(&streamDO, "/kabutech/settings/setpoints");
+        Firebase.RTDB.setStreamCallback(&streamDO, streamCallback, streamTimeoutCallback);
+      }
     }
   }
 
@@ -793,6 +976,15 @@ void loop() {
   if (now - lastHeartbeat >= HEARTBEAT_INTERVAL) {
     lastHeartbeat = now;
     sendHeartbeat();
+  }
+
+  // ── Non-Blocking 3.2" TFT Dashboard Refresh (every 500ms) ──
+  if (now - lastDisplayRefresh >= DISPLAY_REFRESH_INTERVAL) {
+    lastDisplayRefresh = now;
+    drawDashboard(currentTemp, currentHum, currentLight, currentCO2,
+                  shtFault, lightFault, co2Fault,
+                  stateExhaust, stateIntake, stateMister, stateLight,
+                  stateMode, (WiFi.status() == WL_CONNECTED), firebaseReady);
   }
 
   delay(15);

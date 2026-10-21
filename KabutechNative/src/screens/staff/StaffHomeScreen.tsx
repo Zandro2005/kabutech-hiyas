@@ -117,7 +117,7 @@ export default function StaffHomeScreen() {
           <EnvironmentMetricsGrid temp={temp} hum={hum} light={light} co2={co2} navigation={navigation} />
 
           {/* 4. Critical System Alerts */}
-          <CriticalSystemAlerts alerts={alerts} onAlertPress={() => navigation.navigate('Alerts' as any)} />
+          <CriticalSystemAlerts alerts={alerts} evaluation={chamberEval} onAlertPress={() => navigation.navigate('Alerts' as any)} />
 
         </ScrollView>
       )}

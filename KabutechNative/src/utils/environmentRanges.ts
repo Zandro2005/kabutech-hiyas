@@ -36,19 +36,19 @@ export interface ChamberEvaluation {
 const PARAM_LABELS: Record<ParamKey, string> = {
   temp: 'Temperature',
   hum: 'Humidity',
-  co2: 'CO₂ Level',
+  co2: 'CO2 Level',
   light: 'Light Level',
 };
 
 export function formatRangeText(range: ParamRange): string {
   if (range.min !== undefined && range.max !== undefined) {
-    return `${range.min}–${range.max} ${range.unit}`;
+    return `${range.min} - ${range.max} ${range.unit}`;
   }
   if (range.max !== undefined) {
-    return `≤ ${range.max} ${range.unit}`;
+    return `< ${range.max} ${range.unit}`;
   }
   if (range.min !== undefined) {
-    return `≥ ${range.min} ${range.unit}`;
+    return `> ${range.min} ${range.unit}`;
   }
   return '';
 }
@@ -204,7 +204,7 @@ export function evaluateChamber(
   // Generate clear, factual human-readable summary
   let summary = '';
   if (isOffline) {
-    summary = 'Controller offline • Check connection';
+    summary = 'Controller offline - Check connection';
   } else if (faultCount > 0 && inRangeCount === 0) {
     summary = `${faultCount} sensor fault${faultCount > 1 ? 's' : ''}`;
   } else if (allInRange) {
@@ -219,14 +219,14 @@ export function evaluateChamber(
     else if (humEval.state === 'high') issues.push('Humidity high');
     else if (humEval.state === 'fault') issues.push('Hum fault');
 
-    if (co2Eval.state === 'high') issues.push('CO₂ high');
-    else if (co2Eval.state === 'fault') issues.push('CO₂ fault');
+    if (co2Eval.state === 'high') issues.push('CO2 high');
+    else if (co2Eval.state === 'fault') issues.push('CO2 fault');
 
     if (lightEval.state === 'low') issues.push('Light low');
     else if (lightEval.state === 'high') issues.push('Light high');
     else if (lightEval.state === 'fault') issues.push('Light fault');
 
-    summary = issues.join(' • ');
+    summary = issues.join(' - ');
   }
 
   // Status label & badge color

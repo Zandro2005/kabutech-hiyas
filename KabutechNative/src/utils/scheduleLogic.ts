@@ -203,7 +203,7 @@ export const computeAutoDecision = (
   if (needMistersForHum) {
     if (isWaterSafe) {
       misters = true;
-      reasons.misters = `Humidity ${Math.round(currentHum)}% below research threshold (< ${bands.misterOn}%) • Islam et al. (2022)`;
+      reasons.misters = `Humidity ${Math.round(currentHum)}% below research threshold (< ${bands.misterOn}%) - Islam et al. (2022)`;
     } else {
       reasons.mistersBlocked = `Water at ${Math.round(currentWater)}%: misting paused to protect pump`;
     }
@@ -226,15 +226,15 @@ export const computeAutoDecision = (
     if (needFansForTemp) {
       fans = true;
       fansTemp = true;
-      reasons.fans = `Temp ${currentTemp.toFixed(1)}°C exceeds research limit with grace (> ${bands.exhaustTempOn}°C) • Islam et al. (2022)`;
+      reasons.fans = `Temp ${currentTemp.toFixed(1)}°C exceeds research limit with grace (> ${bands.exhaustTempOn}°C) - Islam et al. (2022)`;
     } else if (needFansForCo2) {
       fans = true;
       fansCo2 = true;
-      reasons.fans = `CO₂ ${Math.round(currentCO2)} ppm exceeds allowable threshold with grace (≥ ${bands.exhaustCo2On} ppm) • Bellettini et al. (2019)`;
+      reasons.fans = `CO2 ${Math.round(currentCO2)} ppm exceeds allowable threshold with grace (>= ${bands.exhaustCo2On} ppm) - Bellettini et al. (2019)`;
     } else if (needFansForHum) {
       fans = true;
       fansHum = true;
-      reasons.fans = `Humidity ${Math.round(currentHum)}% saturated • ventilating chamber`;
+      reasons.fans = `Humidity ${Math.round(currentHum)}% saturated - ventilating chamber`;
     }
   }
 
@@ -244,7 +244,7 @@ export const computeAutoDecision = (
   let lights = false;
   if (needLights) {
     lights = true;
-    reasons.lights = `Light ${Math.round(currentLight)} lx below minimum (< ${bands.lightsOn} lx) • Bellettini et al. (2019)`;
+    reasons.lights = `Light ${Math.round(currentLight)} lx below minimum (< ${bands.lightsOn} lx) - Bellettini et al. (2019)`;
   }
 
   // 6. SOLENOID VALVE & CO2 (Closed during oyster fruiting)

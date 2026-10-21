@@ -278,6 +278,19 @@ export function useEnvironmentAlerts(): EnvironmentAlertsResult {
           icon: 'weather-sunny-alert',
           metric: 'light',
         });
+      } else if (lightEval.state === 'low') {
+        list.push({
+          id: 'light-low',
+          type: 'warning',
+          title: 'Light Below Crop Range',
+          shortLabel: `Low Light - ${Math.round(light)} lx`,
+          currentValue: `${Math.round(light)} lx`,
+          targetValue: lightEval.rangeText,
+          action: 'Turn on grow lights for oyster fruiting',
+          message: `Light level dropped to ${Math.round(light)} lx (Crop range: ${lightEval.rangeText}). Regulate illumination for primordia initiation.`,
+          icon: 'weather-sunny-off',
+          metric: 'light',
+        });
       }
     }
 

@@ -46,7 +46,14 @@ The table below defines every active GPIO pin, its net name, subsystem assignmen
 | **GPIO 1** | `I2C_SDA` | I2C Umbilical Bus — Data Line | Serial Data (I2C) | 3.3V Open-Drain | 4.7kΩ Bus Pull-Up (R4) to +3.3V Rail |
 | **GPIO 2** | `I2C_SCL` | I2C Umbilical Bus — Clock Line | Serial Clock (I2C) | 3.3V Open-Drain | 4.7kΩ Bus Pull-Up (R5) to +3.3V Rail |
 | **GPIO 47** | `LED_WIFI` | Front Panel / On-Board WiFi Status LED (D1) | Digital Output | 3.3V Active High | 330Ω Current-Limiting Resistor (R6) |
-| **GPIO 48** | `LED_ALARM` | Front Panel / On-Board Alarm Status LED (D2) | Digital Output | 3.3V Active High | 330Ω Current-Limiting Resistor (R7) |
+| **GPIO 10** | `TFT_CS` | 3.2" SPI TFT Display — Chip Select (CS) | Digital Output | 3.3V Logic | Active LOW select |
+| **GPIO 15** | `TFT_DC` | 3.2" SPI TFT Display — Data / Command (DC/RS) | Digital Output | 3.3V Logic | Low=Command, High=Data |
+| **GPIO 6** | `TFT_RST` | 3.2" SPI TFT Display — Hardware Reset (RESET) | Digital Output | 3.3V Logic | Active LOW hardware reset |
+| **GPIO 17** | `TFT_MOSI` | 3.2" SPI TFT Display — SPI Data In (SDI / MOSI) | Serial Data (SPI) | 3.3V Logic | Master Out Slave In |
+| **GPIO 18** | `TFT_SCK` | 3.2" SPI TFT Display — SPI Clock (SCK / CLK) | Serial Clock (SPI) | 3.3V Logic | High-speed 40MHz SPI clock |
+| **GPIO 2** | `TFT_LED` | 3.2" SPI TFT Display — Backlight (LED) | PWM Output | 3.3V PWM | LovyanGFX PWM dimming (or tie to 3.3V) |
+| **GPIO 16** | `TFT_MISO` | 3.2" SPI TFT Display — SPI Data Out (SDO / MISO) | Serial Data (SPI) | 3.3V Input | Optional read-back line |
+| **5VIN** | `TFT_VCC` | 3.2" SPI TFT Display — Power (VCC) | Power Rail | 5V DC | 5VIN from USB (J1 jumper on TFT left OPEN) |
 
 ---
 
