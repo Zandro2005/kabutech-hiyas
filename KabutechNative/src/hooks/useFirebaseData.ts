@@ -1,8 +1,8 @@
 import { useContext } from 'react';
-import { 
-  ConnectionContext, ServerTimeOffsetContext, SensorsContext, SettingsContext, 
-  BatchesContext, AlertsContext, ActivityLogsContext, 
-  StaffTasksContext, AllUsersContext 
+import {
+  ConnectionContext, ServerTimeOffsetContext, SensorsContext, SettingsContext,
+  BatchesContext, AlertsContext, ActivityLogsContext,
+  StaffTasksContext, AllUsersContext
 } from '../context/FirebaseDataContext';
 
 export function useFirebaseConnection() {

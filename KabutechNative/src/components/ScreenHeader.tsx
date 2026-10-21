@@ -98,7 +98,7 @@ export default React.memo(function ScreenHeader({ title, subtitle, rightComponen
                 hapticSelection();
                 const primary = envAlerts.primaryAlert;
                 if (envAlerts.count > 1) {
-                  const metricNames = Array.from(new Set(envAlerts.activeAlerts.map(a => a.shortLabel.split(' • ')[0]))).slice(0, 3).join(', ');
+                  const metricNames = Array.from(new Set(envAlerts.activeAlerts.map(a => a.shortLabel.split(/ [•\-] /)[0]))).slice(0, 3).join(', ');
                   showToast({
                     type: hasCritical ? 'error' : 'info',
                     text1: `${envAlerts.count} Chamber Warnings`,
@@ -109,7 +109,7 @@ export default React.memo(function ScreenHeader({ title, subtitle, rightComponen
                   showToast({
                     type: hasCritical ? 'error' : 'info',
                     text1: primary.title,
-                    text2: `${primary.currentValue ? `${primary.currentValue} • ` : ''}${primary.action}`,
+                    text2: `${primary.currentValue ? `${primary.currentValue} - ` : ''}${primary.action}`,
                     duration: 4000,
                   });
                 } else {

@@ -178,19 +178,19 @@ export function useEnvironmentAlerts(): EnvironmentAlertsResult {
     const co2Eval = evaluateParam('co2', co2, health.co2Error || !health.isControllerOnline, ACTIVE_PROFILE);
     const lightEval = evaluateParam('light', light, health.lightError || !health.isControllerOnline, ACTIVE_PROFILE);
 
-    // 4. CO₂ Environmental Alerts
+    // 4. CO2 Environmental Alerts
     if (!health.co2Error && co2Eval.state !== 'fault' && co2Eval.state !== 'in_range') {
       if (co2Eval.state === 'high') {
         const isCo2Critical = co2Eval.severity === 'critical';
         list.push({
           id: isCo2Critical ? 'co2-critical' : 'co2-elevated',
           type: isCo2Critical ? 'critical' : 'warning',
-          title: isCo2Critical ? 'Critically High CO₂' : 'CO₂ Above Crop Range',
-          shortLabel: `High CO₂ • ${Math.round(co2)} ppm`,
+          title: isCo2Critical ? 'Critically High CO2' : 'CO2 Above Crop Range',
+          shortLabel: `High CO2 - ${Math.round(co2)} ppm`,
           currentValue: `${Math.round(co2)} ppm`,
           targetValue: co2Eval.rangeText,
           action: 'Run exhaust fans to ventilate',
-          message: `CO₂ reached ${Math.round(co2)} ppm (Crop range: ${co2Eval.rangeText}). Ventilate chamber immediately.`,
+          message: `CO2 reached ${Math.round(co2)} ppm (Crop range: ${co2Eval.rangeText}). Ventilate chamber immediately.`,
           icon: 'molecule-co2',
           metric: 'co2',
         });
@@ -205,7 +205,7 @@ export function useEnvironmentAlerts(): EnvironmentAlertsResult {
           id: isCritical ? 'temp-critical-high' : 'temp-high',
           type: isCritical ? 'critical' : 'warning',
           title: isCritical ? 'Critically High Temp' : 'Temperature Above Crop Range',
-          shortLabel: `High Temp • ${temp.toFixed(1)}°C`,
+          shortLabel: `High Temp - ${temp.toFixed(1)}°C`,
           currentValue: `${temp.toFixed(1)}°C`,
           targetValue: tempEval.rangeText,
           action: 'Run exhaust fans to cool chamber',
@@ -219,7 +219,7 @@ export function useEnvironmentAlerts(): EnvironmentAlertsResult {
           id: isCritical ? 'temp-critical-low' : 'temp-low',
           type: isCritical ? 'critical' : 'warning',
           title: isCritical ? 'Critically Low Temp' : 'Temperature Below Crop Range',
-          shortLabel: `Low Temp • ${temp.toFixed(1)}°C`,
+          shortLabel: `Low Temp - ${temp.toFixed(1)}°C`,
           currentValue: `${temp.toFixed(1)}°C`,
           targetValue: tempEval.rangeText,
           action: 'Reduce fan ventilation to retain heat',
@@ -238,7 +238,7 @@ export function useEnvironmentAlerts(): EnvironmentAlertsResult {
           id: isCritical ? 'hum-critical-high' : 'hum-high',
           type: isCritical ? 'critical' : 'warning',
           title: isCritical ? 'Excessive Humidity Alert' : 'Humidity Above Crop Range',
-          shortLabel: `Saturated • ${Math.round(hum)}%`,
+          shortLabel: `Saturated - ${Math.round(hum)}%`,
           currentValue: `${Math.round(hum)}%`,
           targetValue: humEval.rangeText,
           action: 'Run exhaust fans to reduce moisture',
@@ -252,7 +252,7 @@ export function useEnvironmentAlerts(): EnvironmentAlertsResult {
           id: isCritical ? 'hum-critical-low' : 'hum-low',
           type: isCritical ? 'critical' : 'warning',
           title: isCritical ? 'Critically Low Humidity' : 'Humidity Below Crop Range',
-          shortLabel: `Dry Air • ${Math.round(hum)}%`,
+          shortLabel: `Dry Air - ${Math.round(hum)}%`,
           currentValue: `${Math.round(hum)}%`,
           targetValue: humEval.rangeText,
           action: `Run misters to raise humidity to ${humEval.rangeText}`,
@@ -270,7 +270,7 @@ export function useEnvironmentAlerts(): EnvironmentAlertsResult {
           id: 'light-high',
           type: 'warning',
           title: 'Light Above Crop Range',
-          shortLabel: `Bright Light • ${Math.round(light)} lx`,
+          shortLabel: `Bright Light - ${Math.round(light)} lx`,
           currentValue: `${Math.round(light)} lx`,
           targetValue: lightEval.rangeText,
           action: 'Dim or turn off grow lights',

@@ -31,7 +31,7 @@ const TAB_CONFIGS: Record<string, TabConfig> = {
     inactiveIcon: 'tune-vertical',
   },
   AddAction: {
-    label: 'Insights',
+    label: 'AI Hub',
     activeIcon: 'chart-box',
     inactiveIcon: 'chart-box',
     isFab: true,

@@ -1,15 +1,12 @@
-import React, { useMemo, useState } from 'react';
-import { View, Text, TouchableOpacity, ActivityIndicator } from 'react-native';
+import React, { useMemo } from 'react';
+import { View, Text, TouchableOpacity } from 'react-native';
 import { MaterialCommunityIcons, Ionicons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
 import tw from '../tailwind';
 import { useTheme } from '../context/ThemeContext';
 import { AlertData } from '../types/firebase';
-import { useEnvironmentAlerts, dismissEnvironmentAlert, dismissAllEnvironmentAlerts } from '../hooks/useEnvironmentAlerts';
-import { hapticLight, hapticSelection, hapticSuccess } from '../utils/haptics';
-import { ref, set, update } from 'firebase/database';
-import { db } from '../services/firebase';
-import { showToast } from './CustomToast';
+import { useEnvironmentAlerts } from '../hooks/useEnvironmentAlerts';
+import { hapticLight, hapticSelection } from '../utils/haptics';
 
 interface Props {
   alerts: AlertData[];
@@ -19,7 +16,6 @@ interface Props {
 export default React.memo(function CriticalSystemAlerts({ alerts, onAlertPress }: Props) {
   const navigation = useNavigation<any>();
   const { isDarkMode } = useTheme();
-  const [isClearing, setIsClearing] = useState(false);
   const { unreadAlerts } = useEnvironmentAlerts();
 
   // Normalize alerts array and merge active environment alerts with 0ms delay
@@ -111,44 +107,7 @@ export default React.memo(function CriticalSystemAlerts({ alerts, onAlertPress }
     }
   };
 
-  // Resolve and clear all alerts in Firebase
-  const handleClearAll = async () => {
-    if (isClearing) return;
-    try {
-      setIsClearing(true);
-      hapticSuccess();
-      dismissAllEnvironmentAlerts();
-      
-      const updates: Record<string, any> = {};
-      rawList.forEach((a, idx) => {
-        const key = a.firebaseKey || a.id || String(idx);
-        if (!key.startsWith('live-')) {
-          updates[`kabutech/alerts/${key}/resolved`] = true;
-          updates[`kabutech/alerts/${key}/resolvedAt`] = new Date().toISOString();
-        }
-      });
 
-      if (Object.keys(updates).length > 0) {
-        await update(ref(db), updates);
-      }
-
-      showToast({
-        type: 'success',
-        text1: 'Alerts Resolved',
-        text2: 'All active hazard warnings have been cleared.',
-        duration: 2500,
-      });
-    } catch (e) {
-      console.error('Failed to resolve alerts:', e);
-      showToast({
-        type: 'error',
-        text1: 'Sync Error',
-        text2: 'Could not resolve alerts to server.',
-      });
-    } finally {
-      setIsClearing(false);
-    }
-  };
 
   const formatTimestamp = (ts: string) => {
     if (!ts) return 'Just now';
@@ -221,32 +180,13 @@ export default React.memo(function CriticalSystemAlerts({ alerts, onAlertPress }
                 <Ionicons name="chevron-forward" size={12} color="#94a3b8" />
               </View>
               <Text numberOfLines={1} style={[tw`text-[10px] text-slate-400 dark:text-slate-500`, { fontFamily: 'PlusJakartaSans_500Medium' }]}>
-                {isAllClear ? 'All sensors nominal • Tap for history' : 'Active alerts require attention'}
+                {isAllClear ? 'All sensors nominal - Tap for history' : 'Active alerts require attention'}
               </Text>
             </View>
           </TouchableOpacity>
 
-          {/* Action Row: Clear All Button & Status Pill */}
-          <View style={tw`flex-row items-center gap-2`}>
-            {!isAllClear && (
-              <TouchableOpacity
-                activeOpacity={0.75}
-                onPress={handleClearAll}
-                disabled={isClearing}
-                style={tw`px-2.5 py-1 rounded-full bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 flex-row items-center gap-1`}
-              >
-                {isClearing ? (
-                  <ActivityIndicator size="small" color="#10b981" />
-                ) : (
-                  <>
-                    <Ionicons name="checkmark-done" size={12} color="#10b981" />
-                    <Text style={[tw`text-[10px] text-slate-600 dark:text-slate-300 font-bold`, { fontFamily: 'PlusJakartaSans_700Bold' }]}>
-                      Clear
-                    </Text>
-                  </>
-                )}
-              </TouchableOpacity>
-            )}
+          {/* Status Pill */}
+          <View style={tw`flex-row items-center`}>
 
             <TouchableOpacity
               activeOpacity={0.75}
