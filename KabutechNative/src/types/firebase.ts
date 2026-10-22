@@ -30,7 +30,7 @@ export interface Setpoints {
   humidity: number;
   light: number;
   co2: number;
-  mode: 'auto' | 'manual' | 'scheduled';
+  mode: 'auto' | 'manual' | 'scheduled' | 'timed';
   devices: DeviceStates;
   aiOverride?: boolean;
 }

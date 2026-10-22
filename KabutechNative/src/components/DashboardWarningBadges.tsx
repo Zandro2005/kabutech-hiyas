@@ -64,7 +64,7 @@ export default React.memo(function DashboardWarningBadges({ alerts, readOnly = f
       <View style={tw`w-full max-w-sm`}>
         <View
           style={[
-            tw`w-full flex-row items-center justify-between pl-3 pr-2 py-2 rounded-2xl border shadow-xs`,
+            tw`w-full flex-row items-center justify-between pl-3 pr-2 py-2 rounded-2xl border shadow-sm`,
             isDarkMode
               ? tw`bg-slate-900/95 border-slate-800`
               : tw`bg-white/95 border-slate-200/90`,

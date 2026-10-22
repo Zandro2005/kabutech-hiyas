@@ -101,6 +101,7 @@ export default React.memo(function CriticalSystemAlerts({ alerts, evaluation, on
   const inRangeCount = evaluation?.inRangeCount ?? 4;
   const isAllSensorsInRange = evaluation ? evaluation.allInRange : true;
   const isTrulyNominal = unresolvedAlerts.length === 0 && isAllSensorsInRange;
+  const isAllClear = isTrulyNominal;
 
   // Extract out-of-range parameters to show factual status matching the hero dial
   const outOfRangeParams = useMemo(() => {
