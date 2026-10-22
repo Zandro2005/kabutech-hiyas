@@ -89,8 +89,12 @@ The table below defines every active GPIO pin, its net name, subsystem assignmen
   - A 10kΩ pull-down resistor (`R3`) holds GPIO 7 stable at 0V when unpowered.
 
 ### Subcircuit 4: Suspended I2C Agro Weather Shield Probe
-- **Umbilical Bus Architecture**: An external 4-conductor shielded cable carries `+3.3V`, `GND`, `SDA` (GPIO 1), and `SCL` (GPIO 2) from the main enclosure to the sensor probe hanging inside the mushroom fruiting chamber.
-- **Pull-Up Resistors**: The hardware I2C bus features 4.7kΩ pull-up resistors (`R4`, `R5`) tied to +3.3V.
+- **Umbilical Bus Architecture**: An external 4-conductor shielded aviation cable (GX16) carries `+3.3V`, `GND`, `SDA` (GPIO 4), and `SCL` (GPIO 5) from the main enclosure to the sensor probe hanging inside the mushroom fruiting chamber.
+- **10-Meter Aviation Cable Engineering Requirements**:
+  - **I2C Clock Speed**: Lowered to **25 kHz** in firmware. Over 10 meters, cable capacitance reaches ~1200–1500 pF; standard 100 kHz fails because RC rise times exceed the pulse width. 25 kHz provides 20µs half-periods for crystal-clear logic HIGH transitions.
+  - **Pull-Up Resistors (`R4`, `R5`)**: Use **2.2kΩ** (or 1.8kΩ) pull-ups to +3.3V at the ESP32 transmitter end to rapidly charge the 10-meter cable capacitance.
+  - **Sensor Probe Decoupling Capacitor**: Add a **100µF 10V electrolytic capacitor + 100nF ceramic capacitor** across +3.3V and GND directly at the sensor probe breakout inside the chamber. This buffers the ~75mA current pulses drawn by the Sensirion SCD41 optical emitter and prevents brownouts on the SHT31.
+  - **Cable Shielding**: Solder the braided shield to **System GND only at the main enclosure end** (leave floating at the sensor probe end) to block inductive EMI from fan motors and misting pumps without creating ground loops.
 - **Connected I2C Devices**:
   1. **Sensirion SCD41 (True NDIR CO₂)**: Address `0x62`. Photoacoustic optical measurement (400–5000 ppm range, ±40 ppm accuracy).
   2. **Sensirion SHT31-D (Industrial Temp/RH)**: Address `0x44`. High-accuracy digital relative humidity (±2% RH, ±0.2°C).

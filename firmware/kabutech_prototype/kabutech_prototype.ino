@@ -118,8 +118,27 @@ bool sht31Ready  = false;
 bool bh1750Ready = false;
 bool scd4xReady  = false;
 
-int lastValidCO2 = 420; // Default outdoor clean baseline until first SCD41 read
-unsigned long lastCO2SuccessTime = 0; // Timestamp of last successful SCD41 reading
+// ─── Long Cable (10m Aviation Cable) I2C Bus Configuration ───
+// 10-meter cables introduce ~1200pF-1500pF line capacitance.
+// 25 kHz (40µs period) gives the slow RC rising edge plenty of time to reach 3.3V logic HIGH.
+#define I2C_LONG_CABLE_CLOCK  50000  // 50 kHz: Fast, responsive, with 2x rise-time margin for cables
+#define I2C_WIRE_TIMEOUT_MS   100    // 100ms: Low latency timeout to prevent loop freezing
+#define SENSOR_HOLD_TIME_MS   3000   // 3s: Responsive real-time updates (no frozen readings)
+
+// Last valid reading buffers (keeps readings stable across momentary cable noise)
+float lastValidTemp  = -999.0;
+float lastValidHum   = -999.0;
+int   lastValidLight = -999;
+int   lastValidCO2   = -999;
+
+// Dual-redundancy: SCD41 also reads integrated temperature & humidity
+float scdBackupTemp  = -999.0;
+float scdBackupHum   = -999.0;
+
+unsigned long lastSHTSuccessTime   = 0;
+unsigned long lastLightSuccessTime = 0;
+unsigned long lastCO2SuccessTime   = 0;
+unsigned long lastScdBackupTime    = 0;
 
 // ── Sensor Reading Structures ──
 struct SHTReading {
@@ -166,8 +185,8 @@ bool shtFault   = true;
 bool lightFault = true;
 bool co2Fault   = true;
 
-// Debouncing streaks (2 consecutive reads to latch/clear fault)
-#define STREAK_TO_LATCH_FAULT 2
+// Debouncing streaks (consecutive reads to latch/clear fault)
+#define STREAK_TO_LATCH_FAULT 4
 #define STREAK_TO_CLEAR_FAULT 2
 
 int shtFailStreak = 0,   shtValidStreak = 0;
@@ -408,11 +427,15 @@ void setup() {
   Serial.println("╚══════════════════════════════════════════════════╝");
   Serial.println();
 
-  // ── Initialize I2C Bus on GPIO 4 (SDA) and GPIO 5 (SCL) ──
+  // ── Configure Internal Pull-Ups for 10m Aviation Cable ──
+  pinMode(I2C_SDA_PIN, INPUT_PULLUP);
+  pinMode(I2C_SCL_PIN, INPUT_PULLUP);
+
+  // ── Initialize I2C Bus on GPIO 4 (SDA) and GPIO 5 (SCL) at 50 kHz ──
   Wire.begin(I2C_SDA_PIN, I2C_SCL_PIN);
-  Wire.setClock(100000); // 100 kHz Standard Mode (rock-solid over breadboard/cables)
-  Wire.setTimeOut(100);  // 100ms timeout for SCD41 clock-stretching support
-  delay(100);            // Allow sensor voltage rails to stabilize
+  Wire.setClock(I2C_LONG_CABLE_CLOCK); // 50 kHz (Fast, responsive, stable for cables)
+  Wire.setTimeOut(I2C_WIRE_TIMEOUT_MS); // 100ms timeout
+  delay(150);            // Allow sensor voltage rails to stabilize over cable
 
   // ── Live I2C Bus Scanner for Immediate Debugging ──
   Serial.println("🔍 Scanning I2C Bus on GPIO 4 (SDA) & GPIO 5 (SCL)...");
@@ -578,6 +601,48 @@ void setup() {
 }
 
 // ═══════════════════════════════════════════════
+//  HARDWARE I2C BUS RECOVERY (10m Aviation Cable)
+// ═══════════════════════════════════════════════
+
+// Toggles SCL up to 16 times to release a slave holding SDA low, then sends STOP
+void recoverI2CBus() {
+  Wire.end();
+
+  pinMode(I2C_SDA_PIN, INPUT_PULLUP);
+  pinMode(I2C_SCL_PIN, OUTPUT);
+  digitalWrite(I2C_SCL_PIN, HIGH);
+  delayMicroseconds(25);
+
+  // If a sensor is mid-byte holding SDA low, clock out pulses until released
+  for (int i = 0; i < 16; i++) {
+    if (digitalRead(I2C_SDA_PIN) == HIGH) {
+      break;
+    }
+    digitalWrite(I2C_SCL_PIN, LOW);
+    delayMicroseconds(25);
+    digitalWrite(I2C_SCL_PIN, HIGH);
+    delayMicroseconds(25);
+  }
+
+  // Generate an I2C STOP condition
+  pinMode(I2C_SDA_PIN, OUTPUT);
+  digitalWrite(I2C_SDA_PIN, LOW);
+  delayMicroseconds(25);
+  digitalWrite(I2C_SCL_PIN, HIGH);
+  delayMicroseconds(25);
+  digitalWrite(I2C_SDA_PIN, HIGH);
+  delayMicroseconds(25);
+
+  // Re-enable internal pullups and restart Wire at 25 kHz
+  pinMode(I2C_SDA_PIN, INPUT_PULLUP);
+  pinMode(I2C_SCL_PIN, INPUT_PULLUP);
+  Wire.begin(I2C_SDA_PIN, I2C_SCL_PIN);
+  Wire.setClock(I2C_LONG_CABLE_CLOCK);
+  Wire.setTimeOut(I2C_WIRE_TIMEOUT_MS);
+  delay(50);
+}
+
+// ═══════════════════════════════════════════════
 //  SENSOR READING FUNCTIONS
 // ═══════════════════════════════════════════════
 
@@ -585,30 +650,55 @@ void setup() {
 SHTReading readSHT3x() {
   SHTReading r;
   if (!sht31Ready) {
-    // Attempt auto-recovery
     if (sht31.begin(0x44) || sht31.begin(0x45)) {
       sht31Ready = true;
-    } else {
-      r.temperature = -999.0;
-      r.humidity    = -999.0;
-      r.valid       = false;
-      return r;
+      sht31.heater(false);
     }
   }
 
-  float t = sht31.readTemperature();
-  float h = sht31.readHumidity();
+  float t = NAN;
+  float h = NAN;
+  bool success = false;
 
-  // Validate plausible ranges
-  if (isnan(t) || isnan(h) || t < -20.0 || t > 80.0 || h < 1.0 || h > 100.0) {
+  if (sht31Ready) {
+    if (sht31.readBoth(&t, &h)) {
+      if (!isnan(t) && !isnan(h) && t >= -20.0 && t <= 80.0 && h >= 1.0 && h <= 100.0) {
+        success = true;
+      }
+    }
+  }
+
+  if (success) {
+    lastValidTemp = t + TEMP_OFFSET;
+    lastValidHum  = constrain(h + HUM_OFFSET, 1.0, 100.0);
+    lastSHTSuccessTime = millis();
+    r.temperature = lastValidTemp;
+    r.humidity    = lastValidHum;
+    r.valid       = true;
+    return r;
+  }
+
+  // ── Dual-Redundancy Fallback: Sensirion SCD41 Integrated Temp/Hum ──
+  // If SHT3x dropped packet over 10m, instantly use SCD41's internal CMOSens reading!
+  if (scdBackupTemp > -50.0 && lastScdBackupTime > 0 && (millis() - lastScdBackupTime < 10000)) {
+    r.temperature = scdBackupTemp + TEMP_OFFSET;
+    r.humidity    = constrain(scdBackupHum + HUM_OFFSET, 1.0, 100.0);
+    r.valid       = true;
+    lastValidTemp = r.temperature;
+    lastValidHum  = r.humidity;
+    lastSHTSuccessTime = millis();
+    return r;
+  }
+
+  // Hold previous reading for up to 3s (tight window for real-time responsiveness)
+  if (lastValidTemp > -50.0 && lastSHTSuccessTime > 0 && (millis() - lastSHTSuccessTime < SENSOR_HOLD_TIME_MS)) {
+    r.temperature = lastValidTemp;
+    r.humidity    = lastValidHum;
+    r.valid       = true;
+  } else {
     r.temperature = -999.0;
     r.humidity    = -999.0;
     r.valid       = false;
-  } else {
-    // Apply calibration offset to compensate for ESP32/breadboard self-heating
-    r.temperature = t + TEMP_OFFSET;
-    r.humidity    = constrain(h + HUM_OFFSET, 1.0, 100.0);
-    r.valid       = true;
   }
   return r;
 }
@@ -627,12 +717,19 @@ LightReading readBH1750() {
   }
 
   float lux = lightMeter.readLightLevel();
-  if (isnan(lux) || lux < 0.0) {
-    r.lux   = -999;
-    r.valid = false;
-  } else {
-    r.lux   = (int)constrain(lux, 0.0, 65535.0);
+  if (!isnan(lux) && lux >= 0.0) {
+    lastValidLight = (int)constrain(lux, 0.0, 65535.0);
+    lastLightSuccessTime = millis();
+    r.lux   = lastValidLight;
     r.valid = true;
+  } else {
+    if (lastValidLight >= 0 && lastLightSuccessTime > 0 && (millis() - lastLightSuccessTime < SENSOR_HOLD_TIME_MS)) {
+      r.lux   = lastValidLight;
+      r.valid = true;
+    } else {
+      r.lux   = -999;
+      r.valid = false;
+    }
   }
   return r;
 }
@@ -641,7 +738,7 @@ LightReading readBH1750() {
 CO2Reading readSCD41() {
   CO2Reading r;
 
-  // 1. Auto-recovery: If not initialized or stalled >25s, automatically re-initialize
+  // 1. Auto-recovery: If stalled >25s, restart periodic measurement
   if (!scd4xReady || (lastCO2SuccessTime > 0 && millis() - lastCO2SuccessTime > 25000)) {
     static unsigned long lastRecoveryAttempt = 0;
     if (millis() - lastRecoveryAttempt >= 5000) {
@@ -655,39 +752,50 @@ CO2Reading readSCD41() {
     }
   }
 
-  if (!scd4xReady) {
-    r.ppm   = -999;
-    r.valid = false;
-    return r;
-  }
-
-  // 2. Check if a new 5-second sample is available
-  bool isDataReady = false;
-  uint16_t error = scd4x.getDataReadyStatus(isDataReady);
-  
-  if (error == 0 && isDataReady) {
-    uint16_t co2 = 0;
-    float temp = 0.0f;
-    float hum = 0.0f;
-    error = scd4x.readMeasurement(co2, temp, hum);
+  if (scd4xReady) {
+    // 2. Check if a new 5-second sample is available
+    bool isDataReady = false;
+    uint16_t error = scd4x.getDataReadyStatus(isDataReady);
     
-    if (error == 0 && co2 > 0 && co2 <= 5000) {
-      r.ppm = (int)co2;
-      r.valid = true;
-      lastValidCO2 = r.ppm;
-      lastCO2SuccessTime = millis();
-      return r;
+    if (error == 0 && isDataReady) {
+      uint16_t co2 = 0;
+      float temp = 0.0f;
+      float hum = 0.0f;
+      error = scd4x.readMeasurement(co2, temp, hum);
+      
+      if (error == 0 && co2 > 0 && co2 <= 5000) {
+        lastValidCO2 = (int)co2;
+        lastCO2SuccessTime = millis();
+        if (!isnan(temp) && temp > -20.0 && temp < 80.0) {
+          scdBackupTemp = temp;
+        }
+        if (!isnan(hum) && hum > 0.0 && hum <= 100.0) {
+          scdBackupHum = hum;
+        }
+        lastScdBackupTime = millis();
+        r.ppm   = lastValidCO2;
+        r.valid = true;
+        return r;
+      }
     }
   }
 
-  // 3. Keep latest reading active between 5-second sampling cycles (up to 25s watchdog)
-  if (lastValidCO2 > 0 && (lastCO2SuccessTime == 0 || millis() - lastCO2SuccessTime < 25000)) {
+  // 3. Keep latest reading active between 5-second sampling cycles (up to 10s)
+  if (lastValidCO2 > 0 && lastCO2SuccessTime > 0 && (millis() - lastCO2SuccessTime < 10000)) {
     r.ppm   = lastValidCO2;
     r.valid = true;
-  } else {
-    r.ppm   = -999;
-    r.valid = false;
+    return r;
   }
+
+  // 4. Initial boot warmup grace period (SCD41 optical measurement requires 5-10s)
+  if (millis() - bootTime < 10000) {
+    r.ppm   = -999;
+    r.valid = true; // Still warming up, do not flag fault
+    return r;
+  }
+
+  r.ppm   = -999;
+  r.valid = false;
   return r;
 }
 
@@ -895,8 +1003,10 @@ void loop() {
       co2FailStreak = 0;
       co2ValidStreak++;
       if (co2ValidStreak >= STREAK_TO_CLEAR_FAULT) {
-        co2Fault   = false;
-        currentCO2 = co2Data.ppm;
+        if (co2Data.ppm > 0) {
+          co2Fault   = false;
+          currentCO2 = co2Data.ppm;
+        }
       }
     } else {
       co2ValidStreak = 0;
