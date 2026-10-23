@@ -25,8 +25,14 @@
 #include <LovyanGFX.hpp>
 #include <time.h>
 
-// Screen Orientation: 1 = Landscape (Standard), 3 = Landscape (Inverted 180°)
+#ifndef TFT_ROTATION
+// Screen Orientation: 1 = Landscape (Header TOP, Normal Left-to-Right Text)
 #define TFT_ROTATION 1
+#endif
+
+#ifndef TFT_SPI_FREQ
+#define TFT_SPI_FREQ 4000000 // 4 MHz: rock-solid clock immunity for 30cm DuPont extension wires
+#endif
 
 class LGFX_KabuTech : public lgfx::LGFX_Device {
   lgfx::Panel_ILI9341 _panel_instance;
@@ -38,8 +44,8 @@ public:
       auto cfg = _bus_instance.config();
       cfg.spi_host = SPI2_HOST; // FSPI on ESP32-S3
       cfg.spi_mode = 0;
-      cfg.freq_write = 20000000; // 20 MHz rock-solid on jumper wires
-      cfg.freq_read  = 16000000;
+      cfg.freq_write = TFT_SPI_FREQ; // 4 MHz clock eliminates ringing & capacitive distortion over 30cm
+      cfg.freq_read  = 4000000;
       cfg.pin_sclk = 18; // GPIO 18: SCK
       cfg.pin_mosi = 17; // GPIO 17: SDI (MOSI)
       cfg.pin_miso = -1; // -1: Unused
@@ -50,7 +56,7 @@ public:
     {
       auto cfg = _panel_instance.config();
       cfg.pin_cs           = 10; // GPIO 10: CS
-      cfg.pin_rst          = 6;  // GPIO 6: RESET
+      cfg.pin_rst          = -1; // -1: Handled manually with full 250ms charge-pump settling delays
       cfg.pin_busy         = -1;
       cfg.panel_width      = 240;
       cfg.panel_height     = 320;
@@ -115,21 +121,58 @@ void drawDashboard(float temp, float hum, int light, int co2,
 
 // ─── Initialize TFT ───
 void initDisplay() {
-  // Explicitly force Backlight pin HIGH if connected to GPIO 2
+  Serial.println("📺 [TFT] Initializing 3.2\" SPI ILI9341 Display over 30cm wires...");
+  Serial.printf("📺 [TFT] SPI Clock: %d MHz | SCK: 18 | MOSI: 17 | CS: 10 | DC: 15 | RST: 6\n", (int)(TFT_SPI_FREQ / 1000000));
+
+  // 1. Ensure Backlight pin is HIGH (GPIO 2)
   pinMode(2, OUTPUT);
   digitalWrite(2, HIGH);
 
-  // Clean hardware reset pulse to TFT panel
+  // 2. Perform deep hardware reset with long settling time for 30cm wire capacitance
   pinMode(6, OUTPUT);
-  digitalWrite(6, LOW);
-  delay(20);
   digitalWrite(6, HIGH);
-  delay(120);
+  delay(20);
+  digitalWrite(6, LOW);   // Drive RESET LOW
+  delay(80);              // Hold reset LOW for 80ms to discharge internal charge pumps
+  digitalWrite(6, HIGH);  // Release RESET
+  delay(250);             // Wait 250ms for internal VCOM/VGH/VGL voltage boosters to settle
 
-  tft.init();
+  // 3. Initialize LovyanGFX bus and panel
+  bool ok = tft.init();
+  if (ok) {
+    Serial.println("✅ [TFT] LovyanGFX bus & panel initialized.");
+  } else {
+    Serial.println("⚠️ [TFT] LovyanGFX init returned false — check CS, DC, or MOSI connections.");
+  }
+
   tft.setRotation(TFT_ROTATION); // 320x240 Landscape Mode
   tft.setBrightness(255);
+
+  // 4. Force explicit MIPI DCS wake-up sequence (forces chip out of hardware sleep)
+  tft.startWrite();
+  tft.writeCommand(0x01); // Software Reset
+  delay(150);
+  tft.writeCommand(0x11); // Sleep Out (Exit Sleep Mode)
+  delay(150);
+  tft.writeCommand(0x29); // Display ON
+  delay(50);
+  tft.endWrite();
+
+  // 5. Diagnostic color wipe test: flashes Black -> Red -> Green -> Blue
+  // If you see these colors, SPI is 100% active and receiving data!
+  Serial.println("📺 [TFT] Diagnostic test wipe (Black -> Red -> Green -> Blue)...");
+  tft.fillScreen(0x0000); // Black (proves crystals can polarize)
+  delay(120);
+  tft.fillScreen(0xF800); // Red
+  delay(120);
+  tft.fillScreen(0x07E0); // Green
+  delay(120);
+  tft.fillScreen(0x001F); // Blue
+  delay(120);
+
+  // 6. Draw the production boot splash
   drawBootSplash();
+  Serial.println("✅ [TFT] Boot splash rendered successfully.");
 }
 
 // ─── Boot Splash Screen (320x240 Landscape) ───

@@ -2,6 +2,8 @@
 
 > **System Architecture**: ESP32-S3 Automated Mushroom & Crop Cultivation Environment  
 > **Schematic Standard**: Proteus ISIS Electronic Design Automation (EDA) Specification  
+> **Master Wiring & Pinouts PDF (Complete Multi-Subsystem)**: [`firmware/assets/kabutech_hiyas_master_wiring_specification.pdf`](assets/kabutech_hiyas_master_wiring_specification.pdf)  
+> **Interactive Master Wiring Guide (HTML)**: [`firmware/assets/kabutech_hiyas_master_wiring_guide.html`](assets/kabutech_hiyas_master_wiring_guide.html)  
 > **Vector CAD Source**: [`firmware/assets/kabutech_hiyas_schematic.svg`](assets/kabutech_hiyas_schematic.svg)  
 > **Interactive CAD Viewer**: [`firmware/assets/kabutech_hiyas_schematic_viewer.html`](assets/kabutech_hiyas_schematic_viewer.html)  
 > **High-Resolution Master Render**: [`firmware/assets/kabutech_hiyas_schematic.png`](assets/kabutech_hiyas_schematic.png)  

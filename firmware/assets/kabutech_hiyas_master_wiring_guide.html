@@ -1,0 +1,1329 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Kabutech Hiyas — Master Hardware Wiring & Pinout Specification</title>
+<style>
+  @page {
+    size: A4 portrait;
+    margin: 12mm 14mm 12mm 14mm;
+    @bottom-right {
+      content: counter(page) " of " counter(pages);
+      font-size: 8pt;
+      color: #64748b;
+    }
+  }
+
+  * {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+  }
+
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    color: #0f172a;
+    background: #ffffff;
+    font-size: 8.5pt;
+    line-height: 1.4;
+  }
+
+  .sheet {
+    page-break-after: always;
+    height: 272mm;
+    max-height: 272mm;
+    position: relative;
+    overflow: hidden;
+  }
+
+  .sheet:last-child {
+    page-break-after: avoid;
+  }
+
+  /* Header banner */
+  .doc-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    border-bottom: 2px solid #059669;
+    padding-bottom: 6px;
+    margin-bottom: 8px;
+  }
+
+  .brand-title {
+    font-size: 14pt;
+    font-weight: 800;
+    color: #064e3b;
+    letter-spacing: -0.5px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .brand-badge {
+    background: #10b981;
+    color: #ffffff;
+    font-size: 7pt;
+    font-weight: 700;
+    padding: 2px 6px;
+    border-radius: 4px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+  }
+
+  .doc-meta {
+    text-align: right;
+    font-size: 7.5pt;
+    color: #64748b;
+    line-height: 1.25;
+  }
+
+  .doc-meta strong {
+    color: #1e293b;
+  }
+
+  /* Headings */
+  h1 {
+    font-size: 13pt;
+    font-weight: 800;
+    color: #0f172a;
+    margin-bottom: 5px;
+  }
+
+  h2 {
+    font-size: 10.5pt;
+    font-weight: 700;
+    color: #065f46;
+    border-left: 3.5px solid #10b981;
+    padding-left: 6px;
+    margin-top: 8px;
+    margin-bottom: 6px;
+  }
+
+  p {
+    margin-bottom: 6px;
+    color: #334155;
+    font-size: 8pt;
+  }
+
+  /* Callouts */
+  .callout {
+    border-radius: 5px;
+    padding: 6px 10px;
+    margin: 6px 0;
+    font-size: 7.5pt;
+    line-height: 1.35;
+  }
+
+  .callout-success {
+    background: #ecfdf5;
+    border-left: 3.5px solid #10b981;
+    color: #065f46;
+  }
+
+  .callout-warning {
+    background: #fffbeb;
+    border-left: 3.5px solid #f59e0b;
+    color: #92400e;
+  }
+
+  .callout-danger {
+    background: #fef2f2;
+    border-left: 3.5px solid #ef4444;
+    color: #991b1b;
+  }
+
+  .callout-info {
+    background: #f0fdf4;
+    border: 1px solid #bbf7d0;
+    color: #166534;
+  }
+
+  /* Tables */
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 6px 0 8px 0;
+    font-size: 7.5pt;
+  }
+
+  th {
+    background: #0f172a;
+    color: #f8fafc;
+    text-align: left;
+    padding: 4px 6px;
+    font-weight: 600;
+    text-transform: uppercase;
+    font-size: 7pt;
+    letter-spacing: 0.3px;
+  }
+
+  th.accent {
+    background: #065f46;
+  }
+
+  td {
+    padding: 3.5px 6px;
+    border-bottom: 1px solid #e2e8f0;
+    vertical-align: middle;
+  }
+
+  tr:nth-child(even) td {
+    background: #f8fafc;
+  }
+
+  .pill {
+    display: inline-block;
+    padding: 1px 5px;
+    border-radius: 3px;
+    font-weight: 700;
+    font-size: 7pt;
+    font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  }
+
+  .pill-red { background: #fee2e2; color: #991b1b; }
+  .pill-green { background: #dcfce7; color: #166534; }
+  .pill-blue { background: #e0f2fe; color: #075985; }
+  .pill-amber { background: #fef3c7; color: #92400e; }
+  .pill-purple { background: #f3e8ff; color: #6b21a8; }
+  .pill-slate { background: #f1f5f9; color: #334155; }
+  .pill-cyan { background: #cffafe; color: #155e75; }
+
+  .wire-tag {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    font-weight: 600;
+  }
+
+  .wire-dot {
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    display: inline-block;
+    border: 1px solid rgba(0,0,0,0.2);
+  }
+
+  .wire-red { background-color: #ef4444; }
+  .wire-black { background-color: #1e293b; }
+  .wire-green { background-color: #10b981; }
+  .wire-white { background-color: #ffffff; border: 1px solid #94a3b8; }
+  .wire-yellow { background-color: #eab308; }
+  .wire-blue { background-color: #3b82f6; }
+
+  /* Diagram container */
+  .diagram-box {
+    background: #0f172a;
+    border-radius: 6px;
+    padding: 8px 10px;
+    margin: 6px 0;
+    color: #f8fafc;
+  }
+
+  .diagram-title {
+    font-size: 8pt;
+    font-weight: 700;
+    color: #34d399;
+    margin-bottom: 6px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    display: flex;
+    justify-content: space-between;
+  }
+
+  /* Code block */
+  pre {
+    background: #1e293b;
+    color: #e2e8f0;
+    padding: 6px 10px;
+    border-radius: 5px;
+    font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+    font-size: 7pt;
+    line-height: 1.35;
+    margin: 5px 0;
+  }
+
+  .code-kw { color: #f43f5e; font-weight: bold; }
+  .code-ty { color: #38bdf8; }
+  .code-fn { color: #a855f7; }
+  .code-nu { color: #fbbf24; }
+  .code-cm { color: #64748b; font-style: italic; }
+
+  .grid-2 {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+    margin: 6px 0;
+  }
+
+  .card {
+    background: #ffffff;
+    border: 1px solid #cbd5e1;
+    border-radius: 5px;
+    padding: 8px;
+  }
+
+  .card-header {
+    font-size: 8pt;
+    font-weight: 700;
+    color: #065f46;
+    border-bottom: 1px solid #e2e8f0;
+    padding-bottom: 3px;
+    margin-bottom: 5px;
+    display: flex;
+    justify-content: space-between;
+  }
+
+  .doc-footer {
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    display: flex;
+    justify-content: space-between;
+    font-size: 7pt;
+    color: #94a3b8;
+    border-top: 1px solid #e2e8f0;
+    padding-top: 3px;
+  }
+</style>
+</head>
+<body>
+
+<!-- ============================================================== -->
+<!-- SHEET 1: EXECUTIVE SUMMARY, TOPOLOGY & POWER NETWORK           -->
+<!-- ============================================================== -->
+<div class="sheet">
+  <div class="doc-header">
+    <div class="brand-title">
+      <span>KABUTECH HIYAS</span>
+      <span class="brand-badge">HARDWARE SPECIFICATION</span>
+    </div>
+    <div class="doc-meta">
+      <strong>DOC ID:</strong> KABU-HW-WIRING-V2.0<br>
+      <strong>SYSTEM:</strong> ESP32-S3 Mushroom Automation Controller<br>
+      <strong>REVISION:</strong> October 2026 &bull; Production Release
+    </div>
+  </div>
+
+  <h1>Master Hardware Wiring & Pinout Specification</h1>
+  <p>This document is the official engineering standard for the <strong>Kabutech Hiyas</strong> automated mushroom and crop cultivation chamber. It specifies the electrical interfaces, pin assignments, communication protocols, cable assemblies, and protective circuits connecting the central <strong>ESP32-S3</strong> controller to the <strong>TCA9548A I2C multiplexer</strong>, <strong>3.2" SPI TFT display</strong>, <strong>three 10-meter GX16 aviation sensor umbilicals</strong>, and <strong>opto-isolated 12V actuator relays</strong>.</p>
+
+  <div class="callout callout-success">
+    <strong>Architectural Upgrade — TCA9548A Hardware Bus Multiplexing:</strong> Splicing three 10-meter aviation cables in star topology stacks lumped capacitance to $pprox 3,600	ext{ pF}$, exceeding the $400	ext{ pF}$ I2C standard by 900% and causing bus lockup. Integrating a single TCA9548A multiplexer (~₱100) inside the main controller box isolates each cable to its own sub-bus ($pprox 1,200	ext{ pF}$), guaranteeing zero signal reflection, zero cross-channel noise, and rock-solid telemetry across the BH1750, SHT31, and SCD41 probes.
+  </div>
+
+  <h2>1. Master System Block Diagram & Subsystem Interconnect</h2>
+  <div class="diagram-box">
+    <div class="diagram-title">
+      <span>Figure 1: Complete System Hardware Architecture</span>
+      <span>220VAC Mains &rarr; Dual DC Rails &rarr; Core Subsystems</span>
+    </div>
+    <svg viewBox="0 0 760 300" style="width: 100%; height: auto; font-family: -apple-system, sans-serif;">
+      <!-- Power Supply Box -->
+      <rect x="10" y="15" width="130" height="90" rx="5" fill="#18181b" stroke="#f59e0b" stroke-width="1.5"/>
+      <text x="75" y="34" fill="#f59e0b" font-weight="bold" font-size="8.5" text-anchor="middle">AC MAINS INLET</text>
+      <text x="75" y="48" fill="#e4e4e7" font-size="7.5" text-anchor="middle">220VAC Line / Neutral</text>
+      <text x="75" y="60" fill="#a1a1aa" font-size="7" text-anchor="middle">IEC C14 + 5A Fuse + Switch</text>
+      <text x="75" y="76" fill="#10b981" font-weight="bold" font-size="7.5" text-anchor="middle">&darr; 12V 5A Industrial PSU &darr;</text>
+      <text x="75" y="90" fill="#94a3b8" font-size="7" text-anchor="middle">LM2596 Buck &rarr; +5.0V Logic</text>
+
+      <!-- Central ESP32-S3 Box -->
+      <rect x="200" y="40" width="180" height="210" rx="6" fill="#022c22" stroke="#10b981" stroke-width="2"/>
+      <text x="290" y="62" fill="#34d399" font-weight="bold" font-size="11" text-anchor="middle">ESP32-S3 DevKit N16R8</text>
+      <text x="290" y="75" fill="#a7f3d0" font-size="7.5" text-anchor="middle">Xtensa Dual-Core 240MHz &bull; 16MB Flash</text>
+
+      <!-- Pin groups on ESP32 -->
+      <rect x="210" y="90" width="75" height="42" rx="3" fill="#065f46"/>
+      <text x="247" y="103" fill="#38bdf8" font-size="7" font-weight="bold" text-anchor="middle">I2C BUS (50kHz)</text>
+      <text x="247" y="115" fill="#ffffff" font-size="7" text-anchor="middle">GPIO 4: SDA</text>
+      <text x="247" y="126" fill="#ffffff" font-size="7" text-anchor="middle">GPIO 5: SCL</text>
+
+      <rect x="295" y="90" width="75" height="42" rx="3" fill="#0e7490"/>
+      <text x="332" y="103" fill="#67e8f9" font-size="7" font-weight="bold" text-anchor="middle">SPI DISPLAY (40M)</text>
+      <text x="332" y="115" fill="#ffffff" font-size="6.5" text-anchor="middle">MOSI:17 | SCK:18</text>
+      <text x="332" y="126" fill="#ffffff" font-size="6.5" text-anchor="middle">CS:10|DC:15|RST:6</text>
+
+      <rect x="210" y="145" width="160" height="95" rx="4" fill="#4a044e"/>
+      <text x="290" y="160" fill="#f5d0fe" font-size="7.5" font-weight="bold" text-anchor="middle">RELAY ACTUATOR CONTROLS</text>
+      <text x="218" y="176" fill="#ffffff" font-size="7">&bull; GPIO 9: Relay 1 &rarr; Exhaust Fan (Active LOW)</text>
+      <text x="218" y="190" fill="#ffffff" font-size="7">&bull; GPIO 11: Relay 2 &rarr; Misting Pump (Active LOW)</text>
+      <text x="218" y="204" fill="#ffffff" font-size="7">&bull; GPIO 12: Relay 3 &rarr; Grow Lights (Active LOW)</text>
+      <text x="218" y="218" fill="#ffffff" font-size="7">&bull; GPIO 13: Relay 4 &rarr; Intake Fan (Active LOW)</text>
+      <text x="218" y="232" fill="#e9d5ff" font-size="6.5">Power: 5VIN from Buck &bull; 3V3 Internal LDO</text>
+
+      <!-- TCA9548A Multiplexer Box -->
+      <rect x="445" y="15" width="135" height="110" rx="5" fill="#1e1b4b" stroke="#818cf8" stroke-width="1.5"/>
+      <text x="512" y="32" fill="#a5b4fc" font-weight="bold" font-size="8.5" text-anchor="middle">TCA9548A MULTIPLEXER</text>
+      <text x="512" y="44" fill="#c7d2fe" font-size="7" text-anchor="middle">I2C Address: 0x70 (A0-A2=GND)</text>
+      <text x="512" y="56" fill="#93c5fd" font-size="7" text-anchor="middle">VCC &amp; RST: 3.3V | GND: Common</text>
+      <text x="455" y="74" fill="#38bdf8" font-size="7.5" font-weight="bold">&bull; CH0 (SD0/SC0) &rarr; GX16 Port 1</text>
+      <text x="455" y="88" fill="#34d399" font-size="7.5" font-weight="bold">&bull; CH1 (SD1/SC1) &rarr; GX16 Port 2</text>
+      <text x="455" y="102" fill="#fb923c" font-size="7.5" font-weight="bold">&bull; CH2 (SD2/SC2) &rarr; GX16 Port 3</text>
+      <text x="455" y="116" fill="#64748b" font-size="6.5">&bull; CH3–7: Unused / Reserved</text>
+
+      <!-- I2C Bus Link -->
+      <path d="M 285 105 L 415 105 L 415 50 L 445 50" fill="none" stroke="#38bdf8" stroke-width="2"/>
+      <text x="415" y="75" fill="#38bdf8" font-size="6.5" text-anchor="middle">I2C BUS</text>
+
+      <!-- 3.2" SPI TFT Display Box -->
+      <rect x="445" y="140" width="135" height="110" rx="5" fill="#083344" stroke="#22d3ee" stroke-width="1.5"/>
+      <text x="512" y="157" fill="#67e8f9" font-weight="bold" font-size="8.5" text-anchor="middle">3.2" SPI TFT (ILI9341)</text>
+      <text x="512" y="169" fill="#a5f3fc" font-size="7" text-anchor="middle">240&times;320 &bull; LovyanGFX Driver</text>
+      <text x="512" y="182" fill="#fcd34d" font-weight="bold" font-size="7" text-anchor="middle">VCC: 5V (J1 OPEN) | LED: GPIO 2</text>
+      <text x="455" y="200" fill="#ffffff" font-size="7">CS: GPIO 10 | RST: GPIO 6</text>
+      <text x="455" y="214" fill="#ffffff" font-size="7">DC: GPIO 15 | SCK: GPIO 18</text>
+      <text x="455" y="228" fill="#ffffff" font-size="7">MOSI: GPIO 17 | MISO: GPIO 16</text>
+
+      <!-- SPI Bus Link -->
+      <path d="M 370 115 L 445 195" fill="none" stroke="#22d3ee" stroke-width="2"/>
+
+      <!-- Relays Box -->
+      <rect x="10" y="165" width="145" height="95" rx="5" fill="#3b0764" stroke="#c084fc" stroke-width="1.5"/>
+      <text x="82" y="182" fill="#f5d0fe" font-weight="bold" font-size="8.5" text-anchor="middle">4-CHANNEL RELAYS (5V)</text>
+      <text x="82" y="195" fill="#fbcfe8" font-size="7" text-anchor="middle">JD-VCC &rarr; 5V (Jumper REMOVED)</text>
+      <text x="82" y="207" fill="#fbcfe8" font-size="7" text-anchor="middle">VCC &rarr; 3.3V (Optocoupler LEDs)</text>
+      <text x="18" y="223" fill="#ffffff" font-size="6.5">K1: Exhaust Fan &bull; K2: Misting Pump</text>
+      <text x="18" y="235" fill="#ffffff" font-size="6.5">K3: Grow Lights &bull; K4: Intake Fan</text>
+      <text x="18" y="249" fill="#fcd34d" font-size="6.5">1N4007 Diodes on inductive loads</text>
+
+      <!-- Link ESP to Relays -->
+      <path d="M 210 195 L 155 195" fill="none" stroke="#c084fc" stroke-width="2"/>
+
+      <!-- Sensor Probes (Chamber End) -->
+      <rect x="630" y="15" width="120" height="38" rx="4" fill="#0f172a" stroke="#38bdf8" stroke-width="1.5"/>
+      <text x="690" y="30" fill="#38bdf8" font-weight="bold" font-size="7.5" text-anchor="middle">BH1750 (Lux)</text>
+      <text x="690" y="42" fill="#94a3b8" font-size="6.5" text-anchor="middle">10m Cable 1 &bull; Addr: 0x23</text>
+      <path d="M 580 74 L 630 34" fill="none" stroke="#38bdf8" stroke-width="1.5"/>
+
+      <rect x="630" y="60" width="120" height="38" rx="4" fill="#0f172a" stroke="#34d399" stroke-width="1.5"/>
+      <text x="690" y="75" fill="#34d399" font-weight="bold" font-size="7.5" text-anchor="middle">SHT31-D (Temp/RH)</text>
+      <text x="690" y="87" fill="#94a3b8" font-size="6.5" text-anchor="middle">10m Cable 2 &bull; Addr: 0x44</text>
+      <path d="M 580 88 L 630 79" fill="none" stroke="#34d399" stroke-width="1.5"/>
+
+      <rect x="630" y="105" width="120" height="46" rx="4" fill="#0f172a" stroke="#fb923c" stroke-width="1.5"/>
+      <text x="690" y="120" fill="#fb923c" font-weight="bold" font-size="7.5" text-anchor="middle">SCD41 (CO2 NDIR)</text>
+      <text x="690" y="132" fill="#fdba74" font-size="6.5" text-anchor="middle">+ 100&micro;F Decoupling Cap</text>
+      <text x="690" y="143" fill="#94a3b8" font-size="6.5" text-anchor="middle">10m Cable 3 &bull; Addr: 0x62</text>
+      <path d="M 580 102 L 630 128" fill="none" stroke="#fb923c" stroke-width="1.5"/>
+
+      <!-- GX16 Aviation Box Callout -->
+      <rect x="620" y="165" width="130" height="115" rx="5" fill="#1e293b" stroke="#64748b" stroke-width="1"/>
+      <text x="685" y="180" fill="#cbd5e1" font-weight="bold" font-size="7.5" text-anchor="middle">GX16 AVIATION PINOUT</text>
+      <text x="628" y="196" fill="#ef4444" font-size="7" font-weight="bold">Pin 1: +3.3V (Red)</text>
+      <text x="628" y="210" fill="#94a3b8" font-size="7" font-weight="bold">Pin 2: GND (Black)</text>
+      <text x="628" y="224" fill="#10b981" font-size="7" font-weight="bold">Pin 3: SDA (Green)</text>
+      <text x="628" y="238" fill="#e2e8f0" font-size="7" font-weight="bold">Pin 4: SCL (White/Yel)</text>
+      <text x="628" y="254" fill="#f59e0b" font-size="6.5">Shield: GND at Box only</text>
+      <text x="628" y="266" fill="#38bdf8" font-size="6.5">Length: 10m Isolated Runs</text>
+    </svg>
+  </div>
+
+  <h2>2. Master Power Distribution Network (PDN) Specifications</h2>
+  <table>
+    <thead>
+      <tr>
+        <th style="width: 15%;">Power Stage</th>
+        <th style="width: 14%;">Input</th>
+        <th style="width: 14%;">Output</th>
+        <th style="width: 16%;">Max Current</th>
+        <th style="width: 41%;">Connected Subsystems & Safeguards</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><strong>Primary AC Inlet</strong></td>
+        <td>220VAC Grid</td>
+        <td>220VAC Switched</td>
+        <td>5.0A Glass Fuse</td>
+        <td>IEC C14 panel socket, 275V Metal Oxide Varistor (MOV), DPST illuminated power switch.</td>
+      </tr>
+      <tr>
+        <td><strong>Master DC Supply</strong></td>
+        <td>220VAC</td>
+        <td><strong>+12.0V DC</strong></td>
+        <td>5.0A (60W)</td>
+        <td>Powers 12V 120mm exhaust/intake fans, 60W misting pump, LED grow lights, LM2596 buck input.</td>
+      </tr>
+      <tr>
+        <td><strong>Buck Step-Down</strong></td>
+        <td>+12.0V DC</td>
+        <td><strong>+5.0V DC</strong></td>
+        <td>3.0A (LM2596)</td>
+        <td>ESP32 5VIN pin, 3.2" SPI TFT display VCC (J1 open), Relay coil electromagnet rail (JD-VCC).</td>
+      </tr>
+      <tr>
+        <td><strong>MCU Logic Rail</strong></td>
+        <td>+5.0V (VIN)</td>
+        <td><strong>+3.3V DC</strong></td>
+        <td>800mA (AMS1117)</td>
+        <td>Powers ESP32-S3 SoC, TCA9548A multiplexer logic, BH1750, SHT31, SCD41 sensors, and Relay VCC.</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <div class="doc-footer">
+    <span>Kabutech Hiyas Automated Mushroom Environment &bull; Hardware Engineering Specification</span>
+    <span>Sheet 1 of 6</span>
+  </div>
+</div>
+
+<!-- ============================================================== -->
+<!-- SHEET 2: TCA9548A MULTIPLEXER & 10M SENSOR UMBILICAL           -->
+<!-- ============================================================== -->
+<div class="sheet">
+  <div class="doc-header">
+    <div class="brand-title">
+      <span>KABUTECH HIYAS</span>
+      <span class="brand-badge">I2C SENSOR UMBILICAL SPEC</span>
+    </div>
+    <div class="doc-meta">
+      <strong>SUBSYSTEM:</strong> TCA9548A I2C Multiplexer<br>
+      <strong>CABLE RUNS:</strong> 3&times; 10-Meter Shielded GX16<br>
+      <strong>CLOCK SPEED:</strong> 50 kHz SCL (Controlled RC Rise Time)
+    </div>
+  </div>
+
+  <h1>TCA9548A Multiplexer & 10-Meter Sensor Wiring</h1>
+  <p>To eliminate bus capacitance breakdown and cross-talk, three dedicated GX16 aviation ports connect to Channels 0, 1, and 2 of the TCA9548A module. The ESP32 switches channels sequentially in firmware before reading each sensor.</p>
+
+  <h2>1. TCA9548A Module Full Pinout & Interconnect Table</h2>
+  <table>
+    <thead>
+      <tr>
+        <th class="accent" style="width: 14%;">TCA9548A Pin</th>
+        <th style="width: 16%;">Target ESP32 / Port</th>
+        <th style="width: 14%;">Signal / Net</th>
+        <th style="width: 15%;">Level / Direction</th>
+        <th style="width: 41%;">Wiring Instructions & Engineering Notes</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><span class="pill pill-red">VIN / VCC</span></td>
+        <td>ESP32 <strong>3V3</strong></td>
+        <td><code>+3.3V_RAIL</code></td>
+        <td>3.3V DC Power In</td>
+        <td>Powers multiplexer switch gates. Keep jumper wire under 10cm.</td>
+      </tr>
+      <tr>
+        <td><span class="pill pill-slate">GND</span></td>
+        <td>ESP32 <strong>GND</strong></td>
+        <td><code>SYSTEM_GND</code></td>
+        <td>0V Ground Plane</td>
+        <td>Connect to common system ground bus.</td>
+      </tr>
+      <tr>
+        <td><span class="pill pill-blue">SDA (Upstream)</span></td>
+        <td>ESP32 <strong>GPIO 4</strong></td>
+        <td><code>I2C_SDA</code></td>
+        <td>3.3V Bi-directional</td>
+        <td>Master upstream I2C data. Pulled up via 10k on module.</td>
+      </tr>
+      <tr>
+        <td><span class="pill pill-blue">SCL (Upstream)</span></td>
+        <td>ESP32 <strong>GPIO 5</strong></td>
+        <td><code>I2C_SCL</code></td>
+        <td>3.3V Clock Out</td>
+        <td>Master upstream clock. Firmware configures <strong>50 kHz</strong>.</td>
+      </tr>
+      <tr>
+        <td><span class="pill pill-amber">RST (Reset)</span></td>
+        <td>ESP32 <strong>3V3</strong></td>
+        <td><code>MUX_RST</code></td>
+        <td>Active LOW</td>
+        <td>Tie directly to <strong>3.3V</strong> to disable hardware reset during operation.</td>
+      </tr>
+      <tr>
+        <td><span class="pill pill-purple">A0, A1, A2</span></td>
+        <td>System <strong>GND</strong></td>
+        <td><code>ADDR_SELECT</code></td>
+        <td>Ground (0V)</td>
+        <td>Tying A0, A1, A2 to GND locks I2C multiplexer address to <strong>0x70</strong>.</td>
+      </tr>
+      <tr>
+        <td><span class="pill pill-cyan">SD0 / SC0</span></td>
+        <td>GX16 Port 1 (Pins 3, 4)</td>
+        <td><code>CH0_SDA / SCL</code></td>
+        <td>Downstream I2C</td>
+        <td>10m Cable 1 &rarr; <strong>ROHM BH1750 Ambient Light Sensor (0x23)</strong>.</td>
+      </tr>
+      <tr>
+        <td><span class="pill pill-green">SD1 / SC1</span></td>
+        <td>GX16 Port 2 (Pins 3, 4)</td>
+        <td><code>CH1_SDA / SCL</code></td>
+        <td>Downstream I2C</td>
+        <td>10m Cable 2 &rarr; <strong>Sensirion SHT31-D Temp/RH Sensor (0x44)</strong>.</td>
+      </tr>
+      <tr>
+        <td><span class="pill pill-amber">SD2 / SC2</span></td>
+        <td>GX16 Port 3 (Pins 3, 4)</td>
+        <td><code>CH2_SDA / SCL</code></td>
+        <td>Downstream I2C</td>
+        <td>10m Cable 3 &rarr; <strong>Sensirion SCD41 True NDIR CO2 Sensor (0x62)</strong>.</td>
+      </tr>
+      <tr>
+        <td><span class="pill pill-slate">SD3–7 / SC3–7</span></td>
+        <td>Unconnected</td>
+        <td><code>RESERVED</code></td>
+        <td>Channels 3–7</td>
+        <td>Reserved for future expansion (e.g. soil moisture, weight scale).</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <h2>2. GX16 4-Pin Aviation Port Pinout & Cable Color Standardization</h2>
+  <div class="grid-2">
+    <div class="card">
+      <div class="card-header">
+        <span>GX16 Aviation Connector (Solder Side)</span>
+        <span class="pill pill-green">Standardized</span>
+      </div>
+      <table style="margin: 0; font-size: 7pt;">
+        <thead>
+          <tr>
+            <th>Pin #</th>
+            <th>Signal</th>
+            <th>Wire Color</th>
+            <th>Specification</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><strong>Pin 1</strong></td>
+            <td><code>+3.3V</code></td>
+            <td><span class="wire-tag"><span class="wire-dot wire-red"></span> Red</span></td>
+            <td>Regulated 3.3V DC (22AWG)</td>
+          </tr>
+          <tr>
+            <td><strong>Pin 2</strong></td>
+            <td><code>GND</code></td>
+            <td><span class="wire-tag"><span class="wire-dot wire-black"></span> Black</span></td>
+            <td>System Ground (22AWG)</td>
+          </tr>
+          <tr>
+            <td><strong>Pin 3</strong></td>
+            <td><code>SDA</code></td>
+            <td><span class="wire-tag"><span class="wire-dot wire-green"></span> Green / Blue</span></td>
+            <td>TCA9548A SDx Channel</td>
+          </tr>
+          <tr>
+            <td><strong>Pin 4</strong></td>
+            <td><code>SCL</code></td>
+            <td><span class="wire-tag"><span class="wire-dot wire-white"></span> White / Yellow</span></td>
+            <td>TCA9548A SCx Channel</td>
+          </tr>
+          <tr>
+            <td><strong>Shell</strong></td>
+            <td><code>SHIELD</code></td>
+            <td>Braid Drain</td>
+            <td>GND at Box ONLY (Floating in room)</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="card">
+      <div class="card-header">
+        <span>Sensor Probe End Wiring & Buffering</span>
+        <span class="pill pill-amber">Chamber End</span>
+      </div>
+      <p style="font-size: 7.5pt; margin-bottom: 4px;">
+        <strong>Port 1 &rarr; ROHM BH1750 (Lux):</strong><br>
+        VCC&rarr;Pin 1, GND&rarr;Pin 2, SDA&rarr;Pin 3, SCL&rarr;Pin 4. ADDR tied to GND (0x23).
+      </p>
+      <p style="font-size: 7.5pt; margin-bottom: 4px;">
+        <strong>Port 2 &rarr; Sensirion SHT31-D (Temp/RH):</strong><br>
+        VIN&rarr;Pin 1, GND&rarr;Pin 2, SDA&rarr;Pin 3, SCL&rarr;Pin 4. ADR tied to GND (0x44).
+      </p>
+      <p style="font-size: 7.5pt; margin-bottom: 4px;">
+        <strong>Port 3 &rarr; Sensirion SCD41 (True NDIR CO2):</strong><br>
+        VDD&rarr;Pin 1, GND&rarr;Pin 2, SDA&rarr;Pin 3, SCL&rarr;Pin 4 (0x62).<br>
+        <strong style="color: #b91c1c;">MANDATORY:</strong> Solder a <strong>100&micro;F 10V Electrolytic + 0.1&micro;F Ceramic Capacitor</strong> directly across VDD &amp; GND at the SCD41 breakout to buffer 75mA optical pulses over 10m!
+      </p>
+    </div>
+  </div>
+
+  <h2>3. Software Channel Selection & Non-Blocking Polling Protocol</h2>
+  <pre>
+<span class="code-kw">#define</span> TCA9548A_ADDR <span class="code-nu">0x70</span>
+
+<span class="code-ty">void</span> <span class="code-fn">tcaSelect</span>(<span class="code-ty">uint8_t</span> channel) {
+  <span class="code-kw">if</span> (channel &gt; <span class="code-nu">7</span>) <span class="code-kw">return</span>;
+  Wire.<span class="code-fn">beginTransmission</span>(TCA9548A_ADDR);
+  Wire.<span class="code-fn">write</span>(<span class="code-nu">1</span> &lt;&lt; channel);   <span class="code-cm">// Writes 0x01 (CH0), 0x02 (CH1), or 0x04 (CH2)</span>
+  Wire.<span class="code-fn">endTransmission</span>();
+}
+
+<span class="code-ty">void</span> <span class="code-fn">tcaDisableAll</span>() {
+  Wire.<span class="code-fn">beginTransmission</span>(TCA9548A_ADDR);
+  Wire.<span class="code-fn">write</span>(<span class="code-nu">0x00</span>);          <span class="code-cm">// Electrically disconnects all 3x 10m cables</span>
+  Wire.<span class="code-fn">endTransmission</span>();
+}
+  </pre>
+
+  <div class="callout callout-warning">
+    <strong>Cable Shield Ground-Loop Warning:</strong> The braided shield of each 10-meter aviation cable must be connected to System GND <strong>only at the main controller enclosure</strong>. Leave the shield completely disconnected (floating) at the sensor probe inside the chamber to avoid ground loops that inject 60Hz hum into the I2C clock.
+  </div>
+
+  <div class="doc-footer">
+    <span>Kabutech Hiyas Automated Mushroom Environment &bull; Hardware Engineering Specification</span>
+    <span>Sheet 2 of 6</span>
+  </div>
+</div>
+
+<!-- ============================================================== -->
+<!-- SHEET 3: 3.2" SPI TFT DISPLAY WIRING (ILI9341)                 -->
+<!-- ============================================================== -->
+<div class="sheet">
+  <div class="doc-header">
+    <div class="brand-title">
+      <span>KABUTECH HIYAS</span>
+      <span class="brand-badge">3.2" SPI TFT SPECIFICATION</span>
+    </div>
+    <div class="doc-meta">
+      <strong>DISPLAY:</strong> 3.2" SPI TFT 240&times;320 V1.0<br>
+      <strong>CONTROLLER:</strong> ILI9341 &bull; Touch: XPT2046<br>
+      <strong>GRAPHICS:</strong> LovyanGFX High-Speed SPI
+    </div>
+  </div>
+
+  <h1>3.2" SPI TFT Display (ILI9341) Pinout & Interconnect</h1>
+  <p>The local cabinet screen is a <strong>3.2-inch 240&times;320 SPI TFT display</strong> with an ILI9341 controller. It is connected to dedicated high-speed GPIOs on the ESP32-S3, avoiding conflicts with actuator relay lines (GPIO 9, 11, 12, 13) and I2C lines (GPIO 4, 5).</p>
+
+  <div class="callout callout-danger">
+    <strong>CRITICAL HARDWARE RULE (JUMPER J1 ON BACK OF TFT):</strong><br>
+    The display module is powered from <strong>5V / VIN</strong>. The copper solder jumper labeled <strong>J1</strong> on the back of the red display PCB must remain <strong>COMPLETELY OPEN (UNSHORTED)</strong>. Feeding 5V into VCC with J1 bridged bypasses the onboard 3.3V LDO regulator and permanently destroys the ILI9341 panel!
+  </div>
+
+  <h2>1. TFT 14-Pin Header to ESP32-S3 Pinout Mapping</h2>
+  <table>
+    <thead>
+      <tr>
+        <th class="accent" style="width: 8%;">Pin #</th>
+        <th style="width: 14%;">TFT Pin Label</th>
+        <th style="width: 18%;">Connects to ESP32</th>
+        <th style="width: 15%;">Signal Type</th>
+        <th style="width: 14%;">Logic Level</th>
+        <th style="width: 31%;">Functional Purpose & Safe Routing</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><strong>1</strong></td>
+        <td><span class="pill pill-red">VCC</span></td>
+        <td>ESP32 <strong>5V / VIN</strong></td>
+        <td>Power Input</td>
+        <td>5.0V DC Rail</td>
+        <td>Powers display & backlight via onboard LDO (keeps 100mA off 3.3V rail).</td>
+      </tr>
+      <tr>
+        <td><strong>2</strong></td>
+        <td><span class="pill pill-slate">GND</span></td>
+        <td>ESP32 <strong>GND</strong></td>
+        <td>Power Ground</td>
+        <td>0V Common</td>
+        <td>Connect first before plugging power. Common system ground plane.</td>
+      </tr>
+      <tr>
+        <td><strong>3</strong></td>
+        <td><span class="pill pill-amber">CS</span></td>
+        <td>ESP32 <strong>GPIO 10</strong></td>
+        <td>Chip Select</td>
+        <td>3.3V Logic</td>
+        <td>Active-low display SPI slave select line.</td>
+      </tr>
+      <tr>
+        <td><strong>4</strong></td>
+        <td><span class="pill pill-amber">RESET</span></td>
+        <td>ESP32 <strong>GPIO 6</strong></td>
+        <td>Hardware Reset</td>
+        <td>3.3V Logic</td>
+        <td>Hardware active-low reset. Controlled by LovyanGFX on boot.</td>
+      </tr>
+      <tr>
+        <td><strong>5</strong></td>
+        <td><span class="pill pill-blue">DC / RS</span></td>
+        <td>ESP32 <strong>GPIO 15</strong></td>
+        <td>Data / Command</td>
+        <td>3.3V Logic</td>
+        <td>LOW = Command register, HIGH = Graphic pixel data.</td>
+      </tr>
+      <tr>
+        <td><strong>6</strong></td>
+        <td><span class="pill pill-green">SDI (MOSI)</span></td>
+        <td>ESP32 <strong>GPIO 17</strong></td>
+        <td>SPI Data Out</td>
+        <td>3.3V Logic</td>
+        <td>Master Out Slave In (40 MHz SPI pixel data stream).</td>
+      </tr>
+      <tr>
+        <td><strong>7</strong></td>
+        <td><span class="pill pill-green">SCK (CLK)</span></td>
+        <td>ESP32 <strong>GPIO 18</strong></td>
+        <td>SPI Clock</td>
+        <td>3.3V Logic</td>
+        <td>High-speed SPI clock line. Keep wire length under 15cm.</td>
+      </tr>
+      <tr>
+        <td><strong>8</strong></td>
+        <td><span class="pill pill-purple">LED</span></td>
+        <td>ESP32 <strong>GPIO 2</strong></td>
+        <td>Backlight (PWM)</td>
+        <td>3.3V PWM</td>
+        <td>LovyanGFX PWM dimming and auto-sleep timeout (or tie to 3.3V).</td>
+      </tr>
+      <tr>
+        <td><strong>9</strong></td>
+        <td><span class="pill pill-slate">SDO (MISO)</span></td>
+        <td>ESP32 <strong>GPIO 16</strong></td>
+        <td>SPI Data In</td>
+        <td>3.3V Input</td>
+        <td>Optional read-back line (only needed for panel ID read).</td>
+      </tr>
+      <tr>
+        <td><strong>10–14</strong></td>
+        <td><span class="pill pill-slate">TOUCH PINS</span></td>
+        <td><em>Optional Header</em></td>
+        <td>Touch SPI</td>
+        <td>3.3V Logic</td>
+        <td>T_CLK (18), T_CS (1), T_DIN (17), T_DO (16), T_IRQ (42).</td>
+      </tr>
+      <tr>
+        <td><strong>SD</strong></td>
+        <td><span class="pill pill-slate">SD_CS / MOSI</span></td>
+        <td><strong>LEAVE UNCONNECTED</strong></td>
+        <td>SD Card Slot</td>
+        <td>N/A</td>
+        <td>Unused. Telemetry logs to Firebase cloud, not local SD.</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <h2>2. LovyanGFX Configuration Snippet (Ready to Paste)</h2>
+  <pre>
+<span class="code-kw">#include</span> <span class="code-fn">&lt;LovyanGFX.hpp&gt;</span>
+
+<span class="code-kw">class</span> <span class="code-ty">LGFX_Kabutech</span> : <span class="code-kw">public</span> <span class="code-ty">lgfx::LGFX_Device</span> {
+  <span class="code-ty">lgfx::Panel_ILI9341</span>     _panel;
+  <span class="code-ty">lgfx::Bus_SPI</span>           _bus;
+  <span class="code-ty">lgfx::Light_PWM</span>         _light;
+<span class="code-kw">public:</span>
+  <span class="code-fn">LGFX_Kabutech</span>() {
+    <span class="code-kw">auto</span> cfg_b = _bus.<span class="code-fn">config</span>();
+    cfg_b.spi_host = SPI2_HOST;
+    cfg_b.freq_write = <span class="code-nu">40000000</span>; <span class="code-cm">// 40 MHz SPI clock</span>
+    cfg_b.pin_sclk = <span class="code-nu">18</span>;         <span class="code-cm">// SCK</span>
+    cfg_b.pin_mosi = <span class="code-nu">17</span>;         <span class="code-cm">// SDI (MOSI)</span>
+    cfg_b.pin_miso = <span class="code-nu">16</span>;         <span class="code-cm">// SDO (MISO)</span>
+    cfg_b.pin_dc   = <span class="code-nu">15</span>;         <span class="code-cm">// DC / RS</span>
+    _bus.<span class="code-fn">config</span>(cfg_b);
+    _panel.<span class="code-fn">setBus</span>(&amp;_bus);
+
+    <span class="code-kw">auto</span> cfg_p = _panel.<span class="code-fn">config</span>();
+    cfg_p.pin_cs   = <span class="code-nu">10</span>;         <span class="code-cm">// CS</span>
+    cfg_p.pin_rst  = <span class="code-nu">6</span>;          <span class="code-cm">// RESET</span>
+    cfg_p.panel_width  = <span class="code-nu">240</span>;
+    cfg_p.panel_height = <span class="code-nu">320</span>;
+    _panel.<span class="code-fn">config</span>(cfg_p);
+
+    <span class="code-kw">auto</span> cfg_l = _light.<span class="code-fn">config</span>();
+    cfg_l.pin_bl = <span class="code-nu">2</span>;            <span class="code-cm">// Backlight PWM pin</span>
+    _light.<span class="code-fn">config</span>(cfg_l);
+    _panel.<span class="code-fn">setLight</span>(&amp;_light);
+    <span class="code-fn">setPanel</span>(&amp;_panel);
+  }
+};
+<span class="code-ty">LGFX_Kabutech</span> tft;
+  </pre>
+
+  <div class="callout callout-info">
+    <strong>Wiring Tip for Display Stability:</strong> Keep SPI wires (GPIO 17 and 18) under 15 cm in length. Bundle SPI wires together and route them away from 12V relay wires to prevent magnetic induction from fan start cycles from corrupting screen data.
+  </div>
+
+  <div class="doc-footer">
+    <span>Kabutech Hiyas Automated Mushroom Environment &bull; Hardware Engineering Specification</span>
+    <span>Sheet 3 of 6</span>
+  </div>
+</div>
+
+<!-- ============================================================== -->
+<!-- SHEET 4: ACTUATOR RELAYS & FLYBACK SNUBBERS                    -->
+<!-- ============================================================== -->
+<div class="sheet">
+  <div class="doc-header">
+    <div class="brand-title">
+      <span>KABUTECH HIYAS</span>
+      <span class="brand-badge">ACTUATORS & RELAYS SPEC</span>
+    </div>
+    <div class="doc-meta">
+      <strong>MODULE:</strong> 4-Channel 5V Optocoupled<br>
+      <strong>PROTECTION:</strong> 1N4007 Reverse-Parallel Diodes<br>
+      <strong>ISOLATION:</strong> Complete Galvanic Barrier
+    </div>
+  </div>
+
+  <h1>Actuator Relays & Inductive Snubber Circuitry</h1>
+  <p>The actuator subcircuit controls four heavy-duty environmental actuators inside the mushroom chamber using opto-isolated Songle SRD-05VDC-SL-C relays.</p>
+
+  <div class="callout callout-danger">
+    <strong>CRITICAL RELAY JUMPER SETTING (GALVANIC ISOLATION):</strong><br>
+    Remove the blue shunt jumper linking <strong>VCC and JD-VCC</strong> on the relay board! Connect <strong>JD-VCC</strong> to the LM2596 <strong>+5.0V output</strong> (to power coil electromagnets). Connect <strong>VCC</strong> to the ESP32 <strong>+3.3V rail</strong> (to power optocoupler LEDs). This completely isolates the ESP32 from inductive kickback.
+  </div>
+
+  <h2>1. Actuator Relay Channel Allocation & Optocoupler Setup</h2>
+  <table>
+    <thead>
+      <tr>
+        <th class="accent" style="width: 12%;">Relay Channel</th>
+        <th style="width: 15%;">ESP32 Trigger Pin</th>
+        <th style="width: 16%;">Controlled Device</th>
+        <th style="width: 14%;">Actuator Rating</th>
+        <th style="width: 43%;">Contact Wiring & Inductive Flyback Protection</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><strong>Relay K1</strong></td>
+        <td><span class="pill pill-green">GPIO 9</span> (LOW)</td>
+        <td>120mm Exhaust Fan</td>
+        <td>12V DC, 0.35A</td>
+        <td>COM to +12V rail, NO to fan positive. <strong>1N4007 diode</strong> across fan leads (cathode to +12V).</td>
+      </tr>
+      <tr>
+        <td><strong>Relay K2</strong></td>
+        <td><span class="pill pill-green">GPIO 11</span> (LOW)</td>
+        <td>60W Misting Pump / Valve</td>
+        <td>12V DC, 5.0A</td>
+        <td>COM to +12V rail, NO to pump positive. <strong>1N4007 diode</strong> across pump motor terminals.</td>
+      </tr>
+      <tr>
+        <td><strong>Relay K3</strong></td>
+        <td><span class="pill pill-green">GPIO 12</span> (LOW)</td>
+        <td>LED Grow Light Strip</td>
+        <td>12V DC, 1.2A</td>
+        <td>COM to +12V rail, NO to strip positive. Resistive load (no back-EMF diode required).</td>
+      </tr>
+      <tr>
+        <td><strong>Relay K4</strong></td>
+        <td><span class="pill pill-green">GPIO 13</span> (LOW)</td>
+        <td>Intake / Circulation Fan</td>
+        <td>12V DC, 0.35A</td>
+        <td>COM to +12V rail, NO to fan positive. <strong>1N4007 diode</strong> across fan motor leads.</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <h2>2. Inductive Kickback Snubber Schematic & Installation</h2>
+  <div class="card" style="margin-top: 6px;">
+    <div class="card-header">
+      <span>1N4007 Flyback Diode Orientation Rules</span>
+      <span class="pill pill-red">Safety Critical</span>
+    </div>
+    <div style="display: flex; gap: 15px; align-items: center;">
+      <div style="flex: 1; font-size: 7.5pt; line-height: 1.4;">
+        <p>When an inductive load (fan motor, solenoid valve, high-pressure pump) is switched OFF by the relay, the collapsing magnetic field generates a reverse voltage spike up to <strong>150V–200V</strong>.</p>
+        <p>A <strong>1N4007 diode</strong> must be soldered directly across the load terminals in <strong>reverse parallel</strong>:</p>
+        <ul style="margin-left: 14px; margin-top: 4px;">
+          <li><strong>Cathode (Silver Band end):</strong> Connect to the <strong>+12V DC supply line</strong>.</li>
+          <li><strong>Anode (Black end):</strong> Connect to the <strong>switched ground / return lead</strong>.</li>
+        </ul>
+        <p style="margin-top: 4px; color: #b91c1c; font-weight: bold;">WARNING: If the diode is soldered backward, turning ON the relay causes a dead short across the 12V supply and will instantly destroy the diode!</p>
+      </div>
+      <div style="width: 220px; background: #0f172a; padding: 10px; border-radius: 6px; text-align: center;">
+        <svg viewBox="0 0 200 90" style="width: 100%; height: auto;">
+          <!-- 12V line -->
+          <line x1="20" y1="20" x2="180" y2="20" stroke="#ef4444" stroke-width="2"/>
+          <text x="15" y="16" fill="#ef4444" font-size="7" font-weight="bold">+12V</text>
+          
+          <!-- Diode -->
+          <rect x="75" y="35" width="50" height="20" rx="3" fill="#1e293b" stroke="#94a3b8" stroke-width="1"/>
+          <rect x="75" y="35" width="10" height="20" rx="1" fill="#e2e8f0"/>
+          <text x="100" y="48" fill="#ffffff" font-size="7" text-anchor="middle">1N4007</text>
+          <line x1="100" y1="20" x2="100" y2="35" stroke="#ef4444" stroke-width="1.5"/>
+          <line x1="100" y1="55" x2="100" y2="70" stroke="#38bdf8" stroke-width="1.5"/>
+          <text x="70" y="32" fill="#e2e8f0" font-size="6">Cathode Band</text>
+
+          <!-- Motor / Pump coil -->
+          <circle cx="150" cy="45" r="14" fill="#065f46" stroke="#34d399" stroke-width="1.5"/>
+          <text x="150" y="48" fill="#ffffff" font-size="7" font-weight="bold" text-anchor="middle">MOTOR</text>
+          <line x1="150" y1="20" x2="150" y2="31" stroke="#ef4444" stroke-width="1.5"/>
+          <line x1="150" y1="59" x2="150" y2="70" stroke="#38bdf8" stroke-width="1.5"/>
+
+          <!-- Switched line -->
+          <line x1="20" y1="70" x2="180" y2="70" stroke="#38bdf8" stroke-width="2"/>
+          <text x="15" y="78" fill="#38bdf8" font-size="7" font-weight="bold">RELAY NO</text>
+        </svg>
+      </div>
+    </div>
+  </div>
+
+  <div class="doc-footer">
+    <span>Kabutech Hiyas Automated Mushroom Environment &bull; Hardware Engineering Specification</span>
+    <span>Sheet 4 of 6</span>
+  </div>
+</div>
+
+<!-- ============================================================== -->
+<!-- SHEET 5: UNIFIED MASTER PINOUT & CODE REFERENCE                -->
+<!-- ============================================================== -->
+<div class="sheet">
+  <div class="doc-header">
+    <div class="brand-title">
+      <span>KABUTECH HIYAS</span>
+      <span class="brand-badge">ESP32-S3 PINOUT MATRIX</span>
+    </div>
+    <div class="doc-meta">
+      <strong>TARGET:</strong> ESP32-S3 DevKit N16R8<br>
+      <strong>CLOCK:</strong> 240 MHz &bull; Flash: 16MB Quad-SPI<br>
+      <strong>MAPPING:</strong> Non-conflicting GPIO Architecture
+    </div>
+  </div>
+
+  <h1>Unified Master ESP32-S3 Pin Allocation Matrix</h1>
+  <p>The table below provides a complete lookup matrix of every active pin on the ESP32-S3 controller, verifying that zero pin conflicts exist between SPI, I2C, analog inputs, and digital actuator drivers.</p>
+
+  <h2>1. Complete Pin Allocation Matrix</h2>
+  <table>
+    <thead>
+      <tr>
+        <th class="accent" style="width: 14%;">ESP32-S3 Pin</th>
+        <th style="width: 16%;">Net Name</th>
+        <th style="width: 22%;">Target Hardware Device</th>
+        <th style="width: 15%;">Signal Type</th>
+        <th style="width: 12%;">Logic Level</th>
+        <th style="width: 21%;">Safety / Notes</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><strong>3V3</strong></td>
+        <td><code>+3.3V_RAIL</code></td>
+        <td>TCA9548A, BH1750, SHT31, SCD41</td>
+        <td>Power Output</td>
+        <td>3.3V DC</td>
+        <td>AMS1117-3.3 on-board regulator.</td>
+      </tr>
+      <tr>
+        <td><strong>5V / VIN</strong></td>
+        <td><code>+5V_RAIL</code></td>
+        <td>3.2" SPI TFT VCC &amp; LM2596 Output</td>
+        <td>Power Input</td>
+        <td>5.0V DC</td>
+        <td>LM2596 tuned to 5.00V &plusmn; 0.05V.</td>
+      </tr>
+      <tr>
+        <td><strong>GND</strong></td>
+        <td><code>SYSTEM_GND</code></td>
+        <td>Common Ground Plane</td>
+        <td>Ground</td>
+        <td>0V Ground</td>
+        <td>Star ground topology.</td>
+      </tr>
+      <tr>
+        <td><strong>GPIO 4</strong></td>
+        <td><code>I2C_SDA</code></td>
+        <td>TCA9548A Multiplexer (SDA)</td>
+        <td>Bi-directional I2C</td>
+        <td>3.3V Open-Drain</td>
+        <td>Internal 10k pull-up on MUX.</td>
+      </tr>
+      <tr>
+        <td><strong>GPIO 5</strong></td>
+        <td><code>I2C_SCL</code></td>
+        <td>TCA9548A Multiplexer (SCL)</td>
+        <td>Clock Output I2C</td>
+        <td>3.3V Open-Drain</td>
+        <td>50 kHz clock rate in firmware.</td>
+      </tr>
+      <tr>
+        <td><strong>GPIO 10</strong></td>
+        <td><code>TFT_CS</code></td>
+        <td>3.2" SPI TFT Display (CS)</td>
+        <td>Digital Output</td>
+        <td>3.3V Logic</td>
+        <td>Active-low display chip select.</td>
+      </tr>
+      <tr>
+        <td><strong>GPIO 15</strong></td>
+        <td><code>TFT_DC</code></td>
+        <td>3.2" SPI TFT Display (DC/RS)</td>
+        <td>Digital Output</td>
+        <td>3.3V Logic</td>
+        <td>Low=Command, High=Pixel data.</td>
+      </tr>
+      <tr>
+        <td><strong>GPIO 6</strong></td>
+        <td><code>TFT_RST</code></td>
+        <td>3.2" SPI TFT Display (RESET)</td>
+        <td>Digital Output</td>
+        <td>3.3V Logic</td>
+        <td>Active-low display reset.</td>
+      </tr>
+      <tr>
+        <td><strong>GPIO 17</strong></td>
+        <td><code>TFT_MOSI</code></td>
+        <td>3.2" SPI TFT Display (SDI)</td>
+        <td>SPI Master Out</td>
+        <td>3.3V Logic</td>
+        <td>40 MHz hardware SPI bus.</td>
+      </tr>
+      <tr>
+        <td><strong>GPIO 18</strong></td>
+        <td><code>TFT_SCK</code></td>
+        <td>3.2" SPI TFT Display (SCK)</td>
+        <td>SPI Clock Out</td>
+        <td>3.3V Logic</td>
+        <td>High-speed SPI clock line.</td>
+      </tr>
+      <tr>
+        <td><strong>GPIO 2</strong></td>
+        <td><code>TFT_LED</code></td>
+        <td>3.2" SPI TFT Display (LED)</td>
+        <td>PWM Output</td>
+        <td>3.3V PWM</td>
+        <td>LovyanGFX PWM backlight dimming.</td>
+      </tr>
+      <tr>
+        <td><strong>GPIO 16</strong></td>
+        <td><code>TFT_MISO</code></td>
+        <td>3.2" SPI TFT Display (SDO)</td>
+        <td>SPI Master In</td>
+        <td>3.3V Input</td>
+        <td>Optional display read-back.</td>
+      </tr>
+      <tr>
+        <td><strong>GPIO 9</strong></td>
+        <td><code>RELAY_EXH</code></td>
+        <td>Relay K1 — 120mm Exhaust Fan</td>
+        <td>Digital Output</td>
+        <td>3.3V (Act. LOW)</td>
+        <td>PC817 Opto-isolated driver.</td>
+      </tr>
+      <tr>
+        <td><strong>GPIO 11</strong></td>
+        <td><code>RELAY_MIST</code></td>
+        <td>Relay K2 — Misting Solenoid Pump</td>
+        <td>Digital Output</td>
+        <td>3.3V (Act. LOW)</td>
+        <td>PC817 Opto-isolated driver.</td>
+      </tr>
+      <tr>
+        <td><strong>GPIO 12</strong></td>
+        <td><code>RELAY_LIGHT</code></td>
+        <td>Relay K3 — LED Grow Lights</td>
+        <td>Digital Output</td>
+        <td>3.3V (Act. LOW)</td>
+        <td>PC817 Opto-isolated driver.</td>
+      </tr>
+      <tr>
+        <td><strong>GPIO 13</strong></td>
+        <td><code>RELAY_INT</code></td>
+        <td>Relay K4 — 120mm Intake Fan</td>
+        <td>Digital Output</td>
+        <td>3.3V (Act. LOW)</td>
+        <td>PC817 Opto-isolated driver.</td>
+      </tr>
+      <tr>
+        <td><strong>GPIO 14</strong></td>
+        <td><code>FLOW_PULSE</code></td>
+        <td>YF-S201 Water Flow Sensor</td>
+        <td>Interrupt Input</td>
+        <td>3.3V Pulses</td>
+        <td>10k pull-up + voltage divider.</td>
+      </tr>
+      <tr>
+        <td><strong>GPIO 21</strong></td>
+        <td><code>LEVEL_CAP</code></td>
+        <td>XKC-Y25 Capacitive Water Level</td>
+        <td>Digital Input</td>
+        <td>3.3V High/Low</td>
+        <td>Liquid reservoir status.</td>
+      </tr>
+      <tr>
+        <td><strong>GPIO 47</strong></td>
+        <td><code>LED_WIFI</code></td>
+        <td>Front Panel WiFi Status LED</td>
+        <td>Digital Output</td>
+        <td>3.3V Active High</td>
+        <td>330&Omega; current-limiting resistor.</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <h2>2. Non-Blocking Sequential Read Timing Diagram</h2>
+  <div class="diagram-box">
+    <div class="diagram-title">
+      <span>Figure 2: Non-Blocking 1-Second Sampling Loop</span>
+      <span>Total I2C Bus Active Time: &lt; 25 Milliseconds per Cycle</span>
+    </div>
+    <svg viewBox="0 0 740 65" style="width: 100%; height: auto;">
+      <!-- Timeline bar -->
+      <rect x="10" y="25" width="720" height="15" rx="3" fill="#1e293b"/>
+      
+      <!-- Slot 1: BH1750 (CH0) -->
+      <rect x="10" y="25" width="70" height="15" rx="3" fill="#38bdf8"/>
+      <text x="45" y="36" fill="#0f172a" font-size="7" font-weight="bold" text-anchor="middle">CH0: Lux (4ms)</text>
+
+      <!-- Slot 2: SHT31 (CH1) -->
+      <rect x="85" y="25" width="70" height="15" rx="3" fill="#34d399"/>
+      <text x="120" y="36" fill="#0f172a" font-size="7" font-weight="bold" text-anchor="middle">CH1: T/H (6ms)</text>
+
+      <!-- Slot 3: SCD41 (CH2) -->
+      <rect x="160" y="25" width="80" height="15" rx="3" fill="#fb923c"/>
+      <text x="200" y="36" fill="#0f172a" font-size="7" font-weight="bold" text-anchor="middle">CH2: CO2 (8ms)</text>
+
+      <!-- Slot 4: Idle -->
+      <text x="480" y="36" fill="#94a3b8" font-size="7" text-anchor="middle">MUX CHANNELS ISOLATED &bull; ESP32 WiFi / TFT Rendering &bull; Relays Controlled (982ms Idle)</text>
+      
+      <!-- Markers -->
+      <text x="10" y="15" fill="#38bdf8" font-size="7">0 ms</text>
+      <text x="240" y="15" fill="#fb923c" font-size="7">18 ms</text>
+      <text x="710" y="15" fill="#94a3b8" font-size="7">1000 ms</text>
+    </svg>
+  </div>
+
+  <div class="doc-footer">
+    <span>Kabutech Hiyas Automated Mushroom Environment &bull; Hardware Engineering Specification</span>
+    <span>Sheet 5 of 6</span>
+  </div>
+</div>
+
+<!-- ============================================================== -->
+<!-- SHEET 6: COMMISSIONING CHECKLIST & VERIFICATION               -->
+<!-- ============================================================== -->
+<div class="sheet">
+  <div class="doc-header">
+    <div class="brand-title">
+      <span>KABUTECH HIYAS</span>
+      <span class="brand-badge">PRE-FLIGHT COMMISSIONING</span>
+    </div>
+    <div class="doc-meta">
+      <strong>QA / QC:</strong> Field Verification Standard<br>
+      <strong>SAFETY:</strong> Zero Dead-Short Guarantee<br>
+      <strong>STATUS:</strong> Certified for Production Deployment
+    </div>
+  </div>
+
+  <h1>Pre-Power Commissioning & Multimeter Verification</h1>
+  <p>To prevent catastrophic component failure, perform the following 6 sequential multimeter tests with AC mains power <strong>COMPLETELY UNPLUGGED</strong> before initial power-on.</p>
+
+  <h2>1. Master Pre-Power Multimeter Verification Checklist</h2>
+  <table>
+    <thead>
+      <tr>
+        <th style="width: 8%;">Step</th>
+        <th style="width: 24%;">Test Point / Multimeter Mode</th>
+        <th style="width: 22%;">Expected Reading</th>
+        <th style="width: 46%;">Troubleshooting & Safe Corrective Action</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><strong>01</strong></td>
+        <td><strong>3.3V Rail to GND</strong><br>(Resistance / Continuity)</td>
+        <td><strong>&gt; 500 &Omega;</strong><br>(No beep / No short)</td>
+        <td>If &lt; 50 &Omega; or continuous beep: STOP! Unplug sensors and MUX one by one until short clears. Check for solder bridge.</td>
+      </tr>
+      <tr>
+        <td><strong>02</strong></td>
+        <td><strong>5V Rail to GND</strong><br>(Resistance / Continuity)</td>
+        <td><strong>&gt; 1 k&Omega;</strong><br>(No beep)</td>
+        <td>If shorted: Check LM2596 buck converter output and TFT VCC header. Do not power up until resolved.</td>
+      </tr>
+      <tr>
+        <td><strong>03</strong></td>
+        <td><strong>TFT J1 Solder Jumper</strong><br>(Visual Inspection)</td>
+        <td><strong>OPEN</strong><br>(Unsoldered gap)</td>
+        <td>Confirm copper pads of J1 are NOT bridged. VCC must feed onboard 3.3V regulator from 5V rail.</td>
+      </tr>
+      <tr>
+        <td><strong>04</strong></td>
+        <td><strong>GX16 10m Aviation Cables</strong><br>(Pin-to-pin Continuity)</td>
+        <td><strong>Pin 1&rarr;1, 2&rarr;2, 3&rarr;3, 4&rarr;4</strong><br>(&lt; 1.5 &Omega; loop resistance)</td>
+        <td>Verify no cross-wiring (e.g. Pin 1 shorted to Pin 2). Verify shield braid connects to GND ONLY at enclosure end.</td>
+      </tr>
+      <tr>
+        <td><strong>05</strong></td>
+        <td><strong>1N4007 Diode Orientation</strong><br>(Diode Test Mode)</td>
+        <td>Cathode (silver band) to <strong>+12V</strong><br>Anode to switched ground</td>
+        <td>If reversed, diode will create a direct dead short when relay turns ON and blow the 12V 5A fuse!</td>
+      </tr>
+      <tr>
+        <td><strong>06</strong></td>
+        <td><strong>LM2596 Buck Voltage Trim</strong><br>(DC Volts without ESP32 seated)</td>
+        <td><strong>Exactly 5.00V &plusmn; 0.05V</strong></td>
+        <td>Turn ON 12V PSU first with ESP32 unplugged. Adjust brass screw trimmer on LM2596 until DMM reads exactly 5.0V.</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <h2>2. Field Diagnostic & Troubleshooting Quick Guide</h2>
+  <div class="grid-2">
+    <div class="card">
+      <div class="card-header">
+        <span>Symptom: Sensor Reads FAULT / NACK</span>
+        <span class="pill pill-amber">Troubleshooting</span>
+      </div>
+      <p style="font-size: 7.5pt; margin-bottom: 4px;">
+        <strong>1. Check TCA9548A Address:</strong> Ensure pins A0, A1, A2 are connected to GND (address <code>0x70</code>).<br>
+        <strong>2. Check Sensor Channel:</strong> Confirm BH1750 is on CH0, SHT31 on CH1, SCD41 on CH2.<br>
+        <strong>3. SCD41 Power Dip:</strong> Ensure the 100&micro;F decoupling capacitor is soldered directly across SCD41 VDD and GND at the chamber end.<br>
+        <strong>4. Bus Clock:</strong> Ensure <code>Wire.setClock(50000)</code> is active in firmware.
+      </p>
+    </div>
+
+    <div class="card">
+      <div class="card-header">
+        <span>Symptom: TFT White Screen / Blank</span>
+        <span class="pill pill-blue">Troubleshooting</span>
+      </div>
+      <p style="font-size: 7.5pt; margin-bottom: 4px;">
+        <strong>1. Check Backlight Pin:</strong> Ensure GPIO 2 is set to HIGH or outputting PWM (or test tied to 3.3V).<br>
+        <strong>2. Check J1 Jumper:</strong> Must be OPEN when fed from 5V.<br>
+        <strong>3. Check Reset Pin:</strong> Ensure GPIO 6 is connected to RESET.<br>
+        <strong>4. Check SPI Clock:</strong> Ensure SCK is on GPIO 18 and MOSI is on GPIO 17 with wires &lt; 15cm.
+      </p>
+    </div>
+  </div>
+
+  <h2>3. Project Engineering Sign-Off & Approvals</h2>
+  <table>
+    <thead>
+      <tr>
+        <th style="width: 25%;">Role</th>
+        <th style="width: 25%;">Designation</th>
+        <th style="width: 25%;">Status</th>
+        <th style="width: 25%;">Verification Timestamp</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><strong>Hardware Design Lead</strong></td>
+        <td>Kabutech AI Engineering Core</td>
+        <td><span class="pill pill-green">APPROVED</span></td>
+        <td>October 2026</td>
+      </tr>
+      <tr>
+        <td><strong>Firmware Integration Lead</strong></td>
+        <td>Kabutech Embedded Systems</td>
+        <td><span class="pill pill-green">VALIDATED</span></td>
+        <td>October 2026</td>
+      </tr>
+      <tr>
+        <td><strong>Field Commissioning</strong></td>
+        <td>Growhouse Installation Pair</td>
+        <td><span class="pill pill-amber">READY FOR DEPLOYMENT</span></td>
+        <td>Revision 2.0 (TCA9548A)</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <div class="doc-footer">
+    <span>Kabutech Hiyas Automated Mushroom Environment &bull; Hardware Engineering Specification</span>
+    <span>Sheet 6 of 6 &bull; END OF SPECIFICATION</span>
+  </div>
+</div>
+
+</body>
+</html>

@@ -1,0 +1,683 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Kabutech Hiyas — Classified Pinouts Quick Reference</title>
+<style>
+  @page {
+    size: A4 portrait;
+    margin: 8mm 10mm 8mm 10mm;
+    @bottom-right {
+      content: counter(page) " of " counter(pages);
+      font-size: 7.2pt;
+      color: #64748b;
+    }
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif;
+    color: #0f172a;
+    background: #fff;
+    font-size: 7.5pt;
+    line-height: 1.4;
+  }
+  .sheet {
+    
+    height: 272mm;
+    max-height: 272mm;
+    position: relative;
+    overflow: hidden;
+    box-sizing: border-box;
+  }
+  .sheet + .sheet { page-break-before: always; }
+  .sheet:last-child {
+    page-break-after: avoid;
+  }
+  
+  .hdr {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    border-bottom: 2.5px solid #059669;
+    padding-bottom: 6px;
+    margin-bottom: 10px;
+  }
+  .title {
+    font-size: 14pt;
+    font-weight: 800;
+    color: #064e3b;
+    letter-spacing: -0.4px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .badge {
+    background: #10b981;
+    color: #fff;
+    font-size: 7pt;
+    font-weight: 700;
+    padding: 2px 7px;
+    border-radius: 4px;
+    text-transform: uppercase;
+  }
+  .meta {
+    font-size: 7.5pt;
+    color: #64748b;
+    text-align: right;
+  }
+
+  .sec-title {
+    font-size: 10pt;
+    font-weight: 700;
+    color: #065f46;
+    background: #ecfdf5;
+    border-left: 4px solid #10b981;
+    padding: 4px 8px;
+    margin: 6px 0 3px 0;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+  }
+
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-bottom: 8px;
+    font-size: 7.2pt;
+  }
+  th {
+    background: #0f172a;
+    color: #f8fafc;
+    text-align: left;
+    padding: 3px 5px;
+    font-weight: 600;
+    text-transform: uppercase;
+    font-size: 7pt;
+    letter-spacing: 0.4px;
+  }
+  th.green { background: #065f46; }
+  th.blue { background: #1e1b4b; }
+  th.cyan { background: #0e7490; }
+  th.purple { background: #581c87; }
+
+  td {
+    padding: 2.2px 5px;
+    border-bottom: 1px solid #e2e8f0;
+    vertical-align: middle;
+  }
+  tr:nth-child(even) td { background: #f8fafc; }
+
+  .pill {
+    display: inline-block;
+    padding: 1.5px 6px;
+    border-radius: 3px;
+    font-weight: 700;
+    font-size: 7pt;
+    font-family: monospace;
+  }
+  .pill-red { background: #fee2e2; color: #991b1b; }
+  .pill-green { background: #dcfce7; color: #166534; }
+  .pill-blue { background: #e0f2fe; color: #075985; }
+  .pill-amber { background: #fef3c7; color: #92400e; }
+  .pill-purple { background: #f3e8ff; color: #6b21a8; }
+  .pill-slate { background: #f1f5f9; color: #334155; }
+
+  .tag { font-weight: 600; }
+  .dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    display: inline-block;
+    vertical-align: middle;
+    margin-right: 4px;
+    border: 1px solid rgba(0,0,0,0.2);
+  }
+  .c-red { background: #ef4444; }
+  .c-black { background: #0f172a; }
+  .c-green { background: #10b981; }
+  .c-white { background: #fff; border: 1px solid #94a3b8; }
+  .c-yellow { background: #eab308; }
+
+  .callout-rule {
+    background: #fffbeb;
+    border: 1px solid #fde68a;
+    border-left: 3.5px solid #f59e0b;
+    padding: 5px 8px;
+    font-size: 7.5pt;
+    color: #92400e;
+    margin: 6px 0 8px 0;
+    border-radius: 4px;
+    line-height: 1.35;
+  }
+
+  .footer {
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    display: flex;
+    justify-content: space-between;
+    font-size: 7pt;
+    color: #94a3b8;
+    border-top: 1px solid #e2e8f0;
+    padding-top: 4px;
+  }
+</style>
+</head>
+<body>
+
+<!-- SHEET 1: ESP32-S3 MASTER PINOUT & POWER RAILS -->
+<div class="sheet">
+  <div class="hdr">
+    <div class="title">KABUTECH HIYAS <span class="badge">PINOUTS ONLY REFERENCE</span></div>
+    <div class="meta"><strong>DOC ID:</strong> KABU-PINOUT-V2.0<br><strong>CLASSIFICATION 1 &amp; 2:</strong> MCU &amp; POWER</div>
+  </div>
+
+  <div class="sec-title">1. ESP32-S3 Microcontroller (Master Pinout Matrix)</div>
+  <table>
+    <thead>
+      <tr>
+        <th class="green" style="width: 17%;">ESP32-S3 Pin</th>
+        <th style="width: 22%;">Connected Device</th>
+        <th style="width: 18%;">Device Pin</th>
+        <th style="width: 18%;">Signal Net</th>
+        <th style="width: 25%;">Voltage Level / Mode</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><strong>3V3</strong></td>
+        <td>TCA9548A, Sensors, Relay VCC</td>
+        <td><code>VIN / VCC</code></td>
+        <td><code>+3.3V_RAIL</code></td>
+        <td>3.3V DC Power (Out)</td>
+      </tr>
+      <tr>
+        <td><strong>5V / VIN</strong></td>
+        <td>3.2" SPI TFT VCC &amp; LM2596</td>
+        <td><code>VCC</code></td>
+        <td><code>+5V_RAIL</code></td>
+        <td>5.0V DC Power (In)</td>
+      </tr>
+      <tr>
+        <td><strong>GND</strong></td>
+        <td>All Subsystems</td>
+        <td><code>GND</code></td>
+        <td><code>SYSTEM_GND</code></td>
+        <td>0V System Ground</td>
+      </tr>
+      <tr>
+        <td><strong>GPIO 4</strong></td>
+        <td>TCA9548A Multiplexer</td>
+        <td><code>SDA</code></td>
+        <td><code>I2C_SDA</code></td>
+        <td>3.3V Bi-directional (I2C Data)</td>
+      </tr>
+      <tr>
+        <td><strong>GPIO 5</strong></td>
+        <td>TCA9548A Multiplexer</td>
+        <td><code>SCL</code></td>
+        <td><code>I2C_SCL</code></td>
+        <td>3.3V Clock Out (50 kHz I2C)</td>
+      </tr>
+      <tr>
+        <td><strong>GPIO 10</strong></td>
+        <td>3.2" SPI TFT (ILI9341)</td>
+        <td><code>CS</code></td>
+        <td><code>TFT_CS</code></td>
+        <td>3.3V Digital Out (Active LOW)</td>
+      </tr>
+      <tr>
+        <td><strong>GPIO 6</strong></td>
+        <td>3.2" SPI TFT (ILI9341)</td>
+        <td><code>RESET</code></td>
+        <td><code>TFT_RST</code></td>
+        <td>3.3V Digital Out (Active LOW)</td>
+      </tr>
+      <tr>
+        <td><strong>GPIO 15</strong></td>
+        <td>3.2" SPI TFT (ILI9341)</td>
+        <td><code>DC / RS</code></td>
+        <td><code>TFT_DC</code></td>
+        <td>3.3V Digital Out (0=Cmd, 1=Data)</td>
+      </tr>
+      <tr>
+        <td><strong>GPIO 17</strong></td>
+        <td>3.2" SPI TFT (ILI9341)</td>
+        <td><code>SDI (MOSI)</code></td>
+        <td><code>TFT_MOSI</code></td>
+        <td>3.3V High-Speed SPI (40 MHz)</td>
+      </tr>
+      <tr>
+        <td><strong>GPIO 18</strong></td>
+        <td>3.2" SPI TFT (ILI9341)</td>
+        <td><code>SCK (CLK)</code></td>
+        <td><code>TFT_SCK</code></td>
+        <td>3.3V High-Speed SPI Clock</td>
+      </tr>
+      <tr>
+        <td><strong>GPIO 2</strong></td>
+        <td>3.2" SPI TFT (ILI9341)</td>
+        <td><code>LED</code></td>
+        <td><code>TFT_LED</code></td>
+        <td>3.3V PWM (Backlight Dimming)</td>
+      </tr>
+      <tr>
+        <td><strong>GPIO 16</strong></td>
+        <td>3.2" SPI TFT (ILI9341)</td>
+        <td><code>SDO (MISO)</code></td>
+        <td><code>TFT_MISO</code></td>
+        <td>3.3V Input (Optional read-back)</td>
+      </tr>
+      <tr>
+        <td><strong>GPIO 9</strong></td>
+        <td>Relay K1 (120mm Exhaust Fan)</td>
+        <td><code>IN1</code></td>
+        <td><code>RELAY_EXH</code></td>
+        <td>3.3V Digital Out (Active LOW)</td>
+      </tr>
+      <tr>
+        <td><strong>GPIO 11</strong></td>
+        <td>Relay K2 (Misting Solenoid Pump)</td>
+        <td><code>IN2</code></td>
+        <td><code>RELAY_MIST</code></td>
+        <td>3.3V Digital Out (Active LOW)</td>
+      </tr>
+      <tr>
+        <td><strong>GPIO 12</strong></td>
+        <td>Relay K3 (LED Grow Lights)</td>
+        <td><code>IN3</code></td>
+        <td><code>RELAY_LIGHT</code></td>
+        <td>3.3V Digital Out (Active LOW)</td>
+      </tr>
+      <tr>
+        <td><strong>GPIO 13</strong></td>
+        <td>Relay K4 (120mm Intake Fan)</td>
+        <td><code>IN4</code></td>
+        <td><code>RELAY_INT</code></td>
+        <td>3.3V Digital Out (Active LOW)</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <div class="sec-title">2. Power Distribution Rails &amp; Grounding</div>
+  <table>
+    <thead>
+      <tr>
+        <th class="green" style="width: 18%;">Power Rail</th>
+        <th style="width: 15%;">Voltage</th>
+        <th style="width: 25%;">Power Source</th>
+        <th style="width: 42%;">Target Subsystems &amp; Loads</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><strong>AC Mains</strong></td>
+        <td>220VAC</td>
+        <td>Wall Outlet &rarr; IEC C14</td>
+        <td>12V 5A Industrial Enclosed Switching PSU (5A Fused)</td>
+      </tr>
+      <tr>
+        <td><strong>+12V Master Rail</strong></td>
+        <td>+12.0V DC</td>
+        <td>12V 5A Switching PSU</td>
+        <td>Fans, Misting Pump, Grow Lights, LM2596 Buck Input</td>
+      </tr>
+      <tr>
+        <td><strong>+5V Logic Rail</strong></td>
+        <td>+5.0V DC</td>
+        <td>LM2596 Buck Converter</td>
+        <td>ESP32 5VIN pin, 3.2" TFT VCC, Relay JD-VCC coil rail</td>
+      </tr>
+      <tr>
+        <td><strong>+3.3V MCU Rail</strong></td>
+        <td>+3.3V DC</td>
+        <td>ESP32 AMS1117 LDO</td>
+        <td>ESP32 SoC, TCA9548A MUX, BH1750, SHT31, SCD41, Relay VCC</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <div class="footer">
+    <span>Kabutech Hiyas Automated Cultivation Controller &bull; Master Hardware Pinouts</span>
+    <span>Sheet 1 of 3</span>
+  </div>
+</div>
+
+<!-- SHEET 2: TCA9548A MULTIPLEXER & 10M SENSORS -->
+<div class="sheet">
+  <div class="hdr">
+    <div class="title">KABUTECH HIYAS <span class="badge">PINOUTS ONLY REFERENCE</span></div>
+    <div class="meta"><strong>DOC ID:</strong> KABU-PINOUT-V2.0<br><strong>CLASSIFICATION 3 &amp; 4:</strong> MULTIPLEXER &amp; SENSORS</div>
+  </div>
+
+  <div class="sec-title">3. TCA9548A 8-Channel I2C Multiplexer Pinout</div>
+  <table>
+    <thead>
+      <tr>
+        <th class="blue" style="width: 18%;">TCA9548A Pin</th>
+        <th style="width: 24%;">Connected To</th>
+        <th style="width: 18%;">Signal Net</th>
+        <th style="width: 40%;">Hardware Function &amp; Destination</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><strong>VIN / VCC</strong></td>
+        <td>ESP32 <code>3V3</code> Rail</td>
+        <td><code>+3.3V</code></td>
+        <td>Powers multiplexer internal switch gates</td>
+      </tr>
+      <tr>
+        <td><strong>GND</strong></td>
+        <td>System <code>GND</code></td>
+        <td><code>GND</code></td>
+        <td>Common system ground plane</td>
+      </tr>
+      <tr>
+        <td><strong>SDA</strong></td>
+        <td>ESP32 <code>GPIO 4</code></td>
+        <td><code>I2C_SDA</code></td>
+        <td>Upstream master I2C data</td>
+      </tr>
+      <tr>
+        <td><strong>SCL</strong></td>
+        <td>ESP32 <code>GPIO 5</code></td>
+        <td><code>I2C_SCL</code></td>
+        <td>Upstream master I2C clock (50 kHz)</td>
+      </tr>
+      <tr>
+        <td><strong>RST</strong></td>
+        <td>ESP32 <code>3V3</code> Rail</td>
+        <td><code>+3.3V</code></td>
+        <td>Tied HIGH to disable hardware reset</td>
+      </tr>
+      <tr>
+        <td><strong>A0, A1, A2</strong></td>
+        <td>System <code>GND</code></td>
+        <td><code>GND</code></td>
+        <td>Tied to GND &rarr; Locks I2C Address to <strong>0x70</strong></td>
+      </tr>
+      <tr>
+        <td><strong>SD0 / SC0</strong></td>
+        <td>GX16 Port 1 (Pins 3, 4)</td>
+        <td><code>CH 0</code></td>
+        <td>&rarr; 10m Cable 1 &rarr; <strong>ROHM BH1750 Ambient Light (0x23)</strong></td>
+      </tr>
+      <tr>
+        <td><strong>SD1 / SC1</strong></td>
+        <td>GX16 Port 2 (Pins 3, 4)</td>
+        <td><code>CH 1</code></td>
+        <td>&rarr; 10m Cable 2 &rarr; <strong>Sensirion SHT31-D Temp/RH (0x44)</strong></td>
+      </tr>
+      <tr>
+        <td><strong>SD2 / SC2</strong></td>
+        <td>GX16 Port 3 (Pins 3, 4)</td>
+        <td><code>CH 2</code></td>
+        <td>&rarr; 10m Cable 3 &rarr; <strong>Sensirion SCD41 True NDIR CO2 (0x62)</strong></td>
+      </tr>
+      <tr>
+        <td><strong>SD3–7 / SC3–7</strong></td>
+        <td><em>Leave Unconnected</em></td>
+        <td><code>CH 3–7</code></td>
+        <td>Unused / Reserved for future expansion</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <div class="sec-title">4. GX16 4-Pin Aviation Connectors &amp; 10-Meter Cables</div>
+  <table>
+    <thead>
+      <tr>
+        <th class="blue" style="width: 14%;">GX16 Pin</th>
+        <th style="width: 22%;">Wire Color</th>
+        <th style="width: 24%;">Main Controller Side</th>
+        <th style="width: 40%;">Sensor Probe End (Chamber)</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><strong>Pin 1</strong></td>
+        <td><span class="tag"><span class="dot c-red"></span> RED (22 AWG)</span></td>
+        <td>ESP32 <code>3V3</code> Rail</td>
+        <td>Sensor <code>VCC</code> / <code>VIN</code> / <code>VDD</code> (+3.3V)</td>
+      </tr>
+      <tr>
+        <td><strong>Pin 2</strong></td>
+        <td><span class="tag"><span class="dot c-black"></span> BLACK (22 AWG)</span></td>
+        <td>System <code>GND</code></td>
+        <td>Sensor <code>GND</code> (Also tie ADDR/ADR pin to GND)</td>
+      </tr>
+      <tr>
+        <td><strong>Pin 3</strong></td>
+        <td><span class="tag"><span class="dot c-green"></span> GREEN / BLUE</span></td>
+        <td>TCA9548A <code>SD0 / SD1 / SD2</code></td>
+        <td>Sensor <code>SDA</code> (Data Line)</td>
+      </tr>
+      <tr>
+        <td><strong>Pin 4</strong></td>
+        <td><span class="tag"><span class="dot c-white"></span> WHITE / YELLOW</span></td>
+        <td>TCA9548A <code>SC0 / SC1 / SC2</code></td>
+        <td>Sensor <code>SCL</code> (Clock Line)</td>
+      </tr>
+      <tr>
+        <td><strong>Shell</strong></td>
+        <td>Bare Braid Shield</td>
+        <td>System <code>GND</code> at Box ONLY</td>
+        <td><strong>LEAVE FLOATING</strong> in chamber (Prevents ground loops)</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <div class="sec-title">5. Sensor Breakout Board Pinouts (Chamber End)</div>
+  <table>
+    <thead>
+      <tr>
+        <th class="blue" style="width: 20%;">Sensor Breakout</th>
+        <th style="width: 15%;">I2C Address</th>
+        <th style="width: 25%;">Breakout Pins</th>
+        <th style="width: 40%;">Wiring Instructions</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><strong>ROHM BH1750 (Lux)</strong></td>
+        <td><code>0x23</code></td>
+        <td>VCC, GND, SDA, SCL, ADDR</td>
+        <td>VCC&rarr;Pin 1, GND&rarr;Pin 2, SDA&rarr;Pin 3, SCL&rarr;Pin 4. ADDR tied to GND.</td>
+      </tr>
+      <tr>
+        <td><strong>Sensirion SHT31 (T/RH)</strong></td>
+        <td><code>0x44</code></td>
+        <td>VIN, GND, SDA, SCL, ADR</td>
+        <td>VIN&rarr;Pin 1, GND&rarr;Pin 2, SDA&rarr;Pin 3, SCL&rarr;Pin 4. ADR tied to GND.</td>
+      </tr>
+      <tr>
+        <td><strong>Sensirion SCD41 (CO2)</strong></td>
+        <td><code>0x62</code></td>
+        <td>VDD, GND, SDA, SCL</td>
+        <td>VDD&rarr;Pin 1, GND&rarr;Pin 2, SDA&rarr;Pin 3, SCL&rarr;Pin 4.</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <div class="callout-rule">
+    <strong>SCD41 10-Meter Buffer Capacitor:</strong> Solder a <strong>100&micro;F 10V electrolytic capacitor + 0.1&micro;F ceramic capacitor</strong> directly across Pin 1 (VDD) and Pin 2 (GND) at the SCD41 breakout board inside the chamber probe.
+  </div>
+
+  <div class="footer">
+    <span>Kabutech Hiyas Automated Cultivation Controller &bull; Master Hardware Pinouts</span>
+    <span>Sheet 2 of 3</span>
+  </div>
+</div>
+
+<!-- SHEET 3: 3.2" SPI TFT & 4-CHANNEL RELAYS -->
+<div class="sheet">
+  <div class="hdr">
+    <div class="title">KABUTECH HIYAS <span class="badge">PINOUTS ONLY REFERENCE</span></div>
+    <div class="meta"><strong>DOC ID:</strong> KABU-PINOUT-V2.0<br><strong>CLASSIFICATION 5 &amp; 6:</strong> TFT DISPLAY &amp; RELAYS</div>
+  </div>
+
+  <div class="sec-title">6. 3.2" SPI TFT Display (ILI9341, 240x320) Pinout</div>
+  <table>
+    <thead>
+      <tr>
+        <th class="cyan" style="width: 10%;">TFT Pin #</th>
+        <th style="width: 18%;">TFT Pin Label</th>
+        <th style="width: 22%;">ESP32-S3 Pin</th>
+        <th style="width: 20%;">Signal Net</th>
+        <th style="width: 30%;">Wiring Rule &amp; Function</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><strong>1</strong></td>
+        <td><span class="pill pill-red">VCC</span></td>
+        <td>ESP32 <strong>5V / VIN</strong></td>
+        <td><code>+5V_RAIL</code></td>
+        <td>Powers display via onboard LDO (J1 MUST BE OPEN)</td>
+      </tr>
+      <tr>
+        <td><strong>2</strong></td>
+        <td><span class="pill pill-slate">GND</span></td>
+        <td>ESP32 <strong>GND</strong></td>
+        <td><code>SYSTEM_GND</code></td>
+        <td>Common ground plane</td>
+      </tr>
+      <tr>
+        <td><strong>3</strong></td>
+        <td><span class="pill pill-amber">CS</span></td>
+        <td>ESP32 <strong>GPIO 10</strong></td>
+        <td><code>TFT_CS</code></td>
+        <td>Display SPI chip select (Active LOW)</td>
+      </tr>
+      <tr>
+        <td><strong>4</strong></td>
+        <td><span class="pill pill-amber">RESET</span></td>
+        <td>ESP32 <strong>GPIO 6</strong></td>
+        <td><code>TFT_RST</code></td>
+        <td>Display hardware reset (Active LOW)</td>
+      </tr>
+      <tr>
+        <td><strong>5</strong></td>
+        <td><span class="pill pill-blue">DC / RS</span></td>
+        <td>ESP32 <strong>GPIO 15</strong></td>
+        <td><code>TFT_DC</code></td>
+        <td>Data / Command select (0=Cmd, 1=Data)</td>
+      </tr>
+      <tr>
+        <td><strong>6</strong></td>
+        <td><span class="pill pill-green">SDI (MOSI)</span></td>
+        <td>ESP32 <strong>GPIO 17</strong></td>
+        <td><code>TFT_MOSI</code></td>
+        <td>SPI Master Out (40 MHz Data In)</td>
+      </tr>
+      <tr>
+        <td><strong>7</strong></td>
+        <td><span class="pill pill-green">SCK (CLK)</span></td>
+        <td>ESP32 <strong>GPIO 18</strong></td>
+        <td><code>TFT_SCK</code></td>
+        <td>SPI Clock (40 MHz)</td>
+      </tr>
+      <tr>
+        <td><strong>8</strong></td>
+        <td><span class="pill pill-purple">LED</span></td>
+        <td>ESP32 <strong>GPIO 2</strong></td>
+        <td><code>TFT_LED</code></td>
+        <td>Backlight PWM dimming (or tie to 3.3V)</td>
+      </tr>
+      <tr>
+        <td><strong>9</strong></td>
+        <td><span class="pill pill-slate">SDO (MISO)</span></td>
+        <td>ESP32 <strong>GPIO 16</strong></td>
+        <td><code>TFT_MISO</code></td>
+        <td>SPI Master In (Optional read-back)</td>
+      </tr>
+      <tr>
+        <td><strong>10–14</strong></td>
+        <td><code>TOUCH PINS</code></td>
+        <td><em>Optional Header</em></td>
+        <td><code>T_CLK..IRQ</code></td>
+        <td>T_CLK(18), T_CS(1), T_DIN(17), T_DO(16), T_IRQ(42)</td>
+      </tr>
+      <tr>
+        <td><strong>SD</strong></td>
+        <td><code>SD_CS..SCK</code></td>
+        <td><em>Unconnected</em></td>
+        <td><code>N/C</code></td>
+        <td>Leave disconnected (Firebase cloud storage used)</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <div class="callout-rule" style="background: #fef2f2; border-color: #fca5a5; color: #991b1b; border-left-color: #ef4444;">
+    <strong>TFT J1 SOLDER JUMPER:</strong> Copper jumper <strong>J1</strong> on the back of the red display PCB must remain <strong>OPEN (UNSHORTED)</strong> when VCC is powered from 5V. Feeding 5V with J1 shorted destroys the ILI9341 panel!
+  </div>
+
+  <div class="sec-title">7. 4-Channel 5V Optocoupled Relay Module Pinout</div>
+  <table>
+    <thead>
+      <tr>
+        <th class="purple" style="width: 15%;">Relay Header</th>
+        <th style="width: 22%;">Connected To</th>
+        <th style="width: 24%;">Controlled Device</th>
+        <th style="width: 39%;">Wiring &amp; Protection Diode</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><strong>JD-VCC</strong></td>
+        <td>LM2596 <strong>+5.0V</strong> Output</td>
+        <td>Electromagnet Coil Rail</td>
+        <td>Powers relay coils (Blue jumper REMOVED)</td>
+      </tr>
+      <tr>
+        <td><strong>VCC</strong></td>
+        <td>ESP32 <strong>3V3</strong> Rail</td>
+        <td>Optocoupler Input LEDs</td>
+        <td>3.3V logic supply for PC817 optocouplers</td>
+      </tr>
+      <tr>
+        <td><strong>GND</strong></td>
+        <td>System <strong>GND</strong></td>
+        <td>Ground Plane</td>
+        <td>Common system ground</td>
+      </tr>
+      <tr>
+        <td><strong>IN1</strong></td>
+        <td>ESP32 <strong>GPIO 9</strong></td>
+        <td>Relay 1: 120mm Exhaust Fan</td>
+        <td>Active LOW. <strong>1N4007 diode</strong> across fan (cathode to +12V)</td>
+      </tr>
+      <tr>
+        <td><strong>IN2</strong></td>
+        <td>ESP32 <strong>GPIO 11</strong></td>
+        <td>Relay 2: Misting Pump / Valve</td>
+        <td>Active LOW. <strong>1N4007 diode</strong> across pump (cathode to +12V)</td>
+      </tr>
+      <tr>
+        <td><strong>IN3</strong></td>
+        <td>ESP32 <strong>GPIO 12</strong></td>
+        <td>Relay 3: LED Grow Light Strip</td>
+        <td>Active LOW. Resistive 12V load (no diode needed)</td>
+      </tr>
+      <tr>
+        <td><strong>IN4</strong></td>
+        <td>ESP32 <strong>GPIO 13</strong></td>
+        <td>Relay 4: 120mm Intake Fan</td>
+        <td>Active LOW. <strong>1N4007 diode</strong> across fan (cathode to +12V)</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <div class="callout-rule">
+    <strong>RELAY GALVANIC ISOLATION:</strong> Pull off the blue plastic shunt connecting VCC and JD-VCC. Connect JD-VCC directly to the LM2596 +5V rail, and connect VCC to the ESP32 +3.3V pin.
+  </div>
+
+  <div class="footer">
+    <span>Kabutech Hiyas Automated Cultivation Controller &bull; Master Hardware Pinouts</span>
+    <span>Sheet 3 of 3 &bull; END OF SPECIFICATION</span>
+  </div>
+</div>
+
+</body>
+</html>

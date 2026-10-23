@@ -48,6 +48,10 @@
 #include <time.h>
 
 // ─── TFT SPI Display Driver (LovyanGFX ILI9341 240x320) ───
+// 4 MHz SPI Clock: Eliminates ringing/crosstalk over 30cm extension wires (fixes white screen)
+#define TFT_SPI_FREQ    4000000
+// Orientation: 1 = Landscape Upright (Header at TOP, Left-to-Right normal text)
+#define TFT_ROTATION    7
 #include "tft_display.h"
 
 // ─── Addons for Firebase token management ───
@@ -1137,6 +1141,27 @@ void loop() {
                   shtFault, lightFault, co2Fault,
                   stateExhaust, stateIntake, stateMister, stateLight,
                   stateMode, (WiFi.status() == WL_CONNECTED), firebaseReady);
+  }
+
+  // ── Live Serial Diagnostic Command: Type 't' to re-init, 'm' to flip rotation ──
+  if (Serial.available()) {
+    char ch = Serial.read();
+    if (ch == 't' || ch == 'T' || ch == 'r' || ch == 'R') {
+      Serial.println("\n🔄 [SERIAL TRIGGER] Re-initializing TFT Display & testing color wipe...");
+      initDisplay();
+    } else if (ch == 'm' || ch == 'M') {
+      static uint8_t curRot = TFT_ROTATION;
+      // Cycle landscape modes: 1 (Upright normal) -> 3 (180° inverted) -> 7 (Normal flipped) -> 5 (Mirrored)
+      if (curRot == 1) curRot = 3;
+      else if (curRot == 3) curRot = 7;
+      else if (curRot == 7) curRot = 5;
+      else curRot = 1;
+      Serial.printf("\n🔄 [SERIAL TRIGGER] Setting TFT Rotation to %d...\n", curRot);
+      tft.setRotation(curRot);
+      baseDrawn = false;
+      tft.fillScreen(COLOR_BG);
+      drawStaticDashboard();
+    }
   }
 
   delay(15);
