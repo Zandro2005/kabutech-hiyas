@@ -1,0 +1,37 @@
+{
+  "sensors": [
+    "temperature",
+    "humidity",
+    "co2",
+    "light"
+  ],
+  "window": 20,
+  "horizon": 20,
+  "step_ms": 30000,
+  "input_mean": [
+    23.11074447631836,
+    83.50399780273438,
+    980.2863159179688,
+    406.7295227050781
+  ],
+  "input_std": [
+    1.835586667060852,
+    7.0992350578308105,
+    236.29766845703125,
+    37.74233627319336
+  ],
+  "rel_std": [
+    0.20504193007946014,
+    1.5429176092147827,
+    53.06523513793945,
+    18.18671417236328
+  ],
+  "delta_std": [
+    0.30960533022880554,
+    2.454533338546753,
+    79.49874877929688,
+    18.1055850982666
+  ],
+  "feature_layout": "interleaved [T,H,CO2,L] x WINDOW, oldest first; steps 0..W-2 = (x-x_latest)/rel_std, last step = (x-mean)/std",
+  "output": "normalized delta; multiply by delta_std and add current value"
+}

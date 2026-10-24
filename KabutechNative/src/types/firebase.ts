@@ -13,6 +13,12 @@ export interface SensorData {
   light_error?: boolean | string | number;
   co2_error?: boolean | string | number;
   water_error?: boolean | string | number;
+  ai_ready?: boolean;
+  ai_action?: string;
+  ai_pred_temp_10m?: number;
+  ai_pred_hum_10m?: number;
+  ai_pred_co2_10m?: number;
+  ai_pred_light_10m?: number;
 }
 
 export interface DeviceStates {

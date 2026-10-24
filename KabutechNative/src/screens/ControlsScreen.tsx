@@ -159,8 +159,8 @@ export default function ControlsScreen() {
     }, 2500);
 
     const deviceLabel =
-      key === 'fanIn' ? 'Fan In' :
-      key === 'fanOut' ? 'Fan Out' :
+      key === 'fanIn' ? 'Intake' :
+      key === 'fanOut' ? 'Exhaust' :
       key === 'misters' ? 'Mister' :
       key === 'lights' ? 'Grow Lights' :
       'Device';
@@ -374,14 +374,14 @@ export default function ControlsScreen() {
   const actuatorDevices = [
     {
       key: 'fanIn',
-      name: 'Fan In',
+      name: 'Intake',
       roleHint: 'Air Intake',
       icon: 'fan-chevron-down' as const,
       active: Boolean(devices.fanIn),
     },
     {
       key: 'fanOut',
-      name: 'Fan Out',
+      name: 'Exhaust',
       roleHint: 'Air Exhaust',
       icon: 'fan-chevron-up' as const,
       active: Boolean(devices.fanOut ?? devices.fans),

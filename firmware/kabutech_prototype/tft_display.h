@@ -343,7 +343,8 @@ void drawActuatorChip(int x, int y, int w, int h, const char* label, bool active
 void drawDashboard(float temp, float hum, int light, int co2,
                    bool shtErr, bool lightErr, bool co2Err,
                    bool exhOn, bool intOn, bool mistOn, bool lightOn,
-                   const String& mode, bool wifiOk, bool fbOk) {
+                   const String& mode, bool wifiOk, bool fbOk,
+                   bool aiActive = false, const char* aiAct = "none") {
   if (!baseDrawn) {
     drawStaticDashboard();
   }
@@ -415,7 +416,7 @@ void drawDashboard(float temp, float hum, int light, int co2,
     tft.drawString("--:--", 266, 13);
   }
 
-  // Cloud Link Status Pill (Far Right)
+  // Cloud Link Status Pill (Far Right) - Shows LOCAL when offline, proving main box is alive
   tft.setTextDatum(textdatum_t::middle_right);
   tft.setTextSize(1);
   tft.fillRect(268, 4, 48, 18, COLOR_BG);
@@ -426,8 +427,8 @@ void drawDashboard(float temp, float hum, int light, int co2,
     tft.setTextColor(COLOR_AMBER, COLOR_BG);
     tft.drawString("SYNC", 312, 13);
   } else {
-    tft.setTextColor(COLOR_MUTED, COLOR_BG);
-    tft.drawString("OFFLINE", 312, 13);
+    tft.setTextColor(COLOR_CYAN, COLOR_BG);
+    tft.drawString("LOCAL", 312, 13); // Main box runs 100% autonomous locally
   }
 
   // 2. ENVIRONMENTAL CARDS (2x2 Grid)
@@ -557,21 +558,34 @@ void drawDashboard(float temp, float hum, int light, int co2,
     drawActuatorChip(158, 207, 48, 22, "LIGHT", lightOn, COLOR_EMERALD);
   }
 
-  // 4. FOOTER INFO: Mode & Uptime (Right side of bottom container)
-  if (mode != prevMode) {
+  // 4. FOOTER INFO: Mode, Edge AI & Uptime (Right side of bottom container)
+  static bool   prevAiActive = false;
+  static String prevAiAct    = "";
+  String curAiAct = (aiAct != nullptr) ? String(aiAct) : "none";
+
+  if (mode != prevMode || aiActive != prevAiActive || curAiAct != prevAiAct) {
     prevMode = mode;
-    tft.fillRect(210, 206, 50, 24, COLOR_CARD_BG);
+    prevAiActive = aiActive;
+    prevAiAct = curAiAct;
+
+    tft.fillRect(208, 206, 52, 24, COLOR_CARD_BG);
     tft.setTextDatum(textdatum_t::middle_left);
     tft.setTextSize(1);
     if (mode == "MANUAL") {
       tft.setTextColor(COLOR_AMBER, COLOR_CARD_BG);
-      tft.drawString("MANUAL", 212, 218);
+      tft.drawString("MANUAL", 210, 218);
     } else if (mode == "TIMED" || mode == "SCHEDULED") {
       tft.setTextColor(COLOR_PURPLE, COLOR_CARD_BG);
-      tft.drawString("TIMED", 212, 218);
+      tft.drawString("TIMED", 210, 218);
+    } else if (curAiAct.startsWith("preempt_")) {
+      tft.setTextColor(COLOR_AMBER, COLOR_CARD_BG);
+      tft.drawString("PREEMPT", 210, 218); // Pre-emptive fan/mister triggered by Edge AI
+    } else if (aiActive) {
+      tft.setTextColor(COLOR_EMERALD, COLOR_CARD_BG);
+      tft.drawString("AUTO*AI", 210, 218); // TinyML forecasting active on ESP32
     } else {
       tft.setTextColor(COLOR_EMERALD, COLOR_CARD_BG);
-      tft.drawString("AUTO", 212, 218);
+      tft.drawString("AUTO", 210, 218);
     }
   }
 

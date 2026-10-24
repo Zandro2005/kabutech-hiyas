@@ -67,3 +67,8 @@ node_modules/
 
 # dataconnect generated files
 .dataconnect
+
+# TinyML / Edge AI
+tinyml/.venv/
+tinyml/forecast_sequences.csv
+

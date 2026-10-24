@@ -48,16 +48,7 @@ import {
 } from '../utils/haptics';
 import { useResponsive } from '../utils/responsive';
 
-const globalTimeouts: ReturnType<typeof setTimeout>[] = [];
-let isGlobalProcessing: string | false = false;
-const globalStartTimes: Record<string, number> = {};
 
-DeviceEventEmitter.addListener('cancelAiOverride', () => {
-  globalTimeouts.forEach(clearTimeout);
-  globalTimeouts.length = 0;
-  isGlobalProcessing = false;
-  Object.keys(globalStartTimes).forEach((k) => delete globalStartTimes[k]);
-});
 
 type MetricKey = 'temp' | 'hum' | 'light' | 'co2';
 type ForecastHorizon = '2H' | '6H' | '24H';
@@ -98,9 +89,6 @@ export default function ReportScreen() {
   const { isDarkMode } = useTheme();
   const { width } = useResponsive();
 
-  // Processing state
-  const [isProcessing, setIsProcessing] = useState<string | false>(isGlobalProcessing);
-  const [now, setNow] = useState(Date.now());
   const [isScanning, setIsScanning] = useState(false);
 
   // Chart configuration
@@ -112,11 +100,23 @@ export default function ReportScreen() {
 
   // Modal
   const [showSuggestionsModal, setShowSuggestionsModal] = useState(false);
-  const [selectedActions, setSelectedActions] = useState({
-    fans: true,
-    misters: true,
-    co2: true,
-  });
+
+  // Edge AI live status from ESP32
+  const isPreempting = Boolean(sensors?.ai_action && sensors.ai_action !== 'none');
+  const isAiReady = Boolean(sensors?.ai_ready);
+
+  const preemptLabel = useMemo(() => {
+    switch (sensors?.ai_action) {
+      case 'preempt_exhaust_temp':
+        return 'Cooling temp spike ahead';
+      case 'preempt_exhaust_co2':
+        return 'Purging CO₂ spike ahead';
+      case 'preempt_mister':
+        return 'Misting dry drop ahead';
+      default:
+        return 'Pre-empting spike (+10m)';
+    }
+  }, [sensors?.ai_action]);
 
   // Pulse animation for alert dots
   const pulseAnim = useRef(new Animated.Value(1)).current;
@@ -131,43 +131,7 @@ export default function ReportScreen() {
     return () => loop.stop();
   }, [pulseAnim]);
 
-  // Second ticker
-  useEffect(() => {
-    const interval = setInterval(() => setNow(Date.now()), 1000);
-    return () => clearInterval(interval);
-  }, []);
 
-  // Sync global device start times
-  useEffect(() => {
-    const currentTime = Date.now();
-    ['fans', 'misters', 'lights', 'co2'].forEach((device) => {
-      if (
-        settings?.setpoints?.aiOverride &&
-        settings?.setpoints?.devices?.[device as keyof typeof settings.setpoints.devices]
-      ) {
-        if (!globalStartTimes[device]) globalStartTimes[device] = currentTime;
-      } else {
-        delete globalStartTimes[device];
-      }
-    });
-  }, [settings?.setpoints?.devices, settings?.setpoints?.aiOverride]);
-
-  const setProcessingState = (state: string | false) => {
-    isGlobalProcessing = state;
-    DeviceEventEmitter.emit('processingStateChanged', state);
-  };
-
-  useEffect(() => {
-    const sub = DeviceEventEmitter.addListener('cancelAiOverride', () => setProcessingState(false));
-    const stateSub = DeviceEventEmitter.addListener('processingStateChanged', (state) => {
-      setIsProcessing(state);
-    });
-    setIsProcessing(isGlobalProcessing);
-    return () => {
-      sub.remove();
-      stateSub.remove();
-    };
-  }, []);
 
   // Sensor inputs
   const liveTemp = typeof sensors.temperature === 'number' && sensors.temperature > 0 && sensors.temperature !== -999 ? sensors.temperature : 0;
@@ -180,13 +144,20 @@ export default function ReportScreen() {
   const targetLight = settings?.setpoints?.light ?? 580;
   const targetCo2 = settings?.setpoints?.co2 ?? 690;
 
+  // TinyML Edge AI predictions received from ESP32
+  const aiReady = Boolean(sensors?.ai_ready);
+  const aiPredTemp = (typeof sensors?.ai_pred_temp_10m === 'number' && sensors.ai_pred_temp_10m !== -999) ? sensors.ai_pred_temp_10m : null;
+  const aiPredHum = (typeof sensors?.ai_pred_hum_10m === 'number' && sensors.ai_pred_hum_10m !== -999) ? sensors.ai_pred_hum_10m : null;
+  const aiPredCo2 = (typeof sensors?.ai_pred_co2_10m === 'number' && sensors.ai_pred_co2_10m !== -999) ? sensors.ai_pred_co2_10m : null;
+  const aiPredLight = (typeof sensors?.ai_pred_light_10m === 'number' && sensors.ai_pred_light_10m !== -999) ? sensors.ai_pred_light_10m : null;
+
   const tempVariance = Number((liveTemp - targetTemp).toFixed(1));
   const humVariance = Number((liveHum - targetHum).toFixed(1));
   const co2Variance = Number((liveCo2 - targetCo2).toFixed(0));
 
-  const isTempCritical = tempVariance > 1.8;
-  const isHumCritical = humVariance < -12;
-  const isCo2Critical = co2Variance > 180;
+  const isTempCritical = liveTemp > 0 && tempVariance > 1.8;
+  const isHumCritical = liveHum > 0 && humVariance < -12;
+  const isCo2Critical = liveCo2 > 0 && co2Variance > 180;
   const hasCriticalRisk = isTempCritical || isHumCritical || isCo2Critical;
 
   const chamberEval = useMemo(() => {
@@ -202,18 +173,40 @@ export default function ReportScreen() {
     );
   }, [liveTemp, liveHum, liveLight, liveCo2]);
 
-
-  // Dynamic 2h projections
+  // Dynamic projections backed by real Edge AI TinyML
   const futureValues = useMemo(() => {
-    const predTemp = Number((liveTemp + (isTempCritical ? 1.4 : 0.7)).toFixed(1));
-    const predHum = Math.max(45, Math.round(liveHum - (isHumCritical ? 14 : 7)));
-    const predLight = liveLight;
-    const predCo2 = Math.round(liveCo2 + (isCo2Critical ? 220 : 110));
+    // Temperature projection
+    let predTemp = liveTemp;
+    if (liveTemp > 0) {
+      const dTemp10m = aiPredTemp !== null ? (aiPredTemp - liveTemp) : (isTempCritical ? 0.8 : 0.3);
+      predTemp = Number((liveTemp + dTemp10m * 1.6).toFixed(1));
+    }
 
-    const tempVar = Number((predTemp - targetTemp).toFixed(1));
-    const humVar = Number((predHum - targetHum).toFixed(1));
-    const lightVar = Number((predLight - targetLight).toFixed(0));
-    const co2Var = Number((predCo2 - targetCo2).toFixed(0));
+    // Humidity projection
+    let predHum = liveHum;
+    if (liveHum > 0) {
+      const dHum10m = aiPredHum !== null ? (aiPredHum - liveHum) : (isHumCritical ? -6 : -2);
+      predHum = Math.round(Math.max(25, Math.min(100, liveHum + dHum10m * 1.6)));
+    }
+
+    // Light projection
+    let predLight = liveLight;
+    if (liveLight >= 0 && sensors.light !== -999) {
+      const dLight10m = aiPredLight !== null ? (aiPredLight - liveLight) : 0;
+      predLight = Math.round(Math.max(0, liveLight + dLight10m));
+    }
+
+    // CO2 projection
+    let predCo2 = liveCo2;
+    if (liveCo2 > 0) {
+      const dCo210m = aiPredCo2 !== null ? (aiPredCo2 - liveCo2) : (isCo2Critical ? 120 : 40);
+      predCo2 = Math.round(Math.max(350, liveCo2 + dCo210m * 1.6));
+    }
+
+    const tempVar = liveTemp > 0 ? Number((predTemp - targetTemp).toFixed(1)) : 0;
+    const humVar = liveHum > 0 ? Number((predHum - targetHum).toFixed(1)) : 0;
+    const lightVar = liveLight >= 0 && sensors.light !== -999 ? Number((predLight - targetLight).toFixed(0)) : 0;
+    const co2Var = liveCo2 > 0 ? Number((predCo2 - targetCo2).toFixed(0)) : 0;
 
     return {
       temp: {
@@ -223,9 +216,9 @@ export default function ReportScreen() {
         statusColor: tempVar > 2 ? '#ef4444' : tempVar > 0.8 ? '#f97316' : '#10b981',
         description:
           tempVar > 2
-            ? `Temperature is projected to rise ${tempVar}°C above target. Activate cooling fans immediately to prevent plant stress.`
+            ? `Temperature is projected to rise ${tempVar}°C above target. Pre-emptive cooling active.`
             : tempVar > 0.8
-            ? `A mild ${tempVar}°C overshoot is expected. Pre-emptive fan activation is recommended.`
+            ? `A mild ${tempVar}°C overshoot is expected. Regulating autonomously.`
             : `Temperature is on track. No intervention needed within the next 2 hours.`,
         icon: 'thermometer',
       },
@@ -236,10 +229,10 @@ export default function ReportScreen() {
         statusColor: humVar < -12 ? '#ef4444' : humVar < -5 ? '#0284c7' : '#10b981',
         description:
           humVar < -12
-            ? `Humidity will drop ${Math.abs(humVar)}% below target — severe dryness risk. Trigger misters now to protect foliage.`
+            ? `Humidity will drop ${Math.abs(humVar)}% below target. Pre-emptive misting active.`
             : humVar < -5
-            ? `A moderate ${Math.abs(humVar)}% humidity deficit is forecast. Short misting intervals are advised.`
-            : `Humidity levels are projected to remain stable. Current conditions are within the safe range.`,
+            ? `A moderate ${Math.abs(humVar)}% humidity deficit is forecast.`
+            : `Humidity levels are projected to remain stable within optimal band.`,
         icon: 'water-percent',
       },
       light: {
@@ -249,10 +242,10 @@ export default function ReportScreen() {
         statusColor: lightVar > 60 ? '#f97316' : lightVar < -60 ? '#6366f1' : '#10b981',
         description:
           lightVar > 60
-            ? `Light intensity is above the target by ${lightVar} lx. Consider partial shading to avoid leaf scorch.`
+            ? `Light intensity is above target by ${lightVar} lx.`
             : lightVar < -60
-            ? `Light levels are ${Math.abs(lightVar)} lx below target. Supplemental lighting may be needed for optimal growth.`
-            : `Light intensity is well-balanced. Plants are receiving the recommended photoperiod dose.`,
+            ? `Light levels are ${Math.abs(lightVar)} lx below target.`
+            : `Light intensity is well-balanced. Photoperiod is optimal.`,
         icon: 'white-balance-sunny',
       },
       co2: {
@@ -262,158 +255,67 @@ export default function ReportScreen() {
         statusColor: co2Var > 180 ? '#ef4444' : co2Var > 80 ? '#a855f7' : '#10b981',
         description:
           co2Var > 180
-            ? `CO2 is on a steep upward trajectory (+${co2Var} ppm). Open vents immediately to prevent toxicity.`
+            ? `CO₂ is on a steep upward trajectory (+${co2Var} ppm). Pre-emptive exhaust fans active.`
             : co2Var > 80
-            ? `CO2 concentration is rising (+${co2Var} ppm). Schedule a ventilation cycle within 30 minutes.`
-            : `CO2 levels are projected to stay within the safe range. No ventilation action required.`,
+            ? `CO₂ concentration is rising (+${co2Var} ppm). Purge scheduled.`
+            : `CO₂ levels are projected to stay within the safe range.`,
         icon: 'molecule-co2',
       },
     };
-  }, [liveTemp, liveHum, liveLight, liveCo2, targetTemp, targetHum, targetLight, targetCo2, isTempCritical, isHumCritical, isCo2Critical]);
+  }, [liveTemp, liveHum, liveLight, liveCo2, targetTemp, targetHum, targetLight, targetCo2, isTempCritical, isHumCritical, isCo2Critical, aiPredTemp, aiPredHum, aiPredLight, aiPredCo2, sensors.light]);
 
-  const getElapsed = (device: string) => {
-    const goalSecs = device === 'misters' ? 10 : 30;
-    if (!globalStartTimes[device]) {
-      return { current: '00:00', goal: `${goalSecs}s`, progress: 0, secondsRemaining: goalSecs };
+  const activeMetricData = useMemo(() => {
+    switch (activeMetric) {
+      case 'temp':
+        return {
+          name: 'Temperature',
+          unit: '°C',
+          live: liveTemp > 0 ? `${liveTemp.toFixed(1)}°C` : '--',
+          pred: liveTemp > 0 ? `${futureValues.temp.raw}°C` : '--',
+          ai10m: aiPredTemp !== null ? `${aiPredTemp.toFixed(1)}°C` : (liveTemp > 0 ? `${liveTemp.toFixed(1)}°C` : '--'),
+          target: `${targetTemp}°C`,
+          variance: liveTemp > 0 ? `${tempVariance >= 0 ? '+' : ''}${tempVariance}°C` : '--',
+          isCritical: isTempCritical,
+          hasSensor: liveTemp > 0,
+        };
+      case 'hum':
+        return {
+          name: 'Humidity',
+          unit: '%',
+          live: liveHum > 0 ? `${Math.round(liveHum)}%` : '--',
+          pred: liveHum > 0 ? `${futureValues.hum.raw}%` : '--',
+          ai10m: aiPredHum !== null ? `${Math.round(aiPredHum)}%` : (liveHum > 0 ? `${Math.round(liveHum)}%` : '--'),
+          target: `${targetHum}%`,
+          variance: liveHum > 0 ? `${humVariance >= 0 ? '+' : ''}${humVariance}%` : '--',
+          isCritical: isHumCritical,
+          hasSensor: liveHum > 0,
+        };
+      case 'light':
+        return {
+          name: 'Light Level',
+          unit: 'lx',
+          live: liveLight >= 0 && sensors.light !== -999 ? `${liveLight} lx` : '--',
+          pred: liveLight >= 0 && sensors.light !== -999 ? `${futureValues.light.raw} lx` : '--',
+          ai10m: aiPredLight !== null ? `${Math.round(aiPredLight)} lx` : (liveLight >= 0 && sensors.light !== -999 ? `${liveLight} lx` : '--'),
+          target: `${targetLight} lx`,
+          variance: liveLight >= 0 && sensors.light !== -999 ? `${(liveLight - targetLight) >= 0 ? '+' : ''}${Math.round(liveLight - targetLight)} lx` : '--',
+          isCritical: false,
+          hasSensor: liveLight >= 0 && sensors.light !== -999,
+        };
+      case 'co2':
+        return {
+          name: 'CO₂',
+          unit: 'ppm',
+          live: liveCo2 > 0 ? `${liveCo2} ppm` : '--',
+          pred: liveCo2 > 0 ? `${futureValues.co2.raw} ppm` : '--',
+          ai10m: aiPredCo2 !== null ? `${Math.round(aiPredCo2)} ppm` : (liveCo2 > 0 ? `${Math.round(liveCo2)} ppm` : '--'),
+          target: `${targetCo2} ppm`,
+          variance: liveCo2 > 0 ? `${co2Variance >= 0 ? '+' : ''}${co2Variance} ppm` : '--',
+          isCritical: isCo2Critical,
+          hasSensor: liveCo2 > 0,
+        };
     }
-    const diff = Math.floor((now - globalStartTimes[device]) / 1000);
-    const cappedDiff = Math.min(Math.max(0, diff), goalSecs);
-    const progress = Math.min(1, cappedDiff / goalSecs);
-    const secondsRemaining = Math.max(0, goalSecs - cappedDiff);
-    return { current: `${cappedDiff}s`, goal: `${goalSecs}s`, progress, secondsRemaining };
-  };
-
-  // Hardware overrides
-  const overrideDevice = async (deviceKey: string, actionName: string, durationMs: number) => {
-    if (isGlobalProcessing) {
-      showToast({ type: 'info', text1: 'Action in Progress', text2: 'Please wait for current cycle.' });
-      return;
-    }
-    hapticMedium();
-    setProcessingState(deviceKey);
-    try {
-      await update(ref(db, 'kabutech/settings/setpoints'), { mode: 'manual', aiOverride: true });
-      await update(ref(db, `kabutech/settings/setpoints/devices`), { [deviceKey]: true });
-
-      showToast({
-        type: 'success',
-        text1: `${actionName} Started`,
-        text2: `Running for ${Math.round(durationMs / 1000)}s`,
-      });
-
-      const timeoutId = setTimeout(() => {
-        try {
-          update(ref(db, `kabutech/settings/setpoints/devices`), { [deviceKey]: false });
-          update(ref(db, 'kabutech/settings/setpoints'), { mode: 'auto', aiOverride: false });
-
-          Vibration.vibrate([0, 300, 150, 300], true);
-          SoundManager.playAlarm();
-
-          DeviceEventEmitter.emit('showAlarmModal', {
-            title: 'AI Action Finished',
-            message: `${actionName} complete. System returned to AUTO.`,
-          });
-          showToast({ type: 'success', text1: 'Cycle Finished', text2: `${actionName} returned to AUTO.` });
-        } catch (e: any) {
-          showToast({ type: 'error', text1: 'Revert Error', text2: e?.message || 'Error' });
-        } finally {
-          setProcessingState(false);
-        }
-      }, durationMs);
-      globalTimeouts.push(timeoutId);
-    } catch (err: any) {
-      showToast({ type: 'error', text1: 'Override Failed', text2: err.message });
-      setProcessingState(false);
-    }
-  };
-
-  const handleAutoFix = async () => {
-    if (!selectedActions.fans && !selectedActions.misters && !selectedActions.co2) {
-      showToast({ type: 'info', text1: 'No actions selected' });
-      return;
-    }
-    if (isGlobalProcessing) {
-      showToast({ type: 'info', text1: 'Action in Progress' });
-      return;
-    }
-    hapticHeavy();
-    setProcessingState('all');
-    try {
-      await update(ref(db, 'kabutech/settings/setpoints'), { mode: 'manual', aiOverride: true });
-
-      const updates: any = {};
-      if (selectedActions.fans) updates.fans = true;
-      if (selectedActions.misters) updates.misters = true;
-      if (selectedActions.co2) updates.co2 = true;
-
-      await update(ref(db, `kabutech/settings/setpoints/devices`), updates);
-
-      showToast({ type: 'success', text1: 'Auto-Fix Active', text2: 'Balancing microclimate...' });
-
-      const maxDuration = selectedActions.fans || selectedActions.co2 ? 30000 : 10000;
-
-      if (selectedActions.misters) {
-        const mistTimeoutId = setTimeout(() => {
-          try {
-            update(ref(db, `kabutech/settings/setpoints/devices`), { misters: false });
-            if (maxDuration > 10000) {
-              SoundManager.playRing();
-            }
-          } catch (e) {}
-        }, 10000);
-        globalTimeouts.push(mistTimeoutId);
-      }
-
-      const finalTimeoutId = setTimeout(() => {
-        try {
-          const revertUpdates: any = {};
-          if (selectedActions.fans) revertUpdates.fans = false;
-          if (selectedActions.co2) revertUpdates.co2 = false;
-          if (selectedActions.misters && maxDuration === 10000) revertUpdates.misters = false;
-
-          update(ref(db, `kabutech/settings/setpoints/devices`), revertUpdates);
-          update(ref(db, 'kabutech/settings/setpoints'), { mode: 'auto', aiOverride: false });
-
-          Vibration.vibrate([0, 400, 200, 400], true);
-          SoundManager.playAlarm();
-
-          DeviceEventEmitter.emit('showAlarmModal', {
-            title: 'Auto-Fix Completed!',
-            message: 'Conditions restored. Returned to AUTO mode.',
-          });
-          showToast({ type: 'success', text1: 'Chamber Balanced' });
-        } catch (e: any) {
-          showToast({ type: 'error', text1: 'Revert Error', text2: e?.message || 'Error' });
-        } finally {
-          setProcessingState(false);
-        }
-      }, maxDuration);
-      globalTimeouts.push(finalTimeoutId);
-    } catch (err: any) {
-      showToast({ type: 'error', text1: 'Auto-Fix Failed', text2: err.message });
-      setProcessingState(false);
-    }
-  };
-
-  const cancelOverride = () => {
-    hapticMedium();
-    globalTimeouts.forEach(clearTimeout);
-    globalTimeouts.length = 0;
-    setProcessingState(false);
-
-    try {
-      update(ref(db, `kabutech/settings/setpoints/devices`), {
-        fans: false,
-        misters: false,
-        co2: false,
-        lights: false,
-      });
-      update(ref(db, 'kabutech/settings/setpoints'), { mode: 'auto', aiOverride: false });
-      showToast({ type: 'info', text1: 'Aborted', text2: 'Returned to AUTO.' });
-    } catch (e: any) {
-      showToast({ type: 'error', text1: 'Cancel Failed' });
-    }
-  };
+  }, [activeMetric, liveTemp, liveHum, liveLight, liveCo2, targetTemp, targetHum, targetLight, targetCo2, tempVariance, humVariance, co2Variance, futureValues, aiPredTemp, aiPredHum, aiPredLight, aiPredCo2, isTempCritical, isHumCritical, isCo2Critical, sensors.light]);
 
   const handleResync = () => {
     if (isScanning) return;
@@ -461,6 +363,21 @@ export default function ReportScreen() {
         ? 'lx'
         : 'ppm';
 
+    const hasSensor =
+      activeMetric === 'temp' ? liveTemp > 0 :
+      activeMetric === 'hum' ? liveHum > 0 :
+      activeMetric === 'light' ? (liveLight >= 0 && sensors.light !== -999) :
+      liveCo2 > 0;
+
+    const aiPredVal =
+      activeMetric === 'temp' ? aiPredTemp :
+      activeMetric === 'hum' ? aiPredHum :
+      activeMetric === 'light' ? aiPredLight :
+      aiPredCo2;
+
+    const delta10m = (aiPredVal !== null && hasSensor) ? (aiPredVal - baseVal) : null;
+    const effectiveBase = hasSensor ? baseVal : targetVal;
+
     const points = Array.from({ length: pointCount }).map((_, i) => {
       const minutesOffset = i * intervalMinutes;
       const targetDate = new Date(Date.now() + minutesOffset * 60000);
@@ -472,25 +389,40 @@ export default function ReportScreen() {
       const fullTimeLabel = `${hours12}:${mins} ${ampm}`;
       const relLabel = i === 0 ? 'Now' : `+${minutesOffset >= 60 ? `${(minutesOffset / 60).toFixed(0)}h` : `${minutesOffset}m`}`;
 
-      let rawVal = baseVal;
+      let rawVal = effectiveBase;
 
-      if (activeMetric === 'temp') {
-        const diff = baseVal - targetVal;
-        const trend = diff >= 0 ? 1 : -0.4;
-        const drift = (i / (pointCount - 1)) * (activeHorizon === '2H' ? 1.2 : activeHorizon === '6H' ? 2.2 : 3.4);
-        const osc = Math.sin((i / (pointCount - 1)) * Math.PI) * 0.3;
-        rawVal = Number((baseVal + trend * drift + osc).toFixed(1));
-      } else if (activeMetric === 'hum') {
-        const drift = (i / (pointCount - 1)) * (activeHorizon === '2H' ? 8 : activeHorizon === '6H' ? 15 : 22);
-        const osc = Math.sin((i / (pointCount - 1)) * Math.PI) * 1.5;
-        rawVal = Math.round(Math.max(35, baseVal - drift + osc));
-      } else if (activeMetric === 'light') {
-        const drift = Math.sin((i / (pointCount - 1)) * Math.PI) * 25;
-        rawVal = Math.max(0, Math.round(baseVal + drift));
-      } else {
-        const drift = (i / (pointCount - 1)) * (activeHorizon === '2H' ? 140 : activeHorizon === '6H' ? 260 : 420);
-        const osc = Math.sin((i / (pointCount - 1)) * Math.PI) * 20;
-        rawVal = Math.round(baseVal + drift + osc);
+      if (hasSensor) {
+        const progressFactor = i / (pointCount - 1);
+        if (delta10m !== null) {
+          // Real TinyML-guided trajectory:
+          // Rate of change directly anchored to on-device TinyML inference
+          const initialProjected = delta10m * (minutesOffset / 10);
+          const regulationDampen = Math.exp(-progressFactor * 1.5);
+          const targetPull = (targetVal - effectiveBase) * (1 - regulationDampen) * 0.45;
+          const osc = Math.sin(progressFactor * Math.PI) * (activeMetric === 'co2' ? 12 : activeMetric === 'hum' ? 0.8 : 0.15);
+
+          if (activeMetric === 'temp') {
+            rawVal = Number((effectiveBase + initialProjected * regulationDampen + targetPull + osc).toFixed(1));
+          } else if (activeMetric === 'hum') {
+            rawVal = Math.round(Math.max(20, Math.min(100, effectiveBase + initialProjected * regulationDampen + targetPull + osc)));
+          } else if (activeMetric === 'light') {
+            rawVal = Math.round(Math.max(0, effectiveBase + initialProjected * regulationDampen));
+          } else {
+            rawVal = Math.round(Math.max(350, effectiveBase + initialProjected * regulationDampen + targetPull + osc));
+          }
+        } else {
+          // Sensor connected, seeding buffer:
+          const diff = effectiveBase - targetVal;
+          if (activeMetric === 'temp') {
+            rawVal = Number((effectiveBase - diff * progressFactor * 0.25).toFixed(1));
+          } else if (activeMetric === 'hum') {
+            rawVal = Math.round(effectiveBase - diff * progressFactor * 0.25);
+          } else if (activeMetric === 'light') {
+            rawVal = Math.round(effectiveBase);
+          } else {
+            rawVal = Math.round(effectiveBase - diff * progressFactor * 0.25);
+          }
+        }
       }
 
       return {
@@ -499,12 +431,12 @@ export default function ReportScreen() {
         fullTimeLabel,
         relLabel,
         rawVal,
-        val: rawVal,
+        val: hasSensor ? rawVal : '--',
       };
     });
 
-    return { points, unit, targetVal };
-  }, [activeHorizon, activeMetric, liveTemp, liveHum, liveLight, liveCo2, targetTemp, targetHum, targetLight, targetCo2]);
+    return { points, unit, targetVal, hasSensor };
+  }, [activeHorizon, activeMetric, liveTemp, liveHum, liveLight, liveCo2, targetTemp, targetHum, targetLight, targetCo2, aiPredTemp, aiPredHum, aiPredLight, aiPredCo2, sensors.light]);
 
   const yAxisWidth = 46;
   const chartHeight = 220;
@@ -686,13 +618,13 @@ export default function ReportScreen() {
         {/* Top Main Card (Rock-solid View container with gradient overlay) */}
         <View
           style={[
-            tw`w-full rounded-[28px] p-5 mb-4 shadow-sm overflow-hidden relative items-center`,
-            { backgroundColor: hasCriticalRisk ? '#dc2626' : '#2563eb' },
+            tw`w-full rounded-[28px] p-5 mb-4 shadow-sm overflow-hidden relative`,
+            { backgroundColor: (activeMetricData.isCritical || hasCriticalRisk) ? '#dc2626' : '#2563eb' },
           ]}
         >
           <LinearGradient
             colors={
-              hasCriticalRisk
+              (activeMetricData.isCritical || hasCriticalRisk)
                 ? ['#dc2626', '#ea580c']
                 : ['#0284c7', '#2563eb']
             }
@@ -706,42 +638,112 @@ export default function ReportScreen() {
           <View style={tw`absolute -top-10 -left-10 w-28 h-28 rounded-full bg-white/10`} />
           <View style={tw`absolute -bottom-12 -right-10 w-36 h-36 rounded-full bg-black/10`} />
 
-          {/* Title */}
-          <Text style={[tw`text-blue-100 text-xs mb-1 tracking-wider uppercase`, { fontFamily: 'PlusJakartaSans_700Bold' }]}>
-            {hasCriticalRisk ? 'Critical Forecast' : 'Microclimate Forecast'}
-          </Text>
-
-          {/* Large Peak Display */}
-          <Text style={[tw`text-white text-3xl mb-4`, { fontFamily: 'PlusJakartaSans_800ExtraBold' }]}>
-            {futureValues?.temp?.raw ?? 26.5}°C Peak
-          </Text>
-
-          {/* 3-Column Stats Grid */}
-          <View style={tw`flex-row justify-between w-full mb-4 px-2`}>
-            <View style={tw`items-center flex-1`}>
-              <Text style={[tw`text-blue-200 text-[11px] mb-0.5`, { fontFamily: 'PlusJakartaSans_500Medium' }]}>Target</Text>
-              <Text style={[tw`text-white text-lg`, { fontFamily: 'PlusJakartaSans_800ExtraBold' }]}>{targetTemp}°C</Text>
-            </View>
-            <View style={tw`w-[1px] h-full bg-blue-400/50`} />
-            <View style={tw`items-center flex-1`}>
-              <Text style={[tw`text-blue-200 text-[11px] mb-0.5`, { fontFamily: 'PlusJakartaSans_500Medium' }]}>Variance</Text>
-              <Text style={[tw`text-white text-lg`, { fontFamily: 'PlusJakartaSans_800ExtraBold' }]}>
-                {tempVariance >= 0 ? `+${tempVariance}` : `${tempVariance}`}°C
+          {/* Header Row: Title & Active Model Pill */}
+          <View style={tw`flex-row items-center justify-between w-full mb-1.5`}>
+            <View style={tw`flex-1 mr-2`}>
+              <Text
+                numberOfLines={1}
+                ellipsizeMode="tail"
+                style={[tw`text-blue-100 text-[11px] tracking-wider uppercase`, { fontFamily: 'PlusJakartaSans_700Bold' }]}
+              >
+                {activeMetricData.isCritical ? `⚠️ Critical ${activeMetricData.name} Forecast` : hasCriticalRisk ? '⚠️ Critical Anomaly' : `${activeMetricData.name} Forecast`}
               </Text>
             </View>
-            <View style={tw`w-[1px] h-full bg-blue-400/50`} />
-            <View style={tw`items-center flex-1`}>
-              <Text style={[tw`text-blue-200 text-[11px] mb-0.5`, { fontFamily: 'PlusJakartaSans_500Medium' }]}>ETA</Text>
-              <Text style={[tw`text-white text-lg`, { fontFamily: 'PlusJakartaSans_800ExtraBold' }]}>in ~2 hrs</Text>
+            <View style={tw`bg-emerald-500/90 px-2.5 py-0.5 rounded-full flex-row items-center gap-1 shrink-0`}>
+              <View style={tw`w-1.5 h-1.5 rounded-full bg-white`} />
+              <Text style={[tw`text-white text-[9.5px] tracking-wider`, { fontFamily: 'PlusJakartaSans_800ExtraBold' }]}>
+                {aiReady ? 'TINYML ON-DEVICE' : (activeMetricData.hasSensor ? 'MODEL ACTIVE' : 'AWAITING SENSORS')}
+              </Text>
             </View>
           </View>
 
-          {/* Model Active Pill */}
-          <View style={tw`bg-[#10b981] px-4 py-1.5 rounded-full shadow-sm flex-row items-center gap-1.5`}>
-            <View style={tw`w-1.5 h-1.5 rounded-full bg-white`} />
-            <Text style={[tw`text-white text-xs tracking-wider`, { fontFamily: 'PlusJakartaSans_800ExtraBold' }]}>
-              Model Active
-            </Text>
+          {/* Hero Forecast Projection Display */}
+          <Text
+            numberOfLines={1}
+            adjustsFontSizeToFit
+            style={[tw`text-white text-[26px] mb-3 text-center`, { fontFamily: 'PlusJakartaSans_800ExtraBold' }]}
+          >
+            {activeMetricData.hasSensor ? `${activeMetricData.pred} Projected` : 'Awaiting Live Sensors'}
+          </Text>
+
+          {/* 3-Column Stats Grid: Target, Variance, +10m TinyML Forecast */}
+          <View style={tw`flex-row justify-between w-full mb-3 px-2 py-2 rounded-2xl bg-black/15`}>
+            <View style={tw`items-center flex-1`}>
+              <Text style={[tw`text-blue-200 text-[10px] mb-0.5`, { fontFamily: 'PlusJakartaSans_600SemiBold' }]}>Target</Text>
+              <Text style={[tw`text-white text-base`, { fontFamily: 'PlusJakartaSans_800ExtraBold' }]}>{activeMetricData.target}</Text>
+            </View>
+            <View style={tw`w-[1px] h-full bg-white/20`} />
+            <View style={tw`items-center flex-1`}>
+              <Text style={[tw`text-blue-200 text-[10px] mb-0.5`, { fontFamily: 'PlusJakartaSans_600SemiBold' }]}>Variance</Text>
+              <Text style={[tw`text-white text-base`, { fontFamily: 'PlusJakartaSans_800ExtraBold' }]}>
+                {activeMetricData.variance}
+              </Text>
+            </View>
+            <View style={tw`w-[1px] h-full bg-white/20`} />
+            <View style={tw`items-center flex-1`}>
+              <Text style={[tw`text-blue-200 text-[10px] mb-0.5`, { fontFamily: 'PlusJakartaSans_600SemiBold' }]}>TinyML 10m</Text>
+              <Text style={[tw`text-emerald-300 text-base`, { fontFamily: 'PlusJakartaSans_800ExtraBold' }]}>
+                {activeMetricData.ai10m}
+              </Text>
+            </View>
+          </View>
+
+          {/* 4 Environmental Variables Telemetry Grid (Temp, Hum, Light, CO2) */}
+          <View style={tw`flex-row justify-between w-full pt-2.5 border-t border-white/20`}>
+            {/* Temp */}
+            <TouchableOpacity onPress={() => setActiveMetric('temp')} style={[tw`items-center flex-1 py-1 rounded-xl`, activeMetric === 'temp' && tw`bg-white/20`]}>
+              <View style={tw`flex-row items-center gap-1`}>
+                <Text style={[tw`text-[9px] text-blue-100 uppercase tracking-wider`, { fontFamily: 'PlusJakartaSans_700Bold' }]}>TEMP</Text>
+                {isTempCritical && <View style={tw`w-1.5 h-1.5 rounded-full bg-rose-400`} />}
+              </View>
+              <Text style={[tw`text-white text-[13px]`, { fontFamily: 'PlusJakartaSans_800ExtraBold' }]}>
+                {liveTemp > 0 ? `${liveTemp.toFixed(1)}°` : '--'}
+              </Text>
+              <Text style={[tw`text-[8.5px] text-emerald-300`, { fontFamily: 'PlusJakartaSans_600SemiBold' }]}>
+                {aiPredTemp !== null ? `10m: ${aiPredTemp.toFixed(1)}°` : (liveTemp > 0 ? 'TinyML' : '--')}
+              </Text>
+            </TouchableOpacity>
+
+            {/* Hum */}
+            <TouchableOpacity onPress={() => setActiveMetric('hum')} style={[tw`items-center flex-1 py-1 rounded-xl border-l border-white/20`, activeMetric === 'hum' && tw`bg-white/20`]}>
+              <View style={tw`flex-row items-center gap-1`}>
+                <Text style={[tw`text-[9px] text-blue-100 uppercase tracking-wider`, { fontFamily: 'PlusJakartaSans_700Bold' }]}>HUM</Text>
+                {isHumCritical && <View style={tw`w-1.5 h-1.5 rounded-full bg-rose-400`} />}
+              </View>
+              <Text style={[tw`text-white text-[13px]`, { fontFamily: 'PlusJakartaSans_800ExtraBold' }]}>
+                {liveHum > 0 ? `${Math.round(liveHum)}%` : '--'}
+              </Text>
+              <Text style={[tw`text-[8.5px] text-emerald-300`, { fontFamily: 'PlusJakartaSans_600SemiBold' }]}>
+                {aiPredHum !== null ? `10m: ${Math.round(aiPredHum)}%` : (liveHum > 0 ? 'TinyML' : '--')}
+              </Text>
+            </TouchableOpacity>
+
+            {/* Light */}
+            <TouchableOpacity onPress={() => setActiveMetric('light')} style={[tw`items-center flex-1 py-1 rounded-xl border-l border-white/20`, activeMetric === 'light' && tw`bg-white/20`]}>
+              <View style={tw`flex-row items-center gap-1`}>
+                <Text style={[tw`text-[9px] text-blue-100 uppercase tracking-wider`, { fontFamily: 'PlusJakartaSans_700Bold' }]}>LIGHT</Text>
+              </View>
+              <Text style={[tw`text-white text-[13px]`, { fontFamily: 'PlusJakartaSans_800ExtraBold' }]}>
+                {liveLight >= 0 && sensors.light !== -999 ? `${liveLight}lx` : '--'}
+              </Text>
+              <Text style={[tw`text-[8.5px] text-emerald-300`, { fontFamily: 'PlusJakartaSans_600SemiBold' }]}>
+                {aiPredLight !== null ? `10m: ${Math.round(aiPredLight)}` : (liveLight >= 0 && sensors.light !== -999 ? 'TinyML' : '--')}
+              </Text>
+            </TouchableOpacity>
+
+            {/* CO2 */}
+            <TouchableOpacity onPress={() => setActiveMetric('co2')} style={[tw`items-center flex-1 py-1 rounded-xl border-l border-white/20`, activeMetric === 'co2' && tw`bg-white/20`]}>
+              <View style={tw`flex-row items-center gap-1`}>
+                <Text style={[tw`text-[9px] text-blue-100 uppercase tracking-wider`, { fontFamily: 'PlusJakartaSans_700Bold' }]}>CO₂</Text>
+                {isCo2Critical && <View style={tw`w-1.5 h-1.5 rounded-full bg-rose-400`} />}
+              </View>
+              <Text style={[tw`text-white text-[13px]`, { fontFamily: 'PlusJakartaSans_800ExtraBold' }]}>
+                {liveCo2 > 0 ? `${liveCo2}` : '--'}
+              </Text>
+              <Text style={[tw`text-[8.5px] text-emerald-300`, { fontFamily: 'PlusJakartaSans_600SemiBold' }]}>
+                {aiPredCo2 !== null ? `10m: ${Math.round(aiPredCo2)}` : (liveCo2 > 0 ? 'TinyML' : '--')}
+              </Text>
+            </TouchableOpacity>
           </View>
         </View>
 
@@ -751,15 +753,12 @@ export default function ReportScreen() {
             <View style={tw`flex-row items-center gap-1.5 mb-1.5`}>
               <MaterialCommunityIcons name="brain" size={16} color="#3b82f6" />
               <Text style={[tw`text-xs text-slate-500 dark:text-slate-400`, { fontFamily: 'PlusJakartaSans_700Bold' }]}>
-                Confidence:
+                Edge AI Model:
               </Text>
             </View>
-            <View style={tw`flex-row items-baseline gap-0.5`}>
-              <Text style={[tw`text-2xl text-slate-900 dark:text-white`, { fontFamily: 'PlusJakartaSans_800ExtraBold' }]}>
-                96
-              </Text>
-              <Text style={[tw`text-xs text-slate-500 dark:text-slate-400`, { fontFamily: 'PlusJakartaSans_700Bold' }]}>
-                %
+            <View style={tw`flex-row items-baseline gap-1`}>
+              <Text style={[tw`text-xl text-slate-900 dark:text-white`, { fontFamily: 'PlusJakartaSans_800ExtraBold' }]}>
+                {aiReady ? 'TFLite INT8' : (liveTemp > 0 ? 'Active' : 'Standby')}
               </Text>
             </View>
           </View>
@@ -768,12 +767,12 @@ export default function ReportScreen() {
             <View style={tw`flex-row items-center gap-1.5 mb-1.5`}>
               <MaterialCommunityIcons name="update" size={16} color="#3b82f6" />
               <Text style={[tw`text-xs text-slate-500 dark:text-slate-400`, { fontFamily: 'PlusJakartaSans_700Bold' }]}>
-                Next Scan:
+                Lookahead:
               </Text>
             </View>
             <View style={tw`flex-row items-baseline gap-0.5`}>
               <Text style={[tw`text-2xl text-slate-900 dark:text-white`, { fontFamily: 'PlusJakartaSans_800ExtraBold' }]}>
-                10
+                +10
               </Text>
               <Text style={[tw`text-xs text-slate-500 dark:text-slate-400`, { fontFamily: 'PlusJakartaSans_700Bold' }]}>
                 min
@@ -977,7 +976,7 @@ export default function ReportScreen() {
                   {/* Dot indicators and scrub guidelines */}
                   {chartData.points.map((p, idx) => {
                     const cx = getX(idx);
-                    const cy = getY(p.val);
+                    const cy = getY(p.rawVal);
                     const isSelected = scrubIndex === idx;
 
                     return (
@@ -1051,84 +1050,6 @@ export default function ReportScreen() {
           </View>
         </View>
 
-        {/* HARDWARE ACTUATORS - Clean Minimal List */}
-        <View style={tw`mb-4`}>
-          <Text style={[tw`text-[15px] text-slate-900 dark:text-white mb-2.5 pl-1`, { fontFamily: 'PlusJakartaSans_800ExtraBold' }]}>
-            Hardware Actuators
-          </Text>
-
-          <View style={tw`flex-row flex-wrap justify-between gap-y-2.5`}>
-            {[
-              { key: 'fans', name: 'Fans', icon: 'fan', color: '#3b82f6', duration: 30000 },
-              { key: 'misters', name: 'Misters', icon: 'water', color: '#10b981', duration: 10000 },
-              { key: 'lights', name: 'Lights', icon: 'lightbulb-on', color: '#f59e0b', duration: 30000 },
-              { key: 'co2', name: 'Vent', icon: 'weather-windy', color: '#8b5cf6', duration: 30000 },
-            ].map((device) => {
-              const active =
-                settings?.setpoints?.aiOverride &&
-                settings?.setpoints?.devices?.[device.key as keyof typeof settings.setpoints.devices];
-              const timing = getElapsed(device.key);
-
-              return (
-                <View
-                  key={device.key}
-                  style={[
-                    tw`w-[48.5%] bg-white dark:bg-slate-800 rounded-2xl p-3 shadow-sm border`,
-                    active ? tw`border-blue-400 dark:border-blue-500` : tw`border-slate-200/60 dark:border-slate-700/50`,
-                  ]}
-                >
-                  <View style={tw`flex-row items-center justify-between mb-2`}>
-                    <View style={tw`flex-row items-center gap-2`}>
-                      <View style={[tw`w-8 h-8 rounded-xl items-center justify-center`, { backgroundColor: `${device.color}15` }]}>
-                        <MaterialCommunityIcons name={device.icon as any} size={16} color={device.color} />
-                      </View>
-                      <Text style={[tw`text-[13px] text-slate-900 dark:text-white`, { fontFamily: 'PlusJakartaSans_700Bold' }]}>
-                        {device.name}
-                      </Text>
-                    </View>
-
-                    <TouchableOpacity
-                      activeOpacity={0.7}
-                      disabled={!!isProcessing}
-                      onPress={() => overrideDevice(device.key, device.name, device.duration)}
-                      style={[
-                        tw`px-2.5 py-1 rounded-lg`,
-                        active ? tw`bg-blue-500` : tw`bg-slate-100 dark:bg-slate-700`,
-                        !!isProcessing && !active && tw`opacity-40`,
-                      ]}
-                    >
-                      <Text
-                        style={[
-                          tw`text-[10px]`,
-                          {
-                            fontFamily: 'PlusJakartaSans_700Bold',
-                            color: active ? 'white' : isDarkMode ? '#cbd5e1' : '#475569',
-                          },
-                        ]}
-                      >
-                        {active ? `${timing.secondsRemaining}s` : 'Run'}
-                      </Text>
-                    </TouchableOpacity>
-                  </View>
-
-                  {/* Progress Line */}
-                  <View style={tw`h-1 w-full bg-slate-100 dark:bg-slate-700 rounded-full overflow-hidden`}>
-                    <View
-                      style={[
-                        tw`h-full rounded-full`,
-                        {
-                          width: `${Math.round(timing.progress * 100)}%`,
-                          backgroundColor: active ? device.color : 'transparent',
-                        },
-                      ]}
-                    />
-                  </View>
-                </View>
-              );
-            })}
-          </View>
-        </View>
-
       </ScrollView>
 
       {/* FLOATING ACTION BAR */}
@@ -1138,62 +1059,86 @@ export default function ReportScreen() {
           { paddingBottom: insets.bottom > 0 ? insets.bottom : 8 },
         ]}
       >
-        {isProcessing ? (
-          <View style={tw`flex-row items-center gap-2 p-1`}>
-            <View style={tw`flex-1 flex-row items-center gap-2 pl-2`}>
-              <ActivityIndicator size="small" color="#ef4444" />
-              <Text style={[tw`text-[12px] text-slate-900 dark:text-white`, { fontFamily: 'PlusJakartaSans_800ExtraBold' }]}>
-                AI Cycle Operating...
+        <View style={tw`flex-row items-center gap-2 p-1`}>
+          {/* Live Edge AI Shield Status Indicator */}
+          <View
+            style={[
+              tw`flex-1 flex-row items-center gap-2.5 px-3 py-2 rounded-2xl border`,
+              isPreempting
+                ? tw`bg-amber-500/10 dark:bg-amber-500/20 border-amber-300 dark:border-amber-700`
+                : isAiReady
+                ? tw`bg-emerald-50 dark:bg-emerald-950/40 border-emerald-200 dark:border-emerald-800`
+                : tw`bg-slate-50 dark:bg-slate-800/60 border-slate-200 dark:border-slate-700`,
+            ]}
+          >
+            <View
+              style={[
+                tw`w-8 h-8 rounded-xl items-center justify-center`,
+                isPreempting
+                  ? tw`bg-amber-500/20`
+                  : isAiReady
+                  ? tw`bg-emerald-500/20`
+                  : tw`bg-sky-500/20`,
+              ]}
+            >
+              <MaterialCommunityIcons
+                name={isPreempting ? 'lightning-bolt' : isAiReady ? 'shield-check' : 'shield-sync'}
+                size={18}
+                color={isPreempting ? '#f59e0b' : isAiReady ? '#10b981' : '#0284c7'}
+              />
+            </View>
+            <View style={tw`flex-1`}>
+              <Text
+                style={[
+                  tw`text-[12px]`,
+                  { fontFamily: 'PlusJakartaSans_800ExtraBold' },
+                  isPreempting
+                    ? tw`text-amber-800 dark:text-amber-200`
+                    : isAiReady
+                    ? tw`text-emerald-800 dark:text-emerald-200`
+                    : tw`text-slate-800 dark:text-slate-200`,
+                ]}
+                numberOfLines={1}
+              >
+                {isPreempting ? '⚡ Edge AI Active' : isAiReady ? 'Edge AI Shield Active' : 'Edge AI Ready'}
+              </Text>
+              <Text
+                style={[
+                  tw`text-[10px]`,
+                  { fontFamily: 'PlusJakartaSans_600SemiBold' },
+                  isPreempting
+                    ? tw`text-amber-600 dark:text-amber-300`
+                    : isAiReady
+                    ? tw`text-emerald-600 dark:text-emerald-400`
+                    : tw`text-slate-500 dark:text-slate-400`,
+                ]}
+                numberOfLines={1}
+              >
+                {isPreempting ? preemptLabel : isAiReady ? 'Autonomous offline protection' : 'Sampling 10m buffer'}
               </Text>
             </View>
+          </View>
 
-            <TouchableOpacity
-              activeOpacity={0.8}
-              onPress={cancelOverride}
-              style={tw`bg-rose-500 py-2.5 px-4 rounded-xl flex-row items-center gap-1`}
-            >
-              <Text style={[tw`text-white text-[12px]`, { fontFamily: 'PlusJakartaSans_800ExtraBold' }]}>
-                Stop
+          {/* AI Rules & Logic Button */}
+          <TouchableOpacity
+            activeOpacity={0.8}
+            onPress={() => {
+              hapticLight();
+              setShowSuggestionsModal(true);
+            }}
+            style={tw`py-3 px-3.5 rounded-2xl bg-slate-100 dark:bg-slate-800 items-center justify-center border border-slate-200/50 dark:border-slate-700/50`}
+          >
+            <View style={tw`flex-row items-center gap-1.5`}>
+              <MaterialCommunityIcons name="clipboard-text-outline" size={15} color={isDarkMode ? '#94a3b8' : '#475569'} />
+              <Text style={[tw`text-[13px] text-slate-700 dark:text-slate-200`, { fontFamily: 'PlusJakartaSans_700Bold' }]}>
+                Rules
               </Text>
-            </TouchableOpacity>
-          </View>
-        ) : (
-          <View style={tw`flex-row items-center gap-2 p-1`}>
-            {/* Review Actions - secondary */}
-            <TouchableOpacity
-              activeOpacity={0.8}
-              onPress={() => {
-                hapticLight();
-                setShowSuggestionsModal(true);
-              }}
-              style={tw`flex-1 py-3 rounded-2xl bg-slate-100 dark:bg-slate-800 items-center justify-center border border-slate-200/50 dark:border-slate-700/50`}
-            >
-              <View style={tw`flex-row items-center gap-1.5`}>
-                <MaterialCommunityIcons name="clipboard-list" size={15} color={isDarkMode ? '#94a3b8' : '#475569'} />
-                <Text style={[tw`text-[13px] text-slate-700 dark:text-slate-200`, { fontFamily: 'PlusJakartaSans_700Bold' }]}>
-                  Actions
-                </Text>
-              </View>
-            </TouchableOpacity>
-
-            {/* Auto-Fix - primary, same width */}
-            <TouchableOpacity
-              activeOpacity={0.85}
-              onPress={handleAutoFix}
-              style={tw`flex-1 py-3 rounded-2xl bg-emerald-600 dark:bg-emerald-500 items-center justify-center shadow-md`}
-            >
-              <View style={tw`flex-row items-center gap-1.5`}>
-                <MaterialCommunityIcons name="lightning-bolt" size={15} color="white" />
-                <Text style={[tw`text-white text-[13px]`, { fontFamily: 'PlusJakartaSans_800ExtraBold' }]}>
-                  Auto-Fix
-                </Text>
-              </View>
-            </TouchableOpacity>
-          </View>
-        )}
+            </View>
+          </TouchableOpacity>
+        </View>
       </View>
 
-      {/* AI RECOMMENDATIONS MODAL */}
+      {/* AI AUTONOMOUS RULES & LOGIC MODAL */}
       <Modal visible={showSuggestionsModal} transparent animationType="fade" onRequestClose={slideOutAndClose}>
         <TouchableOpacity
           activeOpacity={1}
@@ -1205,51 +1150,44 @@ export default function ReportScreen() {
             onStartShouldSetResponder={() => true}
             style={[
               tw`bg-white dark:bg-slate-900 rounded-t-[32px] p-5 pt-4 shadow-2xl border-t border-slate-100 dark:border-slate-800`,
-              { transform: [{ translateY }], paddingBottom: insets.bottom + 16, minHeight: 520 },
+              { transform: [{ translateY }], paddingBottom: Math.max(insets.bottom, 24) + 36, minHeight: 520 },
             ]}
           >
             {/* Grab handle */}
             <View style={tw`w-10 h-1 bg-slate-300 dark:bg-slate-700 rounded-full self-center mb-4`} />
 
             {/* Modal Header */}
-            <View style={tw`flex-row items-center justify-between mb-4`}>
-              <Text style={[tw`text-[17px] text-slate-900 dark:text-white`, { fontFamily: 'PlusJakartaSans_800ExtraBold' }]}>
-                AI Recommendations
-              </Text>
-
-              <TouchableOpacity
-                onPress={() => {
-                  hapticLight();
-                  const allSelected = selectedActions.fans && selectedActions.misters && selectedActions.co2;
-                  setSelectedActions({
-                    fans: !allSelected,
-                    misters: !allSelected,
-                    co2: !allSelected,
-                  });
-                }}
-              >
-                <Text style={[tw`text-xs text-emerald-600 dark:text-emerald-400`, { fontFamily: 'PlusJakartaSans_700Bold' }]}>
-                  {selectedActions.fans && selectedActions.misters && selectedActions.co2 ? 'Deselect All' : 'Select All'}
+            <View style={tw`flex-row items-center justify-between mb-3`}>
+              <View>
+                <Text style={[tw`text-[17px] text-slate-900 dark:text-white`, { fontFamily: 'PlusJakartaSans_800ExtraBold' }]}>
+                  Edge AI Autonomous Logic
                 </Text>
-              </TouchableOpacity>
+                <Text style={[tw`text-[11px] text-slate-400 dark:text-slate-500`, { fontFamily: 'PlusJakartaSans_500Medium' }]}>
+                  Closed-loop 10-minute predictive triggers
+                </Text>
+              </View>
+
+              <View style={tw`bg-emerald-100 dark:bg-emerald-950/80 px-2.5 py-1 rounded-full flex-row items-center gap-1`}>
+                <MaterialCommunityIcons name="cpu-64-bit" size={12} color="#10b981" />
+                <Text style={[tw`text-[9px] text-emerald-700 dark:text-emerald-300`, { fontFamily: 'PlusJakartaSans_700Bold' }]}>
+                  ESP32 LOCAL
+                </Text>
+              </View>
+            </View>
+
+            {/* Edge AI Info Banner */}
+            <View style={tw`p-3 rounded-2xl bg-emerald-500/10 dark:bg-emerald-500/15 border border-emerald-500/20 mb-3.5 flex-row items-start gap-2.5`}>
+              <MaterialCommunityIcons name="shield-check" size={18} color="#10b981" style={tw`mt-0.5`} />
+              <Text style={[tw`text-[11px] text-slate-600 dark:text-slate-300 flex-1 leading-4`, { fontFamily: 'PlusJakartaSans_500Medium' }]}>
+                Your TinyML Edge AI runs 100% locally on the ESP32. When it forecasts an anomaly, it engages fans or misters preemptively before thresholds are exceeded. No manual trigger is needed.
+              </Text>
             </View>
 
             {/* Action Cards */}
             <View style={tw`gap-2.5 mb-5`}>
               {/* Action 1 */}
-              <TouchableOpacity
-                activeOpacity={0.7}
-                disabled={!!isProcessing}
-                onPress={() => {
-                  hapticSelection();
-                  setSelectedActions((p) => ({ ...p, fans: !p.fans }));
-                }}
-                style={[
-                  tw`p-3.5 rounded-2xl border flex-row items-center gap-3`,
-                  selectedActions.fans
-                    ? tw`bg-blue-50/60 dark:bg-blue-950/30 border-blue-200 dark:border-blue-800`
-                    : tw`bg-slate-50 dark:bg-slate-800/40 border-slate-200/70 dark:border-slate-700/60`,
-                ]}
+              <View
+                style={tw`p-3.5 rounded-2xl border bg-blue-50/60 dark:bg-blue-950/30 border-blue-200 dark:border-blue-800 flex-row items-center gap-3`}
               >
                 <View style={tw`w-9 h-9 rounded-xl bg-blue-100 dark:bg-blue-900/50 items-center justify-center`}>
                   <MaterialCommunityIcons name="fan" size={18} color="#3b82f6" />
@@ -1260,41 +1198,27 @@ export default function ReportScreen() {
                     <Text style={[tw`text-[13px] text-slate-900 dark:text-white`, { fontFamily: 'PlusJakartaSans_800ExtraBold' }]}>
                       Cool the Chamber
                     </Text>
-                    <View style={tw`bg-rose-100 dark:bg-rose-950/80 px-1.5 py-0.5 rounded`}>
-                      <Text style={[tw`text-[8px] text-rose-600 dark:text-rose-400`, { fontFamily: 'PlusJakartaSans_700Bold' }]}>
-                        URGENT
+                    <View style={tw`bg-blue-100 dark:bg-blue-950/80 px-1.5 py-0.5 rounded`}>
+                      <Text style={[tw`text-[8px] text-blue-600 dark:text-blue-400`, { fontFamily: 'PlusJakartaSans_700Bold' }]}>
+                        SP &gt; 26.0°C
                       </Text>
                     </View>
                   </View>
                   <Text style={[tw`text-[11px] text-slate-500 dark:text-slate-400`, { fontFamily: 'PlusJakartaSans_500Medium' }]}>
-                    Runs fans to bring the temperature down before plants are stressed.
+                    Runs fans preemptively if +10 min forecast exceeds 26°C to purge excess heat.
                   </Text>
                 </View>
 
-                <View
-                  style={[
-                    tw`w-5 h-5 rounded-full border-2 items-center justify-center`,
-                    selectedActions.fans ? tw`bg-emerald-500 border-emerald-500` : tw`border-slate-300 dark:border-slate-600`,
-                  ]}
-                >
-                  {selectedActions.fans && <MaterialCommunityIcons name="check" size={13} color="white" />}
+                <View style={tw`bg-blue-500/15 dark:bg-blue-500/25 px-2 py-1 rounded-lg`}>
+                  <Text style={[tw`text-[9px] text-blue-600 dark:text-blue-400`, { fontFamily: 'PlusJakartaSans_700Bold' }]}>
+                    AUTO
+                  </Text>
                 </View>
-              </TouchableOpacity>
+              </View>
 
               {/* Action 2 */}
-              <TouchableOpacity
-                activeOpacity={0.7}
-                disabled={!!isProcessing}
-                onPress={() => {
-                  hapticSelection();
-                  setSelectedActions((p) => ({ ...p, misters: !p.misters }));
-                }}
-                style={[
-                  tw`p-3.5 rounded-2xl border flex-row items-center gap-3`,
-                  selectedActions.misters
-                    ? tw`bg-emerald-50/60 dark:bg-emerald-950/30 border-emerald-200 dark:border-emerald-800`
-                    : tw`bg-slate-50 dark:bg-slate-800/40 border-slate-200/70 dark:border-slate-700/60`,
-                ]}
+              <View
+                style={tw`p-3.5 rounded-2xl border bg-emerald-50/60 dark:bg-emerald-950/30 border-emerald-200 dark:border-emerald-800 flex-row items-center gap-3`}
               >
                 <View style={tw`w-9 h-9 rounded-xl bg-emerald-100 dark:bg-emerald-900/50 items-center justify-center`}>
                   <MaterialCommunityIcons name="water" size={18} color="#10b981" />
@@ -1307,39 +1231,25 @@ export default function ReportScreen() {
                     </Text>
                     <View style={tw`bg-emerald-100 dark:bg-emerald-950/80 px-1.5 py-0.5 rounded`}>
                       <Text style={[tw`text-[8px] text-emerald-600 dark:text-emerald-400`, { fontFamily: 'PlusJakartaSans_700Bold' }]}>
-                        ADVISED
+                        RH &lt; 75%
                       </Text>
                     </View>
                   </View>
                   <Text style={[tw`text-[11px] text-slate-500 dark:text-slate-400`, { fontFamily: 'PlusJakartaSans_500Medium' }]}>
-                    Pulses the misters to raise humidity and prevent foliage from drying out.
+                    Pulses ultrasonic misters if +10 min humidity drops below optimal band.
                   </Text>
                 </View>
 
-                <View
-                  style={[
-                    tw`w-5 h-5 rounded-full border-2 items-center justify-center`,
-                    selectedActions.misters ? tw`bg-emerald-500 border-emerald-500` : tw`border-slate-300 dark:border-slate-600`,
-                  ]}
-                >
-                  {selectedActions.misters && <MaterialCommunityIcons name="check" size={13} color="white" />}
+                <View style={tw`bg-emerald-500/15 dark:bg-emerald-500/25 px-2 py-1 rounded-lg`}>
+                  <Text style={[tw`text-[9px] text-emerald-600 dark:text-emerald-400`, { fontFamily: 'PlusJakartaSans_700Bold' }]}>
+                    AUTO
+                  </Text>
                 </View>
-              </TouchableOpacity>
+              </View>
 
               {/* Action 3 */}
-              <TouchableOpacity
-                activeOpacity={0.7}
-                disabled={!!isProcessing}
-                onPress={() => {
-                  hapticSelection();
-                  setSelectedActions((p) => ({ ...p, co2: !p.co2 }));
-                }}
-                style={[
-                  tw`p-3.5 rounded-2xl border flex-row items-center gap-3`,
-                  selectedActions.co2
-                    ? tw`bg-purple-50/60 dark:bg-purple-950/30 border-purple-200 dark:border-purple-800`
-                    : tw`bg-slate-50 dark:bg-slate-800/40 border-slate-200/70 dark:border-slate-700/60`,
-                ]}
+              <View
+                style={tw`p-3.5 rounded-2xl border bg-purple-50/60 dark:bg-purple-950/30 border-purple-200 dark:border-purple-800 flex-row items-center gap-3`}
               >
                 <View style={tw`w-9 h-9 rounded-xl bg-purple-100 dark:bg-purple-900/50 items-center justify-center`}>
                   <MaterialCommunityIcons name="weather-windy" size={18} color="#8b5cf6" />
@@ -1352,63 +1262,36 @@ export default function ReportScreen() {
                     </Text>
                     <View style={tw`bg-purple-100 dark:bg-purple-950/80 px-1.5 py-0.5 rounded`}>
                       <Text style={[tw`text-[8px] text-purple-600 dark:text-purple-400`, { fontFamily: 'PlusJakartaSans_700Bold' }]}>
-                        SAFE
+                        CO₂ &gt; 1000 ppm
                       </Text>
                     </View>
                   </View>
                   <Text style={[tw`text-[11px] text-slate-500 dark:text-slate-400`, { fontFamily: 'PlusJakartaSans_500Medium' }]}>
-                    Opens vents to flush out stale air and bring CO2 back to a healthy level.
+                    Flushes stale CO₂ out of the chamber before mycelium suffocation.
                   </Text>
                 </View>
 
-                <View
-                  style={[
-                    tw`w-5 h-5 rounded-full border-2 items-center justify-center`,
-                    selectedActions.co2 ? tw`bg-emerald-500 border-emerald-500` : tw`border-slate-300 dark:border-slate-600`,
-                  ]}
-                >
-                  {selectedActions.co2 && <MaterialCommunityIcons name="check" size={13} color="white" />}
+                <View style={tw`bg-purple-500/15 dark:bg-purple-500/25 px-2 py-1 rounded-lg`}>
+                  <Text style={[tw`text-[9px] text-purple-600 dark:text-purple-400`, { fontFamily: 'PlusJakartaSans_700Bold' }]}>
+                    AUTO
+                  </Text>
                 </View>
-              </TouchableOpacity>
+              </View>
             </View>
 
-            {/* Modal Buttons */}
-            <View style={tw`flex-row gap-2.5`}>
-              {/* Dismiss - same width as Apply */}
-              <TouchableOpacity
-                activeOpacity={0.7}
-                onPress={slideOutAndClose}
-                style={tw`flex-1 py-3.5 rounded-2xl bg-slate-100 dark:bg-slate-800 items-center justify-center border border-slate-200/60 dark:border-slate-700/60`}
-              >
-                <View style={tw`flex-row items-center gap-1.5`}>
-                  <MaterialCommunityIcons name="close" size={14} color={isDarkMode ? '#94a3b8' : '#475569'} />
-                  <Text style={[tw`text-slate-700 dark:text-slate-300 text-[13px]`, { fontFamily: 'PlusJakartaSans_700Bold' }]}>
-                    Dismiss
-                  </Text>
-                </View>
-              </TouchableOpacity>
-
-              {/* Apply - same width */}
-              <TouchableOpacity
-                activeOpacity={0.85}
-                disabled={!selectedActions.fans && !selectedActions.misters && !selectedActions.co2}
-                onPress={() => {
-                  slideOutAndClose();
-                  handleAutoFix();
-                }}
-                style={[
-                  tw`flex-1 py-3.5 rounded-2xl bg-emerald-600 dark:bg-emerald-500 items-center justify-center shadow-md`,
-                  (!selectedActions.fans && !selectedActions.misters && !selectedActions.co2) && tw`opacity-50`,
-                ]}
-              >
-                <View style={tw`flex-row items-center gap-1.5`}>
-                  <MaterialCommunityIcons name="lightning-bolt" size={14} color="white" />
-                  <Text style={[tw`text-white text-[13px]`, { fontFamily: 'PlusJakartaSans_800ExtraBold' }]}>
-                    Apply
-                  </Text>
-                </View>
-              </TouchableOpacity>
-            </View>
+            {/* Modal Button: Got It */}
+            <TouchableOpacity
+              activeOpacity={0.85}
+              onPress={slideOutAndClose}
+              style={tw`w-full py-4 rounded-2xl bg-emerald-600 dark:bg-emerald-500 items-center justify-center shadow-md mb-3`}
+            >
+              <View style={tw`flex-row items-center gap-1.5`}>
+                <MaterialCommunityIcons name="check" size={16} color="white" />
+                <Text style={[tw`text-white text-[13px]`, { fontFamily: 'PlusJakartaSans_800ExtraBold' }]}>
+                  Got It
+                </Text>
+              </View>
+            </TouchableOpacity>
           </Animated.View>
         </TouchableOpacity>
       </Modal>

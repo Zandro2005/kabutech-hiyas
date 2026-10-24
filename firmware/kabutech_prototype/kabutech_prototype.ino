@@ -54,6 +54,11 @@
 #define TFT_ROTATION    7
 #include "tft_display.h"
 
+// ─── Edge AI Forecaster (Edge Impulse) — see edge_forecast.h & tinyml/EDGE_IMPULSE_TUTORIAL.md ───
+#define ENABLE_EDGE_AI  1       // 1 = active on-device TinyML forecasting
+#define CSV_LOG_MODE    0       // 1 = print CSV lines for tinyml/record_real_data.py
+#include "edge_forecast.h"
+
 // ─── Addons for Firebase token management ───
 #include <addons/TokenHelper.h>
 #include <addons/RTDBHelper.h>
@@ -343,6 +348,21 @@ void runAutoRegulation() {
   // Turn ON when Temp > 27.0 °C (exceeds 25°C + 2°C grace), turn OFF when <= 26.0 °C (prevents tropical lock-on)
   bool needFansForTemp = isTempValid && (stateExhaust ? currentTemp > 26.0 : currentTemp > 27.0);
 
+  // 3b. Edge AI pre-emptive triggers: act when the +10 min FORECAST crosses the same thresholds
+  //    (same hysteresis as above, so the AI can only switch fans ON earlier — never block OFF safety)
+  bool aiTempSpike = aiReady && isTempValid && (stateExhaust ? predTemp10m > 26.0 : predTemp10m > 27.0);
+  bool aiCo2Spike  = aiReady && isCo2Valid  && (stateExhaust ? predCO2_10m > 1000 : predCO2_10m > 1150);
+  bool aiHumDrop   = aiReady && isHumValid  && predHum10m < 75.0;
+
+  if (aiReady) {
+    if (aiTempSpike && !needFansForTemp)      aiAction = "preempt_exhaust_temp";
+    else if (aiCo2Spike && !needFansForCo2)   aiAction = "preempt_exhaust_co2";
+    else if (aiHumDrop && currentHum >= 75.0) aiAction = "preempt_mister";
+    else                                      aiAction = "none";
+  }
+  needFansForTemp = needFansForTemp || aiTempSpike;
+  needFansForCo2  = needFansForCo2  || aiCo2Spike;
+
   // Combined Fan Actuation
   if (!isTempCold && (needFansForCo2 || needFansForHum || needFansForTemp)) {
     nextExhaust = true;
@@ -355,7 +375,7 @@ void runAutoRegulation() {
   // 4. Ultrasonic Misters (Islam et al., 2022)
   // Turn ON when Humidity < 75 % (dry air), turn OFF when >= 85 % (returned to 80-95% optimal band)
   if (isHumValid) {
-    if (currentHum < 75.0) {
+    if (currentHum < 75.0 || aiHumDrop) {
       nextMister = true;
     } else if (currentHum >= 85.0) {
       nextMister = false;
@@ -415,9 +435,17 @@ void runAutoRegulation() {
 
 void setup() {
   Serial.begin(115200);
-#if defined(ARDUINO_USB_CDC_ON_BOOT) && (ARDUINO_USB_CDC_ON_BOOT != 0)
-  Serial.setTxTimeoutMs(0); // Never block when disconnected from PC
-#endif
+  
+  // ⚠️ Critical for ESP32-S3 Native USB CDC: wait up to 4s for PC Serial Monitor to attach DTR
+  unsigned long startWait = millis();
+  while (!Serial && (millis() - startWait < 4000)) {
+    delay(10);
+  }
+  delay(500);
+
+  Serial.println("\n\n==================================================");
+  Serial.println("  ESP32-S3 USB CDC Serial Connected Successfully! ");
+  Serial.println("==================================================");
 
   setCpuFrequencyMhz(160); // 160MHz: Fast cryptography, cool operation
 
@@ -842,6 +870,14 @@ void pushToFirebase(float temp, float hum, int light, int co2,
   json.set("actuator_lights", stateLight);
   json.set("mode", stateMode);
 
+  // Edge AI +10 min forecast (Edge Impulse model on the ESP32)
+  json.set("ai_ready", aiReady);
+  json.set("ai_action", aiAction);
+  json.set("ai_pred_temp_10m",  aiReady ? predTemp10m  : -999.0);
+  json.set("ai_pred_hum_10m",   aiReady ? predHum10m   : -999.0);
+  json.set("ai_pred_co2_10m",   aiReady ? predCO2_10m  : -999.0);
+  json.set("ai_pred_light_10m", aiReady ? predLight10m : -999.0);
+
   FirebaseJson ts;
   ts.set(".sv", "timestamp");
   json.set("last_seen", ts);
@@ -1046,6 +1082,10 @@ void loop() {
     Serial.printf("   🔥 ESP32 Chip Temp: %.1f °C\n", temperatureRead());
     Serial.println("──────────────────────────────────────────────────────");
 
+    // ── Edge AI: sample every 30 s into the ring buffer and forecast +10 min ──
+    edgeForecastTick(now, currentTemp, currentHum, currentCO2, currentLight,
+                     shtFault, co2Fault, lightFault);
+
     // ── Local Autonomous Environmental Regulation (AUTO Mode) ──
     runAutoRegulation();
   }
@@ -1140,7 +1180,8 @@ void loop() {
     drawDashboard(currentTemp, currentHum, currentLight, currentCO2,
                   shtFault, lightFault, co2Fault,
                   stateExhaust, stateIntake, stateMister, stateLight,
-                  stateMode, (WiFi.status() == WL_CONNECTED), firebaseReady);
+                  stateMode, (WiFi.status() == WL_CONNECTED), firebaseReady,
+                  aiReady, aiAction);
   }
 
   // ── Live Serial Diagnostic Command: Type 't' to re-init, 'm' to flip rotation ──
