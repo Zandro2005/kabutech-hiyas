@@ -94,6 +94,64 @@ static LGFX_KabuTech tft;
 #define COLOR_DARK_SLATE  0x1925  // #1E293B Pill Background
 #define COLOR_CHIP_OFF    0x08C2  // Dark idle actuator chip
 
+// ─── Dynamic Mode Themes (RGB565) ───
+struct DashboardTheme {
+  uint16_t bg;          // Deep background
+  uint16_t cardBg;      // Card surface
+  uint16_t cardBorder;  // Border lines & dividers
+  uint16_t primary;     // Brand logo, active chips, mode accent
+  uint16_t subText;     // Card titles / subtitles
+  uint16_t chipOff;     // Inactive chip background
+  const char* modeName;
+};
+
+// 1. AUTO / AI AUTO: Emerald Forest Palette (#10B981)
+static const DashboardTheme THEME_AUTO = {
+  0x0122,  // #032514 Deep Forest Green
+  0x09C4,  // #0A3A22 Card Surface
+  0x0A86,  // #105231 Card Outline
+  0x15D0,  // #10B981 Vibrant Emerald
+  0x6776,  // #6EE7B7 Light Mint Text
+  0x08C2,  // Dark Forest Idle Chip
+  "AUTO"
+};
+
+// 2. MANUAL: Industrial Amber / Charcoal Palette (#F59E0B)
+static const DashboardTheme THEME_MANUAL = {
+  0x1881,  // #181208 Deep Charcoal / Warm Obsidian
+  0x2943,  // #2B2212 Dark Amber-Charcoal Card
+  0x9402,  // #95500A Warm Amber Outline
+  0xFCE0,  // #F59E0B Bright Amber Gold
+  0xFDE6,  // #FCD34D Warm Gold Text
+  0x20E2,  // Dark Warm Slate Idle Chip
+  "MANUAL"
+};
+
+// 3. TIMED / SCHEDULED: Royal Midnight / Violet Palette (#A855F7)
+static const DashboardTheme THEME_TIMED = {
+  0x0862,  // #0E0716 Deep Midnight Purple
+  0x18C6,  // #1C102E Dark Violet Card
+  0x51D6,  // #5728A3 Royal Violet Outline
+  0xC43F,  // #C084FC Bright Violet
+  0xDDFE,  // #DDD6FE Soft Lavender Text
+  0x18A5,  // Dark Indigo Idle Chip
+  "TIMED"
+};
+
+// Active theme state
+static DashboardTheme curTheme = THEME_AUTO;
+static String prevThemeMode = "";
+
+inline DashboardTheme getThemeForMode(const String& mode) {
+  if (mode == "MANUAL") {
+    return THEME_MANUAL;
+  } else if (mode == "TIMED" || mode == "SCHEDULED") {
+    return THEME_TIMED;
+  } else {
+    return THEME_AUTO;
+  }
+}
+
 // Track previous values to eliminate screen redraw flicker
 static float prevT = -999.0;
 static float prevH = -999.0;
@@ -235,43 +293,48 @@ void updateBootStep(const char* label, bool success) {
 
 // ─── Draw Base Landscape Dashboard Layout (320x240) ───
 void drawStaticDashboard() {
-  tft.fillScreen(COLOR_BG);
+  tft.fillScreen(curTheme.bg);
 
   // Top header divider line (Y: 26)
-  tft.drawLine(0, 26, 320, 26, COLOR_CARD_BORDER);
+  tft.drawLine(0, 26, 320, 26, curTheme.cardBorder);
 
   // Static Brand Header (Left)
   tft.setFont(nullptr);
   tft.setTextDatum(textdatum_t::middle_left);
   tft.setTextSize(2);
-  tft.setTextColor(COLOR_EMERALD, COLOR_BG);
+  tft.setTextColor(curTheme.primary, curTheme.bg);
   tft.drawString("KABUTECH", 8, 13);
 
   // Card 1: Temp (Col 1, Row 1) -> X: 6, Y: 30, W: 152, H: 82
-  tft.fillRoundRect(6, 30, 152, 82, 6, COLOR_CARD_BG);
-  tft.drawRoundRect(6, 30, 152, 82, 6, COLOR_CARD_BORDER);
+  tft.fillRoundRect(6, 30, 152, 82, 6, curTheme.cardBg);
+  tft.drawRoundRect(6, 30, 152, 82, 6, curTheme.cardBorder);
 
   // Card 2: Hum (Col 2, Row 1) -> X: 162, Y: 30, W: 152, H: 82
-  tft.fillRoundRect(162, 30, 152, 82, 6, COLOR_CARD_BG);
-  tft.drawRoundRect(162, 30, 152, 82, 6, COLOR_CARD_BORDER);
+  tft.fillRoundRect(162, 30, 152, 82, 6, curTheme.cardBg);
+  tft.drawRoundRect(162, 30, 152, 82, 6, curTheme.cardBorder);
 
   // Card 3: CO2 (Col 1, Row 2) -> X: 6, Y: 116, W: 152, H: 82
-  tft.fillRoundRect(6, 116, 152, 82, 6, COLOR_CARD_BG);
-  tft.drawRoundRect(6, 116, 152, 82, 6, COLOR_CARD_BORDER);
+  tft.fillRoundRect(6, 116, 152, 82, 6, curTheme.cardBg);
+  tft.drawRoundRect(6, 116, 152, 82, 6, curTheme.cardBorder);
 
   // Card 4: Light (Col 2, Row 2) -> X: 162, Y: 116, W: 152, H: 82
-  tft.fillRoundRect(162, 116, 152, 82, 6, COLOR_CARD_BG);
-  tft.drawRoundRect(162, 116, 152, 82, 6, COLOR_CARD_BORDER);
+  tft.fillRoundRect(162, 116, 152, 82, 6, curTheme.cardBg);
+  tft.drawRoundRect(162, 116, 152, 82, 6, curTheme.cardBorder);
 
   // Bottom Actuator & Info Container (Y: 202 to 236)
-  tft.fillRoundRect(6, 202, 308, 32, 6, COLOR_CARD_BG);
-  tft.drawRoundRect(6, 202, 308, 32, 6, COLOR_CARD_BORDER);
+  tft.fillRoundRect(6, 202, 308, 32, 6, curTheme.cardBg);
+  tft.drawRoundRect(6, 202, 308, 32, 6, curTheme.cardBorder);
 
-  // Force clean redraw of dynamic chips and mode on next refresh
+  // Invalidate previous cache to force immediate redraw of dynamic cards & chips on new theme
+  prevT = -999.0;
+  prevH = -999.0;
+  prevC = -999;
+  prevL = -999;
   prevExh = -1;
   prevInt = -1;
   prevMist = -1;
   prevLight = -1;
+  prevMinute = -1;
   prevMode = "";
 
   baseDrawn = true;
@@ -287,7 +350,7 @@ void drawMetricCard(int x, int y, int w, int h,
   // 1. Title (Top Left)
   tft.setTextDatum(textdatum_t::top_left);
   tft.setTextSize(1);
-  tft.setTextColor(COLOR_MUTED_GREEN, COLOR_CARD_BG);
+  tft.setTextColor(curTheme.subText, curTheme.cardBg);
   tft.drawString(title, x + 8, y + 6);
 
   // 2. Status Pill (Top Right)
@@ -304,33 +367,34 @@ void drawMetricCard(int x, int y, int w, int h,
   tft.drawString(pillText, pillX + (pillW / 2), pillY + (pillH / 2));
 
   // 3. Main Numeric Readout (Center Left)
-  tft.fillRect(x + 6, y + 23, w - 12, 32, COLOR_CARD_BG);
+  tft.fillRect(x + 6, y + 23, w - 12, 32, curTheme.cardBg);
 
   tft.setTextDatum(textdatum_t::middle_left);
   tft.setTextSize(3); // Large bold readout
-  tft.setTextColor(COLOR_WHITE, COLOR_CARD_BG);
+  tft.setTextColor(COLOR_WHITE, curTheme.cardBg);
   tft.drawString(valStr, x + 10, y + 38);
 
   // Unit symbol right next to number
   int unitOffsetX = (strlen(valStr) >= 4) ? 88 : 72;
   tft.setTextSize(1);
-  tft.setTextColor(COLOR_MUTED, COLOR_CARD_BG);
+  tft.setTextColor(COLOR_MUTED, curTheme.cardBg);
   tft.drawString(unit, x + unitOffsetX, y + 34);
 
   // 4. Target Range (Bottom)
   tft.setTextDatum(textdatum_t::bottom_left);
   tft.setTextSize(1);
-  tft.setTextColor(COLOR_MUTED, COLOR_CARD_BG);
+  tft.setTextColor(COLOR_MUTED, curTheme.cardBg);
   tft.drawString(targetRange, x + 10, y + h - 6);
 }
 
 // ─── Helper: Draw an Actuator Chip ───
 void drawActuatorChip(int x, int y, int w, int h, const char* label, bool active, uint16_t activeColor) {
-  uint16_t bg = active ? activeColor : COLOR_CHIP_OFF;
-  uint16_t txt = active ? COLOR_BG : COLOR_MUTED;
+  uint16_t bg = active ? activeColor : curTheme.chipOff;
+  uint16_t border = active ? activeColor : curTheme.cardBorder;
+  uint16_t txt = active ? curTheme.bg : COLOR_MUTED;
 
   tft.fillRoundRect(x, y, w, h, 4, bg);
-  tft.drawRoundRect(x, y, w, h, 4, active ? activeColor : COLOR_CARD_BORDER);
+  tft.drawRoundRect(x, y, w, h, 4, border);
 
   tft.setTextDatum(textdatum_t::middle_center);
   tft.setFont(nullptr);
@@ -345,7 +409,11 @@ void drawDashboard(float temp, float hum, int light, int co2,
                    bool exhOn, bool intOn, bool mistOn, bool lightOn,
                    const String& mode, bool wifiOk, bool fbOk,
                    bool aiActive = false, const char* aiAct = "none") {
-  if (!baseDrawn) {
+  // ── Dynamic Mode Theme Switching ──
+  // When operating mode transitions (AUTO <-> MANUAL <-> TIMED), switch theme & repaint base
+  if (mode != prevThemeMode || !baseDrawn) {
+    prevThemeMode = mode;
+    curTheme = getThemeForMode(mode);
     drawStaticDashboard();
   }
 
@@ -355,7 +423,7 @@ void drawDashboard(float temp, float hum, int light, int co2,
   // Brand Name (Left)
   tft.setTextDatum(textdatum_t::middle_left);
   tft.setTextSize(2);
-  tft.setTextColor(COLOR_EMERALD, COLOR_BG);
+  tft.setTextColor(curTheme.primary, curTheme.bg);
   tft.drawString("KABUTECH", 8, 13);
 
   // ── Calculate In-Range Count exactly matching mobile app dashboard ──
@@ -380,18 +448,18 @@ void drawDashboard(float temp, float hum, int light, int co2,
   // Center Status: e.g. "4/4 IN RANGE", "3/4 IN RANGE", "1/4 IN RANGE"
   tft.setTextDatum(textdatum_t::middle_center);
   tft.setTextSize(1);
-  tft.fillRect(110, 4, 114, 18, COLOR_BG);
+  tft.fillRect(110, 4, 114, 18, curTheme.bg);
 
   char statusBuf[24];
   if (hasFault) {
     snprintf(statusBuf, sizeof(statusBuf), "%d/4 | FAULT", inRangeCount);
-    tft.setTextColor(COLOR_AMBER, COLOR_BG);
+    tft.setTextColor(COLOR_AMBER, curTheme.bg);
   } else if (inRangeCount == 4) {
     snprintf(statusBuf, sizeof(statusBuf), "4/4 IN RANGE");
-    tft.setTextColor(COLOR_EMERALD, COLOR_BG);
+    tft.setTextColor(curTheme.primary, curTheme.bg);
   } else {
     snprintf(statusBuf, sizeof(statusBuf), "%d/4 IN RANGE", inRangeCount);
-    tft.setTextColor(inRangeCount <= 1 ? COLOR_RED : COLOR_AMBER, COLOR_BG);
+    tft.setTextColor(inRangeCount <= 1 ? COLOR_RED : COLOR_AMBER, curTheme.bg);
   }
   tft.drawString(statusBuf, 166, 13);
 
@@ -402,32 +470,32 @@ void drawDashboard(float temp, float hum, int light, int co2,
       prevMinute = timeinfo.tm_min;
       char timeBuff[10];
       strftime(timeBuff, sizeof(timeBuff), "%H:%M", &timeinfo);
-      tft.fillRect(224, 4, 42, 18, COLOR_BG);
+      tft.fillRect(224, 4, 42, 18, curTheme.bg);
       tft.setTextDatum(textdatum_t::middle_right);
       tft.setTextSize(1);
-      tft.setTextColor(COLOR_WHITE, COLOR_BG);
+      tft.setTextColor(COLOR_WHITE, curTheme.bg);
       tft.drawString(timeBuff, 266, 13);
     }
   } else if (prevMinute == -1) {
-    tft.fillRect(224, 4, 42, 18, COLOR_BG);
+    tft.fillRect(224, 4, 42, 18, curTheme.bg);
     tft.setTextDatum(textdatum_t::middle_right);
     tft.setTextSize(1);
-    tft.setTextColor(COLOR_MUTED, COLOR_BG);
+    tft.setTextColor(COLOR_MUTED, curTheme.bg);
     tft.drawString("--:--", 266, 13);
   }
 
   // Cloud Link Status Pill (Far Right) - Shows LOCAL when offline, proving main box is alive
   tft.setTextDatum(textdatum_t::middle_right);
   tft.setTextSize(1);
-  tft.fillRect(268, 4, 48, 18, COLOR_BG);
+  tft.fillRect(268, 4, 48, 18, curTheme.bg);
   if (wifiOk && fbOk) {
-    tft.setTextColor(COLOR_EMERALD, COLOR_BG);
+    tft.setTextColor(COLOR_EMERALD, curTheme.bg);
     tft.drawString("ONLINE", 312, 13);
   } else if (wifiOk) {
-    tft.setTextColor(COLOR_AMBER, COLOR_BG);
+    tft.setTextColor(COLOR_AMBER, curTheme.bg);
     tft.drawString("SYNC", 312, 13);
   } else {
-    tft.setTextColor(COLOR_CYAN, COLOR_BG);
+    tft.setTextColor(COLOR_CYAN, curTheme.bg);
     tft.drawString("LOCAL", 312, 13); // Main box runs 100% autonomous locally
   }
 
@@ -498,9 +566,15 @@ void drawDashboard(float temp, float hum, int light, int co2,
     uint16_t pillCol = COLOR_EMERALD;
 
     if (co2Err || co2 <= 0) {
-      snprintf(valBuf, sizeof(valBuf), "--");
-      pillTxt = "FAULT";
-      pillCol = COLOR_MUTED;
+      if (millis() < 10000 && co2 <= 0) {
+        snprintf(valBuf, sizeof(valBuf), "...");
+        pillTxt = "WARM";
+        pillCol = COLOR_CYAN;
+      } else {
+        snprintf(valBuf, sizeof(valBuf), "--");
+        pillTxt = "FAULT";
+        pillCol = COLOR_MUTED;
+      }
     } else {
       snprintf(valBuf, sizeof(valBuf), "%d", co2);
       if (co2 > 1150) {
@@ -545,17 +619,17 @@ void drawDashboard(float temp, float hum, int light, int co2,
     drawMetricCard(162, 116, 152, 82, "LIGHT LEVEL", valBuf, "lx", pillTxt, pillCol, "Target: 150-1000 lx");
   }
 
-  // 3. ACTUATOR STATUS CHIPS (Y: 207, H: 22) - Unified single active color
+  // 3. ACTUATOR STATUS CHIPS (Y: 207, H: 22) - Dynamic theme primary active color
   if (exhOn != prevExh || intOn != prevInt || mistOn != prevMist || lightOn != prevLight) {
     prevExh = exhOn;
     prevInt = intOn;
     prevMist = mistOn;
     prevLight = lightOn;
 
-    drawActuatorChip(12,  207, 44, 22, "EXH", exhOn, COLOR_EMERALD);
-    drawActuatorChip(60,  207, 44, 22, "INT", intOn, COLOR_EMERALD);
-    drawActuatorChip(108, 207, 46, 22, "MIST", mistOn, COLOR_EMERALD);
-    drawActuatorChip(158, 207, 48, 22, "LIGHT", lightOn, COLOR_EMERALD);
+    drawActuatorChip(12,  207, 44, 22, "EXH", exhOn, curTheme.primary);
+    drawActuatorChip(60,  207, 44, 22, "INT", intOn, curTheme.primary);
+    drawActuatorChip(108, 207, 46, 22, "MIST", mistOn, curTheme.primary);
+    drawActuatorChip(158, 207, 48, 22, "LIGHT", lightOn, curTheme.primary);
   }
 
   // 4. FOOTER INFO: Mode, Edge AI & Uptime (Right side of bottom container)
@@ -568,24 +642,21 @@ void drawDashboard(float temp, float hum, int light, int co2,
     prevAiActive = aiActive;
     prevAiAct = curAiAct;
 
-    tft.fillRect(208, 206, 52, 24, COLOR_CARD_BG);
+    tft.fillRect(208, 206, 52, 24, curTheme.cardBg);
     tft.setTextDatum(textdatum_t::middle_left);
     tft.setTextSize(1);
     if (mode == "MANUAL") {
-      tft.setTextColor(COLOR_AMBER, COLOR_CARD_BG);
+      tft.setTextColor(curTheme.primary, curTheme.cardBg);
       tft.drawString("MANUAL", 210, 218);
     } else if (mode == "TIMED" || mode == "SCHEDULED") {
-      tft.setTextColor(COLOR_PURPLE, COLOR_CARD_BG);
+      tft.setTextColor(curTheme.primary, curTheme.cardBg);
       tft.drawString("TIMED", 210, 218);
     } else if (curAiAct.startsWith("preempt_")) {
-      tft.setTextColor(COLOR_AMBER, COLOR_CARD_BG);
+      tft.setTextColor(COLOR_AMBER, curTheme.cardBg);
       tft.drawString("PREEMPT", 210, 218); // Pre-emptive fan/mister triggered by Edge AI
-    } else if (aiActive) {
-      tft.setTextColor(COLOR_EMERALD, COLOR_CARD_BG);
-      tft.drawString("AI AUTO", 210, 218); // TinyML forecasting active on ESP32
     } else {
-      tft.setTextColor(COLOR_EMERALD, COLOR_CARD_BG);
-      tft.drawString("AI AUTO", 210, 218);
+      tft.setTextColor(curTheme.primary, curTheme.cardBg);
+      tft.drawString("AI AUTO", 210, 218); // TinyML forecasting active on ESP32
     }
   }
 
@@ -600,10 +671,10 @@ void drawDashboard(float temp, float hum, int light, int co2,
     char upBuf[16];
     snprintf(upBuf, sizeof(upBuf), "Up:%luh%02lum", upHours, upMins);
 
-    tft.fillRect(260, 206, 50, 24, COLOR_CARD_BG);
+    tft.fillRect(260, 206, 50, 24, curTheme.cardBg);
     tft.setTextDatum(textdatum_t::middle_right);
     tft.setTextSize(1);
-    tft.setTextColor(COLOR_MUTED, COLOR_CARD_BG);
+    tft.setTextColor(COLOR_MUTED, curTheme.cardBg);
     tft.drawString(upBuf, 308, 218);
   }
 }

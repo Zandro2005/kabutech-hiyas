@@ -82,7 +82,7 @@ export default function ControlsScreen() {
 
   const isOffline = !health.isControllerOnline;
 
-  const currentMode = String(settings?.setpoints?.mode || 'auto').toLowerCase();
+  const currentMode = isOffline ? 'auto' : String(settings?.setpoints?.mode || 'auto').toLowerCase();
   const isAuto = currentMode === 'auto';
   const isScheduled = currentMode === 'scheduled' || currentMode === 'timed';
   
@@ -588,6 +588,10 @@ export default function ControlsScreen() {
             <TouchableOpacity 
               hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
               onPress={() => {
+                if (isOffline) {
+                  showToast({ type: 'info', text1: 'Controller Offline', text2: 'Hardware is running autonomous AI Auto locally while offline.' });
+                  return;
+                }
                 if (isLocked) DeviceEventEmitter.emit('showManualOverrideModal');
               }}
               style={[tw`px-4 py-2 rounded-xl flex-row items-center gap-1.5`, (!isAuto && !isScheduled) ? tw`bg-amber-500 shadow-sm` : tw`bg-transparent`]}

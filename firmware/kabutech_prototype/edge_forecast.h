@@ -56,6 +56,15 @@ static bool   efHeld[EF_WINDOW];
 static float  efLastGood[EF_N_SENSORS] = { -999.0f, -999.0f, -999.0f, -999.0f };
 static unsigned long efLastSample = 0;
 
+// ─── Fast-Track Event-Driven Delta Trigger ───
+// Bypasses 30-second timer when a sudden spike occurs (e.g. testing or sudden environmental change)
+#define FAST_TRIGGER_TEMP_DELTA   0.3f   // 0.3°C sudden jump
+#define FAST_TRIGGER_HUM_DELTA    2.0f   // 2.0% RH sudden jump/drop
+#define FAST_TRIGGER_CO2_DELTA    35.0f  // 35 ppm sudden jump
+#define FAST_TRIGGER_MIN_INTERVAL 2000   // Min 2 seconds between fast inferences (prevents thrashing)
+static float lastInferredVals[EF_N_SENSORS] = { -999.0f, -999.0f, -999.0f, -999.0f };
+static unsigned long lastFastInferenceTime = 0;
+
 #if ENABLE_EDGE_AI
 static float efFeatures[EF_N_INPUTS];
 
@@ -111,12 +120,9 @@ static void efRunInference() {
 }
 #endif
 
-// Call every loop pass (cheap). Samples every EF_STEP_MS and runs inference.
+// Call every loop pass (cheap). Samples every EF_STEP_MS or runs on sudden delta spike.
 void edgeForecastTick(unsigned long now, float temp, float hum, int co2, int light,
                       bool shtErr, bool co2Err, bool lightErr) {
-  if (efLastSample != 0 && now - efLastSample < EF_STEP_MS) return;
-  efLastSample = now;
-
   float vals[EF_N_SENSORS] = { temp, hum, (float)co2, (float)light };
   bool  bad[EF_N_SENSORS]  = { shtErr || temp <= -50, shtErr || hum <= 0, co2Err || co2 <= 0, lightErr || light < 0 };
 
@@ -131,15 +137,39 @@ void edgeForecastTick(unsigned long now, float temp, float hum, int co2, int lig
     }
   }
 
+  // Check if standard 30-second sample period has elapsed
+  bool isPeriodicSample = (efLastSample == 0 || (now - efLastSample >= EF_STEP_MS));
+
+  // Check if sudden environmental spike occurred (Fast-Track Event Trigger)
+  bool isFastSpike = false;
+  if (!isPeriodicSample && efCount == EF_WINDOW && !held && (now - lastFastInferenceTime >= FAST_TRIGGER_MIN_INTERVAL)) {
+    if (lastInferredVals[0] > -500.0f) {
+      float dTemp = fabsf(vals[0] - lastInferredVals[0]);
+      float dHum  = fabsf(vals[1] - lastInferredVals[1]);
+      float dCo2  = fabsf(vals[2] - lastInferredVals[2]);
+
+      if (dTemp >= FAST_TRIGGER_TEMP_DELTA || dHum >= FAST_TRIGGER_HUM_DELTA || dCo2 >= FAST_TRIGGER_CO2_DELTA) {
+        isFastSpike = true;
+      }
+    }
+  }
+
+  // If neither periodic sample nor fast spike, exit early
+  if (!isPeriodicSample && !isFastSpike) return;
+
+  if (isPeriodicSample) {
+    efLastSample = now;
+  }
+
 #if CSV_LOG_MODE
-  if (!held) {
+  if (!held && isPeriodicSample) {
     Serial.printf("CSV:%lu,%.2f,%.2f,%d,%d\n", now, vals[0], vals[1], (int)vals[2], (int)vals[3]);
   }
 #endif
 
   // ── Fast Warm-Up Seeding ──
   // If this is our very first valid sample, seed all 20 slots with it!
-  // This lets the AI activate in 30 seconds rather than waiting 10 full minutes.
+  // This lets the AI activate immediately rather than waiting 10 full minutes.
   if (efCount == 0 && !held) {
     for (int i = 0; i < EF_WINDOW; i++) {
       for (int s = 0; s < EF_N_SENSORS; s++) efBuf[i][s] = vals[s];
@@ -149,13 +179,22 @@ void edgeForecastTick(unsigned long now, float temp, float hum, int co2, int lig
     efHeldCount = 0;
     efHead = 0;
     Serial.println("⚡ [Edge AI] Buffer fast-seeded with first live reading! AI active immediately.");
-  } else {
+  } else if (isPeriodicSample) {
+    // Normal 30s cadence: advance ring buffer to next time slot
     if (efCount == EF_WINDOW && efHeld[efHead]) efHeldCount--;   // overwriting a held slot
     for (int s = 0; s < EF_N_SENSORS; s++) efBuf[efHead][s] = vals[s];
     efHeld[efHead] = held;
     if (held) efHeldCount++;
     efHead = (efHead + 1) % EF_WINDOW;
     if (efCount < EF_WINDOW) efCount++;
+  } else if (isFastSpike) {
+    // Fast spike event: update newest slot in-place with the live spike value!
+    int newest = (efHead - 1 + EF_WINDOW) % EF_WINDOW;
+    for (int s = 0; s < EF_N_SENSORS; s++) efBuf[newest][s] = vals[s];
+    Serial.printf("⚡ [Edge AI Fast-Track] Sudden climate spike detected (ΔT=%.2f°C, ΔH=%.1f%%, ΔCO2=%.0f ppm) -> Running instant inference!\n",
+                  fabsf(vals[0] - lastInferredVals[0]),
+                  fabsf(vals[1] - lastInferredVals[1]),
+                  fabsf(vals[2] - lastInferredVals[2]));
   }
 
   if (efCount < EF_WINDOW) {
@@ -168,6 +207,12 @@ void edgeForecastTick(unsigned long now, float temp, float hum, int co2, int lig
     aiAction = "sensor_fault";
     return;
   }
+
+  // Update last inferred values tracking
+  for (int s = 0; s < EF_N_SENSORS; s++) {
+    lastInferredVals[s] = vals[s];
+  }
+  lastFastInferenceTime = now;
 
 #if ENABLE_EDGE_AI
   efRunInference();

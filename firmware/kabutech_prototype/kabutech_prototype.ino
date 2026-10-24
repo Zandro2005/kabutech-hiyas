@@ -68,8 +68,8 @@
 // ═══════════════════════════════════════════════
 
 // WiFi Credentials
-#define WIFI_SSID       "jai"
-#define WIFI_PASSWORD   "jai12345678"
+#define WIFI_SSID       "Abad_Fam"
+#define WIFI_PASSWORD   "Connecting123"
 
 // Firebase Project Config
 #define API_KEY         "AIzaSyA3rB7rKIrfdJzCnFdnGvk25n0rd_hHI7M"
@@ -622,8 +622,12 @@ void setup() {
 
   // 3. Initialize Sensirion SCD41 True NDIR CO₂
   scd4x.begin(Wire, 0x62);
+  scd4x.wakeUp();
+  delay(20);
   scd4x.stopPeriodicMeasurement(); // Clean previous state
   delay(500); // ⚠️ CRITICAL: Sensirion SCD41 requires 500ms to stop periodic measurement!
+  scd4x.reinit();
+  delay(20);
   uint16_t scdErr = scd4x.startPeriodicMeasurement(); // Starts 5-second sampling
   if (scdErr) {
     Serial.printf("❌ SCD41 CO₂ sensor error starting periodic measurement: %u (check wiring to GPIO 4/5)\n", scdErr);
@@ -685,6 +689,8 @@ void setup() {
     Serial.println();
     Serial.println("❌ WiFi connection FAILED. Operating in local offline mode.");
     updateBootStep("WiFi Offline", false);
+    stateMode = "AUTO";
+    offlineFailsafeActive = true;
   }
 
   // ── Configure Firebase ──
@@ -728,6 +734,21 @@ void setup() {
         if (json->get(d, "devices/fanIn") || json->get(d, "fanIn")) applyActuator("fanIn", d.to<bool>());
         if (json->get(d, "devices/misters") || json->get(d, "misters")) applyActuator("misters", d.to<bool>());
         if (json->get(d, "devices/lights") || json->get(d, "lights")) applyActuator("lights", d.to<bool>());
+      }
+    }
+  }
+
+  // Check if first SCD41 sample is already ready (5s elapsed during WiFi & Firebase boot)
+  if (scd4xReady) {
+    bool readyNow = false;
+    if (scd4x.getDataReadyStatus(readyNow) == 0 && readyNow) {
+      uint16_t c = 0; float t = 0, h = 0;
+      if (scd4x.readMeasurement(c, t, h) == 0 && c > 0) {
+        lastValidCO2 = c;
+        lastCO2SuccessTime = millis();
+        currentCO2 = c;
+        co2Fault = false;
+        Serial.printf("✅ [SCD41] Initial CO2 reading ready on boot: %d ppm\n", c);
       }
     }
   }
@@ -877,25 +898,39 @@ LightReading readBH1750() {
 }
 
 // ── Read SCD41: True NDIR CO₂ (ppm) ──
+// Sensirion SCD41 produces an optical photoacoustic sample every 5.0 seconds.
+#define SCD41_HOLD_TIME_MS      45000   // 45s: bridges across multiple measurement cycles
+#define SCD41_RECOVERY_TIMEOUT  60000   // 60s: wait 12 missed cycles before restarting sensor
+#define SCD41_RECOVERY_COOLDOWN 30000   // 30s: allow 6 full measurement cycles after restart
+
+static unsigned long lastRecoveryAttempt = 0;
+
 CO2Reading readSCD41() {
   CO2Reading r;
+  unsigned long now = millis();
 
-  // 1. Auto-recovery: If stalled >25s, restart periodic measurement
-  if (!scd4xReady || (lastCO2SuccessTime > 0 && millis() - lastCO2SuccessTime > 25000)) {
-    static unsigned long lastRecoveryAttempt = 0;
-    if (millis() - lastRecoveryAttempt >= 5000) {
-      lastRecoveryAttempt = millis();
+  // 1. Safe Auto-Recovery: Only restart if sensor is completely stalled for >60s with a 30s cooldown
+  if (!scd4xReady || (lastCO2SuccessTime > 0 && (now - lastCO2SuccessTime > SCD41_RECOVERY_TIMEOUT))) {
+    if (lastRecoveryAttempt == 0 || (now - lastRecoveryAttempt >= SCD41_RECOVERY_COOLDOWN)) {
+      lastRecoveryAttempt = now;
+      Serial.println("🔄 [SCD41] Sensor stalled >60s. Restarting periodic measurement...");
+      scd4x.wakeUp();
+      delay(20);
       scd4x.stopPeriodicMeasurement();
       delay(500); // 500ms required by Sensirion before restart
+      scd4x.reinit();
+      delay(20);
       if (scd4x.startPeriodicMeasurement() == 0) {
         scd4xReady = true;
-        Serial.println("🔄 [SCD41] Auto-recovered & restarted periodic measurement!");
+        Serial.println("✅ [SCD41] Successfully restarted periodic measurement (30s cooldown engaged)!");
+      } else {
+        Serial.println("❌ [SCD41] Failed to restart periodic measurement. Retrying in 30s...");
       }
     }
   }
 
+  // 2. Check if a new 5-second sample is available
   if (scd4xReady) {
-    // 2. Check if a new 5-second sample is available
     bool isDataReady = false;
     uint16_t error = scd4x.getDataReadyStatus(isDataReady);
     
@@ -907,14 +942,14 @@ CO2Reading readSCD41() {
       
       if (error == 0 && co2 > 0 && co2 <= 5000) {
         lastValidCO2 = (int)co2;
-        lastCO2SuccessTime = millis();
+        lastCO2SuccessTime = now;
         if (!isnan(temp) && temp > -20.0 && temp < 80.0) {
           scdBackupTemp = temp;
         }
         if (!isnan(hum) && hum > 0.0 && hum <= 100.0) {
           scdBackupHum = hum;
         }
-        lastScdBackupTime = millis();
+        lastScdBackupTime = now;
         r.ppm   = lastValidCO2;
         r.valid = true;
         return r;
@@ -922,16 +957,16 @@ CO2Reading readSCD41() {
     }
   }
 
-  // 3. Keep latest reading active between 5-second sampling cycles (up to 10s)
-  if (lastValidCO2 > 0 && lastCO2SuccessTime > 0 && (millis() - lastCO2SuccessTime < 10000)) {
+  // 3. Keep latest reading active across 5-second sampling cycles (up to 45s)
+  if (lastValidCO2 > 0 && lastCO2SuccessTime > 0 && (now - lastCO2SuccessTime < SCD41_HOLD_TIME_MS)) {
     r.ppm   = lastValidCO2;
     r.valid = true;
     return r;
   }
 
   // 4. Initial boot warmup grace period (SCD41 optical measurement requires 5-10s)
-  if (millis() - bootTime < 10000) {
-    r.ppm   = -999;
+  if (now - bootTime < 15000) {
+    r.ppm   = (lastValidCO2 > 0) ? lastValidCO2 : 500;
     r.valid = true; // Still warming up, do not flag fault
     return r;
   }
@@ -992,12 +1027,20 @@ void pushToFirebase(float temp, float hum, int light, int co2,
   ts.set(".sv", "timestamp");
   json.set("last_seen", ts);
 
+  static int cloudSyncFailStreak = 0;
   if (Firebase.RTDB.updateNode(&fbdo, "/kabutech/sensors/live", &json)) {
     Serial.println("   ☁️  Firebase synced ✓");
     lastSuccessfulCloudSync = millis();
+    cloudSyncFailStreak = 0;
     firebaseReady = true;
   } else {
-    Serial.printf("   ❌ Firebase sync error: %s\n", fbdo.errorReason().c_str());
+    cloudSyncFailStreak++;
+    Serial.printf("   ❌ Firebase sync error (%d): %s\n", cloudSyncFailStreak, fbdo.errorReason().c_str());
+    if (cloudSyncFailStreak >= 2) {
+      // 2 consecutive push failures (~4s) -> cloud link is dead, clear sync immediately!
+      lastSuccessfulCloudSync = 0;
+      firebaseReady = false;
+    }
   }
 }
 
@@ -1018,6 +1061,8 @@ void sendHeartbeat() {
     Serial.println("   💓 Heartbeat sent");
     lastSuccessfulCloudSync = millis();
     firebaseReady = true;
+  } else {
+    firebaseReady = false;
   }
 }
 
@@ -1109,6 +1154,28 @@ void pushHourlyHistory() {
 void loop() {
   unsigned long now = millis();
 
+  // ── Network & Cloud Liveness Check (Matches Mobile App useSensorHealth 6s dynamic threshold) ──
+  // A device is truly "online" ONLY if:
+  // 1. Wi-Fi link is connected (WiFi.status() == WL_CONNECTED)
+  // 2. AND verified 2-way cloud communication occurred within 6 seconds.
+  // 3. During initial boot, allow 6 seconds grace before asserting offline failsafe.
+  #define CLOUD_SYNC_TIMEOUT_MS 6000
+  bool isNetConnected = (WiFi.status() == WL_CONNECTED);
+  bool isCloudSynced  = (lastSuccessfulCloudSync > 0) && (now - lastSuccessfulCloudSync <= CLOUD_SYNC_TIMEOUT_MS);
+  bool isBootGrace    = (lastSuccessfulCloudSync == 0) && (now <= CLOUD_SYNC_TIMEOUT_MS);
+  bool isSysOnline    = isNetConnected && (isCloudSynced || isBootGrace);
+
+  // ── Offline Failsafe Watchdog: Auto-transition to AI AUTO when network or cloud is lost ──
+  if (!isSysOnline) {
+    if (stateMode != "AUTO") {
+      Serial.printf("⚠️ [Offline Failsafe] Device is OFFLINE (LOCAL mode)! Overriding %s -> AI AUTO for autonomous crop preservation.\n", stateMode.c_str());
+      stateMode = "AUTO";
+      offlineFailsafeActive = true;
+    }
+  } else {
+    offlineFailsafeActive = false;
+  }
+
   // ── Read sensors and print to Serial Monitor every 1s ──
   if (now - lastSerialPrint >= SERIAL_PRINT_INTERVAL) {
     lastSerialPrint = now;
@@ -1133,7 +1200,8 @@ void loop() {
       }
     }
 
-    // 2. Read BH1750
+    // 2. Read BH1750 (5ms I2C bus settling delay)
+    delay(5);
     LightReading lightData = readBH1750();
     if (lightData.valid) {
       lightFailStreak = 0;
@@ -1151,7 +1219,8 @@ void loop() {
       }
     }
 
-    // 3. Read SCD41
+    // 3. Read SCD41 (5ms I2C bus settling delay)
+    delay(5);
     CO2Reading co2Data = readSCD41();
     if (co2Data.valid) {
       co2FailStreak = 0;
@@ -1199,19 +1268,6 @@ void loop() {
     // ── Edge AI: sample every 30 s into the ring buffer and forecast +10 min ──
     edgeForecastTick(now, currentTemp, currentHum, currentCO2, currentLight,
                      shtFault, co2Fault, lightFault);
-
-    // ── Offline Failsafe Watchdog: Auto-transition to AI AUTO when Wi-Fi is lost ──
-    bool wifiConnected = (WiFi.status() == WL_CONNECTED);
-
-    if (!wifiConnected) {
-      if (stateMode != "AUTO") {
-        Serial.printf("⚠️ [Offline Failsafe] Wi-Fi link lost (LOCAL mode)! Overriding %s -> AI AUTO for autonomous crop preservation.\n", stateMode.c_str());
-        stateMode = "AUTO";
-        offlineFailsafeActive = true;
-      }
-    } else {
-      offlineFailsafeActive = false;
-    }
 
     // ── Local Autonomous Environmental Regulation (AUTO Mode) ──
     runAutoRegulation();
@@ -1323,9 +1379,6 @@ void loop() {
   // ── Non-Blocking 3.2" TFT Dashboard Refresh (every 500ms) ──
   if (now - lastDisplayRefresh >= DISPLAY_REFRESH_INTERVAL) {
     lastDisplayRefresh = now;
-    bool isNetConnected = (WiFi.status() == WL_CONNECTED);
-    bool isCloudOk = isNetConnected && (lastSuccessfulCloudSync == 0 || (now - lastSuccessfulCloudSync <= 15000));
-    bool isSysOnline = isNetConnected && isCloudOk;
     drawDashboard(currentTemp, currentHum, currentLight, currentCO2,
                   shtFault, lightFault, co2Fault,
                   stateExhaust, stateIntake, stateMister, stateLight,
@@ -1349,7 +1402,7 @@ void loop() {
       Serial.printf("\n🔄 [SERIAL TRIGGER] Setting TFT Rotation to %d...\n", curRot);
       tft.setRotation(curRot);
       baseDrawn = false;
-      tft.fillScreen(COLOR_BG);
+      tft.fillScreen(curTheme.bg);
       drawStaticDashboard();
     }
   }
