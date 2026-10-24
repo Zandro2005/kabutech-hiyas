@@ -4,6 +4,7 @@ import { MaterialCommunityIcons } from '@expo/vector-icons';
 import tw from '../tailwind';
 import { useTheme } from '../context/ThemeContext';
 import { useSensors, useSettings } from '../hooks/useFirebaseData';
+import { useSensorHealth } from '../hooks/useSensorHealth';
 import { useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { GlobalNavigationParamList } from '../types/navigation';

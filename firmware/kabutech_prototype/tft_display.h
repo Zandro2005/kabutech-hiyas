@@ -582,10 +582,10 @@ void drawDashboard(float temp, float hum, int light, int co2,
       tft.drawString("PREEMPT", 210, 218); // Pre-emptive fan/mister triggered by Edge AI
     } else if (aiActive) {
       tft.setTextColor(COLOR_EMERALD, COLOR_CARD_BG);
-      tft.drawString("AUTO*AI", 210, 218); // TinyML forecasting active on ESP32
+      tft.drawString("AI AUTO", 210, 218); // TinyML forecasting active on ESP32
     } else {
       tft.setTextColor(COLOR_EMERALD, COLOR_CARD_BG);
-      tft.drawString("AUTO", 210, 218);
+      tft.drawString("AI AUTO", 210, 218);
     }
   }
 

@@ -80,8 +80,11 @@ export default function ControlsScreen() {
   const isLightDisconnected = health.lightError || light === -999 || light < 0;
   const isCo2Disconnected = health.co2Error || co2 === -999 || co2 < 0;
 
-  const isAuto = String(settings?.setpoints?.mode).toLowerCase() === 'auto';
-  const isScheduled = String(settings?.setpoints?.mode).toLowerCase() === 'scheduled' || String(settings?.setpoints?.mode).toLowerCase() === 'timed';
+  const isOffline = !health.isControllerOnline;
+
+  const currentMode = String(settings?.setpoints?.mode || 'auto').toLowerCase();
+  const isAuto = currentMode === 'auto';
+  const isScheduled = currentMode === 'scheduled' || currentMode === 'timed';
   
   const rawDevices = settings?.setpoints?.devices || DEFAULT_DEVICES;
   const [devices, setDevices] = useState(rawDevices);
@@ -120,9 +123,8 @@ export default function ControlsScreen() {
     sensors?.light,
   ]);
 
-  const isOffline = !health.isControllerOnline;
   const isAiOverride = settings?.setpoints?.aiOverride === true;
-  const isLocked = isAuto || isScheduled || isAiOverride || isOffline;
+  const isLocked = isAuto || isScheduled || isAiOverride;
 
   const toggleDevice = async (key: string, state: boolean) => {
     if (isOffline) {
@@ -586,10 +588,6 @@ export default function ControlsScreen() {
             <TouchableOpacity 
               hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
               onPress={() => {
-                if (isOffline) {
-                  showToast({ type: 'info', text1: 'Controller Offline', text2: 'Control modes cannot be changed while offline.' });
-                  return;
-                }
                 if (isLocked) DeviceEventEmitter.emit('showManualOverrideModal');
               }}
               style={[tw`px-4 py-2 rounded-xl flex-row items-center gap-1.5`, (!isAuto && !isScheduled) ? tw`bg-amber-500 shadow-sm` : tw`bg-transparent`]}
@@ -601,6 +599,16 @@ export default function ControlsScreen() {
             </TouchableOpacity>
           </View>
         </View>
+
+        {/* Offline Local AI Auto Failsafe Banner */}
+        {isOffline ? (
+          <View style={tw`mx-5 bg-amber-500/10 border border-amber-500/30 rounded-2xl px-4 py-2.5 flex-row items-center gap-3 mb-4`}>
+            <MaterialCommunityIcons name="cloud-off-outline" size={18} color="#f59e0b" />
+            <Text style={[tw`text-[11px] text-amber-900 dark:text-amber-200 flex-1`, { fontFamily: 'PlusJakartaSans_600SemiBold' }]}>
+              Controller is currently offline. Hardware runs autonomous AI Auto locally until reconnected.
+            </Text>
+          </View>
+        ) : null}
 
         {/* AI / Lock Status Notification */}
         {isAiOverride ? (
@@ -657,7 +665,7 @@ export default function ControlsScreen() {
                 onPress={() => {
                   if (isOffline) {
                     hapticSelection();
-                    showToast({ type: 'info', text1: 'Controller Offline', text2: 'Equipment cannot be controlled while offline.' });
+                    showToast({ type: 'info', text1: 'Autonomous Local Mode', text2: 'TinyML AI Auto is actively regulating actuators locally while offline.' });
                     return;
                   }
                   if (isLocked) {
@@ -668,7 +676,7 @@ export default function ControlsScreen() {
                 style={[
                   tw`px-2.5 py-1 rounded-full border flex-row items-center gap-1.2`,
                   isOffline
-                    ? tw`bg-slate-100 dark:bg-slate-800 border-slate-300 dark:border-slate-700`
+                    ? tw`bg-emerald-50 dark:bg-emerald-950/40 border-emerald-200 dark:border-emerald-800`
                     : isAiOverride
                     ? tw`bg-blue-50 dark:bg-blue-950/40 border-blue-200 dark:border-blue-800`
                     : isAuto
@@ -682,7 +690,7 @@ export default function ControlsScreen() {
                   style={[
                     tw`w-1.5 h-1.5 rounded-full`,
                     isOffline
-                      ? tw`bg-slate-400 dark:bg-slate-500`
+                      ? tw`bg-emerald-500`
                       : isAiOverride
                       ? tw`bg-blue-500`
                       : isAuto
@@ -697,7 +705,7 @@ export default function ControlsScreen() {
                     tw`text-[9.5px]`,
                     { fontFamily: 'PlusJakartaSans_700Bold' },
                     isOffline
-                      ? tw`text-slate-500 dark:text-slate-400`
+                      ? tw`text-emerald-600 dark:text-emerald-400`
                       : isAiOverride
                       ? tw`text-blue-600 dark:text-blue-400`
                       : isAuto
@@ -707,7 +715,7 @@ export default function ControlsScreen() {
                       : tw`text-slate-600 dark:text-slate-400`
                   ]}
                 >
-                  {isOffline ? 'OFFLINE' : isAiOverride ? 'AI Locked' : isAuto ? 'AUTO' : isScheduled ? 'TIMED' : `${activeDeviceCount} Active`}
+                  {isOffline ? 'LOCAL AI AUTO' : isAiOverride ? 'AI Locked' : isAuto ? 'AUTO' : isScheduled ? 'TIMED' : `${activeDeviceCount} Active`}
                 </Text>
               </TouchableOpacity>
             </View>

@@ -5,9 +5,9 @@ describe('controlBands - getControlBands', () => {
   it('correctly derives thresholds with tropical grace bearing for Oyster Fruiting', () => {
     const bands = getControlBands(OYSTER_FRUITING);
 
-    // Temperature: Max 25°C + 2.0°C grace = 27.0°C ON, 27.0°C OFF (turns off as soon as optimal is reached)
-    expect(bands.exhaustTempOn).toBe(27.0);
-    expect(bands.exhaustTempOff).toBe(27.0);
+    // Temperature: Max 25°C ON, 24.2°C OFF (hysteresis cooling)
+    expect(bands.exhaustTempOn).toBe(25.0);
+    expect(bands.exhaustTempOff).toBe(24.2);
     expect(bands.tempColdBelow).toBe(16.0); // 18°C - 2.0°C grace
 
     // Humidity: Min 80% - 5% grace = 75% ON, 75% OFF
@@ -22,9 +22,9 @@ describe('controlBands - getControlBands', () => {
     expect(bands.exhaustCo2On).toBe(1150);
     expect(bands.exhaustCo2Off).toBe(1150);
 
-    // Light: Min 150 - 50 grace = 100 lx ON, 100 lx OFF (turns off as soon as optimal is reached)
-    expect(bands.lightsOn).toBe(100);
-    expect(bands.lightsOff).toBe(100);
+    // Light: 150 lx ON (dark), 1000 lx OFF (scorching ceiling)
+    expect(bands.lightsOn).toBe(150);
+    expect(bands.lightsOff).toBe(1000);
   });
 
   it('guarantees valid deactivation thresholds aligned with optimal boundaries for all actuators', () => {

@@ -13,8 +13,8 @@ export interface ControlBands {
   exhaustHumOff: number;  // Hum below which exhaust fan turns OFF (92 %)
   misterOn: number;       // Hum below which misters turn ON (75 %)
   misterOff: number;      // Hum above which misters turn OFF (88 %)
-  lightsOn: number;       // Light below which grow lights turn ON (100 lx)
-  lightsOff: number;      // Light above which grow lights turn OFF (300 lx)
+  lightsOn: number;       // Light below which grow lights turn ON (150 lx)
+  lightsOff: number;      // Light above which grow lights turn OFF (1000 lx)
   tempColdBelow: number;  // Temp below which fans are locked OFF to retain heat (16.0 °C)
 }
 
@@ -32,18 +32,19 @@ export const getControlBands = (p: CropProfile = ACTIVE_PROFILE): ControlBands =
 
   const lightMin = p.light.min ?? 150;
   const lightGrace = p.light.graceBearing ?? 50;
+  const lightMax = p.light.max ?? 500;
 
   return {
-    exhaustTempOn: tempMax + tempGrace,        // 27.0 °C (ON beyond grace)
-    exhaustTempOff: tempMax + tempGrace,       // 27.0 °C (OFF as soon as returned to optimal <= 27.0 °C)
+    exhaustTempOn: tempMax,                    // 25.0 °C (ON when exceeding 25°C optimal ceiling)
+    exhaustTempOff: tempMax - 0.8,             // 24.2 °C (OFF once safely cooled into optimal band)
     exhaustCo2On: co2Max + co2Grace,           // 1150 ppm (ON beyond grace)
     exhaustCo2Off: co2Max + co2Grace,          // 1150 ppm (OFF as soon as returned to optimal <= 1150 ppm)
     exhaustHumOn: humMax + humGrace,           // 100 % (ON only if 100% saturated)
     exhaustHumOff: humMax + humGrace,          // 100 % (OFF once inside normal crop range <= 100 %)
     misterOn: humMin - humGrace,               // 75 % (ON when dry)
     misterOff: humMin - humGrace,              // 75 % (OFF as soon as returned to optimal >= 75 %)
-    lightsOn: lightMin - lightGrace,           // 100 lx (ON when dark)
-    lightsOff: lightMin - lightGrace,          // 100 lx (OFF as soon as returned to optimal target >= 100 lx; was 300 lx)
+    lightsOn: 150,                             // 150 lx (ON when dark / below optimal fruiting threshold)
+    lightsOff: 1000,                           // 1000 lx (OFF when exceeding 1000 lx optimal ceiling / too bright)
     tempColdBelow: tempMin - tempGrace,        // 16.0 °C
   };
 };

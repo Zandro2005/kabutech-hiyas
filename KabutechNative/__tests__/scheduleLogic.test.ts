@@ -5,31 +5,31 @@ import {
 } from '../src/utils/scheduleLogic';
 
 describe('scheduleLogic - computeAutoDecision and hysteresis', () => {
-  it('turns fans ON when temperature exceeds research max + grace (> 27.0°C) and turns OFF at <= 27.0°C', () => {
-    // 1. Initially OFF, temp at 26.5°C (within grace buffer) -> stays OFF
-    const sensorsAtGrace = {
-      temperature: 26.5,
+  it('turns fans ON when temperature exceeds research ceiling (> 25.0°C) and turns OFF at <= 24.2°C', () => {
+    // 1. Initially OFF, temp at 24.5°C (within optimal 18-25°C band) -> stays OFF
+    const sensorsOptimal = {
+      temperature: 24.5,
       humidity: 85.0,
       light: 600,
       co2: 600,
       waterLevel: 80,
     };
-    const decisionGrace = computeAutoDecision(sensorsAtGrace, { fans: false });
-    expect(decisionGrace.states.fans).toBe(false);
+    const decisionOptimal = computeAutoDecision(sensorsOptimal, { fans: false });
+    expect(decisionOptimal.states.fans).toBe(false);
 
-    // 2. Temp spikes to 27.4°C (> 27.0°C) -> turns ON
+    // 2. Temp spikes to 25.4°C (> 25.0°C) -> turns ON
     const sensorsHigh = {
-      ...sensorsAtGrace,
-      temperature: 27.4,
+      ...sensorsOptimal,
+      temperature: 25.4,
     };
     const decisionHigh = computeAutoDecision(sensorsHigh, { fans: false });
     expect(decisionHigh.states.fans).toBe(true);
     expect(decisionHigh.reasons.fans).toContain('Islam et al. (2022)');
 
-    // 3. Cooled down to 26.8°C (<= 27.0°C, returned to optimal zone) -> turns OFF
+    // 3. Cooled down to 24.0°C (<= 24.2°C, returned to optimal zone) -> turns OFF
     const sensorsCooled = {
-      ...sensorsAtGrace,
-      temperature: 26.8,
+      ...sensorsOptimal,
+      temperature: 24.0,
     };
     const decisionCooled = computeAutoDecision(sensorsCooled, { fans: true, fansTemp: true });
     expect(decisionCooled.states.fans).toBe(false);
@@ -53,9 +53,9 @@ describe('scheduleLogic - computeAutoDecision and hysteresis', () => {
     expect(decisionCleared.states.fans).toBe(false);
   });
 
-  it('prevents cross-trigger latching: CO2 spike turns fans ON, clearing CO2 turns fans OFF even with ambient temp at 26.5°C', () => {
+  it('prevents cross-trigger latching: CO2 spike turns fans ON, clearing CO2 turns fans OFF even with safe ambient temp at 24.0°C', () => {
     const ambientSensors = {
-      temperature: 26.5, // Normal tropical ambient, safely <= 27.0°C
+      temperature: 24.0, // Normal tropical ambient within optimal 18-25°C band
       humidity: 85.0,
       light: 600,
       co2: 1250,        // CO2 spike!
@@ -68,7 +68,7 @@ describe('scheduleLogic - computeAutoDecision and hysteresis', () => {
     expect(spikedDecision.states.fansCo2).toBe(true);
     expect(spikedDecision.states.fansTemp).toBe(false);
 
-    // 2. CO2 purges down to 950 ppm (optimal target). Ambient temp remains 26.5°C.
+    // 2. CO2 purges down to 950 ppm (optimal target). Ambient temp remains 24.0°C.
     // Fans must turn OFF because Temp was never the trigger that turned fans ON!
     const normalizedDecision = computeAutoDecision(
       { ...ambientSensors, co2: 950 },
@@ -115,8 +115,8 @@ describe('scheduleLogic - computeAutoDecision and hysteresis', () => {
     expect(decision.reasons.mistersBlocked).toContain('misting paused to protect pump');
   });
 
-  it('turns lights ON when light drops below research min - grace (< 100 lx) and turns OFF as soon as light is optimal (>= 100 lx)', () => {
-    // 1. Light at 70 lx (< 100 lx) -> lights ON
+  it('turns lights ON when dark (< 150 lx), maintains ON in optimal band (150 - 1000 lx), and turns OFF when too bright (>= 1000 lx)', () => {
+    // 1. Light at 70 lx (< 150 lx) -> lights ON
     const sensorsDark = {
       temperature: 24.0,
       humidity: 85.0,
@@ -129,13 +129,20 @@ describe('scheduleLogic - computeAutoDecision and hysteresis', () => {
     expect(decision.states.lights).toBe(true);
     expect(decision.reasons.lights).toContain('Bellettini et al. (2019)');
 
-    // 2. Returns to optimal threshold (100 lx) -> turns OFF immediately
-    const decisionOptimal = computeAutoDecision({ ...sensorsDark, light: 100 }, { lights: true });
-    expect(decisionOptimal.states.lights).toBe(false);
+    // 2. Chamber is illuminated into optimal fruiting range (300 lx, 600 lx) -> MAINTAINS lights ON
+    const decisionOptimal = computeAutoDecision({ ...sensorsDark, light: 300 }, { lights: true });
+    expect(decisionOptimal.states.lights).toBe(true);
 
-    // 3. In bright room (200 lx) -> remains OFF
-    const decisionBright = computeAutoDecision({ ...sensorsDark, light: 200 }, { lights: true });
-    expect(decisionBright.states.lights).toBe(false);
+    const decisionMidOptimal = computeAutoDecision({ ...sensorsDark, light: 600 }, { lights: true });
+    expect(decisionMidOptimal.states.lights).toBe(true);
+
+    // 3. Exceeds scorching ceiling (>= 1000 lx) -> turns OFF
+    const decisionTooBright = computeAutoDecision({ ...sensorsDark, light: 1050 }, { lights: true });
+    expect(decisionTooBright.states.lights).toBe(false);
+
+    // 4. In bright room/daylight (400 lx) when lights were OFF -> remains OFF
+    const decisionDaylight = computeAutoDecision({ ...sensorsDark, light: 400 }, { lights: false });
+    expect(decisionDaylight.states.lights).toBe(false);
   });
 
   it('locks exhaust fans OFF when temperature is below safe biological floor (< 16.0°C)', () => {

@@ -68,8 +68,8 @@
 // ═══════════════════════════════════════════════
 
 // WiFi Credentials
-#define WIFI_SSID       "Abad_Fam"
-#define WIFI_PASSWORD   "Connecting123"
+#define WIFI_SSID       "jai"
+#define WIFI_PASSWORD   "jai12345678"
 
 // Firebase Project Config
 #define API_KEY         "AIzaSyA3rB7rKIrfdJzCnFdnGvk25n0rd_hHI7M"
@@ -103,8 +103,8 @@
 //  Compensates for ESP32 / breadboard self-heating
 // ═══════════════════════════════════════════════
 
-#define TEMP_OFFSET     -4.0    // Adjust temperature in °C (e.g. -3.0 lowers reading by 3°C)
-#define HUM_OFFSET       +5.0    // Adjust humidity in % RH (e.g. +2.0 or 0.0)
+#define TEMP_OFFSET     -8.0    // Adjust temperature in °C (e.g. -3.0 lowers reading by 3°C)
+#define HUM_OFFSET       +15.0    // Adjust humidity in % RH (e.g. +2.0 or 0.0)
 
 // ═══════════════════════════════════════════════
 //  TIMING CONFIG
@@ -220,6 +220,19 @@ bool stateIntake  = false;
 bool stateMister  = false;
 bool stateLight   = false;
 String stateMode  = "AUTO"; // Tracks AUTO vs TIMED vs MANUAL control
+bool offlineFailsafeActive = false; // Tracks if we fell back to AI AUTO due to network loss
+unsigned long lastSuccessfulCloudSync = 0; // Tracks last verified 2-way cloud communication
+
+// ─── Grow Light Hysteresis & Dwell Timers (Biological Range: 150 - 1000 lx) ───
+#define LIGHT_ON_THRESHOLD      150     // Turn ON when ambient light drops below 150 lx (Low/Dark)
+#define LIGHT_OFF_THRESHOLD     1000    // Turn OFF when light reaches >= 1000 lx (High/Too Bright)
+#define LIGHT_MIN_ON_TIME_MS    6000    // Minimum ON dwell time: 6 seconds (prevents relay flicker)
+#define LIGHT_MIN_OFF_TIME_MS   4000    // Minimum OFF dwell time: 4 seconds (prevents instant re-triggering)
+#define LIGHT_TRIGGER_STREAK    2       // Require 2 consecutive seconds to confirm state transition
+
+unsigned long lastLightToggleTime = 0;
+int lightLowStreak  = 0;
+int lightHighStreak = 0;
 
 // Normalizes Firebase mode string to canonical stateMode ("AUTO", "TIMED", "MANUAL")
 String normalizeMode(String raw) {
@@ -258,6 +271,9 @@ void applyActuator(const String& key, bool state) {
     Serial.printf("   💧 [Actuator] Misters (GPIO %d) -> %s\n", PIN_MISTER, state ? "ON" : "OFF");
   } else if (key == "lights") {
     stateLight = state;
+    lastLightToggleTime = millis();
+    lightLowStreak = 0;
+    lightHighStreak = 0;
     digitalWrite(PIN_LIGHT, state ? HIGH : LOW);
     Serial.printf("   💡 [Actuator] Grow Light (GPIO %d) -> %s\n", PIN_LIGHT, state ? "ON" : "OFF");
   }
@@ -274,6 +290,7 @@ void streamCallback(FirebaseStream data) {
     if (json != nullptr) {
       if (json->get(result, "mode")) {
         stateMode = normalizeMode(result.to<String>());
+        offlineFailsafeActive = false;
         Serial.printf("   ⚙️ [Control] Mode: %s\n", stateMode.c_str());
       }
       if (json->get(result, "devices/fans") || json->get(result, "fans")) applyActuator("fans", result.to<bool>());
@@ -290,6 +307,7 @@ void streamCallback(FirebaseStream data) {
   // 2. Control Mode string change
   if (path.indexOf("mode") >= 0) {
     stateMode = normalizeMode(data.stringData());
+    offlineFailsafeActive = false;
     Serial.printf("   ⚙️ [Control] Mode changed to: %s\n", stateMode.c_str());
     return;
   }
@@ -336,32 +354,56 @@ void runAutoRegulation() {
   // Cold lockout: if temp < 16.0 °C, lock fans OFF to prevent chilling the mushroom mycelium
   bool isTempCold = (isTempValid && currentTemp < 16.0);
 
-  // 1. CO2 Ventilation (Literature: Bellettini et al., 2019)
-  // Turn ON when CO2 > 1150 ppm (exceeds grace), turn OFF when <= 1000 ppm (returns to optimal target)
-  bool needFansForCo2 = isCo2Valid && (stateExhaust ? currentCO2 > 1000 : currentCO2 > 1150);
-
-  // 2. High Humidity Purge Exhaust (Islam et al., 2022)
-  // Turn ON when Humidity >= 100 % (saturated), turn OFF when <= 95 %
-  bool needFansForHum = isHumValid && (stateExhaust ? currentHum > 95.0 : currentHum >= 100.0);
-
-  // 3. High Temperature Cooling (Hu et al., 2023)
-  // Turn ON when Temp > 27.0 °C (exceeds 25°C + 2°C grace), turn OFF when <= 26.0 °C (prevents tropical lock-on)
-  bool needFansForTemp = isTempValid && (stateExhaust ? currentTemp > 26.0 : currentTemp > 27.0);
-
-  // 3b. Edge AI pre-emptive triggers: act when the +10 min FORECAST crosses the same thresholds
-  //    (same hysteresis as above, so the AI can only switch fans ON earlier — never block OFF safety)
-  bool aiTempSpike = aiReady && isTempValid && (stateExhaust ? predTemp10m > 26.0 : predTemp10m > 27.0);
-  bool aiCo2Spike  = aiReady && isCo2Valid  && (stateExhaust ? predCO2_10m > 1000 : predCO2_10m > 1150);
-  bool aiHumDrop   = aiReady && isHumValid  && predHum10m < 75.0;
-
-  if (aiReady) {
-    if (aiTempSpike && !needFansForTemp)      aiAction = "preempt_exhaust_temp";
-    else if (aiCo2Spike && !needFansForCo2)   aiAction = "preempt_exhaust_co2";
-    else if (aiHumDrop && currentHum >= 75.0) aiAction = "preempt_mister";
-    else                                      aiAction = "none";
+  // 1. High Temperature Cooling (Oyster Optimal: 18.0 - 25.0 °C)
+  // Model Predictive Control (MPC): Prediction is aligned to actuators!
+  // - Turns ON if currentTemp > 25.0 °C OR predTemp10m > 25.0 °C (pre-emptive cooling)
+  // - Turns OFF when currentTemp <= 25.0 °C AND predTemp10m <= 24.8 °C (safe optimal band confirmed)
+  // (Fallback without AI: ON > 25.0 °C, OFF <= 24.2 °C)
+  bool needFansForTemp = false;
+  if (isTempValid) {
+    if (aiReady) {
+      if (stateExhaust) {
+        needFansForTemp = (currentTemp > 25.0) || (predTemp10m > 24.8);
+      } else {
+        needFansForTemp = (currentTemp > 25.0) || (predTemp10m > 25.0);
+      }
+    } else {
+      needFansForTemp = stateExhaust ? (currentTemp > 24.2) : (currentTemp > 25.0);
+    }
   }
-  needFansForTemp = needFansForTemp || aiTempSpike;
-  needFansForCo2  = needFansForCo2  || aiCo2Spike;
+
+  // 2. CO2 Ventilation (Bellettini et al., 2019 / Oyster Optimal: < 1000 ppm, grace <= 1150 ppm)
+  // - Turns ON if currentCO2 > 1150 ppm OR predCO2_10m > 1150 ppm (pre-emptive ventilation)
+  // - Turns OFF when currentCO2 <= 1150 ppm AND predCO2_10m <= 1050 ppm (purge complete)
+  // (Fallback without AI: ON > 1150 ppm, OFF <= 1000 ppm)
+  bool needFansForCo2 = false;
+  if (isCo2Valid) {
+    if (aiReady) {
+      if (stateExhaust) {
+        needFansForCo2 = (currentCO2 > 1150) || (predCO2_10m > 1050);
+      } else {
+        needFansForCo2 = (currentCO2 > 1150) || (predCO2_10m > 1150);
+      }
+    } else {
+      needFansForCo2 = stateExhaust ? (currentCO2 > 1000) : (currentCO2 > 1150);
+    }
+  }
+
+  // 3. High Humidity Purge Exhaust (Islam et al., 2022 / Oyster Optimal: 80 - 95 % RH)
+  // Purge excess condensation only when chamber reaches saturation (>= 100 %).
+  // Turns OFF once humidity drops below 96.0% (returns to normal fruiting humidity).
+  bool needFansForHum = false;
+  if (isHumValid) {
+    if (aiReady) {
+      if (stateExhaust) {
+        needFansForHum = (currentHum >= 100.0) || (predHum10m >= 98.0);
+      } else {
+        needFansForHum = (currentHum >= 100.0) || (predHum10m >= 100.0);
+      }
+    } else {
+      needFansForHum = stateExhaust ? (currentHum > 96.0) : (currentHum >= 100.0);
+    }
+  }
 
   // Combined Fan Actuation
   if (!isTempCold && (needFansForCo2 || needFansForHum || needFansForTemp)) {
@@ -372,24 +414,85 @@ void runAutoRegulation() {
     nextIntake  = false;
   }
 
-  // 4. Ultrasonic Misters (Islam et al., 2022)
-  // Turn ON when Humidity < 75 % (dry air), turn OFF when >= 85 % (returned to 80-95% optimal band)
+  // 4. Ultrasonic Misters (Islam et al., 2022 / Oyster Optimal: 80 - 95 % RH)
+  // - Turns ON when Humidity < 75 % (dry air) OR predHum10m < 75 % (pre-emptive misting)
+  // - Turns OFF when Humidity >= 80 % AND predHum10m >= 80 % (returns to optimal band)
+  // (Fallback without AI: turn OFF >= 85 %)
   if (isHumValid) {
-    if (currentHum < 75.0 || aiHumDrop) {
-      nextMister = true;
-    } else if (currentHum >= 85.0) {
-      nextMister = false;
+    bool needMister = false;
+    if (aiReady) {
+      if (stateMister) {
+        needMister = (currentHum < 80.0) || (predHum10m < 80.0);
+      } else {
+        needMister = (currentHum < 75.0) || (predHum10m < 75.0);
+      }
+    } else {
+      needMister = stateMister ? (currentHum < 85.0) : (currentHum < 75.0);
+    }
+    nextMister = needMister;
+  }
+
+  // 5. Grow Lights Photoperiod / Illumination (Bellettini et al., 2019 / Oyster Optimal: 150 - 1000 lx)
+  // Anti-chatter Biological Hysteresis:
+  // - Turns ON when light < 150 lx (chamber is dark / below optimal fruiting threshold)
+  // - MAINTAINS light ON throughout optimal range (150 - 1000 lx)
+  // - Turns OFF only if light exceeds >= 1000 lx (intense ambient daylight)
+  // - Edge AI integration: if predLight10m >= 1000 lx, turns off early (sunrise incoming)
+  if (isLightValid) {
+    unsigned long nowMs = millis();
+    bool aiSunHigh  = (aiReady && predLight10m >= 1000.0 && currentLight >= 800);
+    bool aiDarkDrop = (aiReady && predLight10m < 150.0 && currentLight < 250);
+
+    if (!stateLight) {
+      if (currentLight < LIGHT_ON_THRESHOLD || aiDarkDrop) {
+        lightLowStreak++;
+        lightHighStreak = 0;
+      } else {
+        lightLowStreak = 0;
+      }
+
+      if (lightLowStreak >= LIGHT_TRIGGER_STREAK && (lastLightToggleTime == 0 || (nowMs - lastLightToggleTime >= LIGHT_MIN_OFF_TIME_MS))) {
+        nextLight = true;
+      }
+    } else {
+      // Light is currently ON
+      if (currentLight >= LIGHT_OFF_THRESHOLD || aiSunHigh) {
+        lightHighStreak++;
+        lightLowStreak = 0;
+      } else {
+        lightHighStreak = 0;
+      }
+
+      if (lightHighStreak >= LIGHT_TRIGGER_STREAK && (nowMs - lastLightToggleTime >= LIGHT_MIN_ON_TIME_MS)) {
+        nextLight = false;
+      } else {
+        nextLight = true; // Hold ON during minimum dwell period
+      }
     }
   }
 
-  // 5. Grow Lights Photoperiod / Illumination (Bellettini et al., 2019)
-  // Turn ON when Light < 100 lx, turn OFF when >= 150 lx
-  if (isLightValid) {
-    if (currentLight < 100) {
-      nextLight = true;
-    } else if (currentLight >= 150) {
-      nextLight = false;
+  // 6. Dynamic Edge AI Action Label
+  if (aiReady) {
+    if (isTempValid && currentTemp <= 25.0 && predTemp10m > 25.0) {
+      aiAction = "preempt_exhaust_temp";
+    } else if (isCo2Valid && currentCO2 <= 1150 && predCO2_10m > 1150) {
+      aiAction = "preempt_exhaust_co2";
+    } else if (isHumValid && currentHum < 100.0 && predHum10m >= 100.0) {
+      aiAction = "preempt_exhaust_hum";
+    } else if (isHumValid && currentHum >= 75.0 && predHum10m < 75.0) {
+      aiAction = "preempt_mister";
+    } else if (nextExhaust) {
+      if (needFansForTemp)      aiAction = "cooling";
+      else if (needFansForCo2)  aiAction = "purging_co2";
+      else if (needFansForHum)  aiAction = "purging_hum";
+      else                      aiAction = "ventilating";
+    } else if (nextMister) {
+      aiAction = "misting";
+    } else {
+      aiAction = "ai_optimal";
     }
+  } else {
+    aiAction = "warming_up";
   }
 
   // If any state adjusted, apply to pins and immediately push to Firebase!
@@ -399,6 +502,12 @@ void runAutoRegulation() {
                   nextLight   != stateLight);
 
   if (changed) {
+    if (nextLight != stateLight) {
+      lastLightToggleTime = millis();
+      lightLowStreak = 0;
+      lightHighStreak = 0;
+    }
+
     stateExhaust = nextExhaust;
     stateIntake  = nextIntake;
     stateMister  = nextMister;
@@ -409,11 +518,12 @@ void runAutoRegulation() {
     digitalWrite(PIN_MISTER,      stateMister  ? HIGH : LOW);
     digitalWrite(PIN_LIGHT,       stateLight   ? HIGH : LOW);
 
-    Serial.printf("🤖 [Auto Regulation] Actuators adjusted: EXH=%s INT=%s MIST=%s LIGHT=%s\n",
+    Serial.printf("🤖 [Auto Regulation] Actuators adjusted: EXH=%s INT=%s MIST=%s LIGHT=%s | AI Action: %s\n",
                   stateExhaust ? "ON" : "OFF",
                   stateIntake  ? "ON" : "OFF",
                   stateMister  ? "ON" : "OFF",
-                  stateLight   ? "ON" : "OFF");
+                  stateLight   ? "ON" : "OFF",
+                  aiAction);
 
     if (Firebase.ready() && WiFi.status() == WL_CONNECTED) {
       FirebaseJson devJson;
@@ -884,6 +994,8 @@ void pushToFirebase(float temp, float hum, int light, int co2,
 
   if (Firebase.RTDB.updateNode(&fbdo, "/kabutech/sensors/live", &json)) {
     Serial.println("   ☁️  Firebase synced ✓");
+    lastSuccessfulCloudSync = millis();
+    firebaseReady = true;
   } else {
     Serial.printf("   ❌ Firebase sync error: %s\n", fbdo.errorReason().c_str());
   }
@@ -904,6 +1016,8 @@ void sendHeartbeat() {
 
   if (Firebase.RTDB.updateNode(&fbdo, "/kabutech/sensors/live", &json)) {
     Serial.println("   💓 Heartbeat sent");
+    lastSuccessfulCloudSync = millis();
+    firebaseReady = true;
   }
 }
 
@@ -1086,8 +1200,40 @@ void loop() {
     edgeForecastTick(now, currentTemp, currentHum, currentCO2, currentLight,
                      shtFault, co2Fault, lightFault);
 
+    // ── Offline Failsafe Watchdog: Auto-transition to AI AUTO when Wi-Fi is lost ──
+    bool wifiConnected = (WiFi.status() == WL_CONNECTED);
+
+    if (!wifiConnected) {
+      if (stateMode != "AUTO") {
+        Serial.printf("⚠️ [Offline Failsafe] Wi-Fi link lost (LOCAL mode)! Overriding %s -> AI AUTO for autonomous crop preservation.\n", stateMode.c_str());
+        stateMode = "AUTO";
+        offlineFailsafeActive = true;
+      }
+    } else {
+      offlineFailsafeActive = false;
+    }
+
     // ── Local Autonomous Environmental Regulation (AUTO Mode) ──
     runAutoRegulation();
+
+    if (stateMode == "AUTO") {
+      if (stateExhaust) {
+        Serial.printf("   🌀 Exhaust Fans:  ON  [%s | T=%.1f°C (Pred:%.1f) | CO2=%d (Pred:%.0f) | H=%.1f%% (Pred:%.1f%%)]\n",
+                      aiAction, currentTemp, aiReady ? predTemp10m : currentTemp,
+                      currentCO2, aiReady ? predCO2_10m : (float)currentCO2,
+                      currentHum, aiReady ? predHum10m : currentHum);
+      } else {
+        Serial.printf("   🌀 Exhaust Fans:  OFF [Aligned: Chamber & Forecast Safe (T=%.1f°C / Pred:%.1f°C)]\n",
+                      currentTemp, aiReady ? predTemp10m : currentTemp);
+      }
+      if (stateMister) {
+        Serial.printf("   💧 Ultrasonic:    ON  [%s | Hum=%.1f%% / Pred=%.1f%%]\n",
+                      aiAction, currentHum, aiReady ? predHum10m : currentHum);
+      }
+      if (stateLight) {
+        Serial.printf("   💡 Grow Light:    ON  [%d lx (Optimal 150-1000 lx)]\n", currentLight);
+      }
+    }
   }
 
   // ── Auto Wi-Fi Reconnection Watchdog ──
@@ -1177,10 +1323,13 @@ void loop() {
   // ── Non-Blocking 3.2" TFT Dashboard Refresh (every 500ms) ──
   if (now - lastDisplayRefresh >= DISPLAY_REFRESH_INTERVAL) {
     lastDisplayRefresh = now;
+    bool isNetConnected = (WiFi.status() == WL_CONNECTED);
+    bool isCloudOk = isNetConnected && (lastSuccessfulCloudSync == 0 || (now - lastSuccessfulCloudSync <= 15000));
+    bool isSysOnline = isNetConnected && isCloudOk;
     drawDashboard(currentTemp, currentHum, currentLight, currentCO2,
                   shtFault, lightFault, co2Fault,
                   stateExhaust, stateIntake, stateMister, stateLight,
-                  stateMode, (WiFi.status() == WL_CONNECTED), firebaseReady,
+                  stateMode, isSysOnline, isSysOnline && firebaseReady,
                   aiReady, aiAction);
   }
 

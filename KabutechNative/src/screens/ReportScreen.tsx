@@ -175,32 +175,47 @@ export default function ReportScreen() {
 
   // Dynamic projections backed by real Edge AI TinyML
   const futureValues = useMemo(() => {
-    // Temperature projection
+    // Temperature projection (+10m TinyML Edge Forecast)
     let predTemp = liveTemp;
     if (liveTemp > 0) {
-      const dTemp10m = aiPredTemp !== null ? (aiPredTemp - liveTemp) : (isTempCritical ? 0.8 : 0.3);
-      predTemp = Number((liveTemp + dTemp10m * 1.6).toFixed(1));
+      if (aiPredTemp !== null) {
+        predTemp = Number(aiPredTemp.toFixed(1));
+      } else {
+        const dTemp10m = isTempCritical ? 0.8 : 0.3;
+        predTemp = Number((liveTemp + dTemp10m).toFixed(1));
+      }
     }
 
-    // Humidity projection
+    // Humidity projection (+10m TinyML Edge Forecast)
     let predHum = liveHum;
     if (liveHum > 0) {
-      const dHum10m = aiPredHum !== null ? (aiPredHum - liveHum) : (isHumCritical ? -6 : -2);
-      predHum = Math.round(Math.max(25, Math.min(100, liveHum + dHum10m * 1.6)));
+      if (aiPredHum !== null) {
+        predHum = Math.round(aiPredHum);
+      } else {
+        const dHum10m = isHumCritical ? -6 : -2;
+        predHum = Math.round(Math.max(25, Math.min(100, liveHum + dHum10m)));
+      }
     }
 
-    // Light projection
+    // Light projection (+10m TinyML Edge Forecast)
     let predLight = liveLight;
     if (liveLight >= 0 && sensors.light !== -999) {
-      const dLight10m = aiPredLight !== null ? (aiPredLight - liveLight) : 0;
-      predLight = Math.round(Math.max(0, liveLight + dLight10m));
+      if (aiPredLight !== null) {
+        predLight = Math.round(aiPredLight);
+      } else {
+        predLight = Math.round(Math.max(0, liveLight));
+      }
     }
 
-    // CO2 projection
+    // CO2 projection (+10m TinyML Edge Forecast)
     let predCo2 = liveCo2;
     if (liveCo2 > 0) {
-      const dCo210m = aiPredCo2 !== null ? (aiPredCo2 - liveCo2) : (isCo2Critical ? 120 : 40);
-      predCo2 = Math.round(Math.max(350, liveCo2 + dCo210m * 1.6));
+      if (aiPredCo2 !== null) {
+        predCo2 = Math.round(aiPredCo2);
+      } else {
+        const dCo210m = isCo2Critical ? 120 : 40;
+        predCo2 = Math.round(Math.max(350, liveCo2 + dCo210m));
+      }
     }
 
     const tempVar = liveTemp > 0 ? Number((predTemp - targetTemp).toFixed(1)) : 0;
@@ -212,53 +227,51 @@ export default function ReportScreen() {
       temp: {
         raw: predTemp,
         variance: tempVar,
-        status: tempVar > 2 ? 'Critical' : tempVar > 0.8 ? 'Elevated' : 'Normal',
-        statusColor: tempVar > 2 ? '#ef4444' : tempVar > 0.8 ? '#f97316' : '#10b981',
+        status: predTemp > 27 ? 'Critical' : predTemp > 25 ? 'Elevated' : predTemp < 16 ? 'Critical' : predTemp < 18 ? 'Low' : 'Normal',
+        statusColor: (predTemp > 27 || predTemp < 16) ? '#ef4444' : (predTemp > 25 || predTemp < 18) ? '#f97316' : '#10b981',
         description:
-          tempVar > 2
-            ? `Temperature is projected to rise ${tempVar}°C above target. Pre-emptive cooling active.`
-            : tempVar > 0.8
-            ? `A mild ${tempVar}°C overshoot is expected. Regulating autonomously.`
-            : `Temperature is on track. No intervention needed within the next 2 hours.`,
+          predTemp > 25
+            ? `Temperature is projected to reach ${predTemp}°C (> 25°C ceiling). Pre-emptive cooling active.`
+            : predTemp < 18
+            ? `Temperature is projected to drop to ${predTemp}°C (< 18°C floor). Fans locked OFF.`
+            : `Temperature is projected at ${predTemp}°C within the optimal 18-25°C band. Actuators idle.`,
         icon: 'thermometer',
       },
       hum: {
         raw: predHum,
         variance: humVar,
-        status: humVar < -12 ? 'Critical' : humVar < -5 ? 'Low' : 'Stable',
-        statusColor: humVar < -12 ? '#ef4444' : humVar < -5 ? '#0284c7' : '#10b981',
+        status: predHum < 75 ? 'Critical' : predHum < 80 ? 'Low' : predHum >= 100 ? 'Saturated' : 'Stable',
+        statusColor: predHum < 75 ? '#ef4444' : (predHum < 80 || predHum >= 100) ? '#f97316' : '#10b981',
         description:
-          humVar < -12
-            ? `Humidity will drop ${Math.abs(humVar)}% below target. Pre-emptive misting active.`
-            : humVar < -5
-            ? `A moderate ${Math.abs(humVar)}% humidity deficit is forecast.`
-            : `Humidity levels are projected to remain stable within optimal band.`,
+          predHum < 75
+            ? `Humidity will drop to ${predHum}% (< 75%). Pre-emptive misting active.`
+            : predHum >= 100
+            ? `Humidity will reach 100% saturation. Pre-emptive purge exhaust active.`
+            : `Humidity is projected at ${predHum}% within the optimal 80-95% band.`,
         icon: 'water-percent',
       },
       light: {
         raw: predLight,
         variance: lightVar,
-        status: lightVar > 60 ? 'High' : lightVar < -60 ? 'Low' : 'Optimal',
-        statusColor: lightVar > 60 ? '#f97316' : lightVar < -60 ? '#6366f1' : '#10b981',
+        status: predLight >= 1000 ? 'High' : predLight < 150 ? 'Low' : 'Optimal',
+        statusColor: (predLight >= 1000 || predLight < 150) ? '#f97316' : '#10b981',
         description:
-          lightVar > 60
-            ? `Light intensity is above target by ${lightVar} lx.`
-            : lightVar < -60
-            ? `Light levels are ${Math.abs(lightVar)} lx below target.`
-            : `Light intensity is well-balanced. Photoperiod is optimal.`,
+          predLight >= 1000
+            ? `Light intensity projected at ${predLight} lx (>= 1000 lx ceiling). Grow lights OFF.`
+            : predLight < 150
+            ? `Light intensity projected at ${predLight} lx (< 150 lx). Grow lights active.`
+            : `Light intensity projected at ${predLight} lx within optimal 150-1000 lx band.`,
         icon: 'white-balance-sunny',
       },
       co2: {
         raw: predCo2,
         variance: co2Var,
-        status: co2Var > 180 ? 'Critical' : co2Var > 80 ? 'Elevated' : 'Normal',
-        statusColor: co2Var > 180 ? '#ef4444' : co2Var > 80 ? '#a855f7' : '#10b981',
+        status: predCo2 > 1500 ? 'Critical' : predCo2 > 1150 ? 'Elevated' : 'Normal',
+        statusColor: predCo2 > 1500 ? '#ef4444' : predCo2 > 1150 ? '#f97316' : '#10b981',
         description:
-          co2Var > 180
-            ? `CO₂ is on a steep upward trajectory (+${co2Var} ppm). Pre-emptive exhaust fans active.`
-            : co2Var > 80
-            ? `CO₂ concentration is rising (+${co2Var} ppm). Purge scheduled.`
-            : `CO₂ levels are projected to stay within the safe range.`,
+          predCo2 > 1150
+            ? `CO₂ is projected to reach ${predCo2} ppm (> 1150 ppm). Pre-emptive exhaust fans active.`
+            : `CO₂ is projected at ${predCo2} ppm within safe optimal range (< 1000 ppm).`,
         icon: 'molecule-co2',
       },
     };
@@ -1200,12 +1213,12 @@ export default function ReportScreen() {
                     </Text>
                     <View style={tw`bg-blue-100 dark:bg-blue-950/80 px-1.5 py-0.5 rounded`}>
                       <Text style={[tw`text-[8px] text-blue-600 dark:text-blue-400`, { fontFamily: 'PlusJakartaSans_700Bold' }]}>
-                        SP &gt; 26.0°C
+                        SP &gt; 25.0°C
                       </Text>
                     </View>
                   </View>
                   <Text style={[tw`text-[11px] text-slate-500 dark:text-slate-400`, { fontFamily: 'PlusJakartaSans_500Medium' }]}>
-                    Runs fans preemptively if +10 min forecast exceeds 26°C to purge excess heat.
+                    Runs fans preemptively if +10 min forecast exceeds 25°C to purge excess heat.
                   </Text>
                 </View>
 

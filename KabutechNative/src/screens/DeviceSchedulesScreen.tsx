@@ -7,6 +7,7 @@ import { GlobalNavigationParamList } from '../types/navigation';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import tw from '../tailwind';
 import { useSettings } from '../hooks/useFirebaseData';
+import { useSensorHealth } from '../hooks/useSensorHealth';
 import { ref, update } from 'firebase/database';
 import { db } from '../services/firebase';
 import { ScheduleSettings, TimeWindow } from '../types/firebase';

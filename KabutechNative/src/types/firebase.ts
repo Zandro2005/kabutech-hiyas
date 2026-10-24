@@ -19,6 +19,7 @@ export interface SensorData {
   ai_pred_hum_10m?: number;
   ai_pred_co2_10m?: number;
   ai_pred_light_10m?: number;
+  mode?: string;
 }
 
 export interface DeviceStates {

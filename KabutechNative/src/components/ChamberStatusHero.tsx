@@ -149,7 +149,7 @@ export default React.memo(function ChamberStatusHero({
               }
             ]}
           >
-            {isAuto ? 'AUTO' : isScheduled ? 'TIMED' : 'MANUAL'}
+            {isOffline && isAuto ? 'AI AUTO (LOCAL)' : isAuto ? 'AUTO' : isScheduled ? 'TIMED' : 'MANUAL'}
           </Text>
         </TouchableOpacity>
       </View>
