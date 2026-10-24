@@ -171,11 +171,13 @@ static bool  baseDrawn = false;
 void initDisplay();
 void drawBootSplash();
 void updateBootStep(const char* label, bool success);
+void drawReconnectingScreen(const char* status = nullptr);
 void drawStaticDashboard();
 void drawDashboard(float temp, float hum, int light, int co2,
                    bool shtErr, bool lightErr, bool co2Err,
                    bool exhOn, bool intOn, bool mistOn, bool lightOn,
-                   const String& mode, bool wifiOk, bool fbOk);
+                   const String& mode, bool wifiOk, bool fbOk,
+                   bool aiActive = false, const char* aiAct = "none");
 
 // ─── Initialize TFT ───
 void initDisplay() {
@@ -289,6 +291,54 @@ void updateBootStep(const char* label, bool success) {
   tft.drawString(label, 74, bootStepY);
   bootStepY += 20;
   delay(120);
+}
+
+// ─── Cloud Reconnecting Screen (320x240 Landscape) ───
+void drawReconnectingScreen(const char* status) {
+  baseDrawn = false; // Invalidate dashboard cache
+  tft.fillScreen(COLOR_BG);
+  
+  // Outer decorative border
+  tft.drawRect(4, 4, 312, 232, COLOR_CARD_BORDER);
+
+  // Logo / Header
+  tft.setTextDatum(textdatum_t::top_center);
+  tft.setTextColor(COLOR_EMERALD, COLOR_BG);
+  tft.setFont(nullptr);
+  tft.setTextSize(3);
+  tft.drawString("KABUTECH", 160, 14);
+
+  tft.setTextSize(1);
+  tft.setTextColor(COLOR_MUTED_GREEN, COLOR_BG);
+  tft.drawString("HIYAS AUTOMATION - Oyster Mushroom Environment", 160, 42);
+
+  // Divider line
+  tft.drawLine(24, 54, 296, 54, COLOR_CARD_BORDER);
+
+  // Reconnecting Card Modal
+  tft.fillRoundRect(24, 64, 272, 140, 8, COLOR_CARD_BG);
+  tft.drawRoundRect(24, 64, 272, 140, 8, COLOR_AMBER);
+
+  // Status icon and title
+  tft.setTextDatum(textdatum_t::top_center);
+  tft.setTextColor(COLOR_AMBER, COLOR_CARD_BG);
+  tft.setTextSize(2);
+  tft.drawString("RECONNECTING", 160, 78);
+
+  tft.setTextSize(1);
+  tft.setTextColor(COLOR_WHITE, COLOR_CARD_BG);
+  tft.drawString(status != nullptr ? status : "Restoring Cloud Link...", 160, 108);
+
+  tft.setTextColor(COLOR_MUTED_GREEN, COLOR_CARD_BG);
+  tft.drawString("Syncing App Mode & Controls...", 160, 130);
+
+  tft.setTextColor(COLOR_MUTED, COLOR_CARD_BG);
+  tft.drawString("Sensors & Edge AI running locally", 160, 158);
+
+  // Footer
+  tft.setTextDatum(textdatum_t::bottom_center);
+  tft.setTextColor(COLOR_MUTED, COLOR_BG);
+  tft.drawString("Please wait a moment...", 160, 226);
 }
 
 // ─── Draw Base Landscape Dashboard Layout (320x240) ───
@@ -408,7 +458,7 @@ void drawDashboard(float temp, float hum, int light, int co2,
                    bool shtErr, bool lightErr, bool co2Err,
                    bool exhOn, bool intOn, bool mistOn, bool lightOn,
                    const String& mode, bool wifiOk, bool fbOk,
-                   bool aiActive = false, const char* aiAct = "none") {
+                   bool aiActive, const char* aiAct) {
   // ── Dynamic Mode Theme Switching ──
   // When operating mode transitions (AUTO <-> MANUAL <-> TIMED), switch theme & repaint base
   if (mode != prevThemeMode || !baseDrawn) {

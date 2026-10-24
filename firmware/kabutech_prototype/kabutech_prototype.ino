@@ -68,8 +68,8 @@
 // ═══════════════════════════════════════════════
 
 // WiFi Credentials
-#define WIFI_SSID       "Abad_Fam"
-#define WIFI_PASSWORD   "Connecting123"
+#define WIFI_SSID       "Zandrix"
+#define WIFI_PASSWORD   "0907133ado"
 
 // Firebase Project Config
 #define API_KEY         "AIzaSyA3rB7rKIrfdJzCnFdnGvk25n0rd_hHI7M"
@@ -132,7 +132,7 @@ bool scd4xReady  = false;
 // 25 kHz (40µs period) gives the slow RC rising edge plenty of time to reach 3.3V logic HIGH.
 #define I2C_LONG_CABLE_CLOCK  50000  // 50 kHz: Fast, responsive, with 2x rise-time margin for cables
 #define I2C_WIRE_TIMEOUT_MS   100    // 100ms: Low latency timeout to prevent loop freezing
-#define SENSOR_HOLD_TIME_MS   3000   // 3s: Responsive real-time updates (no frozen readings)
+#define SENSOR_HOLD_TIME_MS   10000  // 10s: Seamlessly bridges across relay switching spikes and actuator noise
 
 // Last valid reading buffers (keeps readings stable across momentary cable noise)
 float lastValidTemp  = -999.0;
@@ -169,6 +169,9 @@ struct CO2Reading {
 SHTReading readSHT3x();
 LightReading readBH1750();
 CO2Reading readSCD41();
+void recoverI2CBus();
+bool initFirebaseCloud();
+void resyncCloudSetpoints();
 
 FirebaseData fbdo;
 FirebaseData streamDO; // For listening to actuator changes
@@ -195,8 +198,8 @@ bool lightFault = true;
 bool co2Fault   = true;
 
 // Debouncing streaks (consecutive reads to latch/clear fault)
-#define STREAK_TO_LATCH_FAULT 4
-#define STREAK_TO_CLEAR_FAULT 2
+#define STREAK_TO_LATCH_FAULT 6      // 6 consecutive failed reads (6s) required to latch FAULT
+#define STREAK_TO_CLEAR_FAULT 2      // 2 consecutive valid reads to clear FAULT
 
 int shtFailStreak = 0,   shtValidStreak = 0;
 int lightFailStreak = 0, lightValidStreak = 0;
@@ -540,6 +543,82 @@ void runAutoRegulation() {
 }
 
 // ═══════════════════════════════════════════════
+//  FIREBASE CLOUD INITIALIZATION & RESYNC
+// ═══════════════════════════════════════════════
+
+void resyncCloudSetpoints();
+
+bool initFirebaseCloud() {
+  if (WiFi.status() != WL_CONNECTED) return false;
+
+  Serial.println("☁️ [Firebase] Initializing Cloud connection...");
+  config.api_key = API_KEY;
+  config.database_url = DATABASE_URL;
+
+  // Sign up / log in anonymously
+  if (Firebase.signUp(&config, &auth, "", "")) {
+    Serial.println("✅ Firebase anonymous sign-in successful!");
+    firebaseReady = true;
+  } else {
+    Serial.printf("❌ Firebase sign-in failed: %s\n", config.signer.signupError.message.c_str());
+    firebaseReady = false;
+    return false;
+  }
+
+  config.token_status_callback = tokenStatusCallback;
+  Firebase.begin(&config, &auth);
+  Firebase.reconnectNetwork(true);
+
+  fbdo.setBSSLBufferSize(4096, 1024);
+  streamDO.setBSSLBufferSize(4096, 1024);
+
+  // Subscribe to real-time control stream
+  if (!Firebase.RTDB.beginStream(&streamDO, "/kabutech/settings/setpoints")) {
+    Serial.printf("❌ Stream begin error: %s\n", streamDO.errorReason().c_str());
+  } else {
+    Firebase.RTDB.setStreamCallback(&streamDO, streamCallback, streamTimeoutCallback);
+    Serial.println("✅ Firebase RTDB stream active!");
+  }
+
+  // Fetch initial cloud mode and actuator settings immediately
+  resyncCloudSetpoints();
+  return true;
+}
+
+void resyncCloudSetpoints() {
+  if (WiFi.status() != WL_CONNECTED || !firebaseReady) return;
+
+  Serial.println("🔄 [Cloud Sync] Fetching current mode & controls from Firebase RTDB...");
+  if (Firebase.RTDB.getJSON(&fbdo, "/kabutech/settings/setpoints")) {
+    FirebaseJsonData d;
+    FirebaseJson *json = fbdo.jsonObjectPtr();
+    if (json != nullptr) {
+      if (json->get(d, "mode")) {
+        String fetchedMode = normalizeMode(d.to<String>());
+        stateMode = fetchedMode;
+        offlineFailsafeActive = false;
+        Serial.printf("✅ [Cloud Sync] Successfully restored App Mode: %s\n", stateMode.c_str());
+      }
+      if (json->get(d, "devices/fans") || json->get(d, "fans")) applyActuator("fans", d.to<bool>());
+      if (json->get(d, "devices/fanOut") || json->get(d, "fanOut")) applyActuator("fanOut", d.to<bool>());
+      if (json->get(d, "devices/fanIn") || json->get(d, "fanIn")) applyActuator("fanIn", d.to<bool>());
+      if (json->get(d, "devices/misters") || json->get(d, "misters")) applyActuator("misters", d.to<bool>());
+      if (json->get(d, "devices/lights") || json->get(d, "lights")) applyActuator("lights", d.to<bool>());
+      
+      lastSuccessfulCloudSync = millis();
+    }
+  } else {
+    Serial.printf("⚠️ [Cloud Sync] getJSON failed: %s\n", fbdo.errorReason().c_str());
+  }
+
+  // Ensure stream stays subscribed
+  if (!streamDO.httpConnected()) {
+    Firebase.RTDB.beginStream(&streamDO, "/kabutech/settings/setpoints");
+    Firebase.RTDB.setStreamCallback(&streamDO, streamCallback, streamTimeoutCallback);
+  }
+}
+
+// ═══════════════════════════════════════════════
 //  SETUP
 // ═══════════════════════════════════════════════
 
@@ -649,14 +728,14 @@ void setup() {
   digitalWrite(PIN_MISTER, LOW);
   digitalWrite(PIN_LIGHT, LOW);
 
-  // ── Connect to WiFi ──
+  // ── Connect to WiFi (Snappy 4.8s check, never hangs offline boot) ──
   Serial.print("📶 Connecting to WiFi: ");
   Serial.println(WIFI_SSID);
   WiFi.begin(WIFI_SSID, WIFI_PASSWORD);
 
   int attempts = 0;
-  while (WiFi.status() != WL_CONNECTED && attempts < 40) {
-    delay(500);
+  while (WiFi.status() != WL_CONNECTED && attempts < 12) {
+    delay(400);
     Serial.print(".");
     attempts++;
   }
@@ -674,9 +753,9 @@ void setup() {
     Serial.print("⏰ Synchronizing Philippine Standard Time (PST)...");
     struct tm ntpInfo;
     int ntpAttempts = 0;
-    while (!getLocalTime(&ntpInfo, 250) && ntpAttempts < 24) {
+    while (!getLocalTime(&ntpInfo, 200) && ntpAttempts < 15) {
       Serial.print(".");
-      delay(250);
+      delay(200);
       ntpAttempts++;
     }
     if (ntpInfo.tm_year > 120) {
@@ -685,60 +764,22 @@ void setup() {
       Serial.println(" (Syncing in background)");
     }
     updateBootStep("WiFi & Time Synced", true);
+
+    // Initialize Firebase Cloud Connection
+    initFirebaseCloud();
+    updateBootStep("Firebase Cloud", firebaseReady);
   } else {
     Serial.println();
-    Serial.println("❌ WiFi connection FAILED. Operating in local offline mode.");
-    updateBootStep("WiFi Offline", false);
+    Serial.println("❌ WiFi offline on boot. Starting Edge AI Autonomous Mode instantly!");
+    updateBootStep("WiFi: Offline Mode", false);
+    updateBootStep("Edge AI Autonomous", true);
+    updateBootStep("Local AI AUTO Active", true);
     stateMode = "AUTO";
     offlineFailsafeActive = true;
+    firebaseReady = false;
   }
 
-  // ── Configure Firebase ──
-  config.api_key = API_KEY;
-  config.database_url = DATABASE_URL;
-
-  // Sign up / log in anonymously
-  if (Firebase.signUp(&config, &auth, "", "")) {
-    Serial.println("✅ Firebase anonymous sign-in successful!");
-    firebaseReady = true;
-  } else {
-    Serial.printf("❌ Firebase sign-in failed: %s\n", config.signer.signupError.message.c_str());
-  }
-  updateBootStep("Firebase Cloud", firebaseReady);
-
-  config.token_status_callback = tokenStatusCallback;
-  Firebase.begin(&config, &auth);
-  Firebase.reconnectNetwork(true);
-
-  fbdo.setBSSLBufferSize(4096, 1024);
-  streamDO.setBSSLBufferSize(4096, 1024);
-
-  // Start stream for remote actuator & mode controls from mobile app
-  if (!Firebase.RTDB.beginStream(&streamDO, "/kabutech/settings/setpoints")) {
-    Serial.printf("❌ Stream begin error: %s\n", streamDO.errorReason().c_str());
-  }
-  Firebase.RTDB.setStreamCallback(&streamDO, streamCallback, streamTimeoutCallback);
-
-  // Initial synchronization of mode & actuators from cloud
-  if (Firebase.ready()) {
-    if (Firebase.RTDB.getJSON(&fbdo, "/kabutech/settings/setpoints")) {
-      FirebaseJsonData d;
-      FirebaseJson *json = fbdo.jsonObjectPtr();
-      if (json != nullptr) {
-        if (json->get(d, "mode")) {
-          stateMode = normalizeMode(d.to<String>());
-          Serial.printf("   ⚙️ [Control] Initial Cloud Mode: %s\n", stateMode.c_str());
-        }
-        if (json->get(d, "devices/fans") || json->get(d, "fans")) applyActuator("fans", d.to<bool>());
-        if (json->get(d, "devices/fanOut") || json->get(d, "fanOut")) applyActuator("fanOut", d.to<bool>());
-        if (json->get(d, "devices/fanIn") || json->get(d, "fanIn")) applyActuator("fanIn", d.to<bool>());
-        if (json->get(d, "devices/misters") || json->get(d, "misters")) applyActuator("misters", d.to<bool>());
-        if (json->get(d, "devices/lights") || json->get(d, "lights")) applyActuator("lights", d.to<bool>());
-      }
-    }
-  }
-
-  // Check if first SCD41 sample is already ready (5s elapsed during WiFi & Firebase boot)
+  // Check if first SCD41 sample is already ready (5s elapsed during sensor init)
   if (scd4xReady) {
     bool readyNow = false;
     if (scd4x.getDataReadyStatus(readyNow) == 0 && readyNow) {
@@ -754,7 +795,8 @@ void setup() {
   }
 
   // Short pause to show checklist before dashboard transition
-  delay(800);
+  delay(600);
+  curTheme = getThemeForMode(stateMode);
   drawStaticDashboard();
 
   bootTime = millis();
@@ -764,11 +806,19 @@ void setup() {
 }
 
 // ═══════════════════════════════════════════════
-//  HARDWARE I2C BUS RECOVERY (10m Aviation Cable)
+//  HARDWARE I2C BUS RECOVERY (10m Aviation Cable & Relay Noise Immunity)
 // ═══════════════════════════════════════════════
 
-// Toggles SCL up to 16 times to release a slave holding SDA low, then sends STOP
+// Toggles SCL up to 16 times to release a slave holding SDA low, then sends a clean STOP
 void recoverI2CBus() {
+  static unsigned long lastRecovery = 0;
+  unsigned long now = millis();
+  if (lastRecovery > 0 && (now - lastRecovery < 1500)) {
+    return; // Rate limit recovery to once every 1.5s
+  }
+  lastRecovery = now;
+
+  Serial.println("⚡ [I2C Watchdog] Actuator spike/stuck bus detected. Recovering I2C bus...");
   Wire.end();
 
   pinMode(I2C_SDA_PIN, INPUT_PULLUP);
@@ -787,22 +837,29 @@ void recoverI2CBus() {
     delayMicroseconds(25);
   }
 
-  // Generate an I2C STOP condition
+  // Generate a standard I2C STOP condition:
+  // 1. Set SCL LOW first
+  digitalWrite(I2C_SCL_PIN, LOW);
+  delayMicroseconds(25);
+  // 2. Drive SDA LOW while SCL is LOW
   pinMode(I2C_SDA_PIN, OUTPUT);
   digitalWrite(I2C_SDA_PIN, LOW);
   delayMicroseconds(25);
+  // 3. Release SCL HIGH
   digitalWrite(I2C_SCL_PIN, HIGH);
   delayMicroseconds(25);
+  // 4. Drive SDA HIGH while SCL is HIGH -> True STOP condition!
   digitalWrite(I2C_SDA_PIN, HIGH);
   delayMicroseconds(25);
 
-  // Re-enable internal pullups and restart Wire at 25 kHz
+  // Re-enable internal pullups and restart Wire at long cable clock
   pinMode(I2C_SDA_PIN, INPUT_PULLUP);
   pinMode(I2C_SCL_PIN, INPUT_PULLUP);
   Wire.begin(I2C_SDA_PIN, I2C_SCL_PIN);
   Wire.setClock(I2C_LONG_CABLE_CLOCK);
   Wire.setTimeOut(I2C_WIRE_TIMEOUT_MS);
-  delay(50);
+  delay(20);
+  Serial.println("✅ [I2C Watchdog] Bus unjammed and Wire re-initialized successfully.");
 }
 
 // ═══════════════════════════════════════════════
@@ -831,7 +888,9 @@ SHTReading readSHT3x() {
     }
   }
 
+  static int shtRawMisses = 0;
   if (success) {
+    shtRawMisses = 0;
     lastValidTemp = t + TEMP_OFFSET;
     lastValidHum  = constrain(h + HUM_OFFSET, 1.0, 100.0);
     lastSHTSuccessTime = millis();
@@ -841,9 +900,18 @@ SHTReading readSHT3x() {
     return r;
   }
 
+  // If raw read failed, unstick the bus if repeated or if SDA is low
+  shtRawMisses++;
+  if (shtRawMisses >= 2 || digitalRead(I2C_SDA_PIN) == LOW) {
+    recoverI2CBus();
+    sht31Ready = false;
+    bh1750Ready = false;
+    shtRawMisses = 0;
+  }
+
   // ── Dual-Redundancy Fallback: Sensirion SCD41 Integrated Temp/Hum ──
   // If SHT3x dropped packet over 10m, instantly use SCD41's internal CMOSens reading!
-  if (scdBackupTemp > -50.0 && lastScdBackupTime > 0 && (millis() - lastScdBackupTime < 10000)) {
+  if (scdBackupTemp > -50.0 && lastScdBackupTime > 0 && (millis() - lastScdBackupTime < 15000)) {
     r.temperature = scdBackupTemp + TEMP_OFFSET;
     r.humidity    = constrain(scdBackupHum + HUM_OFFSET, 1.0, 100.0);
     r.valid       = true;
@@ -853,7 +921,7 @@ SHTReading readSHT3x() {
     return r;
   }
 
-  // Hold previous reading for up to 3s (tight window for real-time responsiveness)
+  // Hold previous reading for up to 10s (seamlessly bridges across relay switching noise/EMI)
   if (lastValidTemp > -50.0 && lastSHTSuccessTime > 0 && (millis() - lastSHTSuccessTime < SENSOR_HOLD_TIME_MS)) {
     r.temperature = lastValidTemp;
     r.humidity    = lastValidHum;
@@ -873,6 +941,11 @@ LightReading readBH1750() {
     if (lightMeter.begin(BH1750::CONTINUOUS_HIGH_RES_MODE)) {
       bh1750Ready = true;
     } else {
+      if (lastValidLight >= 0 && lastLightSuccessTime > 0 && (millis() - lastLightSuccessTime < SENSOR_HOLD_TIME_MS)) {
+        r.lux   = lastValidLight;
+        r.valid = true;
+        return r;
+      }
       r.lux   = -999;
       r.valid = false;
       return r;
@@ -880,12 +953,21 @@ LightReading readBH1750() {
   }
 
   float lux = lightMeter.readLightLevel();
+  static int bh1750RawMisses = 0;
   if (!isnan(lux) && lux >= 0.0) {
+    bh1750RawMisses = 0;
     lastValidLight = (int)constrain(lux, 0.0, 65535.0);
     lastLightSuccessTime = millis();
     r.lux   = lastValidLight;
     r.valid = true;
   } else {
+    bh1750RawMisses++;
+    if (bh1750RawMisses >= 2 || digitalRead(I2C_SDA_PIN) == LOW) {
+      recoverI2CBus();
+      sht31Ready = false;
+      bh1750Ready = false;
+      bh1750RawMisses = 0;
+    }
     if (lastValidLight >= 0 && lastLightSuccessTime > 0 && (millis() - lastLightSuccessTime < SENSOR_HOLD_TIME_MS)) {
       r.lux   = lastValidLight;
       r.valid = true;
@@ -954,6 +1036,11 @@ CO2Reading readSCD41() {
         r.valid = true;
         return r;
       }
+    }
+    if (error != 0 || digitalRead(I2C_SDA_PIN) == LOW) {
+      recoverI2CBus();
+      sht31Ready = false;
+      bh1750Ready = false;
     }
   }
 
@@ -1171,6 +1258,8 @@ void loop() {
       Serial.printf("⚠️ [Offline Failsafe] Device is OFFLINE (LOCAL mode)! Overriding %s -> AI AUTO for autonomous crop preservation.\n", stateMode.c_str());
       stateMode = "AUTO";
       offlineFailsafeActive = true;
+      curTheme = getThemeForMode(stateMode);
+      drawStaticDashboard();
     }
   } else {
     offlineFailsafeActive = false;
@@ -1179,6 +1268,14 @@ void loop() {
   // ── Read sensors and print to Serial Monitor every 1s ──
   if (now - lastSerialPrint >= SERIAL_PRINT_INTERVAL) {
     lastSerialPrint = now;
+
+    // Proactive bus health check: unstick bus immediately if actuator spike pulled SDA low
+    if (digitalRead(I2C_SDA_PIN) == LOW) {
+      Serial.println("⚡ [I2C Watchdog] Bus stuck LOW before cycle (actuator spike). Unjamming...");
+      recoverI2CBus();
+      sht31Ready = false;
+      bh1750Ready = false;
+    }
 
     // 1. Read SHT3x
     SHTReading shtData = readSHT3x();
@@ -1292,15 +1389,42 @@ void loop() {
     }
   }
 
-  // ── Auto Wi-Fi Reconnection Watchdog ──
+  // ── Auto Wi-Fi Reconnection & Fast Cloud Mode Resync Watchdog ──
+  static bool wasConnected = (WiFi.status() == WL_CONNECTED);
   static unsigned long lastWifiReconnectAttempt = 0;
-  if (WiFi.status() != WL_CONNECTED) {
-    if (now - lastWifiReconnectAttempt >= 10000) {
+
+  if (!isNetConnected) {
+    wasConnected = false;
+    // Fast reconnect attempt every 3.5s
+    if (now - lastWifiReconnectAttempt >= 3500) {
       lastWifiReconnectAttempt = now;
-      Serial.println("🔄 Wi-Fi link lost, attempting reconnection...");
+      Serial.println("🔄 Wi-Fi link lost, attempting fast reconnection...");
       WiFi.disconnect();
       WiFi.reconnect();
     }
+  } else if (isNetConnected && !wasConnected) {
+    // Wi-Fi JUST reconnected!
+    wasConnected = true;
+    Serial.println("🌐 [Network] Wi-Fi link restored! Reconnecting to Cloud...");
+
+    // 1. Show Reconnecting Screen on TFT so the user knows it is syncing!
+    drawReconnectingScreen("Wi-Fi Reconnected!");
+
+    // 2. Sync Philippine Standard Time in background
+    configTime(8 * 3600, 0, "time.google.com", "time.cloudflare.com", "pool.ntp.org");
+    setenv("TZ", "PST-8", 1);
+    tzset();
+
+    // 3. Connect to Firebase or Resync Setpoints
+    if (!firebaseReady) {
+      initFirebaseCloud();
+    } else {
+      resyncCloudSetpoints();
+    }
+
+    // 4. Redraw dashboard with restored theme and app mode
+    curTheme = getThemeForMode(stateMode);
+    drawStaticDashboard();
   }
 
   // ── Philippine Standard Time (PST UTC+8) Sync Watchdog ──
@@ -1317,15 +1441,14 @@ void loop() {
     }
   }
 
-  // ── Firebase Stream Watchdog (Auto-reconnect if dropped) ──
+  // ── Firebase Stream Watchdog (Keep connection alive) ──
   static unsigned long lastStreamCheck = 0;
-  if (now - lastStreamCheck >= 10000) {
+  if (now - lastStreamCheck >= 8000) {
     lastStreamCheck = now;
-    if (firebaseReady && WiFi.status() == WL_CONNECTED) {
+    if (firebaseReady && isNetConnected) {
       if (!streamDO.httpConnected()) {
-        Serial.println("🔄 Stream lost connection, re-subscribing to /kabutech/settings/setpoints...");
-        Firebase.RTDB.beginStream(&streamDO, "/kabutech/settings/setpoints");
-        Firebase.RTDB.setStreamCallback(&streamDO, streamCallback, streamTimeoutCallback);
+        Serial.println("🔄 Stream dropped, resubscribing & syncing setpoints...");
+        resyncCloudSetpoints();
       }
     }
   }
