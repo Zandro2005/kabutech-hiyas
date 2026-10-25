@@ -122,24 +122,45 @@ export default React.memo(function RangeGauge({
     statusBg = isDarkMode ? 'rgba(239, 68, 68, 0.15)' : '#fef2f2';
   }
 
-  // Smooth rotating orbit animation
+  // Smooth rotating orbit animations for dashed circles
   const rotateAnim = useRef(new Animated.Value(0)).current;
+  const reverseRotateAnim = useRef(new Animated.Value(0)).current;
+
   useEffect(() => {
     const rotateLoop = Animated.loop(
       Animated.timing(rotateAnim, {
+        toValue: 1,
+        duration: 22000,
+        easing: Easing.linear,
+        useNativeDriver: true,
+      })
+    );
+    const reverseRotateLoop = Animated.loop(
+      Animated.timing(reverseRotateAnim, {
         toValue: 1,
         duration: 32000,
         easing: Easing.linear,
         useNativeDriver: true,
       })
     );
+
     rotateLoop.start();
-    return () => rotateLoop.stop();
-  }, [rotateAnim]);
+    reverseRotateLoop.start();
+
+    return () => {
+      rotateLoop.stop();
+      reverseRotateLoop.stop();
+    };
+  }, [rotateAnim, reverseRotateAnim]);
 
   const spin = rotateAnim.interpolate({
     inputRange: [0, 1],
     outputRange: ['0deg', '360deg'],
+  });
+
+  const spinReverse = reverseRotateAnim.interpolate({
+    inputRange: [0, 1],
+    outputRange: ['360deg', '0deg'],
   });
 
   const valueFontSize = isSmallDevice ? 42 : isLargeDevice ? 54 : 48;
@@ -175,33 +196,59 @@ export default React.memo(function RangeGauge({
           />
         )}
 
-        {/* 2. Rotating Dashed Orbit Line */}
-        {!isFault && (
-          <Animated.View
-            style={[
-              tw`absolute`,
-              {
-                width: size + 16,
-                height: size + 16,
-                transform: [{ rotate: spin }],
-              },
-            ]}
-            pointerEvents="none"
-          >
-            <Svg width={size + 16} height={size + 16} viewBox={`0 0 ${size + 16} ${size + 16}`}>
-              <Circle
-                cx={(size + 16) / 2}
-                cy={(size + 16) / 2}
-                r={radius + (isLargeDevice ? 18 : 16)}
-                stroke={dialColor}
-                strokeWidth={1.2}
-                strokeDasharray="4 8"
-                strokeOpacity={isDarkMode ? 0.30 : 0.22}
-                fill="none"
-              />
-            </Svg>
-          </Animated.View>
-        )}
+        {/* 2. Rotating Outer Dashed Orbit Line (Clockwise) */}
+        <Animated.View
+          style={[
+            tw`absolute`,
+            {
+              width: size + 28,
+              height: size + 28,
+              transform: [{ rotate: spin }],
+            },
+          ]}
+          pointerEvents="none"
+        >
+          <Svg width={size + 28} height={size + 28} viewBox={`0 0 ${size + 28} ${size + 28}`}>
+            <Circle
+              cx={(size + 28) / 2}
+              cy={(size + 28) / 2}
+              r={radius + (isLargeDevice ? 20 : 18)}
+              stroke={dialColor}
+              strokeWidth={2}
+              strokeDasharray="7 9"
+              strokeLinecap="round"
+              strokeOpacity={isFault ? 0.25 : isDarkMode ? 0.65 : 0.45}
+              fill="none"
+            />
+          </Svg>
+        </Animated.View>
+
+        {/* 3. Counter-Rotating Inner Dashed Orbit Line (Counter-Clockwise) */}
+        <Animated.View
+          style={[
+            tw`absolute`,
+            {
+              width: size,
+              height: size,
+              transform: [{ rotate: spinReverse }],
+            },
+          ]}
+          pointerEvents="none"
+        >
+          <Svg width={size} height={size} viewBox={`0 0 ${size} ${size}`}>
+            <Circle
+              cx={size / 2}
+              cy={size / 2}
+              r={radius - strokeWidth - 6}
+              stroke={dialColor}
+              strokeWidth={1.5}
+              strokeDasharray="4 8"
+              strokeLinecap="round"
+              strokeOpacity={isFault ? 0.18 : isDarkMode ? 0.38 : 0.24}
+              fill="none"
+            />
+          </Svg>
+        </Animated.View>
 
         {/* Background Soft Inner Plate */}
         <View

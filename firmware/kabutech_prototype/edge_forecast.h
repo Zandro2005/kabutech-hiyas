@@ -58,10 +58,10 @@ static unsigned long efLastSample = 0;
 
 // ─── Fast-Track Event-Driven Delta Trigger ───
 // Bypasses 30-second timer when a sudden spike occurs (e.g. testing or sudden environmental change)
-#define FAST_TRIGGER_TEMP_DELTA   0.3f   // 0.3°C sudden jump
-#define FAST_TRIGGER_HUM_DELTA    2.0f   // 2.0% RH sudden jump/drop
-#define FAST_TRIGGER_CO2_DELTA    35.0f  // 35 ppm sudden jump
-#define FAST_TRIGGER_MIN_INTERVAL 2000   // Min 2 seconds between fast inferences (prevents thrashing)
+#define FAST_TRIGGER_TEMP_DELTA   1.0f   // 1.0°C significant jump (prevents 0.3°C noise flickering)
+#define FAST_TRIGGER_HUM_DELTA    4.0f   // 4.0% RH significant jump/drop
+#define FAST_TRIGGER_CO2_DELTA    80.0f  // 80 ppm significant jump
+#define FAST_TRIGGER_MIN_INTERVAL 8000   // Min 8 seconds between fast inferences (prevents thrashing/flickering)
 static float lastInferredVals[EF_N_SENSORS] = { -999.0f, -999.0f, -999.0f, -999.0f };
 static unsigned long lastFastInferenceTime = 0;
 
@@ -109,10 +109,23 @@ static void efRunInference() {
     d[i] = result.classification[i].value * EF_DELTA_STD[i];
   }
 
-  predTemp10m  = efBuf[newest][0] + d[0];
-  predHum10m   = constrain(efBuf[newest][1] + d[1], 0.0f, 100.0f);
-  predCO2_10m  = max(400.0f, efBuf[newest][2] + d[2]);
-  predLight10m = max(0.0f, efBuf[newest][3] + d[3]);
+  float rawPredTemp  = efBuf[newest][0] + d[0];
+  float rawPredHum   = constrain(efBuf[newest][1] + d[1], 0.0f, 100.0f);
+  float rawPredCO2   = max(400.0f, efBuf[newest][2] + d[2]);
+  float rawPredLight = max(0.0f, efBuf[newest][3] + d[3]);
+
+  // Smooth prediction outputs to prevent rapid spike jump/flicker
+  if (aiReady && predTemp10m > -500.0f) {
+    predTemp10m  = 0.70f * predTemp10m  + 0.30f * rawPredTemp;
+    predHum10m   = 0.70f * predHum10m   + 0.30f * rawPredHum;
+    predCO2_10m  = 0.70f * predCO2_10m  + 0.30f * rawPredCO2;
+    predLight10m = 0.70f * predLight10m + 0.30f * rawPredLight;
+  } else {
+    predTemp10m  = rawPredTemp;
+    predHum10m   = rawPredHum;
+    predCO2_10m  = rawPredCO2;
+    predLight10m = rawPredLight;
+  }
   aiReady = true;
 
   Serial.printf("🔮 [Edge AI] +10 min forecast: T=%.1f°C  H=%.1f%%  CO2=%.0fppm  L=%.0flx  (%lu µs)\n",

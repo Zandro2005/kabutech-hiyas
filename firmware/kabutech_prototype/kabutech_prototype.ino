@@ -171,7 +171,7 @@ LightReading readBH1750();
 CO2Reading readSCD41();
 void recoverI2CBus();
 bool initFirebaseCloud();
-void resyncCloudSetpoints();
+bool resyncCloudSetpoints();
 
 FirebaseData fbdo;
 FirebaseData streamDO; // For listening to actuator changes
@@ -223,8 +223,23 @@ bool stateIntake  = false;
 bool stateMister  = false;
 bool stateLight   = false;
 String stateMode  = "AUTO"; // Tracks AUTO vs TIMED vs MANUAL control
+String lastConfiguredAppMode = "AUTO"; // Persists user's chosen mode across offline disconnects
 bool offlineFailsafeActive = false; // Tracks if we fell back to AI AUTO due to network loss
 unsigned long lastSuccessfulCloudSync = 0; // Tracks last verified 2-way cloud communication
+unsigned long lastWifiReconnectTime = 0;   // Grace period tracker for post-reconnection sync
+
+// ─── Actuator Anti-Chatter Dwell Timers & Streaks (Biological Range & Relay Protection) ───
+#define ACTUATOR_MIN_ON_TIME_MS   6000    // Minimum ON dwell time: 6 seconds (prevents relay chatter)
+#define ACTUATOR_MIN_OFF_TIME_MS  5000    // Minimum OFF dwell time: 5 seconds (prevents rapid re-triggering)
+#define ACTUATOR_TRIGGER_STREAK   2       // Require 2 consecutive cycles to confirm state transition
+
+unsigned long lastFanToggleTime    = 0;
+int fanOnDemandStreak              = 0;
+int fanOffDemandStreak             = 0;
+
+unsigned long lastMisterToggleTime = 0;
+int misterOnDemandStreak           = 0;
+int misterOffDemandStreak          = 0;
 
 // ─── Grow Light Hysteresis & Dwell Timers (Biological Range: 150 - 1000 lx) ───
 #define LIGHT_ON_THRESHOLD      150     // Turn ON when ambient light drops below 150 lx (Low/Dark)
@@ -236,6 +251,11 @@ unsigned long lastSuccessfulCloudSync = 0; // Tracks last verified 2-way cloud c
 unsigned long lastLightToggleTime = 0;
 int lightLowStreak  = 0;
 int lightHighStreak = 0;
+
+// Network & Cloud Status Globals
+bool isSysOnline          = false;
+bool slowInternetDetected = false;
+
 
 // Normalizes Firebase mode string to canonical stateMode ("AUTO", "TIMED", "MANUAL")
 String normalizeMode(String raw) {
@@ -292,7 +312,15 @@ void streamCallback(FirebaseStream data) {
     FirebaseJsonData result;
     if (json != nullptr) {
       if (json->get(result, "mode")) {
-        stateMode = normalizeMode(result.to<String>());
+        String newMode = normalizeMode(result.to<String>());
+        lastConfiguredAppMode = newMode;
+        if (newMode != stateMode) {
+          stateMode = newMode;
+          curTheme = getThemeForMode(stateMode);
+          baseDrawn = false;
+          drawStaticDashboard(stateMode);
+        }
+        lastSuccessfulCloudSync = millis();
         offlineFailsafeActive = false;
         Serial.printf("   ⚙️ [Control] Mode: %s\n", stateMode.c_str());
       }
@@ -303,13 +331,22 @@ void streamCallback(FirebaseStream data) {
       if (json->get(result, "devices/intake") || json->get(result, "intake")) applyActuator("intake", result.to<bool>());
       if (json->get(result, "devices/misters") || json->get(result, "misters")) applyActuator("misters", result.to<bool>());
       if (json->get(result, "devices/lights") || json->get(result, "lights")) applyActuator("lights", result.to<bool>());
+      lastSuccessfulCloudSync = millis();
     }
     return;
   }
 
   // 2. Control Mode string change
   if (path.indexOf("mode") >= 0) {
-    stateMode = normalizeMode(data.stringData());
+    String newMode = normalizeMode(data.stringData());
+    lastConfiguredAppMode = newMode;
+    if (newMode != stateMode) {
+      stateMode = newMode;
+      curTheme = getThemeForMode(stateMode);
+      baseDrawn = false;
+      drawStaticDashboard(stateMode);
+    }
+    lastSuccessfulCloudSync = millis();
     offlineFailsafeActive = false;
     Serial.printf("   ⚙️ [Control] Mode changed to: %s\n", stateMode.c_str());
     return;
@@ -358,17 +395,17 @@ void runAutoRegulation() {
   bool isTempCold = (isTempValid && currentTemp < 16.0);
 
   // 1. High Temperature Cooling (Oyster Optimal: 18.0 - 25.0 °C)
-  // Model Predictive Control (MPC): Prediction is aligned to actuators!
-  // - Turns ON if currentTemp > 25.0 °C OR predTemp10m > 25.0 °C (pre-emptive cooling)
-  // - Turns OFF when currentTemp <= 25.0 °C AND predTemp10m <= 24.8 °C (safe optimal band confirmed)
-  // (Fallback without AI: ON > 25.0 °C, OFF <= 24.2 °C)
+  // Model Predictive Control (MPC): Prediction is aligned to actuators with robust hysteresis
   bool needFansForTemp = false;
   if (isTempValid) {
     if (aiReady) {
       if (stateExhaust) {
-        needFansForTemp = (currentTemp > 25.0) || (predTemp10m > 24.8);
+        // Maintain cooling until BOTH current and predicted temp return to safe optimal range
+        needFansForTemp = (currentTemp > 24.5) || (predTemp10m > 24.5);
       } else {
-        needFansForTemp = (currentTemp > 25.0) || (predTemp10m > 25.0);
+        // Pre-emptive cooling triggers ONLY if chamber is warm (>= 24.0 °C) AND forecast predicts overshoot (>= 25.5 °C)
+        // Or if current measured temperature exceeds 25.0 °C
+        needFansForTemp = (currentTemp > 25.0) || (predTemp10m >= 25.5 && currentTemp >= 24.0);
       }
     } else {
       needFansForTemp = stateExhaust ? (currentTemp > 24.2) : (currentTemp > 25.0);
@@ -376,16 +413,13 @@ void runAutoRegulation() {
   }
 
   // 2. CO2 Ventilation (Bellettini et al., 2019 / Oyster Optimal: < 1000 ppm, grace <= 1150 ppm)
-  // - Turns ON if currentCO2 > 1150 ppm OR predCO2_10m > 1150 ppm (pre-emptive ventilation)
-  // - Turns OFF when currentCO2 <= 1150 ppm AND predCO2_10m <= 1050 ppm (purge complete)
-  // (Fallback without AI: ON > 1150 ppm, OFF <= 1000 ppm)
   bool needFansForCo2 = false;
   if (isCo2Valid) {
     if (aiReady) {
       if (stateExhaust) {
-        needFansForCo2 = (currentCO2 > 1150) || (predCO2_10m > 1050);
+        needFansForCo2 = (currentCO2 > 1000) || (predCO2_10m > 1050);
       } else {
-        needFansForCo2 = (currentCO2 > 1150) || (predCO2_10m > 1150);
+        needFansForCo2 = (currentCO2 > 1150) || (predCO2_10m > 1200 && currentCO2 > 950);
       }
     } else {
       needFansForCo2 = stateExhaust ? (currentCO2 > 1000) : (currentCO2 > 1150);
@@ -393,46 +427,85 @@ void runAutoRegulation() {
   }
 
   // 3. High Humidity Purge Exhaust (Islam et al., 2022 / Oyster Optimal: 80 - 95 % RH)
-  // Purge excess condensation only when chamber reaches saturation (>= 100 %).
-  // Turns OFF once humidity drops below 96.0% (returns to normal fruiting humidity).
   bool needFansForHum = false;
   if (isHumValid) {
     if (aiReady) {
       if (stateExhaust) {
-        needFansForHum = (currentHum >= 100.0) || (predHum10m >= 98.0);
+        needFansForHum = (currentHum > 96.0) || (predHum10m > 96.0);
       } else {
-        needFansForHum = (currentHum >= 100.0) || (predHum10m >= 100.0);
+        needFansForHum = (currentHum >= 100.0) || (predHum10m >= 100.0 && currentHum >= 97.0);
       }
     } else {
       needFansForHum = stateExhaust ? (currentHum > 96.0) : (currentHum >= 100.0);
     }
   }
 
-  // Combined Fan Actuation
-  if (!isTempCold && (needFansForCo2 || needFansForHum || needFansForTemp)) {
-    nextExhaust = true;
-    nextIntake  = true; // Fresh air intake runs with exhaust to purge stale air and cool chamber
+  // Combined Fan Actuation with Dwell Timing & Confirmation Streaks
+  bool rawFanDemand = !isTempCold && (needFansForCo2 || needFansForHum || needFansForTemp);
+  if (rawFanDemand) {
+    fanOnDemandStreak++;
+    fanOffDemandStreak = 0;
   } else {
-    nextExhaust = false;
-    nextIntake  = false;
+    fanOffDemandStreak++;
+    fanOnDemandStreak = 0;
+  }
+
+  unsigned long nowMs = millis();
+  if (!stateExhaust) {
+    if (fanOnDemandStreak >= ACTUATOR_TRIGGER_STREAK && (lastFanToggleTime == 0 || (nowMs - lastFanToggleTime >= ACTUATOR_MIN_OFF_TIME_MS))) {
+      nextExhaust = true;
+      nextIntake  = true;
+    } else {
+      nextExhaust = false;
+      nextIntake  = false;
+    }
+  } else {
+    // Fans are currently ON: enforce minimum continuous runtime
+    if (fanOffDemandStreak >= ACTUATOR_TRIGGER_STREAK && (nowMs - lastFanToggleTime >= ACTUATOR_MIN_ON_TIME_MS)) {
+      nextExhaust = false;
+      nextIntake  = false;
+    } else {
+      nextExhaust = true; // Hold ON during minimum dwell period
+      nextIntake  = true;
+    }
   }
 
   // 4. Ultrasonic Misters (Islam et al., 2022 / Oyster Optimal: 80 - 95 % RH)
-  // - Turns ON when Humidity < 75 % (dry air) OR predHum10m < 75 % (pre-emptive misting)
-  // - Turns OFF when Humidity >= 80 % AND predHum10m >= 80 % (returns to optimal band)
-  // (Fallback without AI: turn OFF >= 85 %)
+  bool needMister = false;
   if (isHumValid) {
-    bool needMister = false;
     if (aiReady) {
       if (stateMister) {
         needMister = (currentHum < 80.0) || (predHum10m < 80.0);
       } else {
-        needMister = (currentHum < 75.0) || (predHum10m < 75.0);
+        needMister = (currentHum < 75.0) || (predHum10m < 74.0 && currentHum < 78.0);
       }
     } else {
       needMister = stateMister ? (currentHum < 85.0) : (currentHum < 75.0);
     }
-    nextMister = needMister;
+  }
+
+  // Combined Mister Actuation with Dwell Timing & Confirmation Streaks
+  if (needMister) {
+    misterOnDemandStreak++;
+    misterOffDemandStreak = 0;
+  } else {
+    misterOffDemandStreak++;
+    misterOnDemandStreak = 0;
+  }
+
+  if (!stateMister) {
+    if (misterOnDemandStreak >= ACTUATOR_TRIGGER_STREAK && (lastMisterToggleTime == 0 || (nowMs - lastMisterToggleTime >= ACTUATOR_MIN_OFF_TIME_MS))) {
+      nextMister = true;
+    } else {
+      nextMister = false;
+    }
+  } else {
+    // Mister is currently ON: enforce minimum continuous mist runtime
+    if (misterOffDemandStreak >= ACTUATOR_TRIGGER_STREAK && (nowMs - lastMisterToggleTime >= ACTUATOR_MIN_ON_TIME_MS)) {
+      nextMister = false;
+    } else {
+      nextMister = true; // Hold ON during minimum dwell period
+    }
   }
 
   // 5. Grow Lights Photoperiod / Illumination (Bellettini et al., 2019 / Oyster Optimal: 150 - 1000 lx)
@@ -442,7 +515,6 @@ void runAutoRegulation() {
   // - Turns OFF only if light exceeds >= 1000 lx (intense ambient daylight)
   // - Edge AI integration: if predLight10m >= 1000 lx, turns off early (sunrise incoming)
   if (isLightValid) {
-    unsigned long nowMs = millis();
     bool aiSunHigh  = (aiReady && predLight10m >= 1000.0 && currentLight >= 800);
     bool aiDarkDrop = (aiReady && predLight10m < 150.0 && currentLight < 250);
 
@@ -476,13 +548,13 @@ void runAutoRegulation() {
 
   // 6. Dynamic Edge AI Action Label
   if (aiReady) {
-    if (isTempValid && currentTemp <= 25.0 && predTemp10m > 25.0) {
+    if (isTempValid && currentTemp <= 25.0 && predTemp10m >= 25.5 && currentTemp >= 24.0) {
       aiAction = "preempt_exhaust_temp";
-    } else if (isCo2Valid && currentCO2 <= 1150 && predCO2_10m > 1150) {
+    } else if (isCo2Valid && currentCO2 <= 1150 && predCO2_10m > 1200 && currentCO2 > 950) {
       aiAction = "preempt_exhaust_co2";
-    } else if (isHumValid && currentHum < 100.0 && predHum10m >= 100.0) {
+    } else if (isHumValid && currentHum < 100.0 && predHum10m >= 100.0 && currentHum >= 97.0) {
       aiAction = "preempt_exhaust_hum";
-    } else if (isHumValid && currentHum >= 75.0 && predHum10m < 75.0) {
+    } else if (isHumValid && currentHum >= 75.0 && predHum10m < 74.0 && currentHum < 78.0) {
       aiAction = "preempt_mister";
     } else if (nextExhaust) {
       if (needFansForTemp)      aiAction = "cooling";
@@ -505,8 +577,18 @@ void runAutoRegulation() {
                   nextLight   != stateLight);
 
   if (changed) {
+    if (nextExhaust != stateExhaust) {
+      lastFanToggleTime = nowMs;
+      fanOnDemandStreak = 0;
+      fanOffDemandStreak = 0;
+    }
+    if (nextMister != stateMister) {
+      lastMisterToggleTime = nowMs;
+      misterOnDemandStreak = 0;
+      misterOffDemandStreak = 0;
+    }
     if (nextLight != stateLight) {
-      lastLightToggleTime = millis();
+      lastLightToggleTime = nowMs;
       lightLowStreak = 0;
       lightHighStreak = 0;
     }
@@ -528,7 +610,8 @@ void runAutoRegulation() {
                   stateLight   ? "ON" : "OFF",
                   aiAction);
 
-    if (Firebase.ready() && WiFi.status() == WL_CONNECTED) {
+    // Only update cloud if online and connection is healthy (NEVER block if offline or slow!)
+    if (isSysOnline && Firebase.ready() && WiFi.status() == WL_CONNECTED) {
       FirebaseJson devJson;
       devJson.set("fans",    stateExhaust);
       devJson.set("fanOut",  stateExhaust);
@@ -546,7 +629,7 @@ void runAutoRegulation() {
 //  FIREBASE CLOUD INITIALIZATION & RESYNC
 // ═══════════════════════════════════════════════
 
-void resyncCloudSetpoints();
+bool resyncCloudSetpoints();
 
 bool initFirebaseCloud() {
   if (WiFi.status() != WL_CONNECTED) return false;
@@ -566,11 +649,19 @@ bool initFirebaseCloud() {
   }
 
   config.token_status_callback = tokenStatusCallback;
+  // Strict non-blocking network timeouts: Prevents slow internet from freezing CPU loops
+  config.timeout.socketConnection = 1200;  // 1.2s max socket connect timeout
+  config.timeout.sslHandshake = 1800;      // 1.8s max SSL handshake timeout
+  config.timeout.serverResponse = 1200;    // 1.2s max server response timeout
+  config.timeout.wifiReconnect = 2000;
+
   Firebase.begin(&config, &auth);
   Firebase.reconnectNetwork(true);
 
   fbdo.setBSSLBufferSize(4096, 1024);
   streamDO.setBSSLBufferSize(4096, 1024);
+  Firebase.RTDB.setMaxRetry(&fbdo, 1);
+  Firebase.RTDB.setMaxErrorQueue(&fbdo, 1);
 
   // Subscribe to real-time control stream
   if (!Firebase.RTDB.beginStream(&streamDO, "/kabutech/settings/setpoints")) {
@@ -585,8 +676,9 @@ bool initFirebaseCloud() {
   return true;
 }
 
-void resyncCloudSetpoints() {
-  if (WiFi.status() != WL_CONNECTED || !firebaseReady) return;
+bool resyncCloudSetpoints() {
+  if (WiFi.status() != WL_CONNECTED) return false;
+  if (!Firebase.ready()) return false;
 
   Serial.println("🔄 [Cloud Sync] Fetching current mode & controls from Firebase RTDB...");
   if (Firebase.RTDB.getJSON(&fbdo, "/kabutech/settings/setpoints")) {
@@ -596,6 +688,8 @@ void resyncCloudSetpoints() {
       if (json->get(d, "mode")) {
         String fetchedMode = normalizeMode(d.to<String>());
         stateMode = fetchedMode;
+        lastConfiguredAppMode = fetchedMode;
+        curTheme = getThemeForMode(stateMode);
         offlineFailsafeActive = false;
         Serial.printf("✅ [Cloud Sync] Successfully restored App Mode: %s\n", stateMode.c_str());
       }
@@ -606,6 +700,8 @@ void resyncCloudSetpoints() {
       if (json->get(d, "devices/lights") || json->get(d, "lights")) applyActuator("lights", d.to<bool>());
       
       lastSuccessfulCloudSync = millis();
+      firebaseReady = true;
+      return true;
     }
   } else {
     Serial.printf("⚠️ [Cloud Sync] getJSON failed: %s\n", fbdo.errorReason().c_str());
@@ -616,6 +712,7 @@ void resyncCloudSetpoints() {
     Firebase.RTDB.beginStream(&streamDO, "/kabutech/settings/setpoints");
     Firebase.RTDB.setStreamCallback(&streamDO, streamCallback, streamTimeoutCallback);
   }
+  return false;
 }
 
 // ═══════════════════════════════════════════════
@@ -797,7 +894,7 @@ void setup() {
   // Short pause to show checklist before dashboard transition
   delay(600);
   curTheme = getThemeForMode(stateMode);
-  drawStaticDashboard();
+  drawStaticDashboard(stateMode);
 
   bootTime = millis();
   Serial.println();
@@ -1115,18 +1212,35 @@ void pushToFirebase(float temp, float hum, int light, int co2,
   json.set("last_seen", ts);
 
   static int cloudSyncFailStreak = 0;
-  if (Firebase.RTDB.updateNode(&fbdo, "/kabutech/sensors/live", &json)) {
-    Serial.println("   ☁️  Firebase synced ✓");
+  static int slowNetStreak = 0;
+
+  unsigned long tPushStart = millis();
+  bool success = Firebase.RTDB.updateNode(&fbdo, "/kabutech/sensors/live", &json);
+  unsigned long pushDuration = millis() - tPushStart;
+
+  // Internet latency watchdog: A push taking > 1500ms or failing means connection is slow/degraded
+  if (success && pushDuration <= 1500) {
+    Serial.printf("   ☁️  Firebase synced ✓ (%lu ms)\n", pushDuration);
     lastSuccessfulCloudSync = millis();
     cloudSyncFailStreak = 0;
+    slowNetStreak = 0;
+    slowInternetDetected = false;
     firebaseReady = true;
   } else {
+    slowNetStreak++;
     cloudSyncFailStreak++;
-    Serial.printf("   ❌ Firebase sync error (%d): %s\n", cloudSyncFailStreak, fbdo.errorReason().c_str());
-    if (cloudSyncFailStreak >= 2) {
-      // 2 consecutive push failures (~4s) -> cloud link is dead, clear sync immediately!
+    Serial.printf("   ⚠️ [Slow/Degraded Cloud] Push took %lu ms (Fail streak: %d, reason: %s)\n",
+                  pushDuration, slowNetStreak, fbdo.errorReason().c_str());
+
+    // When internet is slow or failing, IMMEDIATELY drop to LOCAL autonomous mode!
+    if (slowNetStreak >= 2 || pushDuration > 1800) {
+      Serial.println("🚨 [Network Watchdog] Internet is too slow! Immediately switching to LOCAL mode so sensor readings stay 100% responsive.");
       lastSuccessfulCloudSync = 0;
+      isSysOnline = false;
       firebaseReady = false;
+      slowInternetDetected = true;
+      // Back off next cloud push by 10s so local sensor sampling and regulation loops run with zero freeze
+      lastFirebasePush = millis() + 10000;
     }
   }
 }
@@ -1250,16 +1364,25 @@ void loop() {
   bool isNetConnected = (WiFi.status() == WL_CONNECTED);
   bool isCloudSynced  = (lastSuccessfulCloudSync > 0) && (now - lastSuccessfulCloudSync <= CLOUD_SYNC_TIMEOUT_MS);
   bool isBootGrace    = (lastSuccessfulCloudSync == 0) && (now <= CLOUD_SYNC_TIMEOUT_MS);
-  bool isSysOnline    = isNetConnected && (isCloudSynced || isBootGrace);
+  bool isReconnectGrace = (lastWifiReconnectTime > 0) && (now - lastWifiReconnectTime <= CLOUD_SYNC_TIMEOUT_MS);
+  isSysOnline = isNetConnected && !slowInternetDetected && (isCloudSynced || isBootGrace || isReconnectGrace);
 
-  // ── Offline Failsafe Watchdog: Auto-transition to AI AUTO when network or cloud is lost ──
+  // ── Offline / Slow Internet Failsafe Watchdog: Auto-transition to AI AUTO when network is lost or slow ──
   if (!isSysOnline) {
     if (stateMode != "AUTO") {
-      Serial.printf("⚠️ [Offline Failsafe] Device is OFFLINE (LOCAL mode)! Overriding %s -> AI AUTO for autonomous crop preservation.\n", stateMode.c_str());
+      Serial.printf("⚠️ [Network Failsafe] Device is in LOCAL mode (offline or slow net)! Overriding %s -> AI AUTO for autonomous crop preservation.\n", stateMode.c_str());
+      if (lastConfiguredAppMode == "AUTO" || lastConfiguredAppMode.length() == 0) {
+        lastConfiguredAppMode = stateMode; // Retain user's setting so it can be restored on reconnect
+      }
       stateMode = "AUTO";
       offlineFailsafeActive = true;
       curTheme = getThemeForMode(stateMode);
-      drawStaticDashboard();
+      drawStaticDashboard(stateMode);
+      drawDashboard(currentTemp, currentHum, currentLight, currentCO2,
+                    shtFault, lightFault, co2Fault,
+                    stateExhaust, stateIntake, stateMister, stateLight,
+                    stateMode, isSysOnline, isSysOnline && firebaseReady,
+                    aiReady, aiAction);
     }
   } else {
     offlineFailsafeActive = false;
@@ -1405,9 +1528,10 @@ void loop() {
   } else if (isNetConnected && !wasConnected) {
     // Wi-Fi JUST reconnected!
     wasConnected = true;
+    lastWifiReconnectTime = millis();
     Serial.println("🌐 [Network] Wi-Fi link restored! Reconnecting to Cloud...");
 
-    // 1. Show Reconnecting Screen on TFT so the user knows it is syncing!
+    // 1. Show Reconnecting Screen on TFT (keeps user informed while catching up)
     drawReconnectingScreen("Wi-Fi Reconnected!");
 
     // 2. Sync Philippine Standard Time in background
@@ -1415,16 +1539,50 @@ void loop() {
     setenv("TZ", "PST-8", 1);
     tzset();
 
-    // 3. Connect to Firebase or Resync Setpoints
+    // 3. Connect to Firebase and wait for authentication / token ready
+    updateReconnectingStatus("Authenticating Cloud...", "Connecting to Firebase RTDB...");
     if (!firebaseReady) {
       initFirebaseCloud();
-    } else {
-      resyncCloudSetpoints();
     }
 
-    // 4. Redraw dashboard with restored theme and app mode
+    // Give Firebase client up to 2.5s to establish SSL and authenticate token
+    unsigned long waitAuthStart = millis();
+    while (!Firebase.ready() && (millis() - waitAuthStart < 2500)) {
+      delay(100);
+    }
+
+    // 4. Fetch the latest App Mode & Setpoints from Firebase
+    updateReconnectingStatus("Syncing Setpoints...", "Fetching App Mode & Controls...");
+    bool syncSuccess = resyncCloudSetpoints();
+
+    // If direct getJSON failed, fall back to lastConfiguredAppMode
+    if (!syncSuccess && lastConfiguredAppMode.length() > 0) {
+      stateMode = lastConfiguredAppMode;
+      curTheme = getThemeForMode(stateMode);
+      Serial.printf("⚠️ [Cloud Reconnect] Using persisted App Mode: %s\n", stateMode.c_str());
+    }
+
+    // 5. Announce restored mode on screen and hold for clean visual transition
+    char syncDoneMsg[48];
+    snprintf(syncDoneMsg, sizeof(syncDoneMsg), "Restored App Mode: %s", stateMode.c_str());
+    updateReconnectingStatus("Cloud Link Synced ✓", syncDoneMsg);
+    delay(1000); // 1.0s pause so user can clearly see the restored mode before dashboard appears
+
+    // 6. Reset watchdog timestamps & repaint static dashboard with restored theme
+    lastSuccessfulCloudSync = millis();
+    lastWifiReconnectTime = millis();
+    offlineFailsafeActive = false;
+    slowInternetDetected = false;
+    isSysOnline = true;
+    baseDrawn = false;
     curTheme = getThemeForMode(stateMode);
-    drawStaticDashboard();
+    drawStaticDashboard(stateMode);
+    drawDashboard(currentTemp, currentHum, currentLight, currentCO2,
+                  shtFault, lightFault, co2Fault,
+                  stateExhaust, stateIntake, stateMister, stateLight,
+                  stateMode, isSysOnline, isSysOnline && firebaseReady,
+                  aiReady, aiAction);
+    lastDisplayRefresh = millis();
   }
 
   // ── Philippine Standard Time (PST UTC+8) Sync Watchdog ──
@@ -1525,8 +1683,7 @@ void loop() {
       Serial.printf("\n🔄 [SERIAL TRIGGER] Setting TFT Rotation to %d...\n", curRot);
       tft.setRotation(curRot);
       baseDrawn = false;
-      tft.fillScreen(curTheme.bg);
-      drawStaticDashboard();
+      drawStaticDashboard(stateMode);
     }
   }
 

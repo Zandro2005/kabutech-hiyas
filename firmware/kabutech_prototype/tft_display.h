@@ -171,8 +171,9 @@ static bool  baseDrawn = false;
 void initDisplay();
 void drawBootSplash();
 void updateBootStep(const char* label, bool success);
-void drawReconnectingScreen(const char* status = nullptr);
-void drawStaticDashboard();
+void drawReconnectingScreen(const char* status = nullptr, int progressPercent = -1);
+void updateReconnectingStatus(const char* status, const char* subtext = nullptr, int progressPercent = -1);
+void drawStaticDashboard(const String& mode = "");
 void drawDashboard(float temp, float hum, int light, int co2,
                    bool shtErr, bool lightErr, bool co2Err,
                    bool exhOn, bool intOn, bool mistOn, bool lightOn,
@@ -294,7 +295,7 @@ void updateBootStep(const char* label, bool success) {
 }
 
 // ─── Cloud Reconnecting Screen (320x240 Landscape) ───
-void drawReconnectingScreen(const char* status) {
+void drawReconnectingScreen(const char* status, int progressPercent) {
   baseDrawn = false; // Invalidate dashboard cache
   tft.fillScreen(COLOR_BG);
   
@@ -315,34 +316,61 @@ void drawReconnectingScreen(const char* status) {
   // Divider line
   tft.drawLine(24, 54, 296, 54, COLOR_CARD_BORDER);
 
-  // Reconnecting Card Modal
-  tft.fillRoundRect(24, 64, 272, 140, 8, COLOR_CARD_BG);
-  tft.drawRoundRect(24, 64, 272, 140, 8, COLOR_AMBER);
+  // Reconnecting Card Modal (Clean text-focused design without lingering progress bar)
+  tft.fillRoundRect(24, 60, 272, 148, 8, COLOR_CARD_BG);
+  tft.drawRoundRect(24, 60, 272, 148, 8, COLOR_AMBER);
 
   // Status icon and title
   tft.setTextDatum(textdatum_t::top_center);
   tft.setTextColor(COLOR_AMBER, COLOR_CARD_BG);
   tft.setTextSize(2);
-  tft.drawString("RECONNECTING", 160, 78);
+  tft.drawString("RECONNECTING", 160, 75);
 
+  // Primary status text
   tft.setTextSize(1);
   tft.setTextColor(COLOR_WHITE, COLOR_CARD_BG);
-  tft.drawString(status != nullptr ? status : "Restoring Cloud Link...", 160, 108);
+  tft.drawString(status != nullptr ? status : "Restoring Cloud Link...", 160, 106);
 
+  // Secondary subtext
   tft.setTextColor(COLOR_MUTED_GREEN, COLOR_CARD_BG);
-  tft.drawString("Syncing App Mode & Controls...", 160, 130);
+  tft.drawString("Syncing App Mode & Controls...", 160, 128);
 
   tft.setTextColor(COLOR_MUTED, COLOR_CARD_BG);
-  tft.drawString("Sensors & Edge AI running locally", 160, 158);
+  tft.drawString("Sensors & Edge AI running locally", 160, 155);
 
   // Footer
   tft.setTextDatum(textdatum_t::bottom_center);
   tft.setTextColor(COLOR_MUTED, COLOR_BG);
-  tft.drawString("Please wait a moment...", 160, 226);
+  tft.drawString("Matching mobile app settings...", 160, 226);
+}
+
+// Update status dynamically without full redraw flicker or progress bar ghosting
+void updateReconnectingStatus(const char* status, const char* subtext, int progressPercent) {
+  tft.setTextDatum(textdatum_t::top_center);
+  tft.setFont(nullptr);
+  tft.setTextSize(1);
+
+  // Clear and update status text line
+  tft.fillRect(30, 104, 260, 18, COLOR_CARD_BG);
+  tft.setTextColor(COLOR_WHITE, COLOR_CARD_BG);
+  if (status != nullptr) {
+    tft.drawString(status, 160, 106);
+  }
+
+  // Clear and update subtext line
+  if (subtext != nullptr) {
+    tft.fillRect(30, 126, 260, 18, COLOR_CARD_BG);
+    tft.setTextColor(COLOR_MUTED_GREEN, COLOR_CARD_BG);
+    tft.drawString(subtext, 160, 128);
+  }
 }
 
 // ─── Draw Base Landscape Dashboard Layout (320x240) ───
-void drawStaticDashboard() {
+void drawStaticDashboard(const String& mode) {
+  if (mode.length() > 0) {
+    prevThemeMode = mode;
+    curTheme = getThemeForMode(mode);
+  }
   tft.fillScreen(curTheme.bg);
 
   // Top header divider line (Y: 26)
@@ -464,7 +492,7 @@ void drawDashboard(float temp, float hum, int light, int co2,
   if (mode != prevThemeMode || !baseDrawn) {
     prevThemeMode = mode;
     curTheme = getThemeForMode(mode);
-    drawStaticDashboard();
+    drawStaticDashboard(mode);
   }
 
   // 1. TOP HEADER (320px Width)

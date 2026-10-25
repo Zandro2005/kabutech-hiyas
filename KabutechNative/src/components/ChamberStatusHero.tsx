@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { View, Text, TouchableOpacity, Modal, ScrollView } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
+import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import Svg, { Circle, Defs, LinearGradient as SvgGradient, Stop } from 'react-native-svg';
 import tw from '../tailwind';
 import { useAuth } from '../context/AuthContext';
@@ -39,22 +39,62 @@ export default React.memo(function ChamberStatusHero({
 
   const { inRangeCount, total, params, summary, statusLabel, badgeColor, profile: cropProfile } = evaluation;
 
-  // Ultra-sleek hero dial dimensions
-  const ringSize = isSmallDevice ? 218 : 242;
-  const strokeWidth = isSmallDevice ? 12 : 13;
+  // Ultra-sleek hero dial dimensions - Expanded for spacious symmetrical complication pills inside
+  const ringSize = isSmallDevice ? 250 : 274;
+  const strokeWidth = isSmallDevice ? 11 : 12;
   const radius = (ringSize - strokeWidth - 6) / 2; // Slight inset for breathing room
   const circumference = 2 * Math.PI * radius;
   const gapPx = 10;
   const arcLength = Math.max(1, circumference / 4 - gapPx);
   const gapAngleDeg = (gapPx / circumference) * 360;
 
-  // Quadrants: 0: Temp (Top-Right), 1: Humidity (Bottom-Right), 2: CO2 (Bottom-Left), 3: Light (Top-Left)
+  // Quadrants matching 2x2 layout: Temp (Top-Left), Hum (Top-Right), CO2 (Bottom-Left), Light (Bottom-Right)
   const segments = [
-    { key: 'temp' as const, label: 'Temp', eval: params.temp, baseDeg: -90 },
-    { key: 'hum' as const, label: 'Humidity', eval: params.hum, baseDeg: 0 },
+    { key: 'temp' as const, label: 'Temp', eval: params.temp, baseDeg: 180 },
+    { key: 'hum' as const, label: 'Humidity', eval: params.hum, baseDeg: -90 },
+    { key: 'light' as const, label: 'Light', eval: params.light, baseDeg: 0 },
     { key: 'co2' as const, label: 'CO₂', eval: params.co2, baseDeg: 90 },
-    { key: 'light' as const, label: 'Light', eval: params.light, baseDeg: 180 },
   ];
+
+  // Helper to extract clean compact status label and dot color for each quadrant slice
+  const getQuadrantBadge = (paramEval: ParamEvaluation) => {
+    if (isOffline) {
+      return {
+        dotColor: isDarkMode ? '#94a3b8' : '#64748b',
+        textColor: isDarkMode ? '#94a3b8' : '#64748b',
+        statusText: 'Off',
+        isInRange: false,
+      };
+    }
+    if (paramEval.state === 'fault') {
+      return {
+        dotColor: isDarkMode ? '#94a3b8' : '#64748b',
+        textColor: isDarkMode ? '#94a3b8' : '#64748b',
+        statusText: 'Fault',
+        isInRange: false,
+      };
+    }
+    if (paramEval.state === 'in_range') {
+      return {
+        dotColor: '#10b981',
+        textColor: isDarkMode ? '#34d399' : '#059669',
+        statusText: 'OK',
+        isInRange: true,
+      };
+    }
+    const isCrit = paramEval.severity === 'critical';
+    return {
+      dotColor: isCrit ? '#ef4444' : '#f59e0b',
+      textColor: isCrit ? (isDarkMode ? '#f87171' : '#dc2626') : (isDarkMode ? '#fbbf24' : '#d97706'),
+      statusText: isCrit ? 'Crit' : (paramEval.state === 'low' ? 'Low' : 'High'),
+      isInRange: false,
+    };
+  };
+
+  const tempBadge = getQuadrantBadge(params.temp);
+  const humBadge = getQuadrantBadge(params.hum);
+  const co2Badge = getQuadrantBadge(params.co2);
+  const lightBadge = getQuadrantBadge(params.light);
 
   const getSegmentStroke = (paramEval: ParamEvaluation) => {
     if (isOffline || paramEval.state === 'fault') {
@@ -163,7 +203,7 @@ export default React.memo(function ChamberStatusHero({
         }}
         style={tw`items-center justify-center my-1.5`}
       >
-        <View style={{ width: ringSize, height: ringSize, alignItems: 'center', justifyContent: 'center' }}>
+        <View style={{ width: ringSize, height: ringSize, alignItems: 'center', justifyContent: 'center', position: 'relative' }}>
           <Svg width={ringSize} height={ringSize}>
             <Defs>
               {/* Vibrant High-End Gradients */}
@@ -188,7 +228,7 @@ export default React.memo(function ChamberStatusHero({
               cx={ringSize / 2}
               cy={ringSize / 2}
               r={radius + strokeWidth / 2 + 2}
-              stroke={isDarkMode ? 'rgba(51, 65, 85, 0.15)' : 'rgba(203, 213, 225, 0.25)'}
+              stroke={isDarkMode ? 'rgba(51, 65, 85, 0.25)' : 'rgba(203, 213, 225, 0.35)'}
               strokeWidth={1}
               fill="none"
             />
@@ -198,7 +238,7 @@ export default React.memo(function ChamberStatusHero({
               cx={ringSize / 2}
               cy={ringSize / 2}
               r={radius - strokeWidth / 2 - 2}
-              stroke={isDarkMode ? 'rgba(51, 65, 85, 0.15)' : 'rgba(203, 213, 225, 0.25)'}
+              stroke={isDarkMode ? 'rgba(51, 65, 85, 0.25)' : 'rgba(203, 213, 225, 0.35)'}
               strokeWidth={1}
               fill="none"
             />
@@ -208,7 +248,7 @@ export default React.memo(function ChamberStatusHero({
               cx={ringSize / 2}
               cy={ringSize / 2}
               r={radius}
-              stroke={isDarkMode ? 'rgba(30, 41, 59, 0.85)' : 'rgba(241, 245, 249, 1)'}
+              stroke={isDarkMode ? 'rgba(30, 41, 59, 0.9)' : 'rgba(241, 245, 249, 1)'}
               strokeWidth={strokeWidth}
               fill="none"
             />
@@ -239,37 +279,36 @@ export default React.memo(function ChamberStatusHero({
           <View
             pointerEvents="none"
             style={[
-              tw`absolute rounded-full items-center justify-center border`,
+              tw`absolute rounded-full items-center justify-center border shadow-sm`,
               {
-                width: ringSize - (strokeWidth * 2 + 18),
-                height: ringSize - (strokeWidth * 2 + 18),
+                width: ringSize - (strokeWidth * 2 + 10),
+                height: ringSize - (strokeWidth * 2 + 10),
+                backgroundColor: '#ffffff',
+                borderColor: '#e2e8f0',
               },
-              isDarkMode
-                ? tw`bg-slate-900/60 border-slate-800/70`
-                : tw`bg-white/85 border-slate-200/50 shadow-sm`,
             ]}
           />
 
-          {/* Center Typography: Clean, Modern, Minimal */}
+          {/* Center Typography: Clean, Modern, Minimal (Middle pill removed as requested) */}
           <View style={tw`absolute items-center justify-center px-4`}>
             <Text
               style={[
-                tw`text-[9.5px] uppercase tracking-widest text-slate-400 dark:text-slate-400 mb-1`,
+                tw`text-[9.5px] uppercase tracking-wider text-slate-400 mb-0.5`,
                 { fontFamily: 'PlusJakartaSans_700Bold' }
               ]}
             >
               Parameters In Range
             </Text>
 
-            <View style={tw`flex-row items-baseline justify-center mb-1`}>
+            <View style={tw`flex-row items-baseline justify-center`}>
               <Text
                 style={[
-                  isOffline ? tw`text-slate-400 dark:text-slate-500` : tw`text-slate-900 dark:text-white`,
                   {
+                    color: '#0f172a', // Solid deep black, never grey
                     fontSize: isSmallDevice ? 46 : 52,
                     fontFamily: 'PlusJakartaSans_800ExtraBold',
                     letterSpacing: -1.8,
-                    lineHeight: isSmallDevice ? 50 : 56
+                    lineHeight: isSmallDevice ? 50 : 56,
                   }
                 ]}
               >
@@ -277,38 +316,110 @@ export default React.memo(function ChamberStatusHero({
               </Text>
               <Text
                 style={[
-                  tw`text-lg sm:text-xl text-slate-400 dark:text-slate-500 ml-1`,
+                  tw`text-xl sm:text-2xl text-slate-400 ml-1`,
                   { fontFamily: 'PlusJakartaSans_700Bold' }
                 ]}
               >
                 /{total}
               </Text>
             </View>
+          </View>
 
-            {/* Modern Micro Pill */}
-            <View
-              style={[
-                tw`flex-row items-center px-2.5 py-1 rounded-full border shadow-sm`,
-                isOffline
-                  ? (isDarkMode ? tw`bg-slate-800/80 border-slate-700` : tw`bg-slate-100 border-slate-200`)
-                  : (isDarkMode ? tw`bg-slate-900/90 border-slate-700/80` : tw`bg-white border-slate-200/90`)
-              ]}
-            >
-              <View style={[tw`w-1.5 h-1.5 rounded-full mr-1.5`, { backgroundColor: badgeColor }]} />
-              <Text
-                style={[
-                  tw`text-[10px]`,
-                  {
-                    fontFamily: 'PlusJakartaSans_700Bold',
-                    color: isOffline
-                      ? (isDarkMode ? '#94a3b8' : '#64748b')
-                      : (isDarkMode ? '#e2e8f0' : '#1e293b')
-                  }
-                ]}
-              >
-                {statusLabel}
-              </Text>
-            </View>
+          {/* 4 Symmetrical Quadrant Flags INSIDE the Circle (Moved inward towards the middle) */}
+          {/* Top-Left: Temp */}
+          <View
+            style={[
+              tw`absolute flex-row items-center`,
+              {
+                top: isSmallDevice ? 56 : 60,
+                left: isSmallDevice ? 56 : 62,
+              }
+            ]}
+          >
+            <MaterialCommunityIcons
+              name="flag-variant"
+              size={12}
+              color={tempBadge.dotColor}
+              style={{ marginRight: 3 }}
+            />
+            <Text style={[tw`text-[10px] text-slate-800 font-extrabold`, { fontFamily: 'PlusJakartaSans_800ExtraBold', letterSpacing: -0.2 }]}>
+              Temp
+            </Text>
+            <Text style={[tw`text-[9.5px] font-bold ml-1`, { color: tempBadge.textColor, fontFamily: 'PlusJakartaSans_700Bold' }]}>
+              {tempBadge.statusText}
+            </Text>
+          </View>
+
+          {/* Top-Right: Hum */}
+          <View
+            style={[
+              tw`absolute flex-row items-center`,
+              {
+                top: isSmallDevice ? 56 : 60,
+                right: isSmallDevice ? 56 : 62,
+              }
+            ]}
+          >
+            <MaterialCommunityIcons
+              name="flag-variant"
+              size={12}
+              color={humBadge.dotColor}
+              style={{ marginRight: 3 }}
+            />
+            <Text style={[tw`text-[10px] text-slate-800 font-extrabold`, { fontFamily: 'PlusJakartaSans_800ExtraBold', letterSpacing: -0.2 }]}>
+              Hum
+            </Text>
+            <Text style={[tw`text-[9.5px] font-bold ml-1`, { color: humBadge.textColor, fontFamily: 'PlusJakartaSans_700Bold' }]}>
+              {humBadge.statusText}
+            </Text>
+          </View>
+
+          {/* Bottom-Left: CO2 */}
+          <View
+            style={[
+              tw`absolute flex-row items-center`,
+              {
+                bottom: isSmallDevice ? 56 : 60,
+                left: isSmallDevice ? 56 : 62,
+              }
+            ]}
+          >
+            <MaterialCommunityIcons
+              name="flag-variant"
+              size={12}
+              color={co2Badge.dotColor}
+              style={{ marginRight: 3 }}
+            />
+            <Text style={[tw`text-[10px] text-slate-800 font-extrabold`, { fontFamily: 'PlusJakartaSans_800ExtraBold', letterSpacing: -0.2 }]}>
+              CO₂
+            </Text>
+            <Text style={[tw`text-[9.5px] font-bold ml-1`, { color: co2Badge.textColor, fontFamily: 'PlusJakartaSans_700Bold' }]}>
+              {co2Badge.statusText}
+            </Text>
+          </View>
+
+          {/* Bottom-Right: Light */}
+          <View
+            style={[
+              tw`absolute flex-row items-center`,
+              {
+                bottom: isSmallDevice ? 56 : 60,
+                right: isSmallDevice ? 56 : 62,
+              }
+            ]}
+          >
+            <MaterialCommunityIcons
+              name="flag-variant"
+              size={12}
+              color={lightBadge.dotColor}
+              style={{ marginRight: 3 }}
+            />
+            <Text style={[tw`text-[10px] text-slate-800 font-extrabold`, { fontFamily: 'PlusJakartaSans_800ExtraBold', letterSpacing: -0.2 }]}>
+              Light
+            </Text>
+            <Text style={[tw`text-[9.5px] font-bold ml-1`, { color: lightBadge.textColor, fontFamily: 'PlusJakartaSans_700Bold' }]}>
+              {lightBadge.statusText}
+            </Text>
           </View>
         </View>
 

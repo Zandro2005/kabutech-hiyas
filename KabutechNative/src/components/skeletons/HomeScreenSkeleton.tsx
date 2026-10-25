@@ -26,7 +26,7 @@ export default function HomeScreenSkeleton() {
 
         {/* Center: 4-Segment Halo Ring Skeleton */}
         <View style={tw`items-center justify-center my-2`}>
-          <Skeleton width={220} height={220} borderRadius={110} />
+          <Skeleton width={270} height={270} borderRadius={135} />
           <View style={tw`mt-3 items-center gap-1.5`}>
             <Skeleton width={180} height={14} borderRadius={6} />
             <Skeleton width={130} height={11} borderRadius={4} />
@@ -80,8 +80,11 @@ export default function HomeScreenSkeleton() {
                 <Skeleton width={80} height={28} borderRadius={6} />
               </View>
 
-              {/* Bottom: Progress Bar */}
-              <Skeleton width="100%" height={6} borderRadius={3} style={tw`mt-2.5`} />
+              {/* Bottom: Optimal Range Row Skeleton */}
+              <View style={tw`flex-row justify-between items-center mt-2.5 pt-2 border-t border-slate-100 dark:border-slate-800/60`}>
+                <Skeleton width={42} height={10} borderRadius={4} />
+                <Skeleton width={52} height={10} borderRadius={4} />
+              </View>
             </View>
           ))}
         </View>

@@ -31,11 +31,11 @@ export default React.memo(function EnvironmentMetricsGrid({ temp, hum, light, co
   const isLightFault = health.lightError || light === -999 || light < 0;
   const isCo2Fault = health.co2Error || co2 === -999 || co2 < 0;
 
-  // Dedicated constant theme colors for each environmental metric
-  const TEMP_COLOR = '#f97316'; // Warm Orange
-  const HUM_COLOR = '#0ea5e9';  // Sky Blue
-  const LIGHT_COLOR = '#f59e0b'; // Amber Gold
-  const CO2_COLOR = '#10b981';  // Emerald Green
+  // Unified professional icon theme across all metric cards
+  const ICON_COLOR = isDarkMode ? '#10b981' : '#059669';
+  const ICON_BG = isDarkMode ? 'rgba(16, 185, 129, 0.12)' : '#ecfdf5';
+  const FAULT_ICON_COLOR = isDarkMode ? '#64748b' : '#94a3b8';
+  const FAULT_ICON_BG = isDarkMode ? 'rgba(148, 163, 184, 0.1)' : '#f1f5f9';
 
   const tempEval = evaluateParam('temp', temp, isControllerOff || isTempFault, ACTIVE_PROFILE);
   const humEval = evaluateParam('hum', hum, isControllerOff || isHumFault, ACTIVE_PROFILE);
@@ -43,7 +43,7 @@ export default React.memo(function EnvironmentMetricsGrid({ temp, hum, light, co
   const co2Eval = evaluateParam('co2', co2, isControllerOff || isCo2Fault, ACTIVE_PROFILE);
 
   // Status helper with clean minimal badges matching TFT display
-  const getBadgeStyle = (paramEval: ParamEvaluation, fallbackColor: string) => {
+  const getBadgeStyle = (paramEval: ParamEvaluation) => {
     if (paramEval.state === 'fault') {
       return {
         label: paramEval.statusLabel || 'Fault',
@@ -73,12 +73,6 @@ export default React.memo(function EnvironmentMetricsGrid({ temp, hum, light, co
     };
   };
 
-  // Track scaling
-  const tempPercent = isTempFault ? 0 : Math.min(100, Math.max(0, ((temp - 15) / 20) * 100));
-  const humPercent = isHumFault ? 0 : Math.min(100, Math.max(0, ((hum - 40) / 60) * 100));
-  const lightPercent = isLightFault ? 0 : Math.min(100, Math.max(0, (light / 1200) * 100));
-  const co2Percent = isCo2Fault ? 0 : Math.min(100, Math.max(0, ((co2 - 300) / 1200) * 100));
-
   const handleCardPress = (tabKey: 'temp' | 'hum' | 'light' | 'co2') => {
     if (isStaff) return;
     hapticSelection();
@@ -95,53 +89,41 @@ export default React.memo(function EnvironmentMetricsGrid({ temp, hum, light, co
       id: 'temp' as const,
       name: 'Temperature',
       eval: tempEval,
-      status: getBadgeStyle(tempEval, TEMP_COLOR),
+      status: getBadgeStyle(tempEval),
       icon: (isTempFault ? 'alert-circle-outline' : 'thermometer') as any,
-      iconColor: isTempFault ? (isDarkMode ? '#64748b' : '#94a3b8') : TEMP_COLOR,
-      iconBgColor: isTempFault
-        ? (isDarkMode ? 'rgba(148, 163, 184, 0.1)' : '#f1f5f9')
-        : (isDarkMode ? 'rgba(249, 115, 22, 0.16)' : '#fff7ed'),
-      accentColor: TEMP_COLOR,
-      percent: tempPercent,
+      iconColor: isTempFault ? FAULT_ICON_COLOR : ICON_COLOR,
+      iconBgColor: isTempFault ? FAULT_ICON_BG : ICON_BG,
+      targetRange: `${ACTIVE_PROFILE.temp.min ?? 18} – ${ACTIVE_PROFILE.temp.max ?? 25} °C`,
     },
     {
       id: 'hum' as const,
       name: 'Humidity',
       eval: humEval,
-      status: getBadgeStyle(humEval, HUM_COLOR),
+      status: getBadgeStyle(humEval),
       icon: (isHumFault ? 'alert-circle-outline' : 'water-percent') as any,
-      iconColor: isHumFault ? (isDarkMode ? '#64748b' : '#94a3b8') : HUM_COLOR,
-      iconBgColor: isHumFault
-        ? (isDarkMode ? 'rgba(148, 163, 184, 0.1)' : '#f1f5f9')
-        : (isDarkMode ? 'rgba(14, 165, 233, 0.16)' : '#f0f9ff'),
-      accentColor: HUM_COLOR,
-      percent: humPercent,
-    },
-    {
-      id: 'light' as const,
-      name: 'Light Level',
-      eval: lightEval,
-      status: getBadgeStyle(lightEval, LIGHT_COLOR),
-      icon: (isLightFault ? 'alert-circle-outline' : 'white-balance-sunny') as any,
-      iconColor: isLightFault ? (isDarkMode ? '#64748b' : '#94a3b8') : LIGHT_COLOR,
-      iconBgColor: isLightFault
-        ? (isDarkMode ? 'rgba(148, 163, 184, 0.1)' : '#f1f5f9')
-        : (isDarkMode ? 'rgba(245, 158, 11, 0.16)' : '#fffbeb'),
-      accentColor: LIGHT_COLOR,
-      percent: lightPercent,
+      iconColor: isHumFault ? FAULT_ICON_COLOR : ICON_COLOR,
+      iconBgColor: isHumFault ? FAULT_ICON_BG : ICON_BG,
+      targetRange: `${ACTIVE_PROFILE.hum.min ?? 80} – ${ACTIVE_PROFILE.hum.max ?? 95} %`,
     },
     {
       id: 'co2' as const,
       name: 'CO2 Level',
       eval: co2Eval,
-      status: getBadgeStyle(co2Eval, CO2_COLOR),
+      status: getBadgeStyle(co2Eval),
       icon: (isCo2Fault ? 'alert-circle-outline' : 'molecule-co2') as any,
-      iconColor: isCo2Fault ? (isDarkMode ? '#64748b' : '#94a3b8') : CO2_COLOR,
-      iconBgColor: isCo2Fault
-        ? (isDarkMode ? 'rgba(148, 163, 184, 0.1)' : '#f1f5f9')
-        : (isDarkMode ? 'rgba(16, 185, 129, 0.16)' : '#ecfdf5'),
-      accentColor: CO2_COLOR,
-      percent: co2Percent,
+      iconColor: isCo2Fault ? FAULT_ICON_COLOR : ICON_COLOR,
+      iconBgColor: isCo2Fault ? FAULT_ICON_BG : ICON_BG,
+      targetRange: `< ${(ACTIVE_PROFILE.co2.max ?? 1000).toLocaleString()} ppm`,
+    },
+    {
+      id: 'light' as const,
+      name: 'Light Level',
+      eval: lightEval,
+      status: getBadgeStyle(lightEval),
+      icon: (isLightFault ? 'alert-circle-outline' : 'white-balance-sunny') as any,
+      iconColor: isLightFault ? FAULT_ICON_COLOR : ICON_COLOR,
+      iconBgColor: isLightFault ? FAULT_ICON_BG : ICON_BG,
+      targetRange: `${ACTIVE_PROFILE.light.min ?? 150} – ${(ACTIVE_PROFILE.light.max ?? 1000).toLocaleString()} lx`,
     },
   ];
 
@@ -291,19 +273,24 @@ export default React.memo(function EnvironmentMetricsGrid({ temp, hum, light, co
                 </View>
               </View>
 
-              {/* Bottom: Minimal Smooth Rounded Gauge Bar (Zero Black Lines, Zero Footer Text) */}
-              <View style={tw`mt-2`}>
-                <View style={tw`w-full h-1.5 bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden`}>
-                  <View 
-                    style={[
-                      tw`h-full rounded-full`, 
-                      { 
-                        width: isItemFault ? '0%' : `${item.percent}%`, 
-                        backgroundColor: isItemFault ? (isDarkMode ? '#334155' : '#cbd5e1') : item.accentColor 
-                      }
-                    ]} 
-                  />
-                </View>
+              {/* Bottom: Target Optimal Range Benchmark (Replaces progress bar with professional setpoint) */}
+              <View style={tw`mt-2 pt-2 border-t border-slate-100 dark:border-slate-800/70 flex-row items-center justify-between`}>
+                <Text 
+                  style={[
+                    tw`text-[10px] text-slate-400 dark:text-slate-500 uppercase tracking-wider`, 
+                    { fontFamily: 'PlusJakartaSans_700Bold' }
+                  ]}
+                >
+                  Optimal
+                </Text>
+                <Text 
+                  style={[
+                    tw`${isItemFault ? 'text-slate-400 dark:text-slate-500' : 'text-slate-600 dark:text-slate-300'} text-[11px]`, 
+                    { fontFamily: 'PlusJakartaSans_700Bold' }
+                  ]}
+                >
+                  {isItemFault ? '--' : item.targetRange}
+                </Text>
               </View>
             </TouchableOpacity>
           );
