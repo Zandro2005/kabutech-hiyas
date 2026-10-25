@@ -19,6 +19,7 @@ import DashboardWarningBadges from '../components/DashboardWarningBadges';
 import { useTabBarScroll } from '../context/TabBarContext';
 import { evaluateChamber } from '../utils/environmentRanges';
 import { ACTIVE_PROFILE } from '../config/cropProfiles'; // Literature-backed crop baseline
+import { normalizeAppMode } from '../utils/scheduleLogic';
 
 export default function HomeScreen() {
   const navigation = useNavigation<NativeStackNavigationProp<GlobalNavigationParamList>>();
@@ -57,8 +58,9 @@ export default function HomeScreen() {
   const co2 = !isControllerOff && typeof sensors.co2 === 'number' && sensors.co2 !== -999 && sensors.co2 > 0 ? sensors.co2 : -999;
   const light = !isControllerOff && typeof sensors.light === 'number' && sensors.light !== -999 && sensors.light >= 0 ? sensors.light : -999;
 
-  const isAuto = isControllerOff || String(settings?.setpoints?.mode).toLowerCase() === 'auto';
-  const isScheduled = !isControllerOff && (String(settings?.setpoints?.mode).toLowerCase() === 'scheduled' || String(settings?.setpoints?.mode).toLowerCase() === 'timed');
+  const normalizedMode = normalizeAppMode(settings?.setpoints?.mode);
+  const isAuto = isControllerOff || normalizedMode === 'auto';
+  const isScheduled = !isControllerOff && normalizedMode === 'scheduled';
 
   // Chamber evaluation against cited agricultural crop profile
   const chamberEval = useMemo(() => {

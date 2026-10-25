@@ -2,6 +2,30 @@ import { ScheduleSettings } from '../types/firebase';
 import { ACTIVE_PROFILE, CropProfile } from '../config/cropProfiles';
 import { getControlBands } from '../config/controlBands';
 
+export type CanonicalMode = 'auto' | 'scheduled' | 'manual';
+
+/**
+ * Normalizes any mode string ('auto', 'AI AUTO', 'scheduled', 'timed', 'TIMED', 'manual', 'MANUAL', etc.)
+ * into one of the three canonical app modes: 'auto' | 'scheduled' | 'manual'.
+ */
+export const normalizeAppMode = (raw?: string | null): CanonicalMode => {
+  const m = String(raw || '').trim().toLowerCase();
+  if (m === 'manual') return 'manual';
+  if (m === 'scheduled' || m === 'timed') return 'scheduled';
+  return 'auto';
+};
+
+/**
+ * Returns the unified display label matching the 3.2" SPI TFT hardware display.
+ */
+export const getDisplayModeLabel = (mode?: CanonicalMode | string | null, isOffline: boolean = false): string => {
+  if (isOffline) return 'AI AUTO (LOCAL)';
+  const norm = normalizeAppMode(mode);
+  if (norm === 'manual') return 'MANUAL';
+  if (norm === 'scheduled') return 'TIMED';
+  return 'AI AUTO';
+};
+
 /**
  * Computes the expected real-time ON/OFF state of devices based on their schedule and the current time.
  */

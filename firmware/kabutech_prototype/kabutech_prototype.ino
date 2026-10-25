@@ -171,7 +171,9 @@ LightReading readBH1750();
 CO2Reading readSCD41();
 void recoverI2CBus();
 bool initFirebaseCloud();
-bool resyncCloudSetpoints();
+bool resyncCloudSetpoints(bool forceRestartStream = false);
+bool checkWanInternetFast();
+void cloudTask(void *pvParameters);
 
 FirebaseData fbdo;
 FirebaseData streamDO; // For listening to actuator changes
@@ -184,7 +186,24 @@ unsigned long lastHeartbeat    = 0;
 unsigned long lastHourlyPush   = 0;
 unsigned long bootTime         = 0;
 
-bool firebaseReady = false;
+// ─── Hotspot / WAN Latency, Liveness & Stability Qualification Thresholds ───
+#define MAX_FAST_CLOUD_RTT_MS   2000    // Max RTT (2.0s) for a healthy cloud push/sync
+#define CLOUD_STUCK_CALL_MS     3200    // Max in-flight block time (3.2s > 1.8s TLS handshake) before Core 1 forces LOCAL
+#define CLOUD_SYNC_TIMEOUT_MS   6500    // Max time (6.5s) between verified cloud syncs before LOCAL failsafe
+#define STABLE_RECOVERY_STREAK  3       // Require 3 consecutive fast cloud checks (~6s stable internet) to recover LOCAL -> ONLINE
+#define FAIL_STREAK_TO_LOCAL    2       // 2 consecutive slow/failed cloud pushes (or 1 failure + dead WAN) -> LOCAL
+
+volatile bool firebaseReady = false;
+volatile bool firebaseInitialized = false;
+volatile bool needsCloudResync = false;
+volatile unsigned long firebaseBackoffUntil = 0;
+volatile unsigned long lastStreamEventTime = 0;
+volatile bool cloudOpInFlight = false;
+volatile unsigned long cloudOpStartMs = 0;
+volatile bool pendingAutoDeviceSync = false;
+volatile int stableCloudStreak = 0;
+volatile int consecutiveCloudFailures = 0;
+TaskHandle_t cloudTaskHandle = NULL;
 
 // Live cached telemetry values
 float currentTemp  = -999.0;
@@ -224,9 +243,9 @@ bool stateMister  = false;
 bool stateLight   = false;
 String stateMode  = "AUTO"; // Tracks AUTO vs TIMED vs MANUAL control
 String lastConfiguredAppMode = "AUTO"; // Persists user's chosen mode across offline disconnects
-bool offlineFailsafeActive = false; // Tracks if we fell back to AI AUTO due to network loss
-unsigned long lastSuccessfulCloudSync = 0; // Tracks last verified 2-way cloud communication
-unsigned long lastWifiReconnectTime = 0;   // Grace period tracker for post-reconnection sync
+volatile bool offlineFailsafeActive = false; // Tracks if we fell back to AI AUTO due to network loss
+volatile unsigned long lastSuccessfulCloudSync = 0; // Tracks last verified 2-way cloud communication
+volatile unsigned long lastWifiReconnectTime = 0;   // Tracker for Wi-Fi association timestamp
 
 // ─── Actuator Anti-Chatter Dwell Timers & Streaks (Biological Range & Relay Protection) ───
 #define ACTUATOR_MIN_ON_TIME_MS   6000    // Minimum ON dwell time: 6 seconds (prevents relay chatter)
@@ -253,8 +272,8 @@ int lightLowStreak  = 0;
 int lightHighStreak = 0;
 
 // Network & Cloud Status Globals
-bool isSysOnline          = false;
-bool slowInternetDetected = false;
+volatile bool isSysOnline          = false;
+volatile bool slowInternetDetected = false;
 
 
 // Normalizes Firebase mode string to canonical stateMode ("AUTO", "TIMED", "MANUAL")
@@ -281,32 +300,65 @@ unsigned long lastDisplayRefresh = 0;
 // Helper to set actuator state and update GPIO pin output
 void applyActuator(const String& key, bool state) {
   if (key == "fans" || key == "exhaust" || key == "fanOut") {
-    stateExhaust = state;
-    digitalWrite(PIN_FAN_EXHAUST, state ? HIGH : LOW);
-    Serial.printf("   🌀 [Actuator] Exhaust Fan (GPIO %d) -> %s\n", PIN_FAN_EXHAUST, state ? "ON" : "OFF");
+    if (stateExhaust != state) {
+      stateExhaust = state;
+      digitalWrite(PIN_FAN_EXHAUST, state ? HIGH : LOW);
+      lastDisplayRefresh = 0;
+      Serial.printf("   🌀 [Actuator] Exhaust Fan (GPIO %d) -> %s\n", PIN_FAN_EXHAUST, state ? "ON" : "OFF");
+    } else {
+      digitalWrite(PIN_FAN_EXHAUST, state ? HIGH : LOW);
+    }
   } else if (key == "fanIn" || key == "intake") {
-    stateIntake = state;
-    digitalWrite(PIN_FAN_INTAKE, state ? HIGH : LOW);
-    Serial.printf("   🌀 [Actuator] Intake Fan (GPIO %d) -> %s\n", PIN_FAN_INTAKE, state ? "ON" : "OFF");
+    if (stateIntake != state) {
+      stateIntake = state;
+      digitalWrite(PIN_FAN_INTAKE, state ? HIGH : LOW);
+      lastDisplayRefresh = 0;
+      Serial.printf("   🌀 [Actuator] Intake Fan (GPIO %d) -> %s\n", PIN_FAN_INTAKE, state ? "ON" : "OFF");
+    } else {
+      digitalWrite(PIN_FAN_INTAKE, state ? HIGH : LOW);
+    }
   } else if (key == "misters") {
-    stateMister = state;
-    digitalWrite(PIN_MISTER, state ? HIGH : LOW);
-    Serial.printf("   💧 [Actuator] Misters (GPIO %d) -> %s\n", PIN_MISTER, state ? "ON" : "OFF");
+    if (stateMister != state) {
+      stateMister = state;
+      digitalWrite(PIN_MISTER, state ? HIGH : LOW);
+      lastDisplayRefresh = 0;
+      Serial.printf("   💧 [Actuator] Misters (GPIO %d) -> %s\n", PIN_MISTER, state ? "ON" : "OFF");
+    } else {
+      digitalWrite(PIN_MISTER, state ? HIGH : LOW);
+    }
   } else if (key == "lights") {
-    stateLight = state;
-    lastLightToggleTime = millis();
-    lightLowStreak = 0;
-    lightHighStreak = 0;
-    digitalWrite(PIN_LIGHT, state ? HIGH : LOW);
-    Serial.printf("   💡 [Actuator] Grow Light (GPIO %d) -> %s\n", PIN_LIGHT, state ? "ON" : "OFF");
+    if (stateLight != state) {
+      stateLight = state;
+      lastLightToggleTime = millis();
+      lightLowStreak = 0;
+      lightHighStreak = 0;
+      digitalWrite(PIN_LIGHT, state ? HIGH : LOW);
+      lastDisplayRefresh = 0;
+      Serial.printf("   💡 [Actuator] Grow Light (GPIO %d) -> %s\n", PIN_LIGHT, state ? "ON" : "OFF");
+    } else {
+      digitalWrite(PIN_LIGHT, state ? HIGH : LOW);
+    }
   }
 }
 
 void streamCallback(FirebaseStream data) {
   String path = data.dataPath();
   String type = data.dataType();
+  unsigned long nowMs = millis();
+  lastStreamEventTime = nowMs;
 
-  // 1. Full or partial JSON object payload (handles initial connect and /devices updates)
+  // If currently in LOCAL failsafe (qualifying internet stability), cache mode changes
+  // without prematurely exiting LOCAL until STABLE_RECOVERY_STREAK is verified!
+  bool isQualifyingStability = (offlineFailsafeActive || slowInternetDetected) && (stableCloudStreak < STABLE_RECOVERY_STREAK);
+  if (!isQualifyingStability) {
+    lastSuccessfulCloudSync = nowMs;
+    offlineFailsafeActive = false;
+    needsCloudResync = false;
+    slowInternetDetected = false;
+    firebaseReady = true;
+  }
+
+  // 1. Full or partial JSON object payload (handles initial connect, mode sync pulses, and /devices updates)
   if (type == "json") {
     FirebaseJson *json = data.jsonObjectPtr();
     FirebaseJsonData result;
@@ -314,24 +366,28 @@ void streamCallback(FirebaseStream data) {
       if (json->get(result, "mode")) {
         String newMode = normalizeMode(result.to<String>());
         lastConfiguredAppMode = newMode;
-        if (newMode != stateMode) {
-          stateMode = newMode;
-          curTheme = getThemeForMode(stateMode);
-          baseDrawn = false;
-          drawStaticDashboard(stateMode);
+        if (!isQualifyingStability) {
+          if (newMode != stateMode) {
+            stateMode = newMode;
+            curTheme = getThemeForMode(stateMode);
+            baseDrawn = false;
+            lastDisplayRefresh = 0;
+            Serial.printf("   ⚙️ [Control] Mode switched to: %s\n", stateMode.c_str());
+          } else {
+            Serial.printf("   ⚙️ [Control] Mode verified: %s\n", stateMode.c_str());
+          }
         }
-        lastSuccessfulCloudSync = millis();
-        offlineFailsafeActive = false;
-        Serial.printf("   ⚙️ [Control] Mode: %s\n", stateMode.c_str());
       }
-      if (json->get(result, "devices/fans") || json->get(result, "fans")) applyActuator("fans", result.to<bool>());
-      if (json->get(result, "devices/exhaust") || json->get(result, "exhaust")) applyActuator("exhaust", result.to<bool>());
-      if (json->get(result, "devices/fanOut") || json->get(result, "fanOut")) applyActuator("fanOut", result.to<bool>());
-      if (json->get(result, "devices/fanIn") || json->get(result, "fanIn")) applyActuator("fanIn", result.to<bool>());
-      if (json->get(result, "devices/intake") || json->get(result, "intake")) applyActuator("intake", result.to<bool>());
-      if (json->get(result, "devices/misters") || json->get(result, "misters")) applyActuator("misters", result.to<bool>());
-      if (json->get(result, "devices/lights") || json->get(result, "lights")) applyActuator("lights", result.to<bool>());
-      lastSuccessfulCloudSync = millis();
+      // Apply cloud actuator states in MANUAL and TIMED modes (in AUTO mode, local Edge AI regulation is authoritative)
+      if (!isQualifyingStability && stateMode != "AUTO") {
+        if (json->get(result, "devices/fans") || json->get(result, "fans")) applyActuator("fans", result.to<bool>());
+        if (json->get(result, "devices/exhaust") || json->get(result, "exhaust")) applyActuator("exhaust", result.to<bool>());
+        if (json->get(result, "devices/fanOut") || json->get(result, "fanOut")) applyActuator("fanOut", result.to<bool>());
+        if (json->get(result, "devices/fanIn") || json->get(result, "fanIn")) applyActuator("fanIn", result.to<bool>());
+        if (json->get(result, "devices/intake") || json->get(result, "intake")) applyActuator("intake", result.to<bool>());
+        if (json->get(result, "devices/misters") || json->get(result, "misters")) applyActuator("misters", result.to<bool>());
+        if (json->get(result, "devices/lights") || json->get(result, "lights")) applyActuator("lights", result.to<bool>());
+      }
     }
     return;
   }
@@ -340,19 +396,21 @@ void streamCallback(FirebaseStream data) {
   if (path.indexOf("mode") >= 0) {
     String newMode = normalizeMode(data.stringData());
     lastConfiguredAppMode = newMode;
-    if (newMode != stateMode) {
-      stateMode = newMode;
-      curTheme = getThemeForMode(stateMode);
-      baseDrawn = false;
-      drawStaticDashboard(stateMode);
+    if (!isQualifyingStability) {
+      if (newMode != stateMode) {
+        stateMode = newMode;
+        curTheme = getThemeForMode(stateMode);
+        baseDrawn = false;
+        lastDisplayRefresh = 0;
+      }
+      Serial.printf("   ⚙️ [Control] Mode changed to: %s\n", stateMode.c_str());
     }
-    lastSuccessfulCloudSync = millis();
-    offlineFailsafeActive = false;
-    Serial.printf("   ⚙️ [Control] Mode changed to: %s\n", stateMode.c_str());
     return;
   }
 
-  // 3. Child property change (boolean / string / int)
+  // 3. Child property change (boolean / string / int) — apply in MANUAL and TIMED modes
+  if (isQualifyingStability || stateMode == "AUTO") return;
+
   bool state = false;
   if (type == "boolean") state = data.boolData();
   else if (type == "string") state = (data.stringData() == "true" || data.stringData() == "1");
@@ -610,108 +668,201 @@ void runAutoRegulation() {
                   stateLight   ? "ON" : "OFF",
                   aiAction);
 
-    // Only update cloud if online and connection is healthy (NEVER block if offline or slow!)
-    if (isSysOnline && Firebase.ready() && WiFi.status() == WL_CONNECTED) {
-      FirebaseJson devJson;
-      devJson.set("fans",    stateExhaust);
-      devJson.set("fanOut",  stateExhaust);
-      devJson.set("fanIn",   stateIntake);
-      devJson.set("misters", stateMister);
-      devJson.set("lights",  stateLight);
-      devJson.set("valve",   stateMister);
-      devJson.set("co2",     false);
-      Firebase.RTDB.updateNode(&fbdo, "/kabutech/settings/setpoints/devices", &devJson);
+    // Queue cloud device sync for Core 0 cloudTask (never block Core 1 loop!)
+    if (isSysOnline) {
+      pendingAutoDeviceSync = true;
     }
   }
 }
 
 // ═══════════════════════════════════════════════
-//  FIREBASE CLOUD INITIALIZATION & RESYNC
+//  FIREBASE CLOUD INITIALIZATION & RESYNC (CORE 0)
 // ═══════════════════════════════════════════════
 
-bool resyncCloudSetpoints();
+// Fast TCP SYN-ACK reachability check (zero DNS lookup overhead, 750ms max timeout)
+// Detects immediately when a hotspot is connected to Wi-Fi (WL_CONNECTED) but has NO or VERY SLOW internet!
+bool checkWanInternetFast() {
+  if (WiFi.status() != WL_CONNECTED) return false;
+  WiFiClient probe;
+  unsigned long t0 = millis();
+  cloudOpStartMs = t0;
+  cloudOpInFlight = true;
+  bool ok = probe.connect(IPAddress(8, 8, 8, 8), 53, 750);
+  if (!ok && (millis() - t0 < 750)) {
+    ok = probe.connect(IPAddress(1, 1, 1, 1), 53, 750);
+  }
+  unsigned long rtt = millis() - t0;
+  probe.stop();
+  cloudOpInFlight = false;
+  if (!ok || rtt > 750) {
+    Serial.printf("🌐 [WAN Probe] Hotspot has NO or VERY SLOW internet (RTT=%lu ms) -> Staying in LOCAL AI AUTO.\n", rtt);
+    return false;
+  }
+  return true;
+}
+
+bool resyncCloudSetpoints(bool forceRestartStream);
 
 bool initFirebaseCloud() {
   if (WiFi.status() != WL_CONNECTED) return false;
 
-  Serial.println("☁️ [Firebase] Initializing Cloud connection...");
-  config.api_key = API_KEY;
-  config.database_url = DATABASE_URL;
-
-  // Sign up / log in anonymously
-  if (Firebase.signUp(&config, &auth, "", "")) {
-    Serial.println("✅ Firebase anonymous sign-in successful!");
-    firebaseReady = true;
-  } else {
-    Serial.printf("❌ Firebase sign-in failed: %s\n", config.signer.signupError.message.c_str());
+  // Verify hotspot actually has fast upstream WAN internet before attempting TLS handshake
+  if (!checkWanInternetFast()) {
+    slowInternetDetected = true;
     firebaseReady = false;
+    isSysOnline = false;
     return false;
   }
 
+  Serial.println("☁️ [Firebase] Initializing Cloud connection...");
+  config.api_key = API_KEY;
+  config.database_url = DATABASE_URL;
   config.token_status_callback = tokenStatusCallback;
-  // Strict non-blocking network timeouts: Prevents slow internet from freezing CPU loops
+
+  // ⚠️ Configure tight non-blocking socket/SSL timeouts BEFORE Firebase.signUp()!
   config.timeout.socketConnection = 1200;  // 1.2s max socket connect timeout
-  config.timeout.sslHandshake = 1800;      // 1.8s max SSL handshake timeout
-  config.timeout.serverResponse = 1200;    // 1.2s max server response timeout
-  config.timeout.wifiReconnect = 2000;
+  config.timeout.sslHandshake     = 1800;  // 1.8s max SSL handshake timeout
+  config.timeout.serverResponse   = 1200;  // 1.2s max server response timeout
+  config.timeout.wifiReconnect    = 1500;
+
+  // Sign up / log in anonymously (timed by Core 1 watchdog)
+  unsigned long tSignStart = millis();
+  cloudOpStartMs = tSignStart;
+  cloudOpInFlight = true;
+  bool signedUp = Firebase.signUp(&config, &auth, "", "");
+  unsigned long signDuration = millis() - tSignStart;
+  cloudOpInFlight = false;
+
+  if (signedUp && signDuration <= 2500) {
+    Serial.printf("✅ Firebase anonymous sign-in successful! (%lu ms)\n", signDuration);
+    firebaseReady = true;
+    firebaseInitialized = true;
+  } else {
+    Serial.printf("❌ Firebase sign-in failed or too slow (%lu ms): %s\n",
+                  signDuration, config.signer.signupError.message.c_str());
+    firebaseReady = false;
+    slowInternetDetected = true;
+    isSysOnline = false;
+    return false;
+  }
 
   Firebase.begin(&config, &auth);
-  Firebase.reconnectNetwork(true);
+  Firebase.reconnectNetwork(false); // Managed explicitly by Core 0 watchdog to prevent internal hangs
 
   fbdo.setBSSLBufferSize(4096, 1024);
   streamDO.setBSSLBufferSize(4096, 1024);
-  Firebase.RTDB.setMaxRetry(&fbdo, 1);
-  Firebase.RTDB.setMaxErrorQueue(&fbdo, 1);
+  Firebase.RTDB.setMaxRetry(&fbdo, 0);      // 0 retries: fail fast on slow/dead hotspots!
+  Firebase.RTDB.setMaxErrorQueue(&fbdo, 0);
 
-  // Subscribe to real-time control stream
-  if (!Firebase.RTDB.beginStream(&streamDO, "/kabutech/settings/setpoints")) {
-    Serial.printf("❌ Stream begin error: %s\n", streamDO.errorReason().c_str());
-  } else {
-    Firebase.RTDB.setStreamCallback(&streamDO, streamCallback, streamTimeoutCallback);
-    Serial.println("✅ Firebase RTDB stream active!");
+  // Fetch initial cloud mode and actuator settings and start stream if fast
+  if (!offlineFailsafeActive && !slowInternetDetected) {
+    stableCloudStreak = STABLE_RECOVERY_STREAK - 1; // Allow immediate online on clean boot
   }
-
-  // Fetch initial cloud mode and actuator settings immediately
-  resyncCloudSetpoints();
-  return true;
+  resyncCloudSetpoints(true);
+  return firebaseReady && !slowInternetDetected;
 }
 
-bool resyncCloudSetpoints() {
-  if (WiFi.status() != WL_CONNECTED) return false;
+bool resyncCloudSetpoints(bool forceRestartStream) {
+  if (WiFi.status() != WL_CONNECTED) {
+    stableCloudStreak = 0;
+    return false;
+  }
   if (!Firebase.ready()) return false;
 
-  Serial.println("🔄 [Cloud Sync] Fetching current mode & controls from Firebase RTDB...");
-  if (Firebase.RTDB.getJSON(&fbdo, "/kabutech/settings/setpoints")) {
+  bool isRecovering = (slowInternetDetected || offlineFailsafeActive || needsCloudResync);
+
+  // If recovering from LOCAL / slow internet failsafe, verify WAN reachability first in <750ms
+  if (isRecovering) {
+    if (!checkWanInternetFast()) {
+      stableCloudStreak = 0;
+      slowInternetDetected = true;
+      isSysOnline = false;
+      firebaseBackoffUntil = millis() + 2000;
+      return false;
+    }
+  }
+
+  unsigned long tSyncStart = millis();
+  cloudOpStartMs = tSyncStart;
+  cloudOpInFlight = true;
+  bool gotJson = Firebase.RTDB.getJSON(&fbdo, "/kabutech/settings/setpoints");
+  unsigned long syncDuration = millis() - tSyncStart;
+  cloudOpInFlight = false;
+
+  if (gotJson && syncDuration <= MAX_FAST_CLOUD_RTT_MS) {
     FirebaseJsonData d;
     FirebaseJson *json = fbdo.jsonObjectPtr();
     if (json != nullptr) {
+      String fetchedMode = lastConfiguredAppMode;
       if (json->get(d, "mode")) {
-        String fetchedMode = normalizeMode(d.to<String>());
-        stateMode = fetchedMode;
+        fetchedMode = normalizeMode(d.to<String>());
         lastConfiguredAppMode = fetchedMode;
-        curTheme = getThemeForMode(stateMode);
-        offlineFailsafeActive = false;
-        Serial.printf("✅ [Cloud Sync] Successfully restored App Mode: %s\n", stateMode.c_str());
       }
-      if (json->get(d, "devices/fans") || json->get(d, "fans")) applyActuator("fans", d.to<bool>());
-      if (json->get(d, "devices/fanOut") || json->get(d, "fanOut")) applyActuator("fanOut", d.to<bool>());
-      if (json->get(d, "devices/fanIn") || json->get(d, "fanIn")) applyActuator("fanIn", d.to<bool>());
-      if (json->get(d, "devices/misters") || json->get(d, "misters")) applyActuator("misters", d.to<bool>());
-      if (json->get(d, "devices/lights") || json->get(d, "lights")) applyActuator("lights", d.to<bool>());
-      
+
+      // Open/restart stream only if not currently connected (avoids unnecessary TLS handshake stalls)
+      if (!streamDO.httpConnected()) {
+        cloudOpStartMs = millis();
+        cloudOpInFlight = true;
+        if (Firebase.RTDB.beginStream(&streamDO, "/kabutech/settings/setpoints")) {
+          Firebase.RTDB.setStreamCallback(&streamDO, streamCallback, streamTimeoutCallback);
+        }
+        cloudOpInFlight = false;
+      }
+
+      // If recovering from LOCAL failsafe, require STABLE_RECOVERY_STREAK consecutive fast checks
+      // before transitioning back to ONLINE so unstable internet never loops ONLINE <-> LOCAL!
+      if (isRecovering) {
+        stableCloudStreak++;
+        if (stableCloudStreak < STABLE_RECOVERY_STREAK) {
+          Serial.printf("⏳ [Stability Qualifier] Internet check %d/%d passed (%lu ms). Waiting for stable connection...\n",
+                        stableCloudStreak, STABLE_RECOVERY_STREAK, syncDuration);
+          firebaseBackoffUntil = millis() + 1800;
+          return false; // Hold in LOCAL AI AUTO until all stability checks pass
+        }
+        Serial.printf("✅ [Stability Verified] Internet stable (%d/%d checks, %lu ms)! Transitioning LOCAL -> ONLINE (Mode: %s)\n",
+                      stableCloudStreak, STABLE_RECOVERY_STREAK, syncDuration, fetchedMode.c_str());
+      } else {
+        stableCloudStreak = STABLE_RECOVERY_STREAK;
+      }
+
+      if (fetchedMode != stateMode) {
+        stateMode = fetchedMode;
+        curTheme = getThemeForMode(stateMode);
+        baseDrawn = false;
+        lastDisplayRefresh = 0;
+        Serial.printf("✅ [Cloud Sync] Restored App Mode: %s (%lu ms)\n", stateMode.c_str(), syncDuration);
+      }
+
+      // In MANUAL and TIMED modes, synchronize hardware actuators with cloud setpoints
+      if (stateMode != "AUTO") {
+        if (json->get(d, "devices/fans") || json->get(d, "fans")) applyActuator("fans", d.to<bool>());
+        if (json->get(d, "devices/fanOut") || json->get(d, "fanOut")) applyActuator("fanOut", d.to<bool>());
+        if (json->get(d, "devices/fanIn") || json->get(d, "fanIn")) applyActuator("fanIn", d.to<bool>());
+        if (json->get(d, "devices/misters") || json->get(d, "misters")) applyActuator("misters", d.to<bool>());
+        if (json->get(d, "devices/lights") || json->get(d, "lights")) applyActuator("lights", d.to<bool>());
+      }
+
+      consecutiveCloudFailures = 0;
       lastSuccessfulCloudSync = millis();
+      offlineFailsafeActive = false;
+      needsCloudResync = false;
+      slowInternetDetected = false;
       firebaseReady = true;
       return true;
     }
-  } else {
-    Serial.printf("⚠️ [Cloud Sync] getJSON failed: %s\n", fbdo.errorReason().c_str());
   }
 
-  // Ensure stream stays subscribed
-  if (!streamDO.httpConnected()) {
-    Firebase.RTDB.beginStream(&streamDO, "/kabutech/settings/setpoints");
-    Firebase.RTDB.setStreamCallback(&streamDO, streamCallback, streamTimeoutCallback);
-  }
+  // Failed or too slow -> reset stability streak and stay in LOCAL AI AUTO
+  stableCloudStreak = 0;
+  consecutiveCloudFailures++;
+  Serial.printf("⚠️ [Cloud Sync] Setpoints fetch %s (%lu ms > %d ms limit). Staying in LOCAL AI AUTO.\n",
+                gotJson ? "TOO SLOW" : "FAILED", syncDuration, MAX_FAST_CLOUD_RTT_MS);
+  slowInternetDetected = true;
+  isSysOnline = false;
+  firebaseReady = false;
+  needsCloudResync = true;
+  streamDO.clear();
+  firebaseBackoffUntil = millis() + 2200;
   return false;
 }
 
@@ -847,24 +998,35 @@ void setup() {
     configTime(8 * 3600, 0, "time.google.com", "time.cloudflare.com", "pool.ntp.org");
     setenv("TZ", "PST-8", 1);
     tzset();
-    Serial.print("⏰ Synchronizing Philippine Standard Time (PST)...");
-    struct tm ntpInfo;
-    int ntpAttempts = 0;
-    while (!getLocalTime(&ntpInfo, 200) && ntpAttempts < 15) {
-      Serial.print(".");
-      delay(200);
-      ntpAttempts++;
-    }
-    if (ntpInfo.tm_year > 120) {
-      Serial.printf(" ✓ Synced: %02d:%02d PST\n", ntpInfo.tm_hour, ntpInfo.tm_min);
-    } else {
-      Serial.println(" (Syncing in background)");
-    }
-    updateBootStep("WiFi & Time Synced", true);
 
-    // Initialize Firebase Cloud Connection
-    initFirebaseCloud();
-    updateBootStep("Firebase Cloud", firebaseReady);
+    if (checkWanInternetFast()) {
+      Serial.print("⏰ Synchronizing Philippine Standard Time (PST)...");
+      struct tm ntpInfo;
+      int ntpAttempts = 0;
+      while (!getLocalTime(&ntpInfo, 150) && ntpAttempts < 4) {
+        Serial.print(".");
+        delay(150);
+        ntpAttempts++;
+      }
+      if (ntpInfo.tm_year > 120) {
+        Serial.printf(" ✓ Synced: %02d:%02d PST\n", ntpInfo.tm_hour, ntpInfo.tm_min);
+      } else {
+        Serial.println(" (Syncing in background)");
+      }
+      updateBootStep("WiFi & WAN Online", true);
+
+      // Initialize Firebase Cloud Connection
+      initFirebaseCloud();
+      updateBootStep("Firebase Cloud", firebaseReady && !slowInternetDetected);
+    } else {
+      Serial.println("⚠️ WiFi connected to Hotspot, but NO or VERY SLOW internet! Starting LOCAL AI AUTO.");
+      updateBootStep("Hotspot: No WAN", false);
+      updateBootStep("Local AI AUTO Active", true);
+      stateMode = "AUTO";
+      offlineFailsafeActive = true;
+      slowInternetDetected = true;
+      firebaseReady = false;
+    }
   } else {
     Serial.println();
     Serial.println("❌ WiFi offline on boot. Starting Edge AI Autonomous Mode instantly!");
@@ -873,6 +1035,7 @@ void setup() {
     updateBootStep("Local AI AUTO Active", true);
     stateMode = "AUTO";
     offlineFailsafeActive = true;
+    slowInternetDetected = true;
     firebaseReady = false;
   }
 
@@ -897,8 +1060,19 @@ void setup() {
   drawStaticDashboard(stateMode);
 
   bootTime = millis();
+  // Launch Dedicated Core 0 Cloud Task so Core 1 (Sensors, Edge AI, Relays, TFT Display) NEVER blocks!
+  xTaskCreatePinnedToCore(
+    cloudTask,
+    "CloudTask",
+    16384,
+    NULL,
+    1,
+    &cloudTaskHandle,
+    0
+  );
+
   Serial.println();
-  Serial.println("🚀 System fully initialized! Sampling sensors every 1s...");
+  Serial.println("🚀 System fully initialized! Core 1: Local Sensors/TFT | Core 0: Cloud Watchdog...");
   Serial.println("────────────────────────────────────────────────────────");
 }
 
@@ -1161,7 +1335,7 @@ CO2Reading readSCD41() {
 }
 
 // ═══════════════════════════════════════════════
-//  FIREBASE PUSH FUNCTION
+//  FIREBASE PUSH FUNCTION (RUNS ON CORE 0)
 // ═══════════════════════════════════════════════
 
 void pushToFirebase(float temp, float hum, int light, int co2,
@@ -1169,6 +1343,31 @@ void pushToFirebase(float temp, float hum, int light, int co2,
   if (!Firebase.ready()) {
     Serial.println("   ⏳ Firebase not ready yet...");
     return;
+  }
+
+  // If recovering from LOCAL failsafe or slow internet, verify fast WAN & restore App Mode first
+  // before ever reporting esp32_status = "online" to Firebase!
+  if (slowInternetDetected || offlineFailsafeActive || needsCloudResync) {
+    if (!resyncCloudSetpoints(true)) {
+      return;
+    }
+  }
+
+  // Sync AUTO mode actuator states if queued by Core 1
+  if (pendingAutoDeviceSync && stateMode == "AUTO") {
+    pendingAutoDeviceSync = false;
+    FirebaseJson devJson;
+    devJson.set("fans",    stateExhaust);
+    devJson.set("fanOut",  stateExhaust);
+    devJson.set("fanIn",   stateIntake);
+    devJson.set("misters", stateMister);
+    devJson.set("lights",  stateLight);
+    devJson.set("valve",   stateMister);
+    devJson.set("co2",     false);
+    cloudOpStartMs = millis();
+    cloudOpInFlight = true;
+    Firebase.RTDB.updateNode(&fbdo, "/kabutech/settings/setpoints/devices", &devJson);
+    cloudOpInFlight = false;
   }
 
   // Strictly push -999 whenever a sensor is faulted or unplugged
@@ -1211,36 +1410,37 @@ void pushToFirebase(float temp, float hum, int light, int co2,
   ts.set(".sv", "timestamp");
   json.set("last_seen", ts);
 
-  static int cloudSyncFailStreak = 0;
-  static int slowNetStreak = 0;
-
   unsigned long tPushStart = millis();
+  cloudOpStartMs = tPushStart;
+  cloudOpInFlight = true;
   bool success = Firebase.RTDB.updateNode(&fbdo, "/kabutech/sensors/live", &json);
   unsigned long pushDuration = millis() - tPushStart;
+  cloudOpInFlight = false;
 
-  // Internet latency watchdog: A push taking > 1500ms or failing means connection is slow/degraded
-  if (success && pushDuration <= 1500) {
+  // Require BOTH success AND fast RTT (<= MAX_FAST_CLOUD_RTT_MS).
+  if (success && pushDuration <= MAX_FAST_CLOUD_RTT_MS) {
     Serial.printf("   ☁️  Firebase synced ✓ (%lu ms)\n", pushDuration);
+    consecutiveCloudFailures = 0;
+    stableCloudStreak = STABLE_RECOVERY_STREAK;
     lastSuccessfulCloudSync = millis();
-    cloudSyncFailStreak = 0;
-    slowNetStreak = 0;
     slowInternetDetected = false;
     firebaseReady = true;
   } else {
-    slowNetStreak++;
-    cloudSyncFailStreak++;
-    Serial.printf("   ⚠️ [Slow/Degraded Cloud] Push took %lu ms (Fail streak: %d, reason: %s)\n",
-                  pushDuration, slowNetStreak, fbdo.errorReason().c_str());
-
-    // When internet is slow or failing, IMMEDIATELY drop to LOCAL autonomous mode!
-    if (slowNetStreak >= 2 || pushDuration > 1800) {
-      Serial.println("🚨 [Network Watchdog] Internet is too slow! Immediately switching to LOCAL mode so sensor readings stay 100% responsive.");
-      lastSuccessfulCloudSync = 0;
+    consecutiveCloudFailures++;
+    // If 2 consecutive pushes fail/lag OR WAN probe fails right now -> switch to LOCAL AI AUTO immediately!
+    if (consecutiveCloudFailures >= FAIL_STREAK_TO_LOCAL || !checkWanInternetFast()) {
+      Serial.printf("   🚨 [Network Watchdog] Cloud push %s (%lu ms, streak %d). Switching to LOCAL AI AUTO!\n",
+                    success ? "TOO SLOW" : "FAILED", pushDuration, consecutiveCloudFailures);
+      stableCloudStreak = 0;
       isSysOnline = false;
       firebaseReady = false;
       slowInternetDetected = true;
-      // Back off next cloud push by 10s so local sensor sampling and regulation loops run with zero freeze
-      lastFirebasePush = millis() + 10000;
+      offlineFailsafeActive = true;
+      needsCloudResync = true;
+      streamDO.clear(); // Close stale stream socket immediately so it never blocks
+      firebaseBackoffUntil = millis() + 2000;
+    } else {
+      Serial.printf("   ⚠️ [Network Jitter] Transient slow push (%lu ms). WAN still reachable, retrying next cycle...\n", pushDuration);
     }
   }
 }
@@ -1250,7 +1450,7 @@ void pushToFirebase(float temp, float hum, int light, int co2,
 // ═══════════════════════════════════════════════
 
 void sendHeartbeat() {
-  if (!Firebase.ready()) return;
+  if (!isSysOnline || slowInternetDetected || !Firebase.ready()) return;
 
   FirebaseJson json;
   json.set("esp32_status", "online");
@@ -1258,12 +1458,30 @@ void sendHeartbeat() {
   ts.set(".sv", "timestamp");
   json.set("last_seen", ts);
 
-  if (Firebase.RTDB.updateNode(&fbdo, "/kabutech/sensors/live", &json)) {
+  unsigned long tHbStart = millis();
+  cloudOpStartMs = tHbStart;
+  cloudOpInFlight = true;
+  bool ok = Firebase.RTDB.updateNode(&fbdo, "/kabutech/sensors/live", &json);
+  unsigned long hbDuration = millis() - tHbStart;
+  cloudOpInFlight = false;
+
+  if (ok && hbDuration <= MAX_FAST_CLOUD_RTT_MS) {
     Serial.println("   💓 Heartbeat sent");
+    consecutiveCloudFailures = 0;
     lastSuccessfulCloudSync = millis();
     firebaseReady = true;
   } else {
-    firebaseReady = false;
+    consecutiveCloudFailures++;
+    if (consecutiveCloudFailures >= FAIL_STREAK_TO_LOCAL || !checkWanInternetFast()) {
+      stableCloudStreak = 0;
+      isSysOnline = false;
+      firebaseReady = false;
+      slowInternetDetected = true;
+      offlineFailsafeActive = true;
+      needsCloudResync = true;
+      streamDO.clear();
+      firebaseBackoffUntil = millis() + 2000;
+    }
   }
 }
 
@@ -1285,7 +1503,12 @@ void pruneOldHistory() {
   String prunePath = String("/kabutech/sensors/history/") + oldDateStr;
   Serial.printf("   🧹 Checking 90-day retention prune: Deleting %s\n", prunePath.c_str());
 
-  if (Firebase.RTDB.deleteNode(&fbdo, prunePath.c_str())) {
+  cloudOpStartMs = millis();
+  cloudOpInFlight = true;
+  bool deleted = Firebase.RTDB.deleteNode(&fbdo, prunePath.c_str());
+  cloudOpInFlight = false;
+
+  if (deleted) {
     Serial.println("   ✅ 90-day retention prune check complete.");
   } else {
     Serial.printf("   ℹ️ Prune status: %s\n", fbdo.errorReason().c_str());
@@ -1293,7 +1516,7 @@ void pruneOldHistory() {
 }
 
 void pushHourlyHistory() {
-  if (!Firebase.ready()) return;
+  if (!isSysOnline || slowInternetDetected || !Firebase.ready()) return;
 
   time_t nowSec = time(NULL);
   struct tm timeinfo;
@@ -1327,7 +1550,12 @@ void pushHourlyHistory() {
 
   Serial.printf("   📅 Logging hourly history to %s...\n", historyPath.c_str());
 
-  if (Firebase.RTDB.updateNode(&fbdo, historyPath.c_str(), &historyJson)) {
+  cloudOpStartMs = millis();
+  cloudOpInFlight = true;
+  bool ok = Firebase.RTDB.updateNode(&fbdo, historyPath.c_str(), &historyJson);
+  cloudOpInFlight = false;
+
+  if (ok) {
     Serial.println("   ✅ Hourly history logged successfully!");
   } else {
     Serial.printf("   ❌ Failed to log hourly history: %s\n", fbdo.errorReason().c_str());
@@ -1349,43 +1577,194 @@ void pushHourlyHistory() {
 }
 
 // ═══════════════════════════════════════════════
-//  MAIN LOOP
+//  DEDICATED CORE 0 CLOUD & NETWORK TASK
+//  Guarantees Core 1 (Sensors, Edge AI, TFT) NEVER hangs!
+// ═══════════════════════════════════════════════
+
+void cloudTask(void *pvParameters) {
+  bool wasWifiConnected = (WiFi.status() == WL_CONNECTED);
+  unsigned long lastWifiReconnectAttempt = 0;
+  unsigned long lastNtpCheck = 0;
+  unsigned long lastFirebaseInitRetry = 0;
+  unsigned long lastStreamCheck = 0;
+
+  for (;;) {
+    unsigned long now = millis();
+    bool isNetConnected = (WiFi.status() == WL_CONNECTED);
+
+    // 1. Wi-Fi Link Reconnection Watchdog
+    if (!isNetConnected) {
+      if (wasWifiConnected) {
+        wasWifiConnected = false;
+        stableCloudStreak = 0;
+        consecutiveCloudFailures = FAIL_STREAK_TO_LOCAL;
+        isSysOnline = false;
+        firebaseReady = false;
+        slowInternetDetected = true;
+        offlineFailsafeActive = true;
+        needsCloudResync = true;
+        streamDO.clear();
+        Serial.println("📶 [Core 0] Wi-Fi disconnected -> Instant LOCAL AI AUTO.");
+      }
+      if (now - lastWifiReconnectAttempt >= 3500) {
+        lastWifiReconnectAttempt = now;
+        Serial.println("🔄 [Core 0] Attempting non-blocking Wi-Fi reconnect...");
+        WiFi.reconnect();
+      }
+      vTaskDelay(pdMS_TO_TICKS(100));
+      continue;
+    }
+
+    // 2. Wi-Fi Just Associated (Verify Hotspot Actually Has Stable WAN Internet!)
+    if (isNetConnected && !wasWifiConnected) {
+      wasWifiConnected = true;
+      lastWifiReconnectTime = now;
+      stableCloudStreak = 0; // Require full stability qualification streak after Wi-Fi reconnect
+      WiFi.setSleep(false);
+      Serial.println("🌐 [Core 0] Wi-Fi associated! Probing Hotspot WAN internet stability...");
+
+      configTime(8 * 3600, 0, "time.google.com", "time.cloudflare.com", "pool.ntp.org");
+      setenv("TZ", "PST-8", 1);
+      tzset();
+
+      if (checkWanInternetFast()) {
+        if (!firebaseInitialized) {
+          initFirebaseCloud();
+        } else {
+          resyncCloudSetpoints(false);
+        }
+      } else {
+        // Hotspot is connected to Wi-Fi, but has NO internet or VERY SLOW internet!
+        stableCloudStreak = 0;
+        slowInternetDetected = true;
+        offlineFailsafeActive = true;
+        isSysOnline = false;
+        firebaseReady = false;
+        needsCloudResync = true;
+        firebaseBackoffUntil = millis() + 2000;
+      }
+    }
+
+    // 3. Background NTP Check every 20s
+    if (now - lastNtpCheck >= 20000) {
+      lastNtpCheck = now;
+      if (isSysOnline && !slowInternetDetected) {
+        struct tm chkTime;
+        if (!getLocalTime(&chkTime, 20) || chkTime.tm_year <= 120) {
+          configTime(8 * 3600, 0, "time.google.com", "time.cloudflare.com", "pool.ntp.org");
+          setenv("TZ", "PST-8", 1);
+          tzset();
+        }
+      }
+    }
+
+    // 4. Retry Firebase Init if not yet initialized
+    if (!firebaseInitialized && (long)(now - firebaseBackoffUntil) >= 0 && (now - lastFirebaseInitRetry >= 4000)) {
+      lastFirebaseInitRetry = now;
+      initFirebaseCloud();
+    }
+
+    // 5. Periodic Stream Socket Health Check (only reconnects if stream socket is disconnected, never tears down a healthy stream)
+    if (firebaseInitialized && !slowInternetDetected && !offlineFailsafeActive && (long)(now - firebaseBackoffUntil) >= 0 && (now - lastStreamCheck >= 5000)) {
+      lastStreamCheck = now;
+      if (!streamDO.httpConnected()) {
+        resyncCloudSetpoints(false);
+      }
+    }
+
+    // 6. Push Live Sensor & Actuator Telemetry every 2s (or run stability qualification if in LOCAL failsafe)
+    if (firebaseInitialized && (long)(now - firebaseBackoffUntil) >= 0 && (now - lastFirebasePush >= FIREBASE_PUSH_INTERVAL)) {
+      lastFirebasePush = now;
+      pushToFirebase(currentTemp, currentHum, currentLight, currentCO2,
+                     shtFault, lightFault, co2Fault);
+
+      if (!shtFault && currentTemp > 0 && currentHum > 0) {
+        hourlyTempSum += currentTemp;
+        hourlyHumSum  += currentHum;
+        hourlySHTCount++;
+      }
+      if (!lightFault && currentLight >= 0) {
+        hourlyLightSum += currentLight;
+        hourlyLightCount++;
+      }
+      if (!co2Fault && currentCO2 > 0) {
+        hourlyCO2Sum += currentCO2;
+        hourlyCO2Count++;
+      }
+    }
+
+    // 7. Hourly History Push
+    if (isSysOnline && !slowInternetDetected) {
+      struct tm loopTime;
+      if (getLocalTime(&loopTime, 10) && loopTime.tm_year > 120) {
+        if (lastLoggedHour == -1) {
+          lastLoggedHour = loopTime.tm_hour;
+          lastHourlyPush = now;
+        } else if (loopTime.tm_hour != lastLoggedHour) {
+          lastLoggedHour = loopTime.tm_hour;
+          lastHourlyPush = now;
+          pushHourlyHistory();
+        }
+      } else if (now - lastHourlyPush >= HOURLY_PUSH_INTERVAL && lastHourlyPush > 0) {
+        lastHourlyPush = now;
+        pushHourlyHistory();
+      }
+    }
+
+    vTaskDelay(pdMS_TO_TICKS(40));
+  }
+}
+
+// ═══════════════════════════════════════════════
+//  MAIN LOOP (CORE 1 — 100% NON-BLOCKING LOCAL ENGINE)
 // ═══════════════════════════════════════════════
 
 void loop() {
   unsigned long now = millis();
 
-  // ── Network & Cloud Liveness Check (Matches Mobile App useSensorHealth 6s dynamic threshold) ──
-  // A device is truly "online" ONLY if:
-  // 1. Wi-Fi link is connected (WiFi.status() == WL_CONNECTED)
-  // 2. AND verified 2-way cloud communication occurred within 6 seconds.
-  // 3. During initial boot, allow 6 seconds grace before asserting offline failsafe.
-  #define CLOUD_SYNC_TIMEOUT_MS 6000
+  // ── Instant Network & Hotspot WAN Liveness + Stability Evaluation ──
+  // 1. If Wi-Fi link drops -> Instant LOCAL AI AUTO (0ms)
+  // 2. If any Core 0 cloud operation blocks in-flight > 3200ms -> Instant LOCAL AI AUTO
+  // 3. If WAN probe or consecutive Firebase pushes fail -> Instant LOCAL AI AUTO
+  // 4. Requires STABLE_RECOVERY_STREAK (3 consecutive fast syncs) before returning LOCAL -> ONLINE
   bool isNetConnected = (WiFi.status() == WL_CONNECTED);
-  bool isCloudSynced  = (lastSuccessfulCloudSync > 0) && (now - lastSuccessfulCloudSync <= CLOUD_SYNC_TIMEOUT_MS);
-  bool isBootGrace    = (lastSuccessfulCloudSync == 0) && (now <= CLOUD_SYNC_TIMEOUT_MS);
-  bool isReconnectGrace = (lastWifiReconnectTime > 0) && (now - lastWifiReconnectTime <= CLOUD_SYNC_TIMEOUT_MS);
-  isSysOnline = isNetConnected && !slowInternetDetected && (isCloudSynced || isBootGrace || isReconnectGrace);
+  bool callStuck      = cloudOpInFlight && ((unsigned long)(now - cloudOpStartMs) > CLOUD_STUCK_CALL_MS);
+  if (callStuck && !slowInternetDetected) {
+    Serial.printf("🚨 [Core 1 Watchdog] Cloud call blocked > %d ms (Hotspot has no/slow internet)! Instant switch to LOCAL AI AUTO.\n", CLOUD_STUCK_CALL_MS);
+    stableCloudStreak = 0;
+    slowInternetDetected = true;
+    offlineFailsafeActive = true;
+    needsCloudResync = true;
+  }
+  bool isCloudSynced  = (lastSuccessfulCloudSync > 0) && ((unsigned long)(now - lastSuccessfulCloudSync) <= CLOUD_SYNC_TIMEOUT_MS);
+  bool isStable       = (stableCloudStreak >= STABLE_RECOVERY_STREAK);
+  isSysOnline = isNetConnected && firebaseReady && !slowInternetDetected && !callStuck && isCloudSynced && isStable;
 
-  // ── Offline / Slow Internet Failsafe Watchdog: Auto-transition to AI AUTO when network is lost or slow ──
+  // ── Offline / Slow-Hotspot Failsafe Watchdog & Mode Recovery ──
   if (!isSysOnline) {
-    if (stateMode != "AUTO") {
-      Serial.printf("⚠️ [Network Failsafe] Device is in LOCAL mode (offline or slow net)! Overriding %s -> AI AUTO for autonomous crop preservation.\n", stateMode.c_str());
-      if (lastConfiguredAppMode == "AUTO" || lastConfiguredAppMode.length() == 0) {
-        lastConfiguredAppMode = stateMode; // Retain user's setting so it can be restored on reconnect
+    if (!offlineFailsafeActive) {
+      if (stateMode != "AUTO") {
+        lastConfiguredAppMode = stateMode; // Retain user's setting so it is restored when fast internet returns
       }
-      stateMode = "AUTO";
       offlineFailsafeActive = true;
-      curTheme = getThemeForMode(stateMode);
-      drawStaticDashboard(stateMode);
-      drawDashboard(currentTemp, currentHum, currentLight, currentCO2,
-                    shtFault, lightFault, co2Fault,
-                    stateExhaust, stateIntake, stateMister, stateLight,
-                    stateMode, isSysOnline, isSysOnline && firebaseReady,
-                    aiReady, aiAction);
+      needsCloudResync = true;
     }
-  } else {
+    if (stateMode != "AUTO") {
+      Serial.printf("⚠️ [Network Failsafe] Hotspot offline or slow internet! Overriding %s -> LOCAL AI AUTO.\n", stateMode.c_str());
+      stateMode = "AUTO";
+      curTheme = getThemeForMode(stateMode);
+      baseDrawn = false;
+      lastDisplayRefresh = 0;
+    }
+  } else if (offlineFailsafeActive) {
+    // Fast cloud connectivity verified by Core 0! Restore user's mode immediately
     offlineFailsafeActive = false;
+    if (lastConfiguredAppMode.length() > 0 && stateMode != lastConfiguredAppMode) {
+      stateMode = lastConfiguredAppMode;
+      curTheme = getThemeForMode(stateMode);
+      baseDrawn = false;
+      lastDisplayRefresh = 0;
+    }
   }
 
   // ── Read sensors and print to Serial Monitor every 1s ──
@@ -1482,7 +1861,8 @@ void loop() {
       Serial.printf("   🌬️  CO₂ Level:    %d ppm (Sensirion NDIR)\n", currentCO2);
     }
 
-    Serial.printf("   🔥 ESP32 Chip Temp: %.1f °C\n", temperatureRead());
+    Serial.printf("   🔥 ESP32 Chip Temp: %.1f °C | Cloud: %s | Mode: %s\n",
+                  temperatureRead(), isSysOnline ? "ONLINE" : "LOCAL", stateMode.c_str());
     Serial.println("──────────────────────────────────────────────────────");
 
     // ── Edge AI: sample every 30 s into the ring buffer and forecast +10 min ──
@@ -1510,151 +1890,6 @@ void loop() {
         Serial.printf("   💡 Grow Light:    ON  [%d lx (Optimal 150-1000 lx)]\n", currentLight);
       }
     }
-  }
-
-  // ── Auto Wi-Fi Reconnection & Fast Cloud Mode Resync Watchdog ──
-  static bool wasConnected = (WiFi.status() == WL_CONNECTED);
-  static unsigned long lastWifiReconnectAttempt = 0;
-
-  if (!isNetConnected) {
-    wasConnected = false;
-    // Fast reconnect attempt every 3.5s
-    if (now - lastWifiReconnectAttempt >= 3500) {
-      lastWifiReconnectAttempt = now;
-      Serial.println("🔄 Wi-Fi link lost, attempting fast reconnection...");
-      WiFi.disconnect();
-      WiFi.reconnect();
-    }
-  } else if (isNetConnected && !wasConnected) {
-    // Wi-Fi JUST reconnected!
-    wasConnected = true;
-    lastWifiReconnectTime = millis();
-    Serial.println("🌐 [Network] Wi-Fi link restored! Reconnecting to Cloud...");
-
-    // 1. Show Reconnecting Screen on TFT (keeps user informed while catching up)
-    drawReconnectingScreen("Wi-Fi Reconnected!");
-
-    // 2. Sync Philippine Standard Time in background
-    configTime(8 * 3600, 0, "time.google.com", "time.cloudflare.com", "pool.ntp.org");
-    setenv("TZ", "PST-8", 1);
-    tzset();
-
-    // 3. Connect to Firebase and wait for authentication / token ready
-    updateReconnectingStatus("Authenticating Cloud...", "Connecting to Firebase RTDB...");
-    if (!firebaseReady) {
-      initFirebaseCloud();
-    }
-
-    // Give Firebase client up to 2.5s to establish SSL and authenticate token
-    unsigned long waitAuthStart = millis();
-    while (!Firebase.ready() && (millis() - waitAuthStart < 2500)) {
-      delay(100);
-    }
-
-    // 4. Fetch the latest App Mode & Setpoints from Firebase
-    updateReconnectingStatus("Syncing Setpoints...", "Fetching App Mode & Controls...");
-    bool syncSuccess = resyncCloudSetpoints();
-
-    // If direct getJSON failed, fall back to lastConfiguredAppMode
-    if (!syncSuccess && lastConfiguredAppMode.length() > 0) {
-      stateMode = lastConfiguredAppMode;
-      curTheme = getThemeForMode(stateMode);
-      Serial.printf("⚠️ [Cloud Reconnect] Using persisted App Mode: %s\n", stateMode.c_str());
-    }
-
-    // 5. Announce restored mode on screen and hold for clean visual transition
-    char syncDoneMsg[48];
-    snprintf(syncDoneMsg, sizeof(syncDoneMsg), "Restored App Mode: %s", stateMode.c_str());
-    updateReconnectingStatus("Cloud Link Synced ✓", syncDoneMsg);
-    delay(1000); // 1.0s pause so user can clearly see the restored mode before dashboard appears
-
-    // 6. Reset watchdog timestamps & repaint static dashboard with restored theme
-    lastSuccessfulCloudSync = millis();
-    lastWifiReconnectTime = millis();
-    offlineFailsafeActive = false;
-    slowInternetDetected = false;
-    isSysOnline = true;
-    baseDrawn = false;
-    curTheme = getThemeForMode(stateMode);
-    drawStaticDashboard(stateMode);
-    drawDashboard(currentTemp, currentHum, currentLight, currentCO2,
-                  shtFault, lightFault, co2Fault,
-                  stateExhaust, stateIntake, stateMister, stateLight,
-                  stateMode, isSysOnline, isSysOnline && firebaseReady,
-                  aiReady, aiAction);
-    lastDisplayRefresh = millis();
-  }
-
-  // ── Philippine Standard Time (PST UTC+8) Sync Watchdog ──
-  static unsigned long lastNtpCheck = 0;
-  if (now - lastNtpCheck >= 15000) {
-    lastNtpCheck = now;
-    if (WiFi.status() == WL_CONNECTED) {
-      struct tm chkTime;
-      if (!getLocalTime(&chkTime, 50) || chkTime.tm_year <= 120) {
-        configTime(8 * 3600, 0, "time.google.com", "time.cloudflare.com", "pool.ntp.org");
-        setenv("TZ", "PST-8", 1);
-        tzset();
-      }
-    }
-  }
-
-  // ── Firebase Stream Watchdog (Keep connection alive) ──
-  static unsigned long lastStreamCheck = 0;
-  if (now - lastStreamCheck >= 8000) {
-    lastStreamCheck = now;
-    if (firebaseReady && isNetConnected) {
-      if (!streamDO.httpConnected()) {
-        Serial.println("🔄 Stream dropped, resubscribing & syncing setpoints...");
-        resyncCloudSetpoints();
-      }
-    }
-  }
-
-  // ── Push to Cloud every 2 seconds ──
-  if (now - lastFirebasePush >= FIREBASE_PUSH_INTERVAL) {
-    lastFirebasePush = now;
-    if (WiFi.status() == WL_CONNECTED) {
-      pushToFirebase(currentTemp, currentHum, currentLight, currentCO2,
-                     shtFault, lightFault, co2Fault);
-
-      // Accumulate for hourly history averages if sensor is not faulted
-      if (!shtFault && currentTemp > 0 && currentHum > 0) {
-        hourlyTempSum += currentTemp;
-        hourlyHumSum  += currentHum;
-        hourlySHTCount++;
-      }
-      if (!lightFault && currentLight >= 0) {
-        hourlyLightSum += currentLight;
-        hourlyLightCount++;
-      }
-      if (!co2Fault && currentCO2 > 0) {
-        hourlyCO2Sum += currentCO2;
-        hourlyCO2Count++;
-      }
-    }
-  }
-
-  // ── Periodic Hourly History Push ──
-  struct tm loopTime;
-  if (getLocalTime(&loopTime, 10) && loopTime.tm_year > 120) {
-    if (lastLoggedHour == -1) {
-      lastLoggedHour = loopTime.tm_hour;
-      lastHourlyPush = now;
-    } else if (loopTime.tm_hour != lastLoggedHour) {
-      lastLoggedHour = loopTime.tm_hour;
-      lastHourlyPush = now;
-      pushHourlyHistory();
-    }
-  } else if (now - lastHourlyPush >= HOURLY_PUSH_INTERVAL && lastHourlyPush > 0) {
-    lastHourlyPush = now;
-    pushHourlyHistory();
-  }
-
-  // ── Heartbeat at interval ──
-  if (now - lastHeartbeat >= HEARTBEAT_INTERVAL) {
-    lastHeartbeat = now;
-    sendHeartbeat();
   }
 
   // ── Non-Blocking 3.2" TFT Dashboard Refresh (every 500ms) ──

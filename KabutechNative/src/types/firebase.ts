@@ -20,6 +20,10 @@ export interface SensorData {
   ai_pred_co2_10m?: number;
   ai_pred_light_10m?: number;
   mode?: string;
+  actuator_fans?: boolean;
+  actuator_fanIn?: boolean;
+  actuator_misters?: boolean;
+  actuator_lights?: boolean;
 }
 
 export interface DeviceStates {
@@ -40,6 +44,7 @@ export interface Setpoints {
   mode: 'auto' | 'manual' | 'scheduled' | 'timed';
   devices: DeviceStates;
   aiOverride?: boolean;
+  syncPulse?: number;
 }
 
 export interface TimeWindow {

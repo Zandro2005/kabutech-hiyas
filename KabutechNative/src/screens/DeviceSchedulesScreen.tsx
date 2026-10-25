@@ -15,6 +15,7 @@ import { showToast } from '../components/CustomToast';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { useTheme } from '../context/ThemeContext';
 import { hapticLight, hapticMedium, hapticSelection, hapticSuccess } from '../utils/haptics';
+import { computeScheduledDevicesState, normalizeAppMode, getDisplayModeLabel } from '../utils/scheduleLogic';
 
 // Format "HH:mm" to "h:mm A"
 const formatTime = (timeString: string) => {
@@ -61,8 +62,8 @@ export default function DeviceSchedulesScreen() {
   const { isDarkMode } = useTheme();
   const settings = useSettings();
   const schedules = settings?.schedules;
-  const currentMode = settings?.setpoints?.mode || 'manual';
-  const isScheduledMode = currentMode === 'scheduled' || currentMode === 'timed';
+  const currentMode = normalizeAppMode(settings?.setpoints?.mode);
+  const isScheduledMode = currentMode === 'scheduled';
 
   const [mistersOn, setMistersOn] = useState(false);
   const [misterDuration, setMisterDuration] = useState(30);
@@ -100,6 +101,18 @@ export default function DeviceSchedulesScreen() {
   const updateFirebaseSchedule = async (updates: Partial<ScheduleSettings>) => {
     try {
       await update(ref(db, 'kabutech/settings/schedules'), updates);
+      if (isScheduledMode) {
+        const mergedSchedules: ScheduleSettings = {
+          misters: updates.misters || schedules?.misters || { enabled: mistersOn, durationMins: misterDuration, intervalHours: misterInterval },
+          fans: updates.fans || schedules?.fans || { enabled: fanOn, windows: fanWindows },
+          lights: updates.lights || schedules?.lights || { enabled: lightsOn, windows: lightWindows },
+        };
+        const nextDevices = computeScheduledDevicesState(mergedSchedules);
+        await update(ref(db, 'kabutech/settings/setpoints'), {
+          devices: nextDevices,
+          syncPulse: Date.now(),
+        });
+      }
       showToast({ type: 'success', text1: 'Schedule Saved' });
     } catch (error) {
       console.error(error);
@@ -109,11 +122,19 @@ export default function DeviceSchedulesScreen() {
 
   const handleSwitchToScheduledMode = () => {
     hapticSuccess();
+    const mergedSchedules: ScheduleSettings = {
+      misters: schedules?.misters || { enabled: mistersOn, durationMins: misterDuration, intervalHours: misterInterval },
+      fans: schedules?.fans || { enabled: fanOn, windows: fanWindows },
+      lights: schedules?.lights || { enabled: lightsOn, windows: lightWindows },
+    };
+    const nextDevices = computeScheduledDevicesState(mergedSchedules);
     update(ref(db, 'kabutech/settings/setpoints'), {
       mode: 'scheduled',
-      aiOverride: false
+      aiOverride: false,
+      devices: nextDevices,
+      syncPulse: Date.now(),
     }).then(() => {
-      showToast({ type: 'success', text1: 'Scheduled Mode Activated' });
+      showToast({ type: 'success', text1: 'Switched to TIMED Mode' });
     }).catch(err => Alert.alert("Error Saving", err.message));
   };
 
@@ -353,7 +374,7 @@ export default function DeviceSchedulesScreen() {
             <View style={tw`flex-row items-center gap-2.5 flex-1 mr-2`}>
               <MaterialCommunityIcons name="clock-alert-outline" size={18} color="#f59e0b" />
               <Text style={[tw`text-[11.5px] text-amber-900 dark:text-amber-300 flex-1`, { fontFamily: 'PlusJakartaSans_600SemiBold' }]}>
-                System is in {currentMode.toUpperCase()} mode. Enable Scheduled mode to run timers.
+                System is in {getDisplayModeLabel(currentMode)} mode. Enable TIMED mode to run timers.
               </Text>
             </View>
             <TouchableOpacity

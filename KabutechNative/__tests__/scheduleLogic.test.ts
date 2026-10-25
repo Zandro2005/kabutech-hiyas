@@ -2,6 +2,8 @@ import {
   computeAutoDecision,
   computeAutoDevicesState,
   explainDeviceActivity,
+  normalizeAppMode,
+  getDisplayModeLabel,
 } from '../src/utils/scheduleLogic';
 
 describe('scheduleLogic - computeAutoDecision and hysteresis', () => {
@@ -204,5 +206,21 @@ describe('scheduleLogic - computeAutoDecision and hysteresis', () => {
       { fans: true, misters: true, lights: false, co2: false }
     );
     expect(manualExplanations[0].reason).toContain('Fans, Mister switched on manually by operator');
+  });
+
+  it('normalizes modes and produces unified App/TFT display labels', () => {
+    expect(normalizeAppMode('auto')).toBe('auto');
+    expect(normalizeAppMode('AUTO')).toBe('auto');
+    expect(normalizeAppMode('scheduled')).toBe('scheduled');
+    expect(normalizeAppMode('TIMED')).toBe('scheduled');
+    expect(normalizeAppMode('manual')).toBe('manual');
+    expect(normalizeAppMode('MANUAL')).toBe('manual');
+    expect(normalizeAppMode(null)).toBe('auto');
+
+    expect(getDisplayModeLabel('auto', false)).toBe('AI AUTO');
+    expect(getDisplayModeLabel('scheduled', false)).toBe('TIMED');
+    expect(getDisplayModeLabel('timed', false)).toBe('TIMED');
+    expect(getDisplayModeLabel('manual', false)).toBe('MANUAL');
+    expect(getDisplayModeLabel('manual', true)).toBe('AI AUTO (LOCAL)');
   });
 });

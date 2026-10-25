@@ -1,6 +1,6 @@
 import React from 'react';
 import { View, Text, TouchableOpacity } from 'react-native';
-import { MaterialCommunityIcons, Ionicons } from '@expo/vector-icons';
+import { Ionicons } from '@expo/vector-icons';
 import tw from '../tailwind';
 import { useTheme } from '../context/ThemeContext';
 import { hapticSelection } from '../utils/haptics';
@@ -30,12 +30,6 @@ export default React.memo(function EnvironmentMetricsGrid({ temp, hum, light, co
   const isHumFault = health.humError || hum === -999 || hum <= 0;
   const isLightFault = health.lightError || light === -999 || light < 0;
   const isCo2Fault = health.co2Error || co2 === -999 || co2 < 0;
-
-  // Unified professional icon theme across all metric cards
-  const ICON_COLOR = isDarkMode ? '#10b981' : '#059669';
-  const ICON_BG = isDarkMode ? 'rgba(16, 185, 129, 0.12)' : '#ecfdf5';
-  const FAULT_ICON_COLOR = isDarkMode ? '#64748b' : '#94a3b8';
-  const FAULT_ICON_BG = isDarkMode ? 'rgba(148, 163, 184, 0.1)' : '#f1f5f9';
 
   const tempEval = evaluateParam('temp', temp, isControllerOff || isTempFault, ACTIVE_PROFILE);
   const humEval = evaluateParam('hum', hum, isControllerOff || isHumFault, ACTIVE_PROFILE);
@@ -87,42 +81,34 @@ export default React.memo(function EnvironmentMetricsGrid({ temp, hum, light, co
   const metrics = [
     {
       id: 'temp' as const,
+      title: 'Temperature',
       name: 'Temperature',
       eval: tempEval,
       status: getBadgeStyle(tempEval),
-      icon: (isTempFault ? 'alert-circle-outline' : 'thermometer') as any,
-      iconColor: isTempFault ? FAULT_ICON_COLOR : ICON_COLOR,
-      iconBgColor: isTempFault ? FAULT_ICON_BG : ICON_BG,
       targetRange: `${ACTIVE_PROFILE.temp.min ?? 18} – ${ACTIVE_PROFILE.temp.max ?? 25} °C`,
     },
     {
       id: 'hum' as const,
+      title: 'Humidity',
       name: 'Humidity',
       eval: humEval,
       status: getBadgeStyle(humEval),
-      icon: (isHumFault ? 'alert-circle-outline' : 'water-percent') as any,
-      iconColor: isHumFault ? FAULT_ICON_COLOR : ICON_COLOR,
-      iconBgColor: isHumFault ? FAULT_ICON_BG : ICON_BG,
       targetRange: `${ACTIVE_PROFILE.hum.min ?? 80} – ${ACTIVE_PROFILE.hum.max ?? 95} %`,
     },
     {
       id: 'co2' as const,
+      title: 'CO2',
       name: 'CO2 Level',
       eval: co2Eval,
       status: getBadgeStyle(co2Eval),
-      icon: (isCo2Fault ? 'alert-circle-outline' : 'molecule-co2') as any,
-      iconColor: isCo2Fault ? FAULT_ICON_COLOR : ICON_COLOR,
-      iconBgColor: isCo2Fault ? FAULT_ICON_BG : ICON_BG,
       targetRange: `< ${(ACTIVE_PROFILE.co2.max ?? 1000).toLocaleString()} ppm`,
     },
     {
       id: 'light' as const,
+      title: 'Light',
       name: 'Light Level',
       eval: lightEval,
       status: getBadgeStyle(lightEval),
-      icon: (isLightFault ? 'alert-circle-outline' : 'white-balance-sunny') as any,
-      iconColor: isLightFault ? FAULT_ICON_COLOR : ICON_COLOR,
-      iconBgColor: isLightFault ? FAULT_ICON_BG : ICON_BG,
       targetRange: `${ACTIVE_PROFILE.light.min ?? 150} – ${(ACTIVE_PROFILE.light.max ?? 1000).toLocaleString()} lx`,
     },
   ];
@@ -193,7 +179,7 @@ export default React.memo(function EnvironmentMetricsGrid({ temp, hum, light, co
                 isItemFault && tw`opacity-80`,
                 { 
                   width: '48.5%', 
-                  minHeight: isSmallDevice ? 128 : 138,
+                  minHeight: isSmallDevice ? 118 : 126,
                   shadowColor: '#0f172a',
                   shadowOffset: { width: 0, height: 2 },
                   shadowOpacity: isDarkMode ? 0 : 0.03,
@@ -202,28 +188,29 @@ export default React.memo(function EnvironmentMetricsGrid({ temp, hum, light, co
                 }
               ]}
             >
-              {/* Top Row: Squircle Icon + Minimal Status Badge */}
-              <View style={tw`flex-row justify-between items-center mb-1.5`}>
-                <View 
+              {/* Top Row: Clean Title + Minimal Status Badge */}
+              <View style={tw`flex-row justify-between items-center`}>
+                <Text 
+                  numberOfLines={1}
                   style={[
-                    tw`w-8 h-8 rounded-[12px] items-center justify-center`,
-                    { backgroundColor: item.iconBgColor }
+                    tw`text-[12.5px] sm:text-[13.5px] text-slate-800 dark:text-slate-100 tracking-tight shrink mr-1`,
+                    { fontFamily: 'PlusJakartaSans_700Bold' }
                   ]}
                 >
-                  <MaterialCommunityIcons name={item.icon} size={18} color={item.iconColor} />
-                </View>
+                  {item.title}
+                </Text>
 
                 <View 
                   style={[
-                    tw`flex-row items-center px-2 py-0.5 rounded-full`,
+                    tw`flex-row items-center px-1.5 sm:px-2 py-0.5 rounded-full shrink-0`,
                     { backgroundColor: item.status.badgeBg }
                   ]}
                 >
-                  <View style={[tw`w-1.5 h-1.5 rounded-full mr-1.5`, { backgroundColor: item.status.dotColor }]} />
+                  <View style={[tw`w-1.5 h-1.5 rounded-full mr-1`, { backgroundColor: item.status.dotColor }]} />
                   <Text 
                     numberOfLines={1}
                     style={[
-                      tw`text-[10px]`,
+                      tw`text-[9.5px] sm:text-[10px]`,
                       { 
                         fontFamily: 'PlusJakartaSans_700Bold',
                         color: item.status.badgeText
@@ -235,27 +222,17 @@ export default React.memo(function EnvironmentMetricsGrid({ temp, hum, light, co
                 </View>
               </View>
 
-              {/* Middle: Title & Big Hero Value + Subtle Trend */}
-              <View style={tw`my-auto py-0.5`}>
-                <Text 
-                  numberOfLines={1} 
-                  style={[
-                    tw`text-[10px] text-slate-400 dark:text-slate-500 uppercase tracking-wider mb-0.5`, 
-                    { fontFamily: 'PlusJakartaSans_700Bold' }
-                  ]}
-                >
-                  {item.name}
-                </Text>
-
+              {/* Middle: Big Hero Value */}
+              <View style={tw`my-auto py-1`}>
                 <View style={tw`flex-row items-baseline`}>
                   <Text 
                     style={[
                       tw`${isItemFault ? 'text-slate-400 dark:text-slate-500' : 'text-slate-900 dark:text-white'}`, 
                       { 
-                        fontSize: isSmallDevice ? 26 : 29, 
+                        fontSize: isSmallDevice ? 26 : 30, 
                         fontFamily: 'PlusJakartaSans_800ExtraBold', 
                         letterSpacing: -0.6,
-                        lineHeight: isSmallDevice ? 30 : 34
+                        lineHeight: isSmallDevice ? 30 : 36
                       }
                     ]}
                   >
@@ -273,8 +250,8 @@ export default React.memo(function EnvironmentMetricsGrid({ temp, hum, light, co
                 </View>
               </View>
 
-              {/* Bottom: Target Optimal Range Benchmark (Replaces progress bar with professional setpoint) */}
-              <View style={tw`mt-2 pt-2 border-t border-slate-100 dark:border-slate-800/70 flex-row items-center justify-between`}>
+              {/* Bottom: Target Optimal Range Benchmark (Borderless) */}
+              <View style={tw`flex-row items-center justify-between`}>
                 <Text 
                   style={[
                     tw`text-[10px] text-slate-400 dark:text-slate-500 uppercase tracking-wider`, 

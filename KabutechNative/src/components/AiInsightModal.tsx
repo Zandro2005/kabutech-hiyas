@@ -27,6 +27,11 @@ export default function AiInsightModal({ visible, onClose }: AiInsightModalProps
   
   const handleActivateMisters = async () => {
     try {
+      await update(ref(db, `kabutech/settings/setpoints`), {
+        mode: 'manual',
+        aiOverride: true,
+        syncPulse: Date.now(),
+      });
       await update(ref(db, `kabutech/settings/setpoints/devices`), {
         misters: true
       });

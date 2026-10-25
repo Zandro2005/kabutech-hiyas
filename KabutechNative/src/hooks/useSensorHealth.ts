@@ -31,21 +31,33 @@ export function useSensorHealth(): SensorHealthStatus {
   }, []);
 
   // Track the local time when the last snapshot arrived through the WebSocket stream
+  const mountedAtRef = useRef<number>(Date.now());
   const lastPacketReceivedAt = useRef<number>(Date.now());
+  const lastNewPacketTimeRef = useRef<number>(0);
   const prevLastSeenRef = useRef<number | null>(null);
-  const detectedIntervalRef = useRef<number>(5000); // Defaults to 5s until measured
+  const detectedIntervalRef = useRef<number>(2000); // Matches ESP32 2.0s push cadence
+  const stablePacketStreakRef = useRef<number>(2);  // Starts qualified on mount; resets to 0 on offline drop
+  const wasOnlineRef = useRef<boolean>(false);
 
   useEffect(() => {
     if (sensors && (sensors.temperature != null || sensors.last_seen != null)) {
-      lastPacketReceivedAt.current = Date.now();
+      const now = Date.now();
+      lastPacketReceivedAt.current = now;
 
-      // Measure actual push cadence from the ESP32
+      // Measure actual push cadence from the ESP32 and qualify stability streak
       if (typeof sensors.last_seen === 'number') {
         if (prevLastSeenRef.current !== null && sensors.last_seen > prevLastSeenRef.current) {
+          const prevPacketWallTime = lastNewPacketTimeRef.current;
+          lastNewPacketTimeRef.current = now;
           const delta = sensors.last_seen - prevLastSeenRef.current;
-          // Valid delta range: between 1000ms (1s) and 15000ms (15s)
-          if (delta >= 1000 && delta <= 15000) {
+          if (delta >= 1000 && delta <= 3500) {
             detectedIntervalRef.current = delta;
+          }
+          // Count consecutive timely packets (<= 4.5s apart) to qualify stable recovery from LOCAL -> ONLINE
+          if (prevPacketWallTime === 0 || (now - prevPacketWallTime <= 4500)) {
+            stablePacketStreakRef.current = Math.min(5, stablePacketStreakRef.current + 1);
+          } else {
+            stablePacketStreakRef.current = 1;
           }
         }
         prevLastSeenRef.current = sensors.last_seen;
@@ -55,38 +67,53 @@ export function useSensorHealth(): SensorHealthStatus {
 
   const hasTimestamp = typeof sensors?.last_seen === 'number' && sensors.last_seen > 0;
   
-  // Stale detection:
-  // 1. ESP32 pushes every 2s (fast firmware) to 5s (legacy).
-  // 2. Dynamic threshold adapts to actual detected push interval:
-  //    - At 2s push interval: threshold is Math.max(3500, 2000 + 1500) = 3500ms (3.5 seconds)!
-  //    - At 5s push interval: threshold is Math.max(3500, 5000 + 1500) = 6500ms (6.5 seconds)!
-  //    - Initial fallback threshold: 6000ms (evaluated instantly on cold boot).
-  // 3. Current server time combines device clock + Firebase .info/serverTimeOffset to eliminate clock skew.
-  const dynamicThreshold = Math.max(3500, Math.min(8000, detectedIntervalRef.current + 1500));
+  // Asymmetric Hysteresis Threshold:
+  // - While ONLINE: allow up to 6.0s-6.5s (matches ESP32 6.5s CLOUD_SYNC_TIMEOUT_MS) before dropping to LOCAL
+  // - While LOCAL (recovering): require 2 consecutive timely packets AND fresh timestamp (<= 4.5s) before returning ONLINE
+  const onlineHoldThreshold = Math.max(6000, Math.min(6500, detectedIntervalRef.current * 3));
 
   const currentServerTime = Date.now() + serverTimeOffset;
   const rawServerElapsed = hasTimestamp ? currentServerTime - (sensors.last_seen || 0) : Infinity;
   const localElapsed = lastPacketReceivedAt.current > 0 ? Date.now() - lastPacketReceivedAt.current : Infinity;
+  const newPacketElapsed = lastNewPacketTimeRef.current > 0 ? Date.now() - lastNewPacketTimeRef.current : Infinity;
 
   // Protect against client clock skew:
-  // If rawServerElapsed < 0, phone clock is behind the server; fallback to localElapsed.
-  const timeSinceServerTs = hasTimestamp
+  const serverOrLocalElapsed = hasTimestamp
     ? Math.max(0, rawServerElapsed < 0 ? localElapsed : rawServerElapsed)
     : Infinity;
+  const timeSinceServerTs = Math.min(serverOrLocalElapsed, newPacketElapsed);
 
   const offlineSeconds = hasTimestamp ? Math.round(timeSinceServerTs / 1000) : 0;
   const secondsSinceUpdate = hasTimestamp
     ? Math.max(0, Math.round(timeSinceServerTs / 1000))
     : (localElapsed !== Infinity ? Math.max(0, Math.round(localElapsed / 1000)) : null);
 
-  // Stale check:
-  // Evaluated immediately against currentServerTime + local elapsed timer.
-  // Instantly marks offline when missing or exceeds the fast dynamic threshold.
-  const isServerStale = !hasTimestamp || timeSinceServerTs > dynamicThreshold;
-  const isStale = isServerStale;
-  
   const isExplicitOffline = sensors?.esp32_status === 'offline';
+  const isBootWindow = Date.now() - mountedAtRef.current < 4000;
+
+  let isStale: boolean;
+  if (!hasTimestamp || isExplicitOffline || isFirebaseConnected === false) {
+    isStale = true;
+  } else if (wasOnlineRef.current || isBootWindow) {
+    // Currently ONLINE (or initial boot): stay online unless silence exceeds 6.0s-6.5s
+    isStale = timeSinceServerTs > onlineHoldThreshold;
+  } else {
+    // Currently LOCAL (recovering): require >= 2 consecutive timely packets AND fresh reading (<= 4.5s)
+    // so unstable/flapping internet never loops ONLINE <-> LOCAL!
+    const isQualifiedStable = stablePacketStreakRef.current >= 2 && timeSinceServerTs <= 4500;
+    isStale = !isQualifiedStable;
+  }
+
   const isControllerOnline = !isExplicitOffline && !isStale && isFirebaseConnected !== false;
+
+  if (!isControllerOnline) {
+    if (wasOnlineRef.current) {
+      stablePacketStreakRef.current = 0; // Reset stability streak upon dropping to LOCAL
+    }
+    wasOnlineRef.current = false;
+  } else {
+    wasOnlineRef.current = true;
+  }
 
   // Helper to check for error flags (handles boolean, string "true", number 1)
   const isErr = (val: any) => val === true || val === 'true' || val === 1;

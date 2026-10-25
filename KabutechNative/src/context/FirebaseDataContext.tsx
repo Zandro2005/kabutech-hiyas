@@ -1,10 +1,10 @@
-import React, { createContext, useState, useEffect, useContext } from 'react';
+import React, { createContext, useState, useEffect, useContext, useRef } from 'react';
 import { ref, onValue, update } from 'firebase/database';
 import { db } from '../services/firebase';
 import { useAuth } from './AuthContext';
 import { SensorData, SettingsData, BatchData, AlertData, StaffTask, ActivityLogEntry, UserProfile } from '../types/firebase';
 import { showToast } from '../components/CustomToast';
-import { computeScheduledDevicesState, computeAutoDevicesState } from '../utils/scheduleLogic';
+import { computeScheduledDevicesState, computeAutoDevicesState, normalizeAppMode } from '../utils/scheduleLogic';
 
 const defaultSensors: SensorData = {
   temperature: -999,
@@ -179,6 +179,7 @@ export const FirebaseDataProvider: React.FC<{ children: React.ReactNode }> = ({ 
 
     return () => {
       unsubscribeConnected();
+      unsubscribeOffset();
       unsubscribeSensors();
       unsubscribeSettings();
       unsubscribeBatches();
@@ -189,14 +190,25 @@ export const FirebaseDataProvider: React.FC<{ children: React.ReactNode }> = ({ 
     };
   }, [user?.uid]);
 
-  // Continuous Active Mode & Actuator Sync Loop (Auto and Scheduled)
+  const lastModeSyncPulseRef = useRef<number>(0);
+  const prevEspLastSeenRef = useRef<number>(0);
+  const isEspActivelyStreamingRef = useRef<boolean>(false);
+
+  useEffect(() => {
+    if (typeof sensors?.last_seen === 'number' && sensors.last_seen > 0) {
+      if (prevEspLastSeenRef.current > 0 && sensors.last_seen > prevEspLastSeenRef.current) {
+        isEspActivelyStreamingRef.current = true;
+      }
+      prevEspLastSeenRef.current = sensors.last_seen;
+    }
+  }, [sensors?.last_seen]);
+
+  // Continuous Bidirectional Mode Convergence & Actuator Sync Loop (App <-> ESP32 TFT)
   useEffect(() => {
     if (!user) return;
-    const rawMode = settings?.setpoints?.mode;
-    const mode = String(rawMode || '').trim().toLowerCase();
-    if (mode !== 'auto' && mode !== 'scheduled' && mode !== 'timed') return;
+    const mode = normalizeAppMode(settings?.setpoints?.mode);
 
-    const syncActuators = () => {
+    const syncModeAndActuators = () => {
       const currentDevices = settings?.setpoints?.devices || {
         fanIn: false,
         fanOut: false,
@@ -208,10 +220,48 @@ export const FirebaseDataProvider: React.FC<{ children: React.ReactNode }> = ({ 
       };
       let desiredDevices = { ...currentDevices };
 
-      if (mode === 'scheduled' || mode === 'timed') {
+      if (mode === 'scheduled') {
         desiredDevices = { ...desiredDevices, ...computeScheduledDevicesState(settings?.schedules) };
       } else if (mode === 'auto') {
         desiredDevices = { ...desiredDevices, ...computeAutoDevicesState(sensors, currentDevices) };
+      }
+
+      // 1. Bidirectional Mode Convergence:
+      // If the ESP32 is online and reporting a live hardware mode (e.g. "AUTO" on TFT after a brief failsafe)
+      // that disagrees with the App's configured mode (e.g. "manual" or "scheduled"), push a syncPulse
+      // so the ESP32 streamCallback immediately receives a JSON patch and aligns the TFT display with the App.
+      const now = Date.now();
+      const serverNow = now + serverTimeOffset;
+      const isFreshHeartbeat =
+        sensors?.esp32_status !== 'offline' &&
+        typeof sensors?.last_seen === 'number' &&
+        sensors.last_seen > 0 &&
+        (Math.abs(serverNow - sensors.last_seen) < 12000 || isEspActivelyStreamingRef.current);
+
+      const reportedHwMode = sensors?.mode ? normalizeAppMode(sensors.mode) : null;
+      if (
+        isFreshHeartbeat &&
+        reportedHwMode !== null &&
+        reportedHwMode !== mode &&
+        now - lastModeSyncPulseRef.current > 3000
+      ) {
+        lastModeSyncPulseRef.current = now;
+        update(ref(db, 'kabutech/settings/setpoints'), {
+          mode,
+          aiOverride: Boolean(settings?.setpoints?.aiOverride),
+          devices: desiredDevices,
+          syncPulse: now,
+        }).catch(() => {});
+        return;
+      }
+
+      // 2. Scheduled / Auto Actuator State Sync:
+      if (mode !== 'auto' && mode !== 'scheduled') return;
+
+      // When ESP32 is online in AUTO mode and reporting live hardware actuator states,
+      // let the ESP32's on-device Edge AI + 6s relay dwell timers govern the relays without client overwrite.
+      if (mode === 'auto' && isFreshHeartbeat && typeof sensors?.actuator_fans === 'boolean') {
+        return;
       }
 
       const changed =
@@ -228,10 +278,10 @@ export const FirebaseDataProvider: React.FC<{ children: React.ReactNode }> = ({ 
       }
     };
 
-    syncActuators();
-    const interval = setInterval(syncActuators, 2000);
+    syncModeAndActuators();
+    const interval = setInterval(syncModeAndActuators, 2000);
     return () => clearInterval(interval);
-  }, [user?.uid, settings?.setpoints?.mode, settings?.setpoints, settings?.schedules, sensors]);
+  }, [user?.uid, settings?.setpoints?.mode, settings?.setpoints, settings?.schedules, sensors, serverTimeOffset]);
 
   return (
     <ConnectionContext.Provider value={isConnected}>

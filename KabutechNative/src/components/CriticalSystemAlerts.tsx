@@ -158,6 +158,18 @@ export default React.memo(function CriticalSystemAlerts({ alerts, evaluation, on
     }
   };
 
+  const getMainProblem = (alert: AlertData) => {
+    const meta = alert.metadata;
+    if (meta?.currentValue && meta?.targetValue) {
+      return `${meta.currentValue} (Target: ${meta.targetValue})`;
+    }
+    if (alert.message) {
+      const issue = alert.message.split('.')[0].trim();
+      return issue.replace(/[\u{1F300}-\u{1F9FF}\u{2600}-\u{26FF}\u{2700}-\u{27BF}]/gu, '').trim() || alert.message;
+    }
+    return (alert.title || 'Attention required').replace(/[\u{1F300}-\u{1F9FF}\u{2600}-\u{26FF}\u{2700}-\u{27BF}]/gu, '').trim();
+  };
+
   return (
     <View style={tw`px-5 sm:px-6 pt-6`}>
       <View
@@ -195,7 +207,7 @@ export default React.memo(function CriticalSystemAlerts({ alerts, evaluation, on
               <Text numberOfLines={1} style={[tw`text-[10px] text-slate-400 dark:text-slate-500`, { fontFamily: 'PlusJakartaSans_500Medium' }]}>
                 {isTrulyNominal
                   ? 'All 4 sensors nominal - Tap for history'
-                  : (evaluation?.summary ? `${evaluation.summary} • Tap for details` : `${inRangeCount}/4 in range • Attention required`)}
+                  : (evaluation?.summary ? `${evaluation.summary} • Tap for details` : `${inRangeCount}/4 in range`)}
               </Text>
             </View>
           </TouchableOpacity>
@@ -247,6 +259,11 @@ export default React.memo(function CriticalSystemAlerts({ alerts, evaluation, on
           <View style={tw`gap-2.5 mt-3`}>
             {unresolvedAlerts.slice(0, 3).map((alert, idx) => {
               const badge = getAlertBadge(alert.type);
+              const cleanTitle = (alert.title || 'System Alert')
+                .replace(/[\u{1F300}-\u{1F9FF}\u{2600}-\u{26FF}\u{2700}-\u{27BF}]/gu, '')
+                .trim();
+              const mainProblem = getMainProblem(alert);
+
               return (
                 <TouchableOpacity
                   key={alert.id || idx}
@@ -260,7 +277,7 @@ export default React.memo(function CriticalSystemAlerts({ alerts, evaluation, on
                   <View style={tw`flex-1`}>
                     <View style={tw`flex-row justify-between items-center mb-0.5`}>
                       <Text numberOfLines={1} style={[tw`text-xs text-slate-900 dark:text-white flex-1 mr-2`, { fontFamily: 'PlusJakartaSans_800ExtraBold' }]}>
-                        {alert.title || 'System Alert'}
+                        {cleanTitle}
                       </Text>
                       {alert.timestamp && (
                         <Text style={[tw`text-[9px] text-slate-400 shrink-0`, { fontFamily: 'PlusJakartaSans_600SemiBold' }]}>
@@ -270,9 +287,9 @@ export default React.memo(function CriticalSystemAlerts({ alerts, evaluation, on
                     </View>
                     <Text
                       style={[tw`text-[11px] text-slate-500 dark:text-slate-400 leading-tight`, { fontFamily: 'PlusJakartaSans_500Medium' }]}
-                      numberOfLines={2}
+                      numberOfLines={1}
                     >
-                      {alert.message || 'Action required to restore optimal balance.'}
+                      {mainProblem}
                     </Text>
                   </View>
                   <Ionicons name="chevron-forward" size={14} color="#94a3b8" style={tw`self-center shrink-0`} />
@@ -322,7 +339,7 @@ export default React.memo(function CriticalSystemAlerts({ alerts, evaluation, on
                         </View>
                       </View>
                       <Text style={[tw`text-[10px] text-slate-400 dark:text-slate-500 mt-0.5`, { fontFamily: 'PlusJakartaSans_500Medium' }]}>
-                        Target: {param.rangeText} • Crop Safe Zone
+                        Target: {param.rangeText}
                       </Text>
                     </View>
                   </View>

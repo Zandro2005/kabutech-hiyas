@@ -17,7 +17,7 @@ import ControlsScreenSkeleton from '../components/skeletons/ControlsScreenSkelet
 import { useTheme } from '../context/ThemeContext';
 import { showToast } from '../components/CustomToast';
 import { hapticLight, hapticMedium, hapticSelection } from '../utils/haptics';
-import { computeScheduledDevicesState, computeAutoDevicesState } from '../utils/scheduleLogic';
+import { computeScheduledDevicesState, computeAutoDevicesState, normalizeAppMode, getDisplayModeLabel, CanonicalMode } from '../utils/scheduleLogic';
 import { useResponsive } from '../utils/responsive';
 import { useTabBarScroll } from '../context/TabBarContext';
 
@@ -53,7 +53,8 @@ export default function ControlsScreen() {
   
   const [isReady, setIsReady] = useState(false);
   const [showStopAiModal, setShowStopAiModal] = useState(false);
-  const [pendingMode, setPendingMode] = useState<'auto' | 'manual' | 'scheduled' | null>(null);
+  const [pendingMode, setPendingMode] = useState<CanonicalMode | null>(null);
+  const [optimisticMode, setOptimisticMode] = useState<CanonicalMode | null>(null);
 
   useEffect(() => {
     let mounted = true;
@@ -82,9 +83,24 @@ export default function ControlsScreen() {
 
   const isOffline = !health.isControllerOnline;
 
-  const currentMode = isOffline ? 'auto' : String(settings?.setpoints?.mode || 'auto').toLowerCase();
+  const cloudNormalizedMode = normalizeAppMode(settings?.setpoints?.mode);
+
+  useEffect(() => {
+    if (optimisticMode && cloudNormalizedMode === optimisticMode) {
+      setOptimisticMode(null);
+    }
+  }, [cloudNormalizedMode, optimisticMode]);
+
+  useEffect(() => {
+    if (!optimisticMode) return;
+    const timer = setTimeout(() => setOptimisticMode(null), 4000);
+    return () => clearTimeout(timer);
+  }, [optimisticMode]);
+
+  const configuredMode: CanonicalMode = optimisticMode || cloudNormalizedMode;
+  const currentMode: CanonicalMode = isOffline ? 'auto' : configuredMode;
   const isAuto = currentMode === 'auto';
-  const isScheduled = currentMode === 'scheduled' || currentMode === 'timed';
+  const isScheduled = currentMode === 'scheduled';
   
   const rawDevices = settings?.setpoints?.devices || DEFAULT_DEVICES;
   const [devices, setDevices] = useState(rawDevices);
@@ -97,9 +113,23 @@ export default function ControlsScreen() {
       }, 3000);
       return () => clearInterval(interval);
     } else if (isAuto) {
-      setDevices(computeAutoDevicesState(sensors, rawDevices));
+      const resolveAutoDevices = () => {
+        if (!isOffline && typeof sensors?.actuator_fans === 'boolean') {
+          return {
+            fanIn: Boolean(sensors.actuator_fanIn ?? sensors.actuator_fans),
+            fanOut: Boolean(sensors.actuator_fans),
+            fans: Boolean(sensors.actuator_fans),
+            misters: Boolean(sensors.actuator_misters),
+            lights: Boolean(sensors.actuator_lights),
+            valve: false,
+            co2: false,
+          };
+        }
+        return computeAutoDevicesState(sensors, rawDevices);
+      };
+      setDevices(resolveAutoDevices());
       const interval = setInterval(() => {
-        setDevices(computeAutoDevicesState(sensors, rawDevices));
+        setDevices(resolveAutoDevices());
       }, 3000);
       return () => clearInterval(interval);
     } else {
@@ -108,6 +138,7 @@ export default function ControlsScreen() {
   }, [
     isScheduled,
     isAuto,
+    isOffline,
     settings?.schedules,
     settings?.setpoints?.mode,
     rawDevices.fanIn,
@@ -121,6 +152,10 @@ export default function ControlsScreen() {
     sensors?.humidity,
     sensors?.co2,
     sensors?.light,
+    sensors?.actuator_fans,
+    sensors?.actuator_fanIn,
+    sensors?.actuator_misters,
+    sensors?.actuator_lights,
   ]);
 
   const isAiOverride = settings?.setpoints?.aiOverride === true;
@@ -218,7 +253,8 @@ export default function ControlsScreen() {
     }
   };
 
-  const executeSetMode = (mode: 'auto' | 'manual' | 'scheduled') => {
+  const executeSetMode = (mode: CanonicalMode) => {
+    setOptimisticMode(mode);
     let nextDevices = settings?.setpoints?.devices || DEFAULT_DEVICES;
     if (mode === 'scheduled') {
       nextDevices = computeScheduledDevicesState(settings?.schedules);
@@ -227,22 +263,38 @@ export default function ControlsScreen() {
     }
 
     setDevices(nextDevices);
+    const label = getDisplayModeLabel(mode, false);
 
     update(ref(db, 'kabutech/settings/setpoints'), {
       mode,
       aiOverride: false,
-      devices: nextDevices
+      devices: nextDevices,
+      syncPulse: Date.now(),
     }).then(() => {
-      showToast({ type: 'success', text1: `Switched to ${mode.toUpperCase()} Mode` });
-    }).catch(err => Alert.alert("Error Saving", err.message));
+      if (isOffline) {
+        showToast({
+          type: 'info',
+          text1: `${label} Mode Queued`,
+          text2: 'Will sync to TFT display as soon as controller is online.',
+        });
+      } else {
+        showToast({ type: 'success', text1: `Switched to ${label} Mode` });
+      }
+    }).catch(err => {
+      setOptimisticMode(null);
+      Alert.alert("Error Saving", err.message);
+    });
   };
 
-  const setMode = (mode: 'auto' | 'manual' | 'scheduled') => {
+  useEffect(() => {
+    const sub = DeviceEventEmitter.addListener('confirmManualMode', () => {
+      executeSetMode('manual');
+    });
+    return () => sub.remove();
+  }, [settings?.setpoints?.devices, settings?.schedules, sensors, isOffline]);
+
+  const setMode = (mode: CanonicalMode) => {
     hapticSelection();
-    if (isOffline) {
-      showToast({ type: 'info', text1: 'Controller Offline', text2: 'Control modes cannot be changed while offline.' });
-      return;
-    }
     if (isAiOverride) {
       setPendingMode(mode);
       setShowStopAiModal(true);
@@ -570,7 +622,7 @@ export default function ControlsScreen() {
             >
               {isAuto && <View style={tw`w-1.5 h-1.5 rounded-full bg-white`} />}
               <Text style={[tw`text-[11px]`, isAuto ? tw`text-white` : tw`text-slate-500 dark:text-slate-400`, { fontFamily: 'PlusJakartaSans_800ExtraBold', letterSpacing: 0.3 }]}>
-                AUTO
+                AI AUTO
               </Text>
             </TouchableOpacity>
 
@@ -588,11 +640,12 @@ export default function ControlsScreen() {
             <TouchableOpacity 
               hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
               onPress={() => {
-                if (isOffline) {
-                  showToast({ type: 'info', text1: 'Controller Offline', text2: 'Hardware is running autonomous AI Auto locally while offline.' });
-                  return;
+                hapticSelection();
+                if (isLocked) {
+                  DeviceEventEmitter.emit('showManualOverrideModal');
+                } else {
+                  setMode('manual');
                 }
-                if (isLocked) DeviceEventEmitter.emit('showManualOverrideModal');
               }}
               style={[tw`px-4 py-2 rounded-xl flex-row items-center gap-1.5`, (!isAuto && !isScheduled) ? tw`bg-amber-500 shadow-sm` : tw`bg-transparent`]}
             >
@@ -639,33 +692,40 @@ export default function ControlsScreen() {
         <View style={tw`px-5 pt-0.5 mb-2`}>
           {/* Section Header */}
           <View style={tw`flex-row justify-between items-center mb-2.5`}>
-            <View style={tw`flex-row items-center gap-2`}>
-              <View style={tw`w-6 h-6 rounded-lg bg-emerald-500/10 dark:bg-emerald-500/20 items-center justify-center`}>
-                <MaterialCommunityIcons name="toggle-switch-outline" size={16} color="#10b981" />
+            <View style={tw`flex-row items-center gap-1.5 shrink mr-2`}>
+              <View style={tw`w-6 h-6 rounded-lg bg-emerald-500/10 dark:bg-emerald-500/20 items-center justify-center shrink-0`}>
+                <MaterialCommunityIcons name="toggle-switch-outline" size={15} color="#10b981" />
               </View>
-              <Text style={[tw`text-[14px] text-slate-900 dark:text-white tracking-tight`, { fontFamily: 'PlusJakartaSans_800ExtraBold' }]}>
-                Hardware Actuators
+              <Text 
+                numberOfLines={1}
+                style={[
+                  tw`text-[13px] sm:text-[14px] text-slate-900 dark:text-white tracking-tight`, 
+                  { fontFamily: 'PlusJakartaSans_800ExtraBold' }
+                ]}
+              >
+                {isSmallDevice ? 'Actuators' : 'Hardware Actuators'}
               </Text>
             </View>
 
-            <View style={tw`flex-row items-center gap-1.5`}>
+            <View style={tw`flex-row items-center gap-1.5 shrink-0`}>
               {/* All Off Safety Cutoff Button (visible in manual mode when at least 1 device is running) */}
               {!isLocked && activeDeviceCount > 0 && (
                 <TouchableOpacity
                   activeOpacity={0.75}
                   onPress={turnOffAllDevices}
-                  style={tw`px-2.5 py-1 rounded-xl bg-rose-50 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-800/60 flex-row items-center gap-1`}
+                  hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                  style={tw`px-2 py-0.5 rounded-full bg-rose-50 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-800/60 flex-row items-center gap-1`}
                 >
-                  <MaterialCommunityIcons name="power" size={11} color="#ef4444" />
+                  <MaterialCommunityIcons name="power" size={10} color="#ef4444" />
                   <Text style={[tw`text-[9.5px] text-rose-600 dark:text-rose-400`, { fontFamily: 'PlusJakartaSans_700Bold' }]}>
                     All Off
                   </Text>
                 </TouchableOpacity>
               )}
 
-              {/* Mode Status Pill */}
+              {/* Mode / Active Status Pill */}
               <TouchableOpacity
-                activeOpacity={isLocked ? 0.75 : 1}
+                activeOpacity={isLocked || isOffline ? 0.75 : 1}
                 onPress={() => {
                   if (isOffline) {
                     hapticSelection();
@@ -678,7 +738,7 @@ export default function ControlsScreen() {
                   }
                 }}
                 style={[
-                  tw`px-2.5 py-1 rounded-full border flex-row items-center gap-1.2`,
+                  tw`px-2 py-0.5 rounded-full border flex-row items-center gap-1`,
                   isOffline
                     ? tw`bg-emerald-50 dark:bg-emerald-950/40 border-emerald-200 dark:border-emerald-800`
                     : isAiOverride
@@ -687,6 +747,8 @@ export default function ControlsScreen() {
                     ? tw`bg-emerald-50 dark:bg-emerald-950/40 border-emerald-200 dark:border-emerald-800`
                     : isScheduled
                     ? tw`bg-purple-50 dark:bg-purple-950/40 border-purple-200 dark:border-purple-800`
+                    : activeDeviceCount > 0
+                    ? tw`bg-emerald-50 dark:bg-emerald-950/40 border-emerald-200 dark:border-emerald-800`
                     : tw`bg-slate-100 dark:bg-slate-800 border-slate-200/80 dark:border-slate-700`
                 ]}
               >
@@ -701,7 +763,9 @@ export default function ControlsScreen() {
                       ? tw`bg-emerald-500`
                       : isScheduled
                       ? tw`bg-purple-500`
-                      : tw`bg-emerald-500`
+                      : activeDeviceCount > 0
+                      ? tw`bg-emerald-500`
+                      : tw`bg-slate-400 dark:bg-slate-500`
                   ]}
                 />
                 <Text
@@ -716,10 +780,20 @@ export default function ControlsScreen() {
                       ? tw`text-emerald-600 dark:text-emerald-400`
                       : isScheduled
                       ? tw`text-purple-600 dark:text-purple-400`
-                      : tw`text-slate-600 dark:text-slate-400`
+                      : activeDeviceCount > 0
+                      ? tw`text-emerald-600 dark:text-emerald-400`
+                      : tw`text-slate-500 dark:text-slate-400`
                   ]}
                 >
-                  {isOffline ? 'LOCAL AI AUTO' : isAiOverride ? 'AI Locked' : isAuto ? 'AUTO' : isScheduled ? 'TIMED' : `${activeDeviceCount} Active`}
+                  {isOffline
+                    ? 'Local AI'
+                    : isAiOverride
+                    ? 'AI Locked'
+                    : isAuto
+                    ? 'AI Auto'
+                    : isScheduled
+                    ? 'Timed'
+                    : `${activeDeviceCount} Active`}
                 </Text>
               </TouchableOpacity>
             </View>

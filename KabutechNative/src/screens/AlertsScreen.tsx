@@ -18,7 +18,7 @@ import { ref, update, set, remove } from 'firebase/database';
 import tw from '../tailwind';
 import { useTheme } from '../context/ThemeContext';
 import { useAlerts } from '../hooks/useFirebaseData';
-import { useEnvironmentAlerts, dismissEnvironmentAlert, dismissAllEnvironmentAlerts } from '../hooks/useEnvironmentAlerts';
+import { useEnvironmentAlerts, dismissEnvironmentAlert, dismissAllEnvironmentAlerts, resetDismissedEnvironmentAlerts } from '../hooks/useEnvironmentAlerts';
 import { db } from '../services/firebase';
 import { AlertData } from '../types/firebase';
 import { GlobalNavigationParamList } from '../types/navigation';
@@ -272,6 +272,7 @@ export default function AlertsScreen() {
             try {
               setIsDeleting(true);
               hapticSuccess();
+              resetDismissedEnvironmentAlerts();
               await remove(ref(db, 'kabutech/alerts'));
               showToast({
                 type: 'success',

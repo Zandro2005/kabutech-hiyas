@@ -165,6 +165,7 @@ static String prevMode = "";
 static bool  prevWifi = false;
 static bool  prevFb = false;
 static int   prevMinute = -1;
+static unsigned long lastUptimeDraw = 0;
 static bool  baseDrawn = false;
 
 // ─── Forward Declarations ───
@@ -413,6 +414,7 @@ void drawStaticDashboard(const String& mode) {
   prevMist = -1;
   prevLight = -1;
   prevMinute = -1;
+  lastUptimeDraw = 0;
   prevMode = "";
 
   baseDrawn = true;
@@ -739,9 +741,8 @@ void drawDashboard(float temp, float hum, int light, int co2,
   }
 
   // Uptime
-  static unsigned long lastUptimeDraw = 0;
   if (millis() - lastUptimeDraw >= 60000 || lastUptimeDraw == 0) {
-    lastUptimeDraw = millis();
+    lastUptimeDraw = millis() == 0 ? 1 : millis();
     unsigned long upMins = millis() / 60000;
     unsigned long upHours = upMins / 60;
     upMins = upMins % 60;

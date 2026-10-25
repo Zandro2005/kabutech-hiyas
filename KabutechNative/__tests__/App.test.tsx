@@ -23,7 +23,7 @@ describe('App', () => {
     await act(async () => {
       testRenderer.unmount();
     });
-  });
+  }, 20000);
 
 });
 

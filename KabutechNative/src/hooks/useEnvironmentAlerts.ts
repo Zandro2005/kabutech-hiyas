@@ -38,52 +38,42 @@ export interface EnvironmentAlertsResult {
 
 const DISMISSED_STORAGE_KEY = '@kabutech_dismissed_env_alerts';
 let globalDismissedIds = new Set<string>();
+let currentActiveIds = new Set<string>();
 const inactiveSinceMap = new Map<string, number>();
 const subscribers = new Set<() => void>();
 
-AsyncStorage.getItem(DISMISSED_STORAGE_KEY)
-  .then(raw => {
-    if (raw) {
-      try {
-        const parsed = JSON.parse(raw);
-        if (Array.isArray(parsed)) {
-          globalDismissedIds = new Set(parsed);
-          subscribers.forEach(cb => cb());
-        }
-      } catch (_) { }
-    }
-  })
-  .catch(() => { });
+// Clear any legacy persistent dismissed lock from storage so alerts are never permanently muted across sessions
+AsyncStorage.removeItem(DISMISSED_STORAGE_KEY).catch(() => {});
 
 function notifySubscribers() {
   subscribers.forEach(cb => cb());
 }
 
-function persistDismissedIds() {
-  AsyncStorage.setItem(
-    DISMISSED_STORAGE_KEY,
-    JSON.stringify(Array.from(globalDismissedIds))
-  ).catch(() => { });
-}
-
 export function dismissEnvironmentAlert(id: string) {
   globalDismissedIds.add(id);
-  persistDismissedIds();
   notifySubscribers();
 }
 
 export function dismissAllEnvironmentAlerts(ids?: string[]) {
   if (ids && ids.length > 0) {
     ids.forEach(id => globalDismissedIds.add(id));
+  } else {
+    currentActiveIds.forEach(id => globalDismissedIds.add(id));
   }
-  persistDismissedIds();
   notifySubscribers();
 }
 
 export function clearDismissedEnvironmentAlert(id: string) {
   if (globalDismissedIds.has(id)) {
     globalDismissedIds.delete(id);
-    persistDismissedIds();
+    notifySubscribers();
+  }
+}
+
+export function resetDismissedEnvironmentAlerts() {
+  if (globalDismissedIds.size > 0) {
+    globalDismissedIds.clear();
+    inactiveSinceMap.clear();
     notifySubscribers();
   }
 }
@@ -294,12 +284,12 @@ export function useEnvironmentAlerts(): EnvironmentAlertsResult {
       }
     }
 
-    // 8. Critical unresolved alerts from Firebase Alerts collection (filtered to active within 24h)
+    // 8. Unresolved alerts from Firebase Alerts collection (filtered to active within 24h)
     if (alerts && alerts.length > 0) {
       const now = Date.now();
       const TWENTY_FOUR_HOURS = 24 * 60 * 60 * 1000;
-      const unresolvedCritical = alerts.filter(a => {
-        if (!a || a.resolved || a.type !== 'critical') return false;
+      const unresolvedAlerts = alerts.filter(a => {
+        if (!a || a.resolved || (a.type !== 'critical' && a.type !== 'warning')) return false;
         if (a.timestamp) {
           const time = new Date(a.timestamp).getTime();
           if (!isNaN(time) && (now - time > TWENTY_FOUR_HOURS || time - now > 300_000)) {
@@ -308,44 +298,31 @@ export function useEnvironmentAlerts(): EnvironmentAlertsResult {
         }
         return true;
       });
-      for (const crit of unresolvedCritical) {
-        if (!list.some(l => l.title === crit.title || l.id === crit.id)) {
+      for (const item of unresolvedAlerts) {
+        const alertId = (item.metadata?.alertId as string) || item.id;
+        if (!list.some(l => l.title === item.title || l.id === alertId || l.id === item.id)) {
           list.push({
-            id: crit.id || `fb-${Math.random()}`,
-            type: 'critical',
-            title: crit.title || 'System Alert',
-            shortLabel: crit.title || 'System Alert',
+            id: alertId || `fb-${item.title || 'alert'}`,
+            type: item.type === 'critical' ? 'critical' : 'warning',
+            title: item.title || 'System Alert',
+            shortLabel: item.title || 'System Alert',
             action: 'Check system controls',
-            message: crit.message || 'Action required.',
+            message: item.message || 'Action required.',
             icon: 'alert-circle',
-            metric: 'system',
+            metric: (item.metadata?.metric as any) || 'system',
           });
         }
       }
     }
 
-    // Auto-prune dismissed IDs only after sustained resolution (> 2 minutes) to prevent flapping
+    // Auto-prune dismissed IDs immediately once condition has cleared so re-occurrences trigger fresh alerts
     const activeIdSet = new Set(list.map(a => a.id));
-    const nowTs = Date.now();
-    let pruned = false;
+    currentActiveIds = activeIdSet;
     for (const dismissedId of Array.from(globalDismissedIds)) {
       if (!activeIdSet.has(dismissedId)) {
-        const inactiveStart = inactiveSinceMap.get(dismissedId);
-        if (inactiveStart === undefined) {
-          inactiveSinceMap.set(dismissedId, nowTs);
-        } else if (nowTs - inactiveStart > 120_000) {
-          // Sustained inactive for over 2 minutes -> genuinely resolved
-          globalDismissedIds.delete(dismissedId);
-          inactiveSinceMap.delete(dismissedId);
-          pruned = true;
-        }
-      } else {
-        // Still active or re-occurred within grace period -> reset inactive tracker
+        globalDismissedIds.delete(dismissedId);
         inactiveSinceMap.delete(dismissedId);
       }
-    }
-    if (pruned) {
-      persistDismissedIds();
     }
 
     // Only unread (undismissed) alerts trigger warnings and badges

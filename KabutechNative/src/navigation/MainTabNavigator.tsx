@@ -65,8 +65,11 @@ export default function MainTabNavigator() {
   }, []);
 
   const confirmManualMode = () => {
+    DeviceEventEmitter.emit('confirmManualMode');
     update(ref(db, 'kabutech/settings/setpoints'), {
-      mode: 'manual'
+      mode: 'manual',
+      aiOverride: false,
+      syncPulse: Date.now(),
     }).then(() => {
       showToast({ type: 'success', text1: 'Switched to MANUAL Mode' });
     });

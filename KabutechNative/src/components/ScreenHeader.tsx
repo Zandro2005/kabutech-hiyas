@@ -83,8 +83,12 @@ export default React.memo(function ScreenHeader({ title, subtitle, rightComponen
       <View style={tw`flex-row justify-between items-center`}>
         
         {/* Brand Logo & Name with Warning Icon */}
-        <View style={tw`flex-row items-center gap-1.5 flex-1`}>
-          <MaterialCommunityIcons name="leaf" size={28} color={isDarkMode ? "#6ee7b7" : "#166534"} />
+        <View style={tw`flex-row items-center gap-2 flex-1`}>
+          <Image
+            source={require('../../assets/logo.png')}
+            style={tw`w-8 h-8 rounded-lg`}
+            resizeMode="contain"
+          />
           <Text style={[tw`text-[24px] text-[#166534] dark:text-[#6ee7b7] tracking-tight leading-none`, {fontFamily: 'PlusJakartaSans_800ExtraBold'}]}>
             KabuTech
           </Text>
