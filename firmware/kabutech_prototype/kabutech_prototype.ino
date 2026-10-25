@@ -289,9 +289,30 @@ String normalizeMode(String raw) {
   }
 }
 
-// TFT Display refresh timer (non-blocking 500ms)
+// TFT Display refresh timer & Relay EMI Shielding (prevents white screen on Grow Light / Relay surge)
 unsigned long lastDisplayRefresh = 0;
 #define DISPLAY_REFRESH_INTERVAL 500
+#define RELAY_EMI_QUIET_MS       120    // 120ms SPI lockout during relay contact arc & Grow Light inrush
+volatile bool tftSpiBusy = false;       // Guard so Core 0 never switches a relay while Core 1 is mid-SPI write
+volatile unsigned long lastActuatorSwitchTime = 0;
+volatile bool tftNeedsPrimaryHeal   = false;
+volatile bool tftNeedsSecondaryHeal = false;
+
+// Deselects TFT SPI bus and locks out SPI writes before any relay/actuator switches
+void shieldTftBeforeRelaySwitch() {
+  unsigned long waitStart = millis();
+  while (tftSpiBusy && (millis() - waitStart < 40)) {
+    delay(1);
+  }
+  lastActuatorSwitchTime = millis();
+  tftNeedsPrimaryHeal    = true;
+  tftNeedsSecondaryHeal  = true;
+
+  // Force CS (GPIO 10), RST (GPIO 6), and LED (GPIO 2) HIGH so ILI9341 ignores bus noise during relay arc
+  digitalWrite(TFT_CS_PIN,  HIGH);
+  digitalWrite(TFT_RST_PIN, HIGH);
+  digitalWrite(TFT_LED_PIN, HIGH);
+}
 
 // ═══════════════════════════════════════════════
 //  FIREBASE STREAM CALLBACKS (ACTUATOR CONTROL)
@@ -301,39 +322,43 @@ unsigned long lastDisplayRefresh = 0;
 void applyActuator(const String& key, bool state) {
   if (key == "fans" || key == "exhaust" || key == "fanOut") {
     if (stateExhaust != state) {
+      shieldTftBeforeRelaySwitch();
       stateExhaust = state;
       digitalWrite(PIN_FAN_EXHAUST, state ? HIGH : LOW);
-      lastDisplayRefresh = 0;
+      lastActuatorSwitchTime = millis();
       Serial.printf("   🌀 [Actuator] Exhaust Fan (GPIO %d) -> %s\n", PIN_FAN_EXHAUST, state ? "ON" : "OFF");
     } else {
       digitalWrite(PIN_FAN_EXHAUST, state ? HIGH : LOW);
     }
   } else if (key == "fanIn" || key == "intake") {
     if (stateIntake != state) {
+      shieldTftBeforeRelaySwitch();
       stateIntake = state;
       digitalWrite(PIN_FAN_INTAKE, state ? HIGH : LOW);
-      lastDisplayRefresh = 0;
+      lastActuatorSwitchTime = millis();
       Serial.printf("   🌀 [Actuator] Intake Fan (GPIO %d) -> %s\n", PIN_FAN_INTAKE, state ? "ON" : "OFF");
     } else {
       digitalWrite(PIN_FAN_INTAKE, state ? HIGH : LOW);
     }
   } else if (key == "misters") {
     if (stateMister != state) {
+      shieldTftBeforeRelaySwitch();
       stateMister = state;
       digitalWrite(PIN_MISTER, state ? HIGH : LOW);
-      lastDisplayRefresh = 0;
+      lastActuatorSwitchTime = millis();
       Serial.printf("   💧 [Actuator] Misters (GPIO %d) -> %s\n", PIN_MISTER, state ? "ON" : "OFF");
     } else {
       digitalWrite(PIN_MISTER, state ? HIGH : LOW);
     }
   } else if (key == "lights") {
     if (stateLight != state) {
+      shieldTftBeforeRelaySwitch();
       stateLight = state;
       lastLightToggleTime = millis();
       lightLowStreak = 0;
       lightHighStreak = 0;
       digitalWrite(PIN_LIGHT, state ? HIGH : LOW);
-      lastDisplayRefresh = 0;
+      lastActuatorSwitchTime = millis();
       Serial.printf("   💡 [Actuator] Grow Light (GPIO %d) -> %s\n", PIN_LIGHT, state ? "ON" : "OFF");
     } else {
       digitalWrite(PIN_LIGHT, state ? HIGH : LOW);
@@ -635,17 +660,24 @@ void runAutoRegulation() {
                   nextLight   != stateLight);
 
   if (changed) {
-    if (nextExhaust != stateExhaust) {
+    shieldTftBeforeRelaySwitch();
+
+    bool exhChanged   = (nextExhaust != stateExhaust);
+    bool intChanged   = (nextIntake  != stateIntake);
+    bool mistChanged  = (nextMister  != stateMister);
+    bool lightChanged = (nextLight   != stateLight);
+
+    if (exhChanged) {
       lastFanToggleTime = nowMs;
       fanOnDemandStreak = 0;
       fanOffDemandStreak = 0;
     }
-    if (nextMister != stateMister) {
+    if (mistChanged) {
       lastMisterToggleTime = nowMs;
       misterOnDemandStreak = 0;
       misterOffDemandStreak = 0;
     }
-    if (nextLight != stateLight) {
+    if (lightChanged) {
       lastLightToggleTime = nowMs;
       lightLowStreak = 0;
       lightHighStreak = 0;
@@ -656,10 +688,23 @@ void runAutoRegulation() {
     stateMister  = nextMister;
     stateLight   = nextLight;
 
-    digitalWrite(PIN_FAN_EXHAUST, stateExhaust ? HIGH : LOW);
-    digitalWrite(PIN_FAN_INTAKE,  stateIntake  ? HIGH : LOW);
-    digitalWrite(PIN_MISTER,      stateMister  ? HIGH : LOW);
-    digitalWrite(PIN_LIGHT,       stateLight   ? HIGH : LOW);
+    // Stagger simultaneous relay switches by 20ms so coil & load inrush currents never stack on the +5V/+12V rail
+    if (exhChanged) {
+      digitalWrite(PIN_FAN_EXHAUST, stateExhaust ? HIGH : LOW);
+      delay(20);
+    }
+    if (intChanged) {
+      digitalWrite(PIN_FAN_INTAKE, stateIntake ? HIGH : LOW);
+      delay(20);
+    }
+    if (mistChanged) {
+      digitalWrite(PIN_MISTER, stateMister ? HIGH : LOW);
+      delay(20);
+    }
+    if (lightChanged) {
+      digitalWrite(PIN_LIGHT, stateLight ? HIGH : LOW);
+    }
+    lastActuatorSwitchTime = millis();
 
     Serial.printf("🤖 [Auto Regulation] Actuators adjusted: EXH=%s INT=%s MIST=%s LIGHT=%s | AI Action: %s\n",
                   stateExhaust ? "ON" : "OFF",
@@ -1892,14 +1937,51 @@ void loop() {
     }
   }
 
-  // ── Non-Blocking 3.2" TFT Dashboard Refresh (every 500ms) ──
-  if (now - lastDisplayRefresh >= DISPLAY_REFRESH_INTERVAL) {
-    lastDisplayRefresh = now;
-    drawDashboard(currentTemp, currentHum, currentLight, currentCO2,
-                  shtFault, lightFault, co2Fault,
-                  stateExhaust, stateIntake, stateMister, stateLight,
-                  stateMode, isSysOnline, isSysOnline && firebaseReady,
-                  aiReady, aiAction);
+  // ── Relay EMI Quiet Window & Self-Healing 3.2" TFT Dashboard Refresh ──
+  unsigned long sinceRelaySwitch = (lastActuatorSwitchTime > 0) ? (now - lastActuatorSwitchTime) : 999999UL;
+  if (sinceRelaySwitch < RELAY_EMI_QUIET_MS) {
+    // Hold TFT SPI bus deselected (CS HIGH, RST HIGH, LED HIGH) while relay contacts bounce & Grow Light inrush settles
+    digitalWrite(TFT_CS_PIN,  HIGH);
+    digitalWrite(TFT_RST_PIN, HIGH);
+    digitalWrite(TFT_LED_PIN, HIGH);
+  } else {
+    // 1. Primary post-actuation heal at +120ms: restores ILI9341 registers & repaints full screen after relay surge
+    if (tftNeedsPrimaryHeal && sinceRelaySwitch >= RELAY_EMI_QUIET_MS) {
+      tftNeedsPrimaryHeal = false;
+      tftSpiBusy = true;
+      healTftDisplay(stateMode);
+      drawDashboard(currentTemp, currentHum, currentLight, currentCO2,
+                    shtFault, lightFault, co2Fault,
+                    stateExhaust, stateIntake, stateMister, stateLight,
+                    stateMode, isSysOnline, isSysOnline && firebaseReady,
+                    aiReady, aiAction);
+      tftSpiBusy = false;
+      lastDisplayRefresh = millis();
+    }
+    // 2. Secondary follow-up heal at +600ms: catches delayed LED driver / power supply turn-on transients
+    else if (tftNeedsSecondaryHeal && sinceRelaySwitch >= 600) {
+      tftNeedsSecondaryHeal = false;
+      tftSpiBusy = true;
+      healTftDisplay(stateMode);
+      drawDashboard(currentTemp, currentHum, currentLight, currentCO2,
+                    shtFault, lightFault, co2Fault,
+                    stateExhaust, stateIntake, stateMister, stateLight,
+                    stateMode, isSysOnline, isSysOnline && firebaseReady,
+                    aiReady, aiAction);
+      tftSpiBusy = false;
+      lastDisplayRefresh = millis();
+    }
+    // 3. Normal 500ms non-blocking dashboard refresh
+    else if (now - lastDisplayRefresh >= DISPLAY_REFRESH_INTERVAL) {
+      lastDisplayRefresh = now;
+      tftSpiBusy = true;
+      drawDashboard(currentTemp, currentHum, currentLight, currentCO2,
+                    shtFault, lightFault, co2Fault,
+                    stateExhaust, stateIntake, stateMister, stateLight,
+                    stateMode, isSysOnline, isSysOnline && firebaseReady,
+                    aiReady, aiAction);
+      tftSpiBusy = false;
+    }
   }
 
   // ── Live Serial Diagnostic Command: Type 't' to re-init, 'm' to flip rotation ──
@@ -1908,15 +1990,16 @@ void loop() {
     if (ch == 't' || ch == 'T' || ch == 'r' || ch == 'R') {
       Serial.println("\n🔄 [SERIAL TRIGGER] Re-initializing TFT Display & testing color wipe...");
       initDisplay();
+      baseDrawn = false;
+      drawStaticDashboard(stateMode);
     } else if (ch == 'm' || ch == 'M') {
-      static uint8_t curRot = TFT_ROTATION;
       // Cycle landscape modes: 1 (Upright normal) -> 3 (180° inverted) -> 7 (Normal flipped) -> 5 (Mirrored)
-      if (curRot == 1) curRot = 3;
-      else if (curRot == 3) curRot = 7;
-      else if (curRot == 7) curRot = 5;
-      else curRot = 1;
-      Serial.printf("\n🔄 [SERIAL TRIGGER] Setting TFT Rotation to %d...\n", curRot);
-      tft.setRotation(curRot);
+      if (currentTftRotation == 1) currentTftRotation = 3;
+      else if (currentTftRotation == 3) currentTftRotation = 7;
+      else if (currentTftRotation == 7) currentTftRotation = 5;
+      else currentTftRotation = 1;
+      Serial.printf("\n🔄 [SERIAL TRIGGER] Setting TFT Rotation to %d...\n", currentTftRotation);
+      tft.setRotation(currentTftRotation);
       baseDrawn = false;
       drawStaticDashboard(stateMode);
     }

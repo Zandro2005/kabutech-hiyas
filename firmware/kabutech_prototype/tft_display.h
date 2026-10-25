@@ -167,9 +167,11 @@ static bool  prevFb = false;
 static int   prevMinute = -1;
 static unsigned long lastUptimeDraw = 0;
 static bool  baseDrawn = false;
+static uint8_t currentTftRotation = TFT_ROTATION;
 
 // ─── Forward Declarations ───
 void initDisplay();
+void healTftDisplay(const String& mode = "");
 void drawBootSplash();
 void updateBootStep(const char* label, bool success);
 void drawReconnectingScreen(const char* status = nullptr, int progressPercent = -1);
@@ -186,9 +188,11 @@ void initDisplay() {
   Serial.println("📺 [TFT] Initializing 3.2\" SPI ILI9341 Display over 30cm wires...");
   Serial.printf("📺 [TFT] SPI Clock: %d MHz | SCK: 18 | MOSI: 17 | CS: 10 | DC: 15 | RST: 6\n", (int)(TFT_SPI_FREQ / 1000000));
 
-  // 1. Ensure Backlight pin is HIGH (GPIO 2)
+  // 1. Ensure Backlight pin is HIGH (GPIO 2) & CS is deselected HIGH (GPIO 10)
   pinMode(2, OUTPUT);
   digitalWrite(2, HIGH);
+  pinMode(10, OUTPUT);
+  digitalWrite(10, HIGH);
 
   // 2. Perform deep hardware reset with long settling time for 30cm wire capacitance
   pinMode(6, OUTPUT);
@@ -207,7 +211,7 @@ void initDisplay() {
     Serial.println("⚠️ [TFT] LovyanGFX init returned false — check CS, DC, or MOSI connections.");
   }
 
-  tft.setRotation(TFT_ROTATION); // 320x240 Landscape Mode
+  tft.setRotation(currentTftRotation); // 320x240 Landscape Mode
   tft.setBrightness(255);
 
   // 4. Force explicit MIPI DCS wake-up sequence (forces chip out of hardware sleep)
@@ -235,6 +239,27 @@ void initDisplay() {
   // 6. Draw the production boot splash
   drawBootSplash();
   Serial.println("✅ [TFT] Boot splash rendered successfully.");
+}
+
+// ─── Silent Zero-Wipe TFT Wake Guard (Prevents White Screen after Relay/Light Surge without Screen Wipe) ───
+void healTftDisplay(const String& mode) {
+  (void)mode;
+  // 1. Lock Reset (GPIO 6), Backlight (GPIO 2), and CS (GPIO 10) HIGH to clear any EMI state
+  digitalWrite(2, HIGH);
+  digitalWrite(6, HIGH);
+  digitalWrite(10, HIGH);
+
+  // 2. Silently assert Sleep Out (0x11) and Display ON (0x29) WITHOUT touching 0xB6/0x36 or clearing GRAM!
+  tft.startWrite();
+  tft.writeCommand(0x11); // Sleep Out (wakes internal VGH/VGL charge pumps if brownout occurred)
+  tft.writeCommand(0x29); // Display ON (keeps liquid crystal shutter active)
+  tft.endWrite();
+
+  // 3. Force in-place refresh of actuator chips only (NO full-screen wipe!)
+  prevExh = -1;
+  prevInt = -1;
+  prevMist = -1;
+  prevLight = -1;
 }
 
 // ─── Boot Splash Screen (320x240 Landscape) ───
@@ -489,6 +514,16 @@ void drawDashboard(float temp, float hum, int light, int co2,
                    bool exhOn, bool intOn, bool mistOn, bool lightOn,
                    const String& mode, bool wifiOk, bool fbOk,
                    bool aiActive, const char* aiAct) {
+  // Keep hardware RESET (GPIO 6) and Backlight (GPIO 2) firmly HIGH
+  digitalWrite(6, HIGH);
+  digitalWrite(2, HIGH);
+
+  // Silent zero-flicker MIPI DCS guard: ensures Sleep Out (0x11) and Display ON (0x29)
+  tft.startWrite();
+  tft.writeCommand(0x11); // Sleep Out
+  tft.writeCommand(0x29); // Display ON
+  tft.endWrite();
+
   // ── Dynamic Mode Theme Switching ──
   // When operating mode transitions (AUTO <-> MANUAL <-> TIMED), switch theme & repaint base
   if (mode != prevThemeMode || !baseDrawn) {
@@ -756,4 +791,7 @@ void drawDashboard(float temp, float hum, int light, int co2,
     tft.setTextColor(COLOR_MUTED, curTheme.cardBg);
     tft.drawString(upBuf, 308, 218);
   }
+
+  // Ensure SPI Chip Select (GPIO 10) is deselected HIGH when idle so relay EMI cannot clock into ILI9341
+  digitalWrite(10, HIGH);
 }
