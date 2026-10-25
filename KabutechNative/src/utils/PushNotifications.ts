@@ -5,15 +5,42 @@ import { ref, update, get } from 'firebase/database';
 
 export const ALERT_CHANNEL_ID = 'kabutech-alerts';
 
+// Per-alert deduplication tracker so foreground local banner + remote push don't double-fire the same alertId,
+// while allowing multiple DIFFERENT alerts (e.g. Temp + Hum + CO2) to fire simultaneously with 0ms delay!
+const recentAlertDispatchMap = new Map<string, number>();
+
 Notifications.setNotificationHandler({
-  handleNotification: async () => ({
-    shouldShowAlert: true,
-    shouldShowBanner: true,
-    shouldShowList: true,
-    shouldPlaySound: true,
-    shouldSetBadge: true,
-    priority: Notifications.AndroidNotificationPriority.MAX,
-  }),
+  handleNotification: async (notification) => {
+    const data = notification?.request?.content?.data as any;
+    const alertId = data?.alertId ? String(data.alertId) : '';
+    const source = data?.source ? String(data.source) : '';
+
+    // If this is a remote push arriving while the app is open in foreground,
+    // check if EnvironmentalAlertNotifier already displayed the local banner for this alertId within 8s
+    if (source === 'esp32' && alertId) {
+      const lastLocal = recentAlertDispatchMap.get(alertId) || 0;
+      if (Date.now() - lastLocal < 8000) {
+        return {
+          shouldShowAlert: false,
+          shouldShowBanner: false,
+          shouldShowList: false,
+          shouldPlaySound: false,
+          shouldSetBadge: false,
+          priority: Notifications.AndroidNotificationPriority.MAX,
+        };
+      }
+      recentAlertDispatchMap.set(alertId, Date.now());
+    }
+
+    return {
+      shouldShowAlert: true,
+      shouldShowBanner: true,
+      shouldShowList: true,
+      shouldPlaySound: true,
+      shouldSetBadge: true,
+      priority: Notifications.AndroidNotificationPriority.MAX,
+    };
+  },
 });
 
 let channelsInitialized = false;
@@ -86,9 +113,15 @@ export async function registerForPushNotificationsAsync(userId: string) {
   }
   
   if (token && userId) {
-    // Save token to firebase user profile
+    // 1. Save token to firebase user profile
     await update(ref(db, `kabutech/users/${userId}`), {
       pushToken: token
+    }).catch(() => {});
+
+    // 2. Save token to shared setpoints/pushTokens node so the ESP32-S3 hardware controller
+    // can send 24/7 remote push notifications directly to this phone even when the app is completely closed!
+    await update(ref(db, `kabutech/settings/setpoints/pushTokens`), {
+      [userId]: token
     }).catch(() => {});
   }
   
@@ -219,45 +252,59 @@ export async function scheduleLocalNotification(title: string, body: string, dat
   }
 }
 
-let lastDispatchTimestamp = 0;
-let lastDispatchKey = '';
-
 /**
  * Immediately triggers a native local notification banner on this device,
  * and broadcasts a remote push notification to other registered devices.
- * Incident-level notification lifecycle is handled by EnvironmentalAlertNotifier.
+ * Per-alert deduplication allows multiple distinct alerts to fire simultaneously at 0ms delay.
  */
-export async function notifyEnvironmentalAlert(title: string, body: string, data = {}) {
+export async function notifyEnvironmentalAlert(title: string, body: string, data: any = {}) {
   const now = Date.now();
-  const key = `${title}:${body}`;
+  const alertKey = data?.alertId ? String(data.alertId) : `${title}:${body}`;
+  const lastDispatched = recentAlertDispatchMap.get(alertKey) || 0;
 
-  // Short 300ms deduplication guard to prevent duplicate invocations from synchronous render cycles
-  if (key === lastDispatchKey && now - lastDispatchTimestamp < 300) {
+  // Per-alert 300ms deduplication guard: prevents duplicate render ticks for the SAME alert
+  // while allowing every DIFFERENT alert to fire simultaneously with 0ms delay!
+  if (now - lastDispatched < 300) {
     return;
   }
-  lastDispatchTimestamp = now;
-  lastDispatchKey = key;
+  recentAlertDispatchMap.set(alertKey, now);
 
   // 1. Immediately trigger native heads-up banner on current device
   await scheduleLocalNotification(title, body, data);
 
-  // 2. Broadcast push notification to other users registered in the database
+  // 2. Broadcast push notification to other registered devices (from setpoints/pushTokens and users)
   try {
     if (!auth.currentUser) return;
     const currentUid = auth.currentUser.uid;
-
-    const usersSnap = await get(ref(db, 'kabutech/users'));
-    if (!usersSnap.exists()) return;
-
-    const users = usersSnap.val();
     const tokens = new Set<string>();
 
-    Object.entries(users).forEach(([uid, u]: [string, any]) => {
-      // Exclude current user's token so this device doesn't get duplicate remote + local banners
-      if (uid !== currentUid && u && u.pushToken) {
-        tokens.add(u.pushToken);
+    // Check shared pushTokens node first (fast & accessible to all roles)
+    try {
+      const tokensSnap = await get(ref(db, 'kabutech/settings/setpoints/pushTokens'));
+      if (tokensSnap.exists()) {
+        const tokenMap = tokensSnap.val();
+        if (tokenMap && typeof tokenMap === 'object') {
+          Object.entries(tokenMap).forEach(([uid, tok]: [string, any]) => {
+            if (uid !== currentUid && typeof tok === 'string' && tok.startsWith('ExponentPushToken')) {
+              tokens.add(tok);
+            }
+          });
+        }
       }
-    });
+    } catch (_) {}
+
+    // Also check users node if accessible
+    try {
+      const usersSnap = await get(ref(db, 'kabutech/users'));
+      if (usersSnap.exists()) {
+        const users = usersSnap.val();
+        Object.entries(users).forEach(([uid, u]: [string, any]) => {
+          if (uid !== currentUid && u && u.pushToken) {
+            tokens.add(u.pushToken);
+          }
+        });
+      }
+    } catch (_) {}
 
     for (const token of tokens) {
       await sendPushNotification(token, title, body, data);

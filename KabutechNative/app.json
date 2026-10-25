@@ -18,7 +18,13 @@
       },
       "predictiveBackGestureEnabled": false,
       "package": "com.kabutech.kabutech",
-      "googleServicesFile": "./google-services.json"
+      "googleServicesFile": "./google-services.json",
+      "permissions": [
+        "android.permission.POST_NOTIFICATIONS",
+        "android.permission.RECEIVE_BOOT_COMPLETED",
+        "android.permission.VIBRATE",
+        "android.permission.WAKE_LOCK"
+      ]
     },
     "web": {
       "favicon": "./assets/favicon.png"
@@ -41,7 +47,14 @@
           "backgroundColor": "#00000000"
         }
       ],
-      "expo-notifications",
+      [
+        "expo-notifications",
+        {
+          "icon": "./assets/icon.png",
+          "color": "#083F28",
+          "defaultChannel": "kabutech-alerts"
+        }
+      ],
       "expo-audio"
     ],
     "extra": {

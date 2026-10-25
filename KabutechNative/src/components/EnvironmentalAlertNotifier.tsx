@@ -1,7 +1,12 @@
 import React, { useEffect, useRef, useState } from 'react';
+import { AppState } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useEnvironmentAlerts } from '../hooks/useEnvironmentAlerts';
-import { notifyEnvironmentalAlert, ensureNotificationChannels } from '../utils/PushNotifications';
+import {
+  notifyEnvironmentalAlert,
+  ensureNotificationChannels,
+  registerForPushNotificationsAsync,
+} from '../utils/PushNotifications';
 import { useAuth } from '../context/AuthContext';
 import { useAlerts } from '../hooks/useFirebaseData';
 import { db } from '../services/firebase';
@@ -33,11 +38,25 @@ export default function EnvironmentalAlertNotifier() {
       }))
     : [];
 
-  // Initialize notification channels & clear any legacy global cooldown key on mount
+  // Initialize notification channels, sync push token for closed-app ESP32 pushes, & clear legacy cooldown key
   useEffect(() => {
     ensureNotificationChannels().catch(() => {});
     AsyncStorage.removeItem(LEGACY_STORAGE_KEY).catch(() => {});
-  }, []);
+    if (user?.uid) {
+      registerForPushNotificationsAsync(user.uid).catch(() => {});
+    }
+
+    const sub = AppState.addEventListener('change', (nextState) => {
+      if (nextState === 'active') {
+        ensureNotificationChannels().catch(() => {});
+        if (user?.uid) {
+          registerForPushNotificationsAsync(user.uid).catch(() => {});
+        }
+        setTicker((t) => t + 1);
+      }
+    });
+    return () => sub.remove();
+  }, [user?.uid]);
 
   // Periodic heartbeat every 15 seconds to re-evaluate conditions and cooldowns
   useEffect(() => {
@@ -147,39 +166,35 @@ export default function EnvironmentalAlertNotifier() {
       notifiedAlertIdsRef.current.add(a.id);
     });
 
-    // Prioritize critical alerts first, then warning
-    const criticalAlert = pendingAlerts.find((a) => a.type === 'critical');
-    const primaryAlert = criticalAlert || pendingAlerts[0];
+    // Fire an individual notification for EVERY alert that arrived (never group into "+X more")
+    pendingAlerts.forEach((alertItem) => {
+      const rawTitle = alertItem.title || 'System Alert';
+      const title = rawTitle.replace(/[\u{1F300}-\u{1F9FF}\u{2600}-\u{26FF}\u{2700}-\u{27BF}]/gu, '').trim();
 
-    // Clean title with all emojis/icons removed
-    const rawTitle = primaryAlert.title || 'System Alert';
-    const cleanTitle = rawTitle.replace(/[\u{1F300}-\u{1F9FF}\u{2600}-\u{26FF}\u{2700}-\u{27BF}]/gu, '').trim();
-    const otherCount = pendingAlerts.length - 1;
-    const title = otherCount > 0 ? `${cleanTitle} (+${otherCount} more)` : cleanTitle;
+      // Straight-to-the-point description highlighting only the main problem
+      let body = '';
+      if (alertItem.currentValue && alertItem.targetValue) {
+        body = `${alertItem.currentValue} (Target: ${alertItem.targetValue})`;
+      } else if (alertItem.action) {
+        body = alertItem.action;
+      } else if (alertItem.message) {
+        body = alertItem.message.split('.')[0].trim();
+      } else {
+        body = title;
+      }
 
-    // Straight-to-the-point description highlighting only the main problem
-    let body = '';
-    if (primaryAlert.currentValue && primaryAlert.targetValue) {
-      body = `${primaryAlert.currentValue} (Target: ${primaryAlert.targetValue})`;
-    } else if (primaryAlert.action) {
-      body = primaryAlert.action;
-    } else if (primaryAlert.message) {
-      body = primaryAlert.message.split('.')[0].trim();
-    } else {
-      body = cleanTitle;
-    }
-
-    // Fire up instantly with 0 delay the moment the issue arrives
-    notifyEnvironmentalAlert(title, body, {
-      alertId: primaryAlert.id,
-      metric: primaryAlert.metric,
-      type: primaryAlert.type,
-      currentValue: primaryAlert.currentValue,
-      targetValue: primaryAlert.targetValue,
-      totalAlerts: unreadAlerts.length,
-      timestamp: Date.now(),
-    }).catch((err) => {
-      console.log('Failed to dispatch environmental push notification:', err);
+      // Fire up instantly with 0 delay the moment the issue arrives
+      notifyEnvironmentalAlert(title, body, {
+        alertId: alertItem.id,
+        metric: alertItem.metric,
+        type: alertItem.type,
+        currentValue: alertItem.currentValue,
+        targetValue: alertItem.targetValue,
+        totalAlerts: unreadAlerts.length,
+        timestamp: Date.now(),
+      }).catch((err) => {
+        console.log('Failed to dispatch environmental push notification:', err);
+      });
     });
   }, [unreadAlerts, user]);
 

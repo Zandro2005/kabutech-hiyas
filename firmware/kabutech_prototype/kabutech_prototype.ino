@@ -37,6 +37,8 @@
  *  */
 
 #include <WiFi.h>
+#include <WiFiClientSecure.h>
+#include <HTTPClient.h>
 #include <Wire.h>
 
 // ─── Optimize Flash Footprint ───
@@ -366,6 +368,42 @@ void applyActuator(const String& key, bool state) {
   }
 }
 
+// ─── 24/7 Hardware-to-Phone Expo Push Notification Cache (Fires even when mobile app is CLOSED) ───
+#define MAX_PUSH_TOKENS 8
+String registeredPushTokens[MAX_PUSH_TOKENS];
+int pushTokenCount = 0;
+
+void addOrUpdatePushToken(const String& tok) {
+  if (!tok.startsWith("ExponentPushToken[")) return;
+  for (int i = 0; i < pushTokenCount; i++) {
+    if (registeredPushTokens[i] == tok) return;
+  }
+  if (pushTokenCount < MAX_PUSH_TOKENS) {
+    registeredPushTokens[pushTokenCount++] = tok;
+    Serial.printf("   📱 [Push Registry] Registered phone push token (%d total): %s\n", pushTokenCount, tok.c_str());
+  } else {
+    // Rotate oldest slot if full
+    registeredPushTokens[0] = tok;
+  }
+}
+
+void extractPushTokensFromJson(FirebaseJson *json) {
+  if (json == nullptr) return;
+  String raw;
+  json->toString(raw, false);
+  int pos = 0;
+  while ((pos = raw.indexOf("ExponentPushToken[", pos)) >= 0) {
+    int endBracket = raw.indexOf(']', pos);
+    if (endBracket > pos && (endBracket - pos) < 80) {
+      String tok = raw.substring(pos, endBracket + 1);
+      addOrUpdatePushToken(tok);
+      pos = endBracket + 1;
+    } else {
+      break;
+    }
+  }
+}
+
 void streamCallback(FirebaseStream data) {
   String path = data.dataPath();
   String type = data.dataType();
@@ -383,11 +421,18 @@ void streamCallback(FirebaseStream data) {
     firebaseReady = true;
   }
 
+  // 0. Real-time push token registration from mobile app
+  if (path.indexOf("pushTokens") >= 0 && type == "string") {
+    addOrUpdatePushToken(data.stringData());
+    return;
+  }
+
   // 1. Full or partial JSON object payload (handles initial connect, mode sync pulses, and /devices updates)
   if (type == "json") {
     FirebaseJson *json = data.jsonObjectPtr();
     FirebaseJsonData result;
     if (json != nullptr) {
+      extractPushTokensFromJson(json);
       if (json->get(result, "mode")) {
         String newMode = normalizeMode(result.to<String>());
         lastConfiguredAppMode = newMode;
@@ -838,6 +883,7 @@ bool resyncCloudSetpoints(bool forceRestartStream) {
     FirebaseJsonData d;
     FirebaseJson *json = fbdo.jsonObjectPtr();
     if (json != nullptr) {
+      extractPushTokensFromJson(json);
       String fetchedMode = lastConfiguredAppMode;
       if (json->get(d, "mode")) {
         fetchedMode = normalizeMode(d.to<String>());
@@ -1622,6 +1668,188 @@ void pushHourlyHistory() {
 }
 
 // ═══════════════════════════════════════════════
+//  24/7 HARDWARE-TO-PHONE EXPO PUSH NOTIFICATION ENGINE (CORE 0)
+//  Fires instant high-priority FCM push notifications for EVERY alert
+//  even when the KabuTech mobile app is completely CLOSED or swiped away!
+// ═══════════════════════════════════════════════
+
+bool espNotified_TempHigh   = false;
+bool espNotified_TempLow    = false;
+bool espNotified_HumHigh    = false;
+bool espNotified_HumLow     = false;
+bool espNotified_Co2High    = false;
+bool espNotified_LightHigh  = false;
+bool espNotified_LightLow   = false;
+bool espNotified_SensorErr  = false;
+
+void sendExpoPushFromEsp32(const char* alertId, const char* title, const char* body) {
+  if (pushTokenCount <= 0 || !isSysOnline || slowInternetDetected || WiFi.status() != WL_CONNECTED) return;
+
+  WiFiClientSecure client;
+  client.setInsecure(); // Fast TLS handshake to exp.host without CA bundle overhead
+  client.setTimeout(2);
+
+  HTTPClient https;
+  https.setConnectTimeout(1500);
+  https.setTimeout(2000);
+
+  if (https.begin(client, "https://exp.host/--/api/v2/push/send")) {
+    https.addHeader("Accept", "application/json");
+    https.addHeader("Content-Type", "application/json");
+
+    String payload = "[";
+    for (int i = 0; i < pushTokenCount; i++) {
+      if (i > 0) payload += ",";
+      payload += "{\"to\":\"" + registeredPushTokens[i] + "\",";
+      payload += "\"sound\":\"default\",";
+      payload += "\"priority\":\"high\",";
+      payload += "\"channelId\":\"kabutech-alerts\",";
+      payload += "\"title\":\"" + String(title) + "\",";
+      payload += "\"body\":\"" + String(body) + "\",";
+      payload += "\"data\":{\"alertId\":\"" + String(alertId) + "\",\"source\":\"esp32\"}}";
+    }
+    payload += "]";
+
+    int httpCode = https.POST(payload);
+    Serial.printf("   🔔 [24/7 Cloud Push] Dispatched '%s' (%s) to %d phone(s) -> HTTP %d\n",
+                  title, body, pushTokenCount, httpCode);
+    https.end();
+  }
+}
+
+void evaluateAndDispatchEsp32PushAlerts() {
+  // Wait 10s after boot for initial sensor warmup & first Push Token sync
+  if (millis() < 10000 || pushTokenCount <= 0 || !isSysOnline || slowInternetDetected) return;
+
+  char bodyBuf[64];
+
+  // 1. Temperature Alerts (Optimal: 18 - 25 °C)
+  if (!shtFault && currentTemp > -50 && currentTemp != -999) {
+    if (currentTemp > 25.0) {
+      if (!espNotified_TempHigh) {
+        espNotified_TempHigh = true;
+        bool isCrit = (currentTemp > 27.0);
+        snprintf(bodyBuf, sizeof(bodyBuf), "%.1f°C (Target: 18 - 25 °C)", currentTemp);
+        sendExpoPushFromEsp32(
+          isCrit ? "temp-critical-high" : "temp-high",
+          isCrit ? "Critically High Temp" : "Temperature Above Crop Range",
+          bodyBuf
+        );
+      }
+    } else {
+      espNotified_TempHigh = false; // Re-arm immediately when normal
+    }
+
+    if (currentTemp < 18.0) {
+      if (!espNotified_TempLow) {
+        espNotified_TempLow = true;
+        bool isCrit = (currentTemp < 16.0);
+        snprintf(bodyBuf, sizeof(bodyBuf), "%.1f°C (Target: 18 - 25 °C)", currentTemp);
+        sendExpoPushFromEsp32(
+          isCrit ? "temp-critical-low" : "temp-low",
+          isCrit ? "Critically Low Temp" : "Temperature Below Crop Range",
+          bodyBuf
+        );
+      }
+    } else {
+      espNotified_TempLow = false; // Re-arm immediately when normal
+    }
+  }
+
+  // 2. Humidity Alerts (Optimal: 80 - 95 %)
+  if (!shtFault && currentHum > 0 && currentHum != -999) {
+    if (currentHum > 95.0) {
+      if (!espNotified_HumHigh) {
+        espNotified_HumHigh = true;
+        bool isCrit = (currentHum >= 100.0);
+        snprintf(bodyBuf, sizeof(bodyBuf), "%d%% (Target: 80 - 95 %%)", (int)round(currentHum));
+        sendExpoPushFromEsp32(
+          isCrit ? "hum-critical-high" : "hum-high",
+          isCrit ? "Excessive Humidity Alert" : "Humidity Above Crop Range",
+          bodyBuf
+        );
+      }
+    } else {
+      espNotified_HumHigh = false;
+    }
+
+    if (currentHum < 80.0) {
+      if (!espNotified_HumLow) {
+        espNotified_HumLow = true;
+        bool isCrit = (currentHum < 75.0);
+        snprintf(bodyBuf, sizeof(bodyBuf), "%d%% (Target: 80 - 95 %%)", (int)round(currentHum));
+        sendExpoPushFromEsp32(
+          isCrit ? "hum-critical-low" : "hum-low",
+          isCrit ? "Critically Low Humidity" : "Humidity Below Crop Range",
+          bodyBuf
+        );
+      }
+    } else {
+      espNotified_HumLow = false;
+    }
+  }
+
+  // 3. CO2 Alerts (Optimal: < 1000 ppm)
+  if (!co2Fault && currentCO2 > 0 && currentCO2 != -999) {
+    if (currentCO2 > 1000) {
+      if (!espNotified_Co2High) {
+        espNotified_Co2High = true;
+        bool isCrit = (currentCO2 > 1150);
+        snprintf(bodyBuf, sizeof(bodyBuf), "%d ppm (Target: < 1000 ppm)", currentCO2);
+        sendExpoPushFromEsp32(
+          isCrit ? "co2-critical" : "co2-elevated",
+          isCrit ? "Critically High CO2" : "CO2 Above Crop Range",
+          bodyBuf
+        );
+      }
+    } else {
+      espNotified_Co2High = false;
+    }
+  }
+
+  // 4. Light Alerts (Optimal: 150 - 1000 lx)
+  if (!lightFault && currentLight >= 0 && currentLight != -999) {
+    if (currentLight > 1000) {
+      if (!espNotified_LightHigh) {
+        espNotified_LightHigh = true;
+        snprintf(bodyBuf, sizeof(bodyBuf), "%d lx (Target: 150 - 1000 lx)", currentLight);
+        sendExpoPushFromEsp32("light-high", "Light Above Crop Range", bodyBuf);
+      }
+    } else {
+      espNotified_LightHigh = false;
+    }
+
+    if (currentLight < 150) {
+      if (!espNotified_LightLow) {
+        espNotified_LightLow = true;
+        snprintf(bodyBuf, sizeof(bodyBuf), "%d lx (Target: 150 - 1000 lx)", currentLight);
+        sendExpoPushFromEsp32("light-low", "Light Below Crop Range", bodyBuf);
+      }
+    } else {
+      espNotified_LightLow = false;
+    }
+  }
+
+  // 5. Sensor Hardware Fault Alert (after 15s boot grace)
+  if (millis() > 15000) {
+    bool anyFault = shtFault || lightFault || co2Fault;
+    if (anyFault) {
+      if (!espNotified_SensorErr) {
+        espNotified_SensorErr = true;
+        String faultNames = "";
+        if (shtFault) faultNames += "Temp/Hum";
+        if (co2Fault) { if (faultNames.length() > 0) faultNames += ", "; faultNames += "CO2"; }
+        if (lightFault) { if (faultNames.length() > 0) faultNames += ", "; faultNames += "Light"; }
+        snprintf(bodyBuf, sizeof(bodyBuf), "%s (Target: Nominal)", faultNames.c_str());
+        sendExpoPushFromEsp32("sensor-disconnected", "Sensor Fault", bodyBuf);
+      }
+    } else {
+      espNotified_SensorErr = false;
+    }
+  }
+}
+
+// ═══════════════════════════════════════════════
 //  DEDICATED CORE 0 CLOUD & NETWORK TASK
 //  Guarantees Core 1 (Sensors, Edge AI, TFT) NEVER hangs!
 // ═══════════════════════════════════════════════
@@ -1722,6 +1950,9 @@ void cloudTask(void *pvParameters) {
       lastFirebasePush = now;
       pushToFirebase(currentTemp, currentHum, currentLight, currentCO2,
                      shtFault, lightFault, co2Fault);
+
+      // Dispatch 24/7 high-priority remote push notifications for every active alert (fires even when app is closed)
+      evaluateAndDispatchEsp32PushAlerts();
 
       if (!shtFault && currentTemp > 0 && currentHum > 0) {
         hourlyTempSum += currentTemp;
