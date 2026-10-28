@@ -150,6 +150,13 @@ bool scd4xReady  = false;
 
 void recoverI2CBus();
 
+// Fast non-destructive probe to check if an I2C device acknowledges its address (~0.2ms)
+// Sends only address byte and reads ACK without calling device commands or locking the bus.
+inline bool i2cProbeAddress(uint8_t addr) {
+  Wire.beginTransmission(addr);
+  return (Wire.endTransmission() == 0);
+}
+
 bool tcaPresent = false;
 uint8_t currentTcaChannel = 255;
 
@@ -163,8 +170,7 @@ bool tcaSelect(uint8_t channel) {
   Wire.write(1 << channel);
   uint8_t err = Wire.endTransmission();
   if (err != 0) {
-    // If TCA communication failed, unjam the bus and retry switching
-    recoverI2CBus();
+    // If TCA communication failed, retry once cleanly without resetting bus & other sensors
     Wire.beginTransmission(TCA9548A_ADDR);
     Wire.write(1 << channel);
     err = Wire.endTransmission();
@@ -995,22 +1001,30 @@ void setup() {
 
   // Initialize Sensirion SCD41 True NDIR CO₂ (Channel 2 on TCA)
   tcaSelect(TCA_CH_SCD41);
-  scd4x.begin(Wire, 0x62);
-  scd4x.wakeUp();
-  delay(20);
-  scd4x.stopPeriodicMeasurement();
-  delay(500); // Sensirion SCD41 settling
-  scd4x.reinit();
-  delay(20);
-  // Sensirion ASC (Automatic Self-Calibration) must be DISABLED for mushroom cultivation!
-  // In a fruiting room CO2 is always elevated (>800 ppm). ASC would mistakenly treat 800 ppm as 400 ppm fresh air and corrupt baseline calibration over long periods!
-  scd4x.setAutomaticSelfCalibrationEnabled(0);
-  delay(10);
-  if (scd4x.startPeriodicMeasurement() == 0) {
-    Serial.println("✅ Sensirion SCD41 True NDIR CO₂ sensor initialized (ASC disabled for mushroom room)!");
-    scd4xReady = true;
+  if (i2cProbeAddress(0x62)) {
+    scd4x.begin(Wire, 0x62);
+    scd4x.wakeUp();
+    delay(20);
+    scd4x.stopPeriodicMeasurement();
+    delay(500); // Sensirion SCD41 settling
+    scd4x.reinit();
+    delay(20);
+    // Sensirion ASC (Automatic Self-Calibration) must be DISABLED for mushroom cultivation!
+    // In a fruiting room CO2 is always elevated (>800 ppm). ASC would mistakenly treat 800 ppm as 400 ppm fresh air and corrupt baseline calibration over long periods!
+    scd4x.setAutomaticSelfCalibrationEnabled(0);
+    delay(10);
+    if (scd4x.startPeriodicMeasurement() == 0) {
+      Serial.println("✅ Sensirion SCD41 True NDIR CO₂ sensor initialized (ASC disabled for mushroom room)!");
+      scd4xReady = true;
+    } else {
+      Serial.println("❌ SCD41 CO₂ sensor error starting measurement.");
+    }
   } else {
-    Serial.println("❌ SCD41 CO₂ sensor error starting measurement.");
+    Serial.println("ℹ️ Sensirion SCD41 CO₂ sensor NOT detected at boot.");
+    scd4xReady = false;
+#if USE_TCA9548A
+    if (tcaPresent) tcaDisableAll();
+#endif
   }
 
   // ── 5. Start Background Wi-Fi Auto-Reconnect (Core 0 handles link in background) ──
@@ -1048,8 +1062,8 @@ void setup() {
 void recoverI2CBus() {
   static unsigned long lastRecovery = 0;
   unsigned long now = millis();
-  if (lastRecovery > 0 && (now - lastRecovery < 1500)) {
-    return; // Rate limit recovery to once every 1.5s
+  if (lastRecovery > 0 && (now - lastRecovery < 3000)) {
+    return; // Rate limit recovery to once every 3s
   }
   lastRecovery = now;
 
@@ -1101,19 +1115,60 @@ void recoverI2CBus() {
   }
 #endif
 
+  // Mark all devices unready so their drivers re-run .begin() cleanly on the re-opened bus
+  sht31Ready  = false;
+  bh1750Ready = false;
+  scd4xReady  = false;
+
   Serial.println("✅ [I2C Watchdog] Bus unjammed and Wire re-initialized successfully.");
 }
 
 // ═══════════════════════════════════════════════
-//  SENSOR READING FUNCTIONS
+//  SENSOR READING FUNCTIONS (FULLY DECOUPLED & INDEPENDENT)
 // ═══════════════════════════════════════════════
 
 // ── Read SHT3x: Temperature (°C) and Humidity (% RH) ──
 SHTReading readSHT3x() {
   SHTReading r;
+  unsigned long now = millis();
+
   if (!tcaSelect(TCA_CH_SHT31)) {
     // Dual-Redundancy Fallback: SCD41 integrated temp & humidity if SHT line unavailable
-    if (scdBackupTemp > -50.0 && scdBackupHum > 0.0 && (millis() - lastScdBackupTime < SCD41_HOLD_TIME_MS)) {
+    // ONLY allowed if SCD41 is NOT in fault and backup is fresh!
+    if (!co2Fault && scdBackupTemp > -50.0 && scdBackupHum > 0.0 && (now - lastScdBackupTime < 15000)) {
+      r.temperature = scdBackupTemp;
+      r.humidity    = scdBackupHum;
+      r.valid       = true;
+      return r;
+    }
+    r.temperature = -999.0;
+    r.humidity    = -999.0;
+    r.valid       = false;
+    return r;
+  }
+
+  // Fast hardware presence probe (~0.2ms): Verify SHT31 acknowledges before attempting transactions
+  uint8_t shtAddr = 0x44;
+  bool shtPresent = i2cProbeAddress(0x44);
+  if (!shtPresent) {
+    shtAddr = 0x45;
+    shtPresent = i2cProbeAddress(0x45);
+  }
+
+  if (!shtPresent) {
+    sht31Ready = false;
+#if USE_TCA9548A
+    if (tcaPresent) tcaDisableAll();
+#endif
+    // 1. Hold previous reading across momentary noise / unplug
+    if (lastValidTemp > -50.0 && lastSHTSuccessTime > 0 && (now - lastSHTSuccessTime < SENSOR_HOLD_TIME_MS)) {
+      r.temperature = lastValidTemp;
+      r.humidity    = lastValidHum;
+      r.valid       = true;
+      return r;
+    }
+    // 2. Dual-Redundancy Fallback: SCD41 integrated temp & humidity if SCD41 is valid & not faulted
+    if (!co2Fault && scdBackupTemp > -50.0 && scdBackupHum > 0.0 && (now - lastScdBackupTime < 15000)) {
       r.temperature = scdBackupTemp;
       r.humidity    = scdBackupHum;
       r.valid       = true;
@@ -1126,9 +1181,9 @@ SHTReading readSHT3x() {
   }
 
   static unsigned long lastShtReinit = 0;
-  if (!sht31Ready && (millis() - lastShtReinit >= 3000)) {
-    lastShtReinit = millis();
-    if (sht31.begin(0x44) || sht31.begin(0x45)) {
+  if (!sht31Ready && (now - lastShtReinit >= 1000)) {
+    lastShtReinit = now;
+    if (sht31.begin(shtAddr)) {
       sht31Ready = true;
       sht31.heater(false);
     }
@@ -1151,33 +1206,30 @@ SHTReading readSHT3x() {
     shtRawMisses = 0;
     lastValidTemp = t + TEMP_OFFSET;
     lastValidHum  = constrain(h + HUM_OFFSET, 1.0, 100.0);
-    lastSHTSuccessTime = millis();
+    lastSHTSuccessTime = now;
     r.temperature = lastValidTemp;
     r.humidity    = lastValidHum;
     r.valid       = true;
     return r;
   }
 
-  // If SDA line is physically stuck LOW by an unresponsive slave, recover the bus
+  // Handle missed read on present sensor
   shtRawMisses++;
-  if (shtRawMisses >= 6) { // Tolerate up to 6 consecutive misses before declaring unready
+  if (shtRawMisses >= 6) {
     sht31Ready = false;
     shtRawMisses = 0;
   }
-  if (digitalRead(I2C_SDA_PIN) == LOW) {
-    recoverI2CBus();
-  }
 
   // 1. Hold previous reading across momentary noise / relay switching spikes
-  if (lastValidTemp > -50.0 && lastSHTSuccessTime > 0 && (millis() - lastSHTSuccessTime < SENSOR_HOLD_TIME_MS)) {
+  if (lastValidTemp > -50.0 && lastSHTSuccessTime > 0 && (now - lastSHTSuccessTime < SENSOR_HOLD_TIME_MS)) {
     r.temperature = lastValidTemp;
     r.humidity    = lastValidHum;
     r.valid       = true;
     return r;
   }
 
-  // 2. Dual-Redundancy Fallback: If SHT31 is truly faulted or disconnected, seamlessly use SCD41 backup!
-  if (scdBackupTemp > -50.0 && scdBackupHum > 0.0 && (millis() - lastScdBackupTime < SCD41_HOLD_TIME_MS)) {
+  // 2. Dual-Redundancy Fallback: SCD41 backup ONLY if SCD41 is healthy and not in fault
+  if (!co2Fault && scdBackupTemp > -50.0 && scdBackupHum > 0.0 && (now - lastScdBackupTime < 15000)) {
     r.temperature = scdBackupTemp;
     r.humidity    = scdBackupHum;
     r.valid       = true;
@@ -1193,23 +1245,45 @@ SHTReading readSHT3x() {
 // ── Read BH1750: Ambient Light (lux) ──
 LightReading readBH1750() {
   LightReading r;
+  unsigned long now = millis();
+
   if (!tcaSelect(TCA_CH_LIGHT)) {
     r.lux   = -999;
     r.valid = false;
     return r;
   }
 
+  // Fast hardware presence probe (~0.2ms)
+  bool bhPresent = i2cProbeAddress(0x23);
+  if (!bhPresent) {
+    bhPresent = i2cProbeAddress(0x5C);
+  }
+
+  if (!bhPresent) {
+    bh1750Ready = false;
+#if USE_TCA9548A
+    if (tcaPresent) tcaDisableAll();
+#endif
+    if (lastValidLight >= 0 && lastLightSuccessTime > 0 && (now - lastLightSuccessTime < SENSOR_HOLD_TIME_MS)) {
+      r.lux   = lastValidLight;
+      r.valid = true;
+    } else {
+      r.lux   = -999;
+      r.valid = false;
+    }
+    return r;
+  }
+
   static unsigned long lastBhReinit = 0;
   if (!bh1750Ready) {
-    if (millis() - lastBhReinit >= 3000) {
-      lastBhReinit = millis();
+    if (now - lastBhReinit >= 1000) {
+      lastBhReinit = now;
       if (lightMeter.begin(BH1750::CONTINUOUS_HIGH_RES_MODE)) {
         bh1750Ready = true;
       }
     }
-    // If sensor is offline/unplugged, DO NOT attempt readLightLevel() to avoid jamming I2C bus!
     if (!bh1750Ready) {
-      if (lastValidLight >= 0 && lastLightSuccessTime > 0 && (millis() - lastLightSuccessTime < SENSOR_HOLD_TIME_MS)) {
+      if (lastValidLight >= 0 && lastLightSuccessTime > 0 && (now - lastLightSuccessTime < SENSOR_HOLD_TIME_MS)) {
         r.lux   = lastValidLight;
         r.valid = true;
       } else {
@@ -1225,19 +1299,16 @@ LightReading readBH1750() {
   if (!isnan(lux) && lux >= 0.0) {
     bh1750RawMisses = 0;
     lastValidLight = (int)constrain(lux, 0.0, 65535.0);
-    lastLightSuccessTime = millis();
+    lastLightSuccessTime = now;
     r.lux   = lastValidLight;
     r.valid = true;
   } else {
     bh1750RawMisses++;
-    if (bh1750RawMisses >= 6) { // Tolerate up to 6 consecutive misses before marking unready
-      bh1750Ready = false; // Mark offline so it stops spamming requests to unplugged sensor
+    if (bh1750RawMisses >= 6) {
+      bh1750Ready = false;
       bh1750RawMisses = 0;
     }
-    if (digitalRead(I2C_SDA_PIN) == LOW) {
-      recoverI2CBus();
-    }
-    if (lastValidLight >= 0 && lastLightSuccessTime > 0 && (millis() - lastLightSuccessTime < SENSOR_HOLD_TIME_MS)) {
+    if (lastValidLight >= 0 && lastLightSuccessTime > 0 && (now - lastLightSuccessTime < SENSOR_HOLD_TIME_MS)) {
       r.lux   = lastValidLight;
       r.valid = true;
     } else {
@@ -1262,13 +1333,32 @@ CO2Reading readSCD41() {
     return r;
   }
 
-  // 1. Safe Auto-Recovery: Restart sensor if unready or stalled >30s (or failed on initial boot after 15s)
+  // Fast hardware presence probe (~0.2ms): Verify SCD41 is physically plugged in
+  bool scdPresent = i2cProbeAddress(0x62);
+  if (!scdPresent) {
+    // Sensor is physically unplugged or disconnected: exit immediately without blocking or resetting bus!
+    scd4xReady = false;
+#if USE_TCA9548A
+    if (tcaPresent) tcaDisableAll();
+#endif
+    // If recently unplugged, hold buffer bridges temporary wire jostle
+    if (lastValidCO2 > 0 && lastCO2SuccessTime > 0 && (now - lastCO2SuccessTime < SCD41_HOLD_TIME_MS)) {
+      r.ppm   = lastValidCO2;
+      r.valid = true;
+      return r;
+    }
+    r.ppm   = -999;
+    r.valid = false;
+    return r;
+  }
+
+  // 1. Safe Auto-Recovery: Restart sensor ONLY if physically present and stalled >30s or uninitialized
   bool isStalled = (lastCO2SuccessTime > 0 && (now - lastCO2SuccessTime > SCD41_RECOVERY_TIMEOUT)) ||
-                   (lastCO2SuccessTime == 0 && (now - bootTime > 15000));
+                   (lastCO2SuccessTime == 0 && !scd4xReady && (now - bootTime > 15000));
   if (!scd4xReady || isStalled) {
     if (lastRecoveryAttempt == 0 || (now - lastRecoveryAttempt >= SCD41_RECOVERY_COOLDOWN)) {
       lastRecoveryAttempt = now;
-      Serial.println("🔄 [SCD41] Sensor stalled/offline. Restarting periodic measurement...");
+      Serial.println("🔄 [SCD41] Sensor present but unready/stalled. Restarting periodic measurement...");
       scd4x.wakeUp();
       delay(20);
       scd4x.stopPeriodicMeasurement();
@@ -1279,7 +1369,6 @@ CO2Reading readSCD41() {
       delay(10);
       if (scd4x.startPeriodicMeasurement() == 0) {
         scd4xReady = true;
-        // Extend lastCO2SuccessTime so hold buffer bridges the 5s warmup for the first reading
         if (lastCO2SuccessTime > 0) {
           lastCO2SuccessTime = now;
         }
@@ -1316,11 +1405,6 @@ CO2Reading readSCD41() {
         return r;
       }
     }
-    // Only unjam the bus if the line is physically held LOW by a stuck slave
-    if (digitalRead(I2C_SDA_PIN) == LOW) {
-      recoverI2CBus();
-      scd4xReady = false;
-    }
   }
 
   // 3. Keep latest reading active across 5-second sampling cycles (up to 45s)
@@ -1330,8 +1414,8 @@ CO2Reading readSCD41() {
     return r;
   }
 
-  // 4. Initial boot warmup grace period (SCD41 optical measurement requires 10-15s)
-  if (now - bootTime < 15000) {
+  // 4. Initial boot warmup grace period (SCD41 optical measurement requires 10-15s, only if present)
+  if (now - bootTime < 15000 && scdPresent) {
     r.ppm   = (lastValidCO2 > 0) ? lastValidCO2 : 500;
     r.valid = true; // Still warming up, do not flag fault
     return r;
@@ -1970,12 +2054,6 @@ void loop() {
   if (now - lastSerialPrint >= SERIAL_PRINT_INTERVAL) {
     lastSerialPrint = now;
 
-    // Proactive bus health check: unstick bus immediately if actuator spike pulled SDA low
-    if (digitalRead(I2C_SDA_PIN) == LOW) {
-      Serial.println("⚡ [I2C Watchdog] Bus stuck LOW before cycle (actuator spike). Unjamming...");
-      recoverI2CBus();
-    }
-
     // 1. Read SHT3x
     SHTReading shtData = readSHT3x();
     if (shtData.valid) {
@@ -2034,6 +2112,20 @@ void loop() {
         co2Fault   = true;
         currentCO2 = -999;
       }
+    }
+
+    // Proactive bus health check: Recover I2C ONLY if ALL sensors fail concurrently for 6 consecutive cycles
+    // (Protects working sensors so one missing sensor never triggers false bus recovery or disrupts others)
+    static int allSensorsFailStreak = 0;
+    if (!shtData.valid && !lightData.valid && !co2Data.valid) {
+      allSensorsFailStreak++;
+      if (allSensorsFailStreak >= 6) {
+        Serial.println("⚡ [I2C Watchdog] All sensors unresponsive for 6s (bus lockup). Recovering I2C bus...");
+        recoverI2CBus();
+        allSensorsFailStreak = 0;
+      }
+    } else {
+      allSensorsFailStreak = 0;
     }
 
     // ── Instant Local Serial Monitor Output ──
