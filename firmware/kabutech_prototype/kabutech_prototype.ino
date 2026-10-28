@@ -134,7 +134,7 @@ bool scd4xReady  = false;
 // 25 kHz (40µs period) gives the slow RC rising edge plenty of time to reach 3.3V logic HIGH.
 #define I2C_LONG_CABLE_CLOCK  50000  // 50 kHz: Fast, responsive, with 2x rise-time margin for cables
 #define I2C_WIRE_TIMEOUT_MS   100    // 100ms: Low latency timeout to prevent loop freezing
-#define SENSOR_HOLD_TIME_MS   10000  // 10s: Seamlessly bridges across relay switching spikes and actuator noise
+#define SENSOR_HOLD_TIME_MS   3000   // 3s: Fast fault response (bridges momentary 1-2s wire noise)
 
 // ─── TCA9548A I2C Multiplexer Configuration ───
 // Eliminates 10-meter cable capacitance by isolating each sensor line onto its own branch.
@@ -256,7 +256,7 @@ bool lightFault = true;
 bool co2Fault   = true;
 
 // Debouncing streaks (consecutive reads to latch/clear fault)
-#define STREAK_TO_LATCH_FAULT 6      // 6 consecutive failed reads (6s) required to latch FAULT
+#define STREAK_TO_LATCH_FAULT 3      // 3 consecutive failed reads (3s) required to latch FAULT
 #define STREAK_TO_CLEAR_FAULT 2      // 2 consecutive valid reads to clear FAULT
 
 int shtFailStreak = 0,   shtValidStreak = 0;
@@ -1084,7 +1084,9 @@ void recoverI2CBus() {
 SHTReading readSHT3x() {
   SHTReading r;
   tcaSelect(TCA_CH_SHT31);
-  if (!sht31Ready) {
+  static unsigned long lastShtReinit = 0;
+  if (!sht31Ready && (millis() - lastShtReinit >= 3000)) {
+    lastShtReinit = millis();
     if (sht31.begin(0x44) || sht31.begin(0x45)) {
       sht31Ready = true;
       sht31.heater(false);
@@ -1115,28 +1117,16 @@ SHTReading readSHT3x() {
     return r;
   }
 
-  // If raw read failed, unstick the bus if repeated or if SDA is low
+  // If SDA line is physically stuck LOW by an unresponsive slave, recover the bus
   shtRawMisses++;
-  if (shtRawMisses >= 2 || digitalRead(I2C_SDA_PIN) == LOW) {
+  if (digitalRead(I2C_SDA_PIN) == LOW) {
     recoverI2CBus();
     sht31Ready = false;
     bh1750Ready = false;
     shtRawMisses = 0;
   }
 
-  // ── Dual-Redundancy Fallback: Sensirion SCD41 Integrated Temp/Hum ──
-  // If SHT3x dropped packet over 10m, instantly use SCD41's internal CMOSens reading!
-  if (scdBackupTemp > -50.0 && lastScdBackupTime > 0 && (millis() - lastScdBackupTime < 15000)) {
-    r.temperature = scdBackupTemp + TEMP_OFFSET;
-    r.humidity    = constrain(scdBackupHum + HUM_OFFSET, 1.0, 100.0);
-    r.valid       = true;
-    lastValidTemp = r.temperature;
-    lastValidHum  = r.humidity;
-    lastSHTSuccessTime = millis();
-    return r;
-  }
-
-  // Hold previous reading for up to 10s (seamlessly bridges across relay switching noise/EMI)
+  // Hold previous reading for up to 3s (bridges momentary noise, then immediately faults)
   if (lastValidTemp > -50.0 && lastSHTSuccessTime > 0 && (millis() - lastSHTSuccessTime < SENSOR_HOLD_TIME_MS)) {
     r.temperature = lastValidTemp;
     r.humidity    = lastValidHum;
@@ -1153,7 +1143,9 @@ SHTReading readSHT3x() {
 LightReading readBH1750() {
   LightReading r;
   tcaSelect(TCA_CH_LIGHT);
-  if (!bh1750Ready) {
+  static unsigned long lastBhReinit = 0;
+  if (!bh1750Ready && (millis() - lastBhReinit >= 3000)) {
+    lastBhReinit = millis();
     if (lightMeter.begin(BH1750::CONTINUOUS_HIGH_RES_MODE)) {
       bh1750Ready = true;
     } else {
@@ -1178,7 +1170,7 @@ LightReading readBH1750() {
     r.valid = true;
   } else {
     bh1750RawMisses++;
-    if (bh1750RawMisses >= 2 || digitalRead(I2C_SDA_PIN) == LOW) {
+    if (digitalRead(I2C_SDA_PIN) == LOW) {
       recoverI2CBus();
       sht31Ready = false;
       bh1750Ready = false;
@@ -1197,7 +1189,7 @@ LightReading readBH1750() {
 
 // ── Read SCD41: True NDIR CO₂ (ppm) ──
 // Sensirion SCD41 produces an optical photoacoustic sample every 5.0 seconds.
-#define SCD41_HOLD_TIME_MS      45000   // 45s: bridges across multiple measurement cycles
+#define SCD41_HOLD_TIME_MS      10000   // 45s: bridges across multiple measurement cycles
 #define SCD41_RECOVERY_TIMEOUT  60000   // 60s: wait 12 missed cycles before restarting sensor
 #define SCD41_RECOVERY_COOLDOWN 30000   // 30s: allow 6 full measurement cycles after restart
 
@@ -1269,7 +1261,7 @@ CO2Reading readSCD41() {
   }
 
   // 4. Initial boot warmup grace period (SCD41 optical measurement requires 5-10s)
-  if (now - bootTime < 15000) {
+  if (now - bootTime < 10000) {
     r.ppm   = (lastValidCO2 > 0) ? lastValidCO2 : 500;
     r.valid = true; // Still warming up, do not flag fault
     return r;

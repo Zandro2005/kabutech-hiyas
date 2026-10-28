@@ -639,7 +639,7 @@ void drawDashboard(float temp, float hum, int light, int co2,
     uint16_t pillCol = COLOR_EMERALD;
 
     if (co2Err || co2 <= 0) {
-      if (millis() < 10000 && co2 <= 0) {
+      if (millis() < 8000 && co2 <= 0) {
         snprintf(valBuf, sizeof(valBuf), "...");
         pillTxt = "WARM";
         pillCol = COLOR_CYAN;
