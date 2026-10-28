@@ -134,7 +134,10 @@ bool scd4xReady  = false;
 // 25 kHz (40µs period) gives the slow RC rising edge plenty of time to reach 3.3V logic HIGH.
 #define I2C_LONG_CABLE_CLOCK  50000  // 50 kHz: Fast, responsive, with 2x rise-time margin for cables
 #define I2C_WIRE_TIMEOUT_MS   100    // 100ms: Low latency timeout to prevent loop freezing
-#define SENSOR_HOLD_TIME_MS   4000   // 4s: Bridges hot-unplug contact bounce while keeping fault response under 7s
+#define SENSOR_HOLD_TIME_MS   15000  // 15s: Bridges relay EMI switching noise, cable noise & contact bounce
+#define SCD41_HOLD_TIME_MS    45000  // 45s: Bridges across multiple 5s measurement cycles (up to 9 missed cycles)
+#define SCD41_RECOVERY_TIMEOUT 30000 // 30s: Wait 6 missed cycles before restarting sensor
+#define SCD41_RECOVERY_COOLDOWN 10000 // 10s: Allow 2 full measurement cycles after restart
 
 // ─── TCA9548A I2C Multiplexer Configuration ───
 // Eliminates 10-meter cable capacitance by isolating each sensor line onto its own branch.
@@ -170,6 +173,7 @@ bool tcaSelect(uint8_t channel) {
     }
   }
   currentTcaChannel = channel;
+  delayMicroseconds(500); // Allow 10m branch line capacitance to settle
   return true;
 #else
   return true;
@@ -264,19 +268,19 @@ volatile int stableCloudStreak = 0;
 volatile int consecutiveCloudFailures = 0;
 TaskHandle_t cloudTaskHandle = NULL;
 
-// Live cached telemetry values
-float currentTemp  = -999.0;
-float currentHum   = -999.0;
-int   currentLight = -999;
-int   currentCO2   = -999;
+// Live cached telemetry values (shared across Core 0 cloud task and Core 1 local loop)
+volatile float currentTemp  = -999.0;
+volatile float currentHum   = -999.0;
+volatile int   currentLight = -999;
+volatile int   currentCO2   = -999;
 
 // Fault flags
-bool shtFault   = true;
-bool lightFault = true;
-bool co2Fault   = true;
+volatile bool shtFault   = true;
+volatile bool lightFault = true;
+volatile bool co2Fault   = true;
 
 // Debouncing streaks (consecutive reads to latch/clear fault)
-#define STREAK_TO_LATCH_FAULT 3      // 3 consecutive failed reads (3s) required to latch FAULT
+#define STREAK_TO_LATCH_FAULT 4      // 4 consecutive failed reads (4s) required to latch FAULT
 #define STREAK_TO_CLEAR_FAULT 2      // 2 consecutive valid reads to clear FAULT
 
 int shtFailStreak = 0,   shtValidStreak = 0;
@@ -998,8 +1002,12 @@ void setup() {
   delay(500); // Sensirion SCD41 settling
   scd4x.reinit();
   delay(20);
+  // Sensirion ASC (Automatic Self-Calibration) must be DISABLED for mushroom cultivation!
+  // In a fruiting room CO2 is always elevated (>800 ppm). ASC would mistakenly treat 800 ppm as 400 ppm fresh air and corrupt baseline calibration over long periods!
+  scd4x.setAutomaticSelfCalibrationEnabled(0);
+  delay(10);
   if (scd4x.startPeriodicMeasurement() == 0) {
-    Serial.println("✅ Sensirion SCD41 True NDIR CO₂ sensor initialized!");
+    Serial.println("✅ Sensirion SCD41 True NDIR CO₂ sensor initialized (ASC disabled for mushroom room)!");
     scd4xReady = true;
   } else {
     Serial.println("❌ SCD41 CO₂ sensor error starting measurement.");
@@ -1104,6 +1112,13 @@ void recoverI2CBus() {
 SHTReading readSHT3x() {
   SHTReading r;
   if (!tcaSelect(TCA_CH_SHT31)) {
+    // Dual-Redundancy Fallback: SCD41 integrated temp & humidity if SHT line unavailable
+    if (scdBackupTemp > -50.0 && scdBackupHum > 0.0 && (millis() - lastScdBackupTime < SCD41_HOLD_TIME_MS)) {
+      r.temperature = scdBackupTemp;
+      r.humidity    = scdBackupHum;
+      r.valid       = true;
+      return r;
+    }
     r.temperature = -999.0;
     r.humidity    = -999.0;
     r.valid       = false;
@@ -1145,7 +1160,7 @@ SHTReading readSHT3x() {
 
   // If SDA line is physically stuck LOW by an unresponsive slave, recover the bus
   shtRawMisses++;
-  if (shtRawMisses >= 2) {
+  if (shtRawMisses >= 6) { // Tolerate up to 6 consecutive misses before declaring unready
     sht31Ready = false;
     shtRawMisses = 0;
   }
@@ -1153,16 +1168,25 @@ SHTReading readSHT3x() {
     recoverI2CBus();
   }
 
-  // Hold previous reading for up to 3s (bridges momentary noise, then immediately faults)
+  // 1. Hold previous reading across momentary noise / relay switching spikes
   if (lastValidTemp > -50.0 && lastSHTSuccessTime > 0 && (millis() - lastSHTSuccessTime < SENSOR_HOLD_TIME_MS)) {
     r.temperature = lastValidTemp;
     r.humidity    = lastValidHum;
     r.valid       = true;
-  } else {
-    r.temperature = -999.0;
-    r.humidity    = -999.0;
-    r.valid       = false;
+    return r;
   }
+
+  // 2. Dual-Redundancy Fallback: If SHT31 is truly faulted or disconnected, seamlessly use SCD41 backup!
+  if (scdBackupTemp > -50.0 && scdBackupHum > 0.0 && (millis() - lastScdBackupTime < SCD41_HOLD_TIME_MS)) {
+    r.temperature = scdBackupTemp;
+    r.humidity    = scdBackupHum;
+    r.valid       = true;
+    return r;
+  }
+
+  r.temperature = -999.0;
+  r.humidity    = -999.0;
+  r.valid       = false;
   return r;
 }
 
@@ -1206,7 +1230,7 @@ LightReading readBH1750() {
     r.valid = true;
   } else {
     bh1750RawMisses++;
-    if (bh1750RawMisses >= 2) {
+    if (bh1750RawMisses >= 6) { // Tolerate up to 6 consecutive misses before marking unready
       bh1750Ready = false; // Mark offline so it stops spamming requests to unplugged sensor
       bh1750RawMisses = 0;
     }
@@ -1226,9 +1250,6 @@ LightReading readBH1750() {
 
 // ── Read SCD41: True NDIR CO₂ (ppm) ──
 // Sensirion SCD41 produces an optical photoacoustic sample every 5.0 seconds.
-#define SCD41_HOLD_TIME_MS      10000   // 45s: bridges across multiple measurement cycles
-#define SCD41_RECOVERY_TIMEOUT  60000   // 60s: wait 12 missed cycles before restarting sensor
-#define SCD41_RECOVERY_COOLDOWN 30000   // 30s: allow 6 full measurement cycles after restart
 
 static unsigned long lastRecoveryAttempt = 0;
 
@@ -1241,22 +1262,30 @@ CO2Reading readSCD41() {
     return r;
   }
 
-  // 1. Safe Auto-Recovery: Only restart if sensor is completely stalled for >60s with a 30s cooldown
-  if (!scd4xReady || (lastCO2SuccessTime > 0 && (now - lastCO2SuccessTime > SCD41_RECOVERY_TIMEOUT))) {
+  // 1. Safe Auto-Recovery: Restart sensor if unready or stalled >30s (or failed on initial boot after 15s)
+  bool isStalled = (lastCO2SuccessTime > 0 && (now - lastCO2SuccessTime > SCD41_RECOVERY_TIMEOUT)) ||
+                   (lastCO2SuccessTime == 0 && (now - bootTime > 15000));
+  if (!scd4xReady || isStalled) {
     if (lastRecoveryAttempt == 0 || (now - lastRecoveryAttempt >= SCD41_RECOVERY_COOLDOWN)) {
       lastRecoveryAttempt = now;
-      Serial.println("🔄 [SCD41] Sensor stalled >60s. Restarting periodic measurement...");
+      Serial.println("🔄 [SCD41] Sensor stalled/offline. Restarting periodic measurement...");
       scd4x.wakeUp();
       delay(20);
       scd4x.stopPeriodicMeasurement();
       delay(500); // 500ms required by Sensirion before restart
       scd4x.reinit();
       delay(20);
+      scd4x.setAutomaticSelfCalibrationEnabled(0); // Keep ASC disabled in mushroom grow room
+      delay(10);
       if (scd4x.startPeriodicMeasurement() == 0) {
         scd4xReady = true;
-        Serial.println("✅ [SCD41] Successfully restarted periodic measurement (30s cooldown engaged)!");
+        // Extend lastCO2SuccessTime so hold buffer bridges the 5s warmup for the first reading
+        if (lastCO2SuccessTime > 0) {
+          lastCO2SuccessTime = now;
+        }
+        Serial.println("✅ [SCD41] Successfully restarted periodic measurement (ASC disabled)!");
       } else {
-        Serial.println("❌ [SCD41] Failed to restart periodic measurement. Retrying in 30s...");
+        Serial.println("❌ [SCD41] Failed to restart periodic measurement. Retrying in 10s...");
       }
     }
   }
@@ -1301,8 +1330,8 @@ CO2Reading readSCD41() {
     return r;
   }
 
-  // 4. Initial boot warmup grace period (SCD41 optical measurement requires 5-10s)
-  if (now - bootTime < 10000) {
+  // 4. Initial boot warmup grace period (SCD41 optical measurement requires 10-15s)
+  if (now - bootTime < 15000) {
     r.ppm   = (lastValidCO2 > 0) ? lastValidCO2 : 500;
     r.valid = true; // Still warming up, do not flag fault
     return r;
@@ -1876,6 +1905,18 @@ void cloudTask(void *pvParameters) {
       } else if (now - lastHourlyPush >= HOURLY_PUSH_INTERVAL && lastHourlyPush > 0) {
         lastHourlyPush = now;
         pushHourlyHistory();
+      }
+    } else {
+      // Offline: Prevent accumulators from growing indefinitely over long multi-day offline periods
+      if (now - lastHourlyPush >= HOURLY_PUSH_INTERVAL && lastHourlyPush > 0) {
+        lastHourlyPush = now;
+        hourlyTempSum = 0.0;
+        hourlyHumSum  = 0.0;
+        hourlyLightSum = 0.0;
+        hourlyCO2Sum  = 0.0;
+        hourlySHTCount = 0;
+        hourlyLightCount = 0;
+        hourlyCO2Count = 0;
       }
     }
 

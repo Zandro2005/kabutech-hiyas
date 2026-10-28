@@ -3,6 +3,7 @@ import renderer, { act } from 'react-test-renderer';
 import AwwSnapOfflineView from '../src/components/AwwSnapOfflineView';
 import RangeGauge from '../src/components/RangeGauge';
 import ChamberStatusHero from '../src/components/ChamberStatusHero';
+import EnvironmentMetricsGrid from '../src/components/EnvironmentMetricsGrid';
 
 // Mock dependencies
 jest.mock('@expo/vector-icons', () => ({
@@ -40,6 +41,18 @@ jest.mock('../src/context/AuthContext', () => ({
   }),
 }));
 
+let mockHealthState = {
+  isControllerOnline: true,
+  tempError: false,
+  humError: false,
+  lightError: false,
+  co2Error: false,
+};
+
+jest.mock('../src/hooks/useSensorHealth', () => ({
+  useSensorHealth: () => mockHealthState,
+}));
+
 function extractText(node: any): string {
   if (!node) return '';
   if (typeof node === 'string' || typeof node === 'number') return String(node);
@@ -49,9 +62,16 @@ function extractText(node: any): string {
   return '';
 }
 
-describe('AwwSnapOfflineView', () => {
+describe('AwwSnapOfflineView and Environmental Widgets', () => {
   beforeEach(() => {
     jest.useFakeTimers();
+    mockHealthState = {
+      isControllerOnline: true,
+      tempError: false,
+      humError: false,
+      lightError: false,
+      co2Error: false,
+    };
   });
 
   afterEach(() => {
@@ -199,5 +219,54 @@ describe('AwwSnapOfflineView', () => {
     // When online, "Parameters In Range" circle IS rendered
     expect(fullText).toContain('Parameters In Range');
     expect(fullText).not.toContain('Aw, Snap!');
+  });
+
+  it('EnvironmentMetricsGrid displays Offline (not Fault) on the 4 widgets when controller is offline', () => {
+    mockHealthState.isControllerOnline = false;
+
+    let testRenderer: any;
+    act(() => {
+      testRenderer = renderer.create(
+        <EnvironmentMetricsGrid
+          temp={-999}
+          hum={-999}
+          light={-999}
+          co2={-999}
+          navigation={{ navigate: jest.fn() }}
+        />
+      );
+    });
+
+    const fullText = extractText(testRenderer.toJSON());
+
+    // Widgets show Offline
+    expect(fullText).toContain('Offline');
+    // Does NOT say Fault anywhere on the widgets when controller is offline
+    expect(fullText).not.toContain('Fault');
+  });
+
+  it('EnvironmentMetricsGrid displays Fault ONLY when controller is online but a sensor has no signals from hardware', () => {
+    mockHealthState.isControllerOnline = true;
+    mockHealthState.tempError = true; // Hardware disconnected
+
+    let testRenderer: any;
+    act(() => {
+      testRenderer = renderer.create(
+        <EnvironmentMetricsGrid
+          temp={-999}
+          hum={85}
+          light={300}
+          co2={600}
+          navigation={{ navigate: jest.fn() }}
+        />
+      );
+    });
+
+    const fullText = extractText(testRenderer.toJSON());
+
+    // Temperature widget says Fault because it has hardware error
+    expect(fullText).toContain('Fault');
+    // Normal sensors still say Optimal
+    expect(fullText).toContain('Optimal');
   });
 });

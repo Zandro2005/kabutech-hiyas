@@ -72,3 +72,10 @@ node_modules/
 tinyml/.venv/
 tinyml/forecast_sequences.csv
 
+
+# Obsidian Vault
+**/.obsidian/workspace.json
+**/.obsidian/workspace-mobile.json
+**/.obsidian/cache/
+**/.obsidian/indexeddb/
+

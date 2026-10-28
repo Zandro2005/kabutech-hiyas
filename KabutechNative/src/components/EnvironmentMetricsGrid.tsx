@@ -26,10 +26,10 @@ export default React.memo(function EnvironmentMetricsGrid({ temp, hum, light, co
   const health = useSensorHealth();
 
   const isControllerOff = !health.isControllerOnline;
-  const isTempFault = health.tempError || temp === -999 || temp <= 0;
-  const isHumFault = health.humError || hum === -999 || hum <= 0;
-  const isLightFault = health.lightError || light === -999 || light < 0;
-  const isCo2Fault = health.co2Error || co2 === -999 || co2 < 0;
+  const isTempFault = !isControllerOff && (health.tempError || temp === -999 || temp <= 0);
+  const isHumFault = !isControllerOff && (health.humError || hum === -999 || hum <= 0);
+  const isLightFault = !isControllerOff && (health.lightError || light === -999 || light < 0);
+  const isCo2Fault = !isControllerOff && (health.co2Error || co2 === -999 || co2 < 0);
 
   const tempEval = evaluateParam('temp', temp, isControllerOff || isTempFault, ACTIVE_PROFILE);
   const humEval = evaluateParam('hum', hum, isControllerOff || isHumFault, ACTIVE_PROFILE);
@@ -38,6 +38,14 @@ export default React.memo(function EnvironmentMetricsGrid({ temp, hum, light, co
 
   // Status helper with clean minimal badges matching TFT display
   const getBadgeStyle = (paramEval: ParamEvaluation) => {
+    if (isControllerOff) {
+      return {
+        label: 'Offline',
+        dotColor: isDarkMode ? '#94a3b8' : '#64748b',
+        badgeBg: isDarkMode ? 'rgba(148, 163, 184, 0.12)' : '#f1f5f9',
+        badgeText: isDarkMode ? '#94a3b8' : '#64748b',
+      };
+    }
     if (paramEval.state === 'fault') {
       return {
         label: paramEval.statusLabel || 'Fault',
@@ -76,7 +84,7 @@ export default React.memo(function EnvironmentMetricsGrid({ temp, hum, light, co
     });
   };
 
-  const activeCount = [!isTempFault, !isHumFault, !isLightFault, !isCo2Fault].filter(Boolean).length;
+  const activeCount = isControllerOff ? 0 : [!isTempFault, !isHumFault, !isLightFault, !isCo2Fault].filter(Boolean).length;
 
   const metrics = [
     {
@@ -123,14 +131,14 @@ export default React.memo(function EnvironmentMetricsGrid({ temp, hum, light, co
           </Text>
           <View style={[
             tw`px-2 py-0.5 rounded-full border flex-row items-center`,
-            activeCount === 4
+            !isControllerOff && activeCount === 4
               ? (isDarkMode ? tw`bg-emerald-950/50 border-emerald-800/50` : tw`bg-emerald-50 border-emerald-200/60`)
               : (isDarkMode ? tw`bg-slate-800/80 border-slate-700/60` : tw`bg-slate-100 border-slate-200/60`)
           ]}>
             <View 
               style={[
                 tw`w-1.5 h-1.5 rounded-full mr-1.5`,
-                { backgroundColor: activeCount === 4 ? '#10b981' : '#94a3b8' }
+                { backgroundColor: !isControllerOff && activeCount === 4 ? '#10b981' : '#94a3b8' }
               ]} 
             />
             <Text 
@@ -138,11 +146,11 @@ export default React.memo(function EnvironmentMetricsGrid({ temp, hum, light, co
                 tw`text-[10px]`,
                 { 
                   fontFamily: 'PlusJakartaSans_700Bold',
-                  color: activeCount === 4 ? (isDarkMode ? '#34d399' : '#059669') : (isDarkMode ? '#94a3b8' : '#64748b')
+                  color: !isControllerOff && activeCount === 4 ? (isDarkMode ? '#34d399' : '#059669') : (isDarkMode ? '#94a3b8' : '#64748b')
                 }
               ]}
             >
-              {activeCount === 4 ? 'Live' : `${activeCount}/4 Active`}
+              {isControllerOff ? 'Offline' : activeCount === 4 ? 'Live' : `${activeCount}/4 Active`}
             </Text>
           </View>
         </View>
@@ -238,7 +246,11 @@ export default React.memo(function EnvironmentMetricsGrid({ temp, hum, light, co
                   >
                     {item.eval.formattedValue}
                   </Text>
-                  {isItemFault ? (
+                  {isControllerOff ? (
+                    <Text style={[tw`text-[11px] ml-1.5 text-slate-400 dark:text-slate-500`, { fontFamily: 'PlusJakartaSans_700Bold' }]}>
+                      Offline
+                    </Text>
+                  ) : isItemFault ? (
                     <Text style={[tw`text-[11px] ml-1.5 text-slate-400 dark:text-slate-500`, { fontFamily: 'PlusJakartaSans_700Bold' }]}>
                       Fault
                     </Text>

@@ -516,7 +516,7 @@ void drawDashboard(float temp, float hum, int light, int co2,
   if (co2InRange) inRangeCount++;
   if (lightInRange) inRangeCount++;
 
-  bool hasFault = shtErr || lightErr || co2Err || temp <= -900 || hum <= -900 || co2 <= 0;
+  bool hasFault = shtErr || lightErr || co2Err || temp <= -900 || hum <= -900 || (millis() >= 15000 && co2 <= 0);
 
   // Center Status: e.g. "4/4 IN RANGE", "3/4 IN RANGE", "1/4 IN RANGE"
   tft.setTextDatum(textdatum_t::middle_center);
@@ -639,7 +639,7 @@ void drawDashboard(float temp, float hum, int light, int co2,
     uint16_t pillCol = COLOR_EMERALD;
 
     if (co2Err || co2 <= 0) {
-      if (millis() < 8000 && co2 <= 0) {
+      if (millis() < 15000 && co2 <= 0) {
         snprintf(valBuf, sizeof(valBuf), "...");
         pillTxt = "WARM";
         pillCol = COLOR_CYAN;
