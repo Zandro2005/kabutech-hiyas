@@ -105,7 +105,7 @@
 //  Compensates for ESP32 / breadboard self-heating
 // ═══════════════════════════════════════════════
 
-#define TEMP_OFFSET     -8.0    // Adjust temperature in °C (e.g. -3.0 lowers reading by 3°C)
+#define TEMP_OFFSET     -10.0    // Adjust temperature in °C (e.g. -3.0 lowers reading by 3°C)
 #define HUM_OFFSET       +15.0    // Adjust humidity in % RH (e.g. +2.0 or 0.0)
 
 // ═══════════════════════════════════════════════
@@ -135,6 +135,37 @@ bool scd4xReady  = false;
 #define I2C_LONG_CABLE_CLOCK  50000  // 50 kHz: Fast, responsive, with 2x rise-time margin for cables
 #define I2C_WIRE_TIMEOUT_MS   100    // 100ms: Low latency timeout to prevent loop freezing
 #define SENSOR_HOLD_TIME_MS   10000  // 10s: Seamlessly bridges across relay switching spikes and actuator noise
+
+// ─── TCA9548A I2C Multiplexer Configuration ───
+// Eliminates 10-meter cable capacitance by isolating each sensor line onto its own branch.
+// Address: 0x70 (A0, A1, A2 unconnected). Auto-detects whether TCA is plugged in or not.
+#define USE_TCA9548A          1       // 1 = Auto-detect & switch TCA9548A channels; 0 = Direct bus only
+#define TCA9548A_ADDR         0x70    // Default I2C address for TCA9548A
+#define TCA_CH_SHT31          0       // Channel 0: SHT31 (Temp & Humidity)
+#define TCA_CH_LIGHT          1       // Channel 1: BH1750 (Ambient Light)
+#define TCA_CH_SCD41          2       // Channel 2: Sensirion SCD41 (True CO2)
+
+bool tcaPresent = false;
+
+// Helper: Select TCA9548A Channel (0 to 7). Safely bypasses if TCA is not detected.
+void tcaSelect(uint8_t channel) {
+#if USE_TCA9548A
+  if (!tcaPresent || channel > 7) return;
+  Wire.beginTransmission(TCA9548A_ADDR);
+  Wire.write(1 << channel);
+  Wire.endTransmission();
+#endif
+}
+
+// Helper: Disconnect all TCA channels (isolates all remote branches from the main bus)
+void tcaDisableAll() {
+#if USE_TCA9548A
+  if (!tcaPresent) return;
+  Wire.beginTransmission(TCA9548A_ADDR);
+  Wire.write(0x00);
+  Wire.endTransmission();
+#endif
+}
 
 // Last valid reading buffers (keeps readings stable across momentary cable noise)
 float lastValidTemp  = -999.0;
@@ -177,8 +208,15 @@ bool resyncCloudSetpoints(bool forceRestartStream = false);
 bool checkWanInternetFast();
 void cloudTask(void *pvParameters);
 
+// ─── RTC Hardware Boot-Once Lock (Survives any soft reset / brownout; clears ONLY on initial power-on) ───
+#define KABUTECH_BOOT_MAGIC 0x4B414255UL
+RTC_DATA_ATTR uint32_t rtcBootMagic = 0;
+bool isFirstPowerOnBoot = true;
+bool ntpConfigured      = false;
+bool firebaseBegun      = false;
+
+// Single Unified TLS Session on Core 0 (Eliminates dual-SSL heap exhaustion & streamDO Use-After-Free crashes!)
 FirebaseData fbdo;
-FirebaseData streamDO; // For listening to actuator changes
 FirebaseAuth auth;
 FirebaseConfig config;
 
@@ -199,7 +237,6 @@ volatile bool firebaseReady = false;
 volatile bool firebaseInitialized = false;
 volatile bool needsCloudResync = false;
 volatile unsigned long firebaseBackoffUntil = 0;
-volatile unsigned long lastStreamEventTime = 0;
 volatile bool cloudOpInFlight = false;
 volatile unsigned long cloudOpStartMs = 0;
 volatile bool pendingAutoDeviceSync = false;
@@ -329,8 +366,7 @@ void applyActuator(const String& key, bool state) {
       digitalWrite(PIN_FAN_EXHAUST, state ? HIGH : LOW);
       lastActuatorSwitchTime = millis();
       Serial.printf("   🌀 [Actuator] Exhaust Fan (GPIO %d) -> %s\n", PIN_FAN_EXHAUST, state ? "ON" : "OFF");
-    } else {
-      digitalWrite(PIN_FAN_EXHAUST, state ? HIGH : LOW);
+      delay(30);
     }
   } else if (key == "fanIn" || key == "intake") {
     if (stateIntake != state) {
@@ -339,8 +375,7 @@ void applyActuator(const String& key, bool state) {
       digitalWrite(PIN_FAN_INTAKE, state ? HIGH : LOW);
       lastActuatorSwitchTime = millis();
       Serial.printf("   🌀 [Actuator] Intake Fan (GPIO %d) -> %s\n", PIN_FAN_INTAKE, state ? "ON" : "OFF");
-    } else {
-      digitalWrite(PIN_FAN_INTAKE, state ? HIGH : LOW);
+      delay(30);
     }
   } else if (key == "misters") {
     if (stateMister != state) {
@@ -349,8 +384,7 @@ void applyActuator(const String& key, bool state) {
       digitalWrite(PIN_MISTER, state ? HIGH : LOW);
       lastActuatorSwitchTime = millis();
       Serial.printf("   💧 [Actuator] Misters (GPIO %d) -> %s\n", PIN_MISTER, state ? "ON" : "OFF");
-    } else {
-      digitalWrite(PIN_MISTER, state ? HIGH : LOW);
+      delay(30);
     }
   } else if (key == "lights") {
     if (stateLight != state) {
@@ -362,8 +396,7 @@ void applyActuator(const String& key, bool state) {
       digitalWrite(PIN_LIGHT, state ? HIGH : LOW);
       lastActuatorSwitchTime = millis();
       Serial.printf("   💡 [Actuator] Grow Light (GPIO %d) -> %s\n", PIN_LIGHT, state ? "ON" : "OFF");
-    } else {
-      digitalWrite(PIN_LIGHT, state ? HIGH : LOW);
+      delay(30);
     }
   }
 }
@@ -402,103 +435,6 @@ void extractPushTokensFromJson(FirebaseJson *json) {
       break;
     }
   }
-}
-
-void streamCallback(FirebaseStream data) {
-  String path = data.dataPath();
-  String type = data.dataType();
-  unsigned long nowMs = millis();
-  lastStreamEventTime = nowMs;
-
-  // If currently in LOCAL failsafe (qualifying internet stability), cache mode changes
-  // without prematurely exiting LOCAL until STABLE_RECOVERY_STREAK is verified!
-  bool isQualifyingStability = (offlineFailsafeActive || slowInternetDetected) && (stableCloudStreak < STABLE_RECOVERY_STREAK);
-  if (!isQualifyingStability) {
-    lastSuccessfulCloudSync = nowMs;
-    offlineFailsafeActive = false;
-    needsCloudResync = false;
-    slowInternetDetected = false;
-    firebaseReady = true;
-  }
-
-  // 0. Real-time push token registration from mobile app
-  if (path.indexOf("pushTokens") >= 0 && type == "string") {
-    addOrUpdatePushToken(data.stringData());
-    return;
-  }
-
-  // 1. Full or partial JSON object payload (handles initial connect, mode sync pulses, and /devices updates)
-  if (type == "json") {
-    FirebaseJson *json = data.jsonObjectPtr();
-    FirebaseJsonData result;
-    if (json != nullptr) {
-      extractPushTokensFromJson(json);
-      if (json->get(result, "mode")) {
-        String newMode = normalizeMode(result.to<String>());
-        lastConfiguredAppMode = newMode;
-        if (!isQualifyingStability) {
-          if (newMode != stateMode) {
-            stateMode = newMode;
-            curTheme = getThemeForMode(stateMode);
-            baseDrawn = false;
-            lastDisplayRefresh = 0;
-            Serial.printf("   ⚙️ [Control] Mode switched to: %s\n", stateMode.c_str());
-          } else {
-            Serial.printf("   ⚙️ [Control] Mode verified: %s\n", stateMode.c_str());
-          }
-        }
-      }
-      // Apply cloud actuator states in MANUAL and TIMED modes (in AUTO mode, local Edge AI regulation is authoritative)
-      if (!isQualifyingStability && stateMode != "AUTO") {
-        if (json->get(result, "devices/fans") || json->get(result, "fans")) applyActuator("fans", result.to<bool>());
-        if (json->get(result, "devices/exhaust") || json->get(result, "exhaust")) applyActuator("exhaust", result.to<bool>());
-        if (json->get(result, "devices/fanOut") || json->get(result, "fanOut")) applyActuator("fanOut", result.to<bool>());
-        if (json->get(result, "devices/fanIn") || json->get(result, "fanIn")) applyActuator("fanIn", result.to<bool>());
-        if (json->get(result, "devices/intake") || json->get(result, "intake")) applyActuator("intake", result.to<bool>());
-        if (json->get(result, "devices/misters") || json->get(result, "misters")) applyActuator("misters", result.to<bool>());
-        if (json->get(result, "devices/lights") || json->get(result, "lights")) applyActuator("lights", result.to<bool>());
-      }
-    }
-    return;
-  }
-
-  // 2. Control Mode string change
-  if (path.indexOf("mode") >= 0) {
-    String newMode = normalizeMode(data.stringData());
-    lastConfiguredAppMode = newMode;
-    if (!isQualifyingStability) {
-      if (newMode != stateMode) {
-        stateMode = newMode;
-        curTheme = getThemeForMode(stateMode);
-        baseDrawn = false;
-        lastDisplayRefresh = 0;
-      }
-      Serial.printf("   ⚙️ [Control] Mode changed to: %s\n", stateMode.c_str());
-    }
-    return;
-  }
-
-  // 3. Child property change (boolean / string / int) — apply in MANUAL and TIMED modes
-  if (isQualifyingStability || stateMode == "AUTO") return;
-
-  bool state = false;
-  if (type == "boolean") state = data.boolData();
-  else if (type == "string") state = (data.stringData() == "true" || data.stringData() == "1");
-  else if (type == "int") state = (data.intData() > 0);
-
-  if (path.indexOf("fanIn") >= 0 || path.indexOf("intake") >= 0) {
-    applyActuator("fanIn", state);
-  } else if (path.indexOf("fans") >= 0 || path.indexOf("exhaust") >= 0 || path.indexOf("fanOut") >= 0) {
-    applyActuator("fans", state);
-  } else if (path.indexOf("misters") >= 0) {
-    applyActuator("misters", state);
-  } else if (path.indexOf("lights") >= 0) {
-    applyActuator("lights", state);
-  }
-}
-
-void streamTimeoutCallback(bool timeout) {
-  if (timeout) Serial.println("   [Stream] Firebase connection timeout, resuming...");
 }
 
 // ═══════════════════════════════════════════════
@@ -733,18 +669,18 @@ void runAutoRegulation() {
     stateMister  = nextMister;
     stateLight   = nextLight;
 
-    // Stagger simultaneous relay switches by 20ms so coil & load inrush currents never stack on the +5V/+12V rail
+    // Stagger simultaneous relay switches by 35ms so coil & load inrush currents never stack on the +5V/+12V rail
     if (exhChanged) {
       digitalWrite(PIN_FAN_EXHAUST, stateExhaust ? HIGH : LOW);
-      delay(20);
+      delay(35);
     }
     if (intChanged) {
       digitalWrite(PIN_FAN_INTAKE, stateIntake ? HIGH : LOW);
-      delay(20);
+      delay(35);
     }
     if (mistChanged) {
       digitalWrite(PIN_MISTER, stateMister ? HIGH : LOW);
-      delay(20);
+      delay(35);
     }
     if (lightChanged) {
       digitalWrite(PIN_LIGHT, stateLight ? HIGH : LOW);
@@ -795,12 +731,18 @@ bool resyncCloudSetpoints(bool forceRestartStream);
 
 bool initFirebaseCloud() {
   if (WiFi.status() != WL_CONNECTED) return false;
+  if (ESP.getFreeHeap() < 50000) {
+    Serial.println("⚠️ [Firebase] Heap low (<50KB), deferring TLS connection...");
+    firebaseBackoffUntil = millis() + 6000;
+    return false;
+  }
 
   // Verify hotspot actually has fast upstream WAN internet before attempting TLS handshake
   if (!checkWanInternetFast()) {
     slowInternetDetected = true;
     firebaseReady = false;
     isSysOnline = false;
+    firebaseBackoffUntil = millis() + 5000;
     return false;
   }
 
@@ -809,13 +751,13 @@ bool initFirebaseCloud() {
   config.database_url = DATABASE_URL;
   config.token_status_callback = tokenStatusCallback;
 
-  // ⚠️ Configure tight non-blocking socket/SSL timeouts BEFORE Firebase.signUp()!
+  // Configure tight non-blocking socket/SSL timeouts
   config.timeout.socketConnection = 1200;  // 1.2s max socket connect timeout
   config.timeout.sslHandshake     = 1800;  // 1.8s max SSL handshake timeout
   config.timeout.serverResponse   = 1200;  // 1.2s max server response timeout
   config.timeout.wifiReconnect    = 1500;
 
-  // Sign up / log in anonymously (timed by Core 1 watchdog)
+  // Sign up / log in anonymously
   unsigned long tSignStart = millis();
   cloudOpStartMs = tSignStart;
   cloudOpInFlight = true;
@@ -833,18 +775,20 @@ bool initFirebaseCloud() {
     firebaseReady = false;
     slowInternetDetected = true;
     isSysOnline = false;
+    firebaseBackoffUntil = millis() + 8000; // Safe backoff: avoids BearSSL memory exhaustion
     return false;
   }
 
-  Firebase.begin(&config, &auth);
-  Firebase.reconnectNetwork(false); // Managed explicitly by Core 0 watchdog to prevent internal hangs
+  if (!firebaseBegun) {
+    Firebase.begin(&config, &auth);
+    Firebase.reconnectNetwork(false); // Handled by Core 0 watchdog to prevent internal hangs
+    fbdo.setBSSLBufferSize(4096, 1024);
+    Firebase.RTDB.setMaxRetry(&fbdo, 0);      // 0 retries: fail fast on slow/dead hotspots!
+    Firebase.RTDB.setMaxErrorQueue(&fbdo, 0);
+    firebaseBegun = true;
+  }
 
-  fbdo.setBSSLBufferSize(4096, 1024);
-  streamDO.setBSSLBufferSize(4096, 1024);
-  Firebase.RTDB.setMaxRetry(&fbdo, 0);      // 0 retries: fail fast on slow/dead hotspots!
-  Firebase.RTDB.setMaxErrorQueue(&fbdo, 0);
-
-  // Fetch initial cloud mode and actuator settings and start stream if fast
+  // Fetch initial cloud mode and actuator settings if fast
   if (!offlineFailsafeActive && !slowInternetDetected) {
     stableCloudStreak = STABLE_RECOVERY_STREAK - 1; // Allow immediate online on clean boot
   }
@@ -853,6 +797,7 @@ bool initFirebaseCloud() {
 }
 
 bool resyncCloudSetpoints(bool forceRestartStream) {
+  (void)forceRestartStream;
   if (WiFi.status() != WL_CONNECTED) {
     stableCloudStreak = 0;
     return false;
@@ -890,16 +835,6 @@ bool resyncCloudSetpoints(bool forceRestartStream) {
         lastConfiguredAppMode = fetchedMode;
       }
 
-      // Open/restart stream only if not currently connected (avoids unnecessary TLS handshake stalls)
-      if (!streamDO.httpConnected()) {
-        cloudOpStartMs = millis();
-        cloudOpInFlight = true;
-        if (Firebase.RTDB.beginStream(&streamDO, "/kabutech/settings/setpoints")) {
-          Firebase.RTDB.setStreamCallback(&streamDO, streamCallback, streamTimeoutCallback);
-        }
-        cloudOpInFlight = false;
-      }
-
       // If recovering from LOCAL failsafe, require STABLE_RECOVERY_STREAK consecutive fast checks
       // before transitioning back to ONLINE so unstable internet never loops ONLINE <-> LOCAL!
       if (isRecovering) {
@@ -927,8 +862,10 @@ bool resyncCloudSetpoints(bool forceRestartStream) {
       // In MANUAL and TIMED modes, synchronize hardware actuators with cloud setpoints
       if (stateMode != "AUTO") {
         if (json->get(d, "devices/fans") || json->get(d, "fans")) applyActuator("fans", d.to<bool>());
+        if (json->get(d, "devices/exhaust") || json->get(d, "exhaust")) applyActuator("exhaust", d.to<bool>());
         if (json->get(d, "devices/fanOut") || json->get(d, "fanOut")) applyActuator("fanOut", d.to<bool>());
         if (json->get(d, "devices/fanIn") || json->get(d, "fanIn")) applyActuator("fanIn", d.to<bool>());
+        if (json->get(d, "devices/intake") || json->get(d, "intake")) applyActuator("intake", d.to<bool>());
         if (json->get(d, "devices/misters") || json->get(d, "misters")) applyActuator("misters", d.to<bool>());
         if (json->get(d, "devices/lights") || json->get(d, "lights")) applyActuator("lights", d.to<bool>());
       }
@@ -952,219 +889,127 @@ bool resyncCloudSetpoints(bool forceRestartStream) {
   isSysOnline = false;
   firebaseReady = false;
   needsCloudResync = true;
-  streamDO.clear();
+  if (stateMode != "AUTO") {
+    stateMode = "AUTO";
+    curTheme = getThemeForMode("AUTO");
+    baseDrawn = false;
+    lastDisplayRefresh = 0;
+  }
   firebaseBackoffUntil = millis() + 2200;
   return false;
 }
 
 // ═══════════════════════════════════════════════
-//  SETUP
+//  SETUP (DIRECT TO LIVE DASHBOARD — BOOT SCREEN PERMANENTLY REMOVED)
 // ═══════════════════════════════════════════════
 
 void setup() {
   Serial.begin(115200);
-  
-  // ⚠️ Critical for ESP32-S3 Native USB CDC: wait up to 4s for PC Serial Monitor to attach DTR
-  unsigned long startWait = millis();
-  while (!Serial && (millis() - startWait < 4000)) {
-    delay(10);
-  }
-  delay(500);
 
-  Serial.println("\n\n==================================================");
-  Serial.println("  ESP32-S3 USB CDC Serial Connected Successfully! ");
-  Serial.println("==================================================");
-
-  setCpuFrequencyMhz(160); // 160MHz: Fast cryptography, cool operation
-
-  // ── Initialize 3.2" SPI TFT Display & Boot Splash ──
-  initDisplay();
-
-  Serial.println();
-  Serial.println("╔══════════════════════════════════════════════════╗");
-  Serial.println("║   KABUTECH HIYAS — Digital I2C Sensor Suite      ║");
-  Serial.println("║   SHT3x (Temp/Hum) | BH1750 (Lux) | SCD41 (CO₂)  ║");
-  Serial.println("╚══════════════════════════════════════════════════╝");
-  Serial.println();
-
-  // ── Configure Internal Pull-Ups for 10m Aviation Cable ──
-  pinMode(I2C_SDA_PIN, INPUT_PULLUP);
-  pinMode(I2C_SCL_PIN, INPUT_PULLUP);
-
-  // ── Initialize I2C Bus on GPIO 4 (SDA) and GPIO 5 (SCL) at 50 kHz ──
-  Wire.begin(I2C_SDA_PIN, I2C_SCL_PIN);
-  Wire.setClock(I2C_LONG_CABLE_CLOCK); // 50 kHz (Fast, responsive, stable for cables)
-  Wire.setTimeOut(I2C_WIRE_TIMEOUT_MS); // 100ms timeout
-  delay(150);            // Allow sensor voltage rails to stabilize over cable
-
-  // ── Live I2C Bus Scanner for Immediate Debugging ──
-  Serial.println("🔍 Scanning I2C Bus on GPIO 4 (SDA) & GPIO 5 (SCL)...");
-  int foundCount = 0;
-  for (uint8_t addr = 1; addr < 127; addr++) {
-    Wire.beginTransmission(addr);
-    if (Wire.endTransmission() == 0) {
-      foundCount++;
-      Serial.printf("   📍 Found I2C device at 0x%02X", addr);
-      if (addr == 0x44 || addr == 0x45) Serial.print(" → SHT3x (Temp/Hum)");
-      else if (addr == 0x23 || addr == 0x5C) Serial.print(" → BH1750 (Lux)");
-      else if (addr == 0x62) Serial.print(" → SCD41 (True NDIR CO₂)");
-      Serial.println();
-    }
-  }
-  if (foundCount == 0) {
-    Serial.println("   ⚠️ No I2C devices found! Check 3.3V/VIN, GND, SDA (GPIO 4), and SCL (GPIO 5).");
-  }
-
-  // 1. Initialize SHT3x (Default address 0x44, fallback 0x45)
-  if (sht31.begin(0x44)) {
-    Serial.println("✅ SHT3x Temp & Humidity sensor initialized! (I2C: 0x44)");
-    sht31Ready = true;
-    sht31.heater(false); // Ensure internal defogging heater is OFF
-  } else if (sht31.begin(0x45)) {
-    Serial.println("✅ SHT3x Temp & Humidity sensor initialized! (I2C: 0x45)");
-    sht31Ready = true;
-    sht31.heater(false); // Ensure internal defogging heater is OFF
-  } else {
-    Serial.println("❌ SHT3x sensor NOT detected. Verify SDA=4, SCL=5, 3.3V, GND.");
-  }
-  updateBootStep("SHT3x Temp/Hum", sht31Ready);
-
-  // 2. Initialize BH1750 Light Sensor
-  if (lightMeter.begin(BH1750::CONTINUOUS_HIGH_RES_MODE)) {
-    Serial.println("✅ BH1750 Digital Light sensor initialized! (I2C: 0x23)");
-    bh1750Ready = true;
-  } else {
-    Serial.println("❌ BH1750 light sensor NOT detected. Check wiring.");
-  }
-  updateBootStep("BH1750 Light", bh1750Ready);
-
-  // 3. Initialize Sensirion SCD41 True NDIR CO₂
-  scd4x.begin(Wire, 0x62);
-  scd4x.wakeUp();
-  delay(20);
-  scd4x.stopPeriodicMeasurement(); // Clean previous state
-  delay(500); // ⚠️ CRITICAL: Sensirion SCD41 requires 500ms to stop periodic measurement!
-  scd4x.reinit();
-  delay(20);
-  uint16_t scdErr = scd4x.startPeriodicMeasurement(); // Starts 5-second sampling
-  if (scdErr) {
-    Serial.printf("❌ SCD41 CO₂ sensor error starting periodic measurement: %u (check wiring to GPIO 4/5)\n", scdErr);
-  } else {
-    Serial.println("✅ Sensirion SCD41 True NDIR CO₂ sensor initialized!");
-    scd4xReady = true;
-  }
-  updateBootStep("SCD41 NDIR CO2", scd4xReady);
-
-  // ── Initialize Actuator LEDs ──
+  // ── 1. Lock All Actuator Relays LOW Immediately (Zero coil current during 3.3V rail ramp-up) ──
   pinMode(PIN_FAN_EXHAUST, OUTPUT);
   pinMode(PIN_FAN_INTAKE, OUTPUT);
   pinMode(PIN_MISTER, OUTPUT);
   pinMode(PIN_LIGHT, OUTPUT);
-  
-  // Start with LEDs off
   digitalWrite(PIN_FAN_EXHAUST, LOW);
   digitalWrite(PIN_FAN_INTAKE, LOW);
   digitalWrite(PIN_MISTER, LOW);
   digitalWrite(PIN_LIGHT, LOW);
 
-  // ── Connect to WiFi (Snappy 4.8s check, never hangs offline boot) ──
-  Serial.print("📶 Connecting to WiFi: ");
+  setCpuFrequencyMhz(160); // 160MHz: Fast cryptography, cool operation
+  delay(400);              // Allow 3.3V power rail and capacitors to fully stabilize
+
+  Serial.println("\n\n==================================================");
+  Serial.println("  KABUTECH HIYAS ESP32-S3 System Booting...       ");
+  Serial.println("==================================================");
+
+  // ── 2. Initialize 3.2" SPI TFT Display FIRST (Guarantees screen is awake and active!) ──
+  curTheme = getThemeForMode(stateMode);
+  initDisplay();
+
+  // ── 3. Configure Internal Pull-Ups for 10m Aviation Cable ──
+  pinMode(I2C_SDA_PIN, INPUT_PULLUP);
+  pinMode(I2C_SCL_PIN, INPUT_PULLUP);
+
+  // ── 4. Initialize I2C Bus on GPIO 4 (SDA) and GPIO 5 (SCL) at 50 kHz ──
+  Wire.begin(I2C_SDA_PIN, I2C_SCL_PIN);
+  Wire.setClock(I2C_LONG_CABLE_CLOCK); // 50 kHz
+  Wire.setTimeOut(I2C_WIRE_TIMEOUT_MS);
+  delay(50);
+
+#if USE_TCA9548A
+  // Probe for TCA9548A Multiplexer at 0x70
+  Wire.beginTransmission(TCA9548A_ADDR);
+  if (Wire.endTransmission() == 0) {
+    tcaPresent = true;
+    Serial.println("✅ [TCA9548A] I2C Multiplexer detected at 0x70! Channel isolation active.");
+    tcaDisableAll();
+  } else {
+    tcaPresent = false;
+    Serial.println("ℹ️ [TCA9548A] Not detected at 0x70 — running in direct shared I2C bus mode.");
+  }
+#endif
+
+  // Initialize SHT3x (Channel 0 on TCA)
+  tcaSelect(TCA_CH_SHT31);
+  if (sht31.begin(0x44) || sht31.begin(0x45)) {
+    Serial.println("✅ SHT3x Temp & Humidity sensor initialized!");
+    sht31Ready = true;
+    sht31.heater(false);
+  } else {
+    Serial.println("❌ SHT3x sensor NOT detected.");
+  }
+
+  // Initialize BH1750 (Channel 1 on TCA)
+  tcaSelect(TCA_CH_LIGHT);
+  if (lightMeter.begin(BH1750::CONTINUOUS_HIGH_RES_MODE)) {
+    Serial.println("✅ BH1750 Digital Light sensor initialized!");
+    bh1750Ready = true;
+  } else {
+    Serial.println("❌ BH1750 light sensor NOT detected.");
+  }
+
+  // Initialize Sensirion SCD41 True NDIR CO₂ (Channel 2 on TCA)
+  tcaSelect(TCA_CH_SCD41);
+  scd4x.begin(Wire, 0x62);
+  scd4x.wakeUp();
+  delay(20);
+  scd4x.stopPeriodicMeasurement();
+  delay(500); // Sensirion SCD41 settling
+  scd4x.reinit();
+  delay(20);
+  if (scd4x.startPeriodicMeasurement() == 0) {
+    Serial.println("✅ Sensirion SCD41 True NDIR CO₂ sensor initialized!");
+    scd4xReady = true;
+  } else {
+    Serial.println("❌ SCD41 CO₂ sensor error starting measurement.");
+  }
+
+  // ── 5. Start Background Wi-Fi Auto-Reconnect (Core 0 handles link in background) ──
+  Serial.print("📶 Starting background Wi-Fi connection: ");
   Serial.println(WIFI_SSID);
+  WiFi.setAutoReconnect(true);
+  WiFi.persistent(true);
   WiFi.begin(WIFI_SSID, WIFI_PASSWORD);
 
-  int attempts = 0;
-  while (WiFi.status() != WL_CONNECTED && attempts < 12) {
-    delay(400);
-    Serial.print(".");
-    attempts++;
-  }
-
-  if (WiFi.status() == WL_CONNECTED) {
-    Serial.println();
-    Serial.print("✅ WiFi connected! IP: ");
-    Serial.println(WiFi.localIP());
-    WiFi.setSleep(false); // Maintain persistent TLS stream without dropping packets
-
-    // Sync NTP Time (UTC+8 for Philippines: 8 * 3600 = 28800s offset)
-    configTime(8 * 3600, 0, "time.google.com", "time.cloudflare.com", "pool.ntp.org");
-    setenv("TZ", "PST-8", 1);
-    tzset();
-
-    if (checkWanInternetFast()) {
-      Serial.print("⏰ Synchronizing Philippine Standard Time (PST)...");
-      struct tm ntpInfo;
-      int ntpAttempts = 0;
-      while (!getLocalTime(&ntpInfo, 150) && ntpAttempts < 4) {
-        Serial.print(".");
-        delay(150);
-        ntpAttempts++;
-      }
-      if (ntpInfo.tm_year > 120) {
-        Serial.printf(" ✓ Synced: %02d:%02d PST\n", ntpInfo.tm_hour, ntpInfo.tm_min);
-      } else {
-        Serial.println(" (Syncing in background)");
-      }
-      updateBootStep("WiFi & WAN Online", true);
-
-      // Initialize Firebase Cloud Connection
-      initFirebaseCloud();
-      updateBootStep("Firebase Cloud", firebaseReady && !slowInternetDetected);
-    } else {
-      Serial.println("⚠️ WiFi connected to Hotspot, but NO or VERY SLOW internet! Starting LOCAL AI AUTO.");
-      updateBootStep("Hotspot: No WAN", false);
-      updateBootStep("Local AI AUTO Active", true);
-      stateMode = "AUTO";
-      offlineFailsafeActive = true;
-      slowInternetDetected = true;
-      firebaseReady = false;
-    }
-  } else {
-    Serial.println();
-    Serial.println("❌ WiFi offline on boot. Starting Edge AI Autonomous Mode instantly!");
-    updateBootStep("WiFi: Offline Mode", false);
-    updateBootStep("Edge AI Autonomous", true);
-    updateBootStep("Local AI AUTO Active", true);
-    stateMode = "AUTO";
-    offlineFailsafeActive = true;
-    slowInternetDetected = true;
-    firebaseReady = false;
-  }
-
-  // Check if first SCD41 sample is already ready (5s elapsed during sensor init)
-  if (scd4xReady) {
-    bool readyNow = false;
-    if (scd4x.getDataReadyStatus(readyNow) == 0 && readyNow) {
-      uint16_t c = 0; float t = 0, h = 0;
-      if (scd4x.readMeasurement(c, t, h) == 0 && c > 0) {
-        lastValidCO2 = c;
-        lastCO2SuccessTime = millis();
-        currentCO2 = c;
-        co2Fault = false;
-        Serial.printf("✅ [SCD41] Initial CO2 reading ready on boot: %d ppm\n", c);
-      }
-    }
-  }
-
-  // Short pause to show checklist before dashboard transition
-  delay(600);
-  curTheme = getThemeForMode(stateMode);
+  // ── 6. Paint Live Dashboard with active theme ──
+  baseDrawn = false;
   drawStaticDashboard(stateMode);
 
   bootTime = millis();
-  // Launch Dedicated Core 0 Cloud Task so Core 1 (Sensors, Edge AI, Relays, TFT Display) NEVER blocks!
+
+  // ── 7. Launch Dedicated Core 0 Cloud Task (20KB Stack, never blocks Core 1!) ──
   xTaskCreatePinnedToCore(
     cloudTask,
     "CloudTask",
-    16384,
+    20480,
     NULL,
     1,
     &cloudTaskHandle,
     0
   );
 
-  Serial.println();
-  Serial.println("🚀 System fully initialized! Core 1: Local Sensors/TFT | Core 0: Cloud Watchdog...");
-  Serial.println("────────────────────────────────────────────────────────");
+  Serial.println("🚀 System fully online! Core 1: Live Dashboard | Core 0: Cloud Link...");
 }
 
 // ═══════════════════════════════════════════════
@@ -1221,6 +1066,13 @@ void recoverI2CBus() {
   Wire.setClock(I2C_LONG_CABLE_CLOCK);
   Wire.setTimeOut(I2C_WIRE_TIMEOUT_MS);
   delay(20);
+
+#if USE_TCA9548A
+  if (tcaPresent) {
+    tcaDisableAll();
+  }
+#endif
+
   Serial.println("✅ [I2C Watchdog] Bus unjammed and Wire re-initialized successfully.");
 }
 
@@ -1231,6 +1083,7 @@ void recoverI2CBus() {
 // ── Read SHT3x: Temperature (°C) and Humidity (% RH) ──
 SHTReading readSHT3x() {
   SHTReading r;
+  tcaSelect(TCA_CH_SHT31);
   if (!sht31Ready) {
     if (sht31.begin(0x44) || sht31.begin(0x45)) {
       sht31Ready = true;
@@ -1299,6 +1152,7 @@ SHTReading readSHT3x() {
 // ── Read BH1750: Ambient Light (lux) ──
 LightReading readBH1750() {
   LightReading r;
+  tcaSelect(TCA_CH_LIGHT);
   if (!bh1750Ready) {
     if (lightMeter.begin(BH1750::CONTINUOUS_HIGH_RES_MODE)) {
       bh1750Ready = true;
@@ -1352,6 +1206,7 @@ static unsigned long lastRecoveryAttempt = 0;
 CO2Reading readSCD41() {
   CO2Reading r;
   unsigned long now = millis();
+  tcaSelect(TCA_CH_SCD41);
 
   // 1. Safe Auto-Recovery: Only restart if sensor is completely stalled for >60s with a 30s cooldown
   if (!scd4xReady || (lastCO2SuccessTime > 0 && (now - lastCO2SuccessTime > SCD41_RECOVERY_TIMEOUT))) {
@@ -1436,12 +1291,10 @@ void pushToFirebase(float temp, float hum, int light, int co2,
     return;
   }
 
-  // If recovering from LOCAL failsafe or slow internet, verify fast WAN & restore App Mode first
-  // before ever reporting esp32_status = "online" to Firebase!
-  if (slowInternetDetected || offlineFailsafeActive || needsCloudResync) {
-    if (!resyncCloudSetpoints(true)) {
-      return;
-    }
+  // Sync cloud setpoints (mode, manual/timed devices, pushTokens) & qualify internet stability
+  // over the single shared fbdo keep-alive TLS socket before reporting esp32_status = "online"
+  if (!resyncCloudSetpoints(false)) {
+    return;
   }
 
   // Sync AUTO mode actuator states if queued by Core 1
@@ -1528,7 +1381,12 @@ void pushToFirebase(float temp, float hum, int light, int co2,
       slowInternetDetected = true;
       offlineFailsafeActive = true;
       needsCloudResync = true;
-      streamDO.clear(); // Close stale stream socket immediately so it never blocks
+      if (stateMode != "AUTO") {
+        stateMode = "AUTO";
+        curTheme = getThemeForMode("AUTO");
+        baseDrawn = false;
+        lastDisplayRefresh = 0;
+      }
       firebaseBackoffUntil = millis() + 2000;
     } else {
       Serial.printf("   ⚠️ [Network Jitter] Transient slow push (%lu ms). WAN still reachable, retrying next cycle...\n", pushDuration);
@@ -1570,7 +1428,12 @@ void sendHeartbeat() {
       slowInternetDetected = true;
       offlineFailsafeActive = true;
       needsCloudResync = true;
-      streamDO.clear();
+      if (stateMode != "AUTO") {
+        stateMode = "AUTO";
+        curTheme = getThemeForMode("AUTO");
+        baseDrawn = false;
+        lastDisplayRefresh = 0;
+      }
       firebaseBackoffUntil = millis() + 2000;
     }
   }
@@ -1684,6 +1547,7 @@ bool espNotified_SensorErr  = false;
 
 void sendExpoPushFromEsp32(const char* alertId, const char* title, const char* body) {
   if (pushTokenCount <= 0 || !isSysOnline || slowInternetDetected || WiFi.status() != WL_CONNECTED) return;
+  if (ESP.getFreeHeap() < 55000) return; // Guard against TLS heap exhaustion
 
   WiFiClientSecure client;
   client.setInsecure(); // Fast TLS handshake to exp.host without CA bundle overhead
@@ -1857,9 +1721,7 @@ void evaluateAndDispatchEsp32PushAlerts() {
 void cloudTask(void *pvParameters) {
   bool wasWifiConnected = (WiFi.status() == WL_CONNECTED);
   unsigned long lastWifiReconnectAttempt = 0;
-  unsigned long lastNtpCheck = 0;
   unsigned long lastFirebaseInitRetry = 0;
-  unsigned long lastStreamCheck = 0;
 
   for (;;) {
     unsigned long now = millis();
@@ -1876,15 +1738,23 @@ void cloudTask(void *pvParameters) {
         slowInternetDetected = true;
         offlineFailsafeActive = true;
         needsCloudResync = true;
-        streamDO.clear();
-        Serial.println("📶 [Core 0] Wi-Fi disconnected -> Instant LOCAL AI AUTO.");
+        if (stateMode != "AUTO") {
+          stateMode = "AUTO";
+          curTheme = getThemeForMode("AUTO");
+          baseDrawn = false;
+          lastDisplayRefresh = 0;
+        }
+        Serial.println("📶 [Core 0] Wi-Fi disconnected -> Operating locally in AI AUTO.");
       }
-      if (now - lastWifiReconnectAttempt >= 3500) {
+      // Actively probe & re-scan Wi-Fi every 4s so re-opened mobile hotspots associate immediately!
+      if (now - lastWifiReconnectAttempt >= 4000) {
         lastWifiReconnectAttempt = now;
-        Serial.println("🔄 [Core 0] Attempting non-blocking Wi-Fi reconnect...");
-        WiFi.reconnect();
+        Serial.println("🔄 [Core 0] Hotspot re-opened or disconnected: Scanning & connecting to Wi-Fi...");
+        WiFi.disconnect();
+        WiFi.begin(WIFI_SSID, WIFI_PASSWORD);
       }
-      vTaskDelay(pdMS_TO_TICKS(100));
+
+      vTaskDelay(pdMS_TO_TICKS(200));
       continue;
     }
 
@@ -1896,9 +1766,13 @@ void cloudTask(void *pvParameters) {
       WiFi.setSleep(false);
       Serial.println("🌐 [Core 0] Wi-Fi associated! Probing Hotspot WAN internet stability...");
 
-      configTime(8 * 3600, 0, "time.google.com", "time.cloudflare.com", "pool.ntp.org");
-      setenv("TZ", "PST-8", 1);
-      tzset();
+      // Configure LwIP SNTP daemon ONCE (calling configTime repeatedly crashes ESP32 LwIP SNTP!)
+      if (!ntpConfigured) {
+        configTime(8 * 3600, 0, "time.google.com", "time.cloudflare.com", "pool.ntp.org");
+        setenv("TZ", "PST-8", 1);
+        tzset();
+        ntpConfigured = true;
+      }
 
       if (checkWanInternetFast()) {
         if (!firebaseInitialized) {
@@ -1914,38 +1788,23 @@ void cloudTask(void *pvParameters) {
         isSysOnline = false;
         firebaseReady = false;
         needsCloudResync = true;
+        if (stateMode != "AUTO") {
+          stateMode = "AUTO";
+          curTheme = getThemeForMode("AUTO");
+          baseDrawn = false;
+          lastDisplayRefresh = 0;
+        }
         firebaseBackoffUntil = millis() + 2000;
       }
     }
 
-    // 3. Background NTP Check every 20s
-    if (now - lastNtpCheck >= 20000) {
-      lastNtpCheck = now;
-      if (isSysOnline && !slowInternetDetected) {
-        struct tm chkTime;
-        if (!getLocalTime(&chkTime, 20) || chkTime.tm_year <= 120) {
-          configTime(8 * 3600, 0, "time.google.com", "time.cloudflare.com", "pool.ntp.org");
-          setenv("TZ", "PST-8", 1);
-          tzset();
-        }
-      }
-    }
-
-    // 4. Retry Firebase Init if not yet initialized
+    // 3. Retry Firebase Init if not yet initialized
     if (!firebaseInitialized && (long)(now - firebaseBackoffUntil) >= 0 && (now - lastFirebaseInitRetry >= 4000)) {
       lastFirebaseInitRetry = now;
       initFirebaseCloud();
     }
 
-    // 5. Periodic Stream Socket Health Check (only reconnects if stream socket is disconnected, never tears down a healthy stream)
-    if (firebaseInitialized && !slowInternetDetected && !offlineFailsafeActive && (long)(now - firebaseBackoffUntil) >= 0 && (now - lastStreamCheck >= 5000)) {
-      lastStreamCheck = now;
-      if (!streamDO.httpConnected()) {
-        resyncCloudSetpoints(false);
-      }
-    }
-
-    // 6. Push Live Sensor & Actuator Telemetry every 2s (or run stability qualification if in LOCAL failsafe)
+    // 4. Push Live Sensor & Actuator Telemetry every 2s (and qualify internet stability via single fbdo session)
     if (firebaseInitialized && (long)(now - firebaseBackoffUntil) >= 0 && (now - lastFirebasePush >= FIREBASE_PUSH_INTERVAL)) {
       lastFirebasePush = now;
       pushToFirebase(currentTemp, currentHum, currentLight, currentCO2,
@@ -2016,31 +1875,21 @@ void loop() {
   bool isStable       = (stableCloudStreak >= STABLE_RECOVERY_STREAK);
   isSysOnline = isNetConnected && firebaseReady && !slowInternetDetected && !callStuck && isCloudSynced && isStable;
 
-  // ── Offline / Slow-Hotspot Failsafe Watchdog & Mode Recovery ──
+  // ── Network Liveness & Online/Local Indicator ──
   if (!isSysOnline) {
+    if (stateMode != "AUTO") {
+      stateMode = "AUTO";
+      curTheme = getThemeForMode("AUTO");
+      baseDrawn = false;
+      lastDisplayRefresh = 0;
+      Serial.println("⚡ [LOCAL Failsafe] Offline/Local detected: Instant switch to AI AUTO mode & Forest Green theme!");
+    }
     if (!offlineFailsafeActive) {
-      if (stateMode != "AUTO") {
-        lastConfiguredAppMode = stateMode; // Retain user's setting so it is restored when fast internet returns
-      }
       offlineFailsafeActive = true;
       needsCloudResync = true;
     }
-    if (stateMode != "AUTO") {
-      Serial.printf("⚠️ [Network Failsafe] Hotspot offline or slow internet! Overriding %s -> LOCAL AI AUTO.\n", stateMode.c_str());
-      stateMode = "AUTO";
-      curTheme = getThemeForMode(stateMode);
-      baseDrawn = false;
-      lastDisplayRefresh = 0;
-    }
   } else if (offlineFailsafeActive) {
-    // Fast cloud connectivity verified by Core 0! Restore user's mode immediately
     offlineFailsafeActive = false;
-    if (lastConfiguredAppMode.length() > 0 && stateMode != lastConfiguredAppMode) {
-      stateMode = lastConfiguredAppMode;
-      curTheme = getThemeForMode(stateMode);
-      baseDrawn = false;
-      lastDisplayRefresh = 0;
-    }
   }
 
   // ── Read sensors and print to Serial Monitor every 1s ──
@@ -2212,27 +2061,6 @@ void loop() {
                     stateMode, isSysOnline, isSysOnline && firebaseReady,
                     aiReady, aiAction);
       tftSpiBusy = false;
-    }
-  }
-
-  // ── Live Serial Diagnostic Command: Type 't' to re-init, 'm' to flip rotation ──
-  if (Serial.available()) {
-    char ch = Serial.read();
-    if (ch == 't' || ch == 'T' || ch == 'r' || ch == 'R') {
-      Serial.println("\n🔄 [SERIAL TRIGGER] Re-initializing TFT Display & testing color wipe...");
-      initDisplay();
-      baseDrawn = false;
-      drawStaticDashboard(stateMode);
-    } else if (ch == 'm' || ch == 'M') {
-      // Cycle landscape modes: 1 (Upright normal) -> 3 (180° inverted) -> 7 (Normal flipped) -> 5 (Mirrored)
-      if (currentTftRotation == 1) currentTftRotation = 3;
-      else if (currentTftRotation == 3) currentTftRotation = 7;
-      else if (currentTftRotation == 7) currentTftRotation = 5;
-      else currentTftRotation = 1;
-      Serial.printf("\n🔄 [SERIAL TRIGGER] Setting TFT Rotation to %d...\n", currentTftRotation);
-      tft.setRotation(currentTftRotation);
-      baseDrawn = false;
-      drawStaticDashboard(stateMode);
     }
   }
 

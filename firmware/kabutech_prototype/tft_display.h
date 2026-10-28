@@ -108,7 +108,7 @@ struct DashboardTheme {
 // 1. AUTO / AI AUTO: Emerald Forest Palette (#10B981)
 static const DashboardTheme THEME_AUTO = {
   0x0122,  // #032514 Deep Forest Green
-  0x09C4,  // #0A3A22 Card Surface
+  0x09C4,  // #0A3A22 Card Surface (Deep Emerald Green)
   0x0A86,  // #105231 Card Outline
   0x15D0,  // #10B981 Vibrant Emerald
   0x6776,  // #6EE7B7 Light Mint Text
@@ -116,25 +116,25 @@ static const DashboardTheme THEME_AUTO = {
   "AUTO"
 };
 
-// 2. MANUAL: Industrial Amber / Charcoal Palette (#F59E0B)
+// 2. MANUAL: Industrial Emerald Yellow / Warm Amber Gold Palette (#FACC15 / #EAB308)
 static const DashboardTheme THEME_MANUAL = {
-  0x1881,  // #181208 Deep Charcoal / Warm Obsidian
-  0x2943,  // #2B2212 Dark Amber-Charcoal Card
-  0x9402,  // #95500A Warm Amber Outline
-  0xFCE0,  // #F59E0B Bright Amber Gold
-  0xFDE6,  // #FCD34D Warm Gold Text
-  0x20E2,  // Dark Warm Slate Idle Chip
+  0x20C0,  // #1F1704 Deep Warm Charcoal Amber Background
+  0x49C0,  // #4E3806 Rich Glowing Emerald Yellow / Amber Gold Card Surface
+  0xE580,  // #EAB308 Radiant Emerald Yellow / Gold Border
+  0xFDE0,  // #FACC15 Bright Emerald Yellow Accent
+  0xFF90,  // #FEF08A Warm Light Gold Title
+  0x2940,  // Dark Amber Idle Chip
   "MANUAL"
 };
 
-// 3. TIMED / SCHEDULED: Royal Midnight / Violet Palette (#A855F7)
+// 3. TIMED / SCHEDULED: Royal Purple Palette (#C084FC / #A855F7)
 static const DashboardTheme THEME_TIMED = {
-  0x0862,  // #0E0716 Deep Midnight Purple
-  0x18C6,  // #1C102E Dark Violet Card
-  0x51D6,  // #5728A3 Royal Violet Outline
-  0xC43F,  // #C084FC Bright Violet
-  0xDDFE,  // #DDD6FE Soft Lavender Text
-  0x18A5,  // Dark Indigo Idle Chip
+  0x1845,  // #180828 Deep Midnight Purple Background
+  0x388C,  // #3B1366 Rich Royal Purple Card Surface
+  0x92BF,  // #9355F8 Vivid Purple Border
+  0xC43F,  // #C084FC Bright Violet Accent
+  0xE6BF,  // #E6D5FF Soft Lavender Title
+  0x2067,  // Dark Violet Idle Chip
   "TIMED"
 };
 
@@ -170,7 +170,7 @@ static bool  baseDrawn = false;
 static uint8_t currentTftRotation = TFT_ROTATION;
 
 // ─── Forward Declarations ───
-void initDisplay();
+void initDisplay(bool skipBootSplash = true);
 void healTftDisplay(const String& mode = "");
 void drawBootSplash();
 void updateBootStep(const char* label, bool success);
@@ -183,10 +183,10 @@ void drawDashboard(float temp, float hum, int light, int co2,
                    const String& mode, bool wifiOk, bool fbOk,
                    bool aiActive = false, const char* aiAct = "none");
 
-// ─── Initialize TFT ───
-void initDisplay() {
-  Serial.println("📺 [TFT] Initializing 3.2\" SPI ILI9341 Display over 30cm wires...");
-  Serial.printf("📺 [TFT] SPI Clock: %d MHz | SCK: 18 | MOSI: 17 | CS: 10 | DC: 15 | RST: 6\n", (int)(TFT_SPI_FREQ / 1000000));
+// ─── Initialize TFT (BOOT SCREEN COMPLETELY REMOVED — Go Direct to Live Dashboard!) ───
+void initDisplay(bool skipBootSplash) {
+  (void)skipBootSplash;
+  Serial.println("📺 [TFT] Initializing 3.2\" SPI ILI9341 Display directly to Live Dashboard...");
 
   // 1. Ensure Backlight pin is HIGH (GPIO 2) & CS is deselected HIGH (GPIO 10)
   pinMode(2, OUTPUT);
@@ -215,30 +215,22 @@ void initDisplay() {
   tft.setBrightness(255);
 
   // 4. Force explicit MIPI DCS wake-up sequence (forces chip out of hardware sleep)
+  // CRITICAL: Must wait >= 150ms after 0x01 (Software Reset in Sleep Out mode) so 0x11 is not ignored!
   tft.startWrite();
   tft.writeCommand(0x01); // Software Reset
-  delay(150);
+  delay(150);             // Mandatory >= 150ms post-reset lockout wait (ILI9341 Section 8.2.2)
   tft.writeCommand(0x11); // Sleep Out (Exit Sleep Mode)
-  delay(150);
+  delay(150);             // Mandatory >= 150ms VGH/VGL step-up charge pump stabilization
   tft.writeCommand(0x29); // Display ON
   delay(50);
   tft.endWrite();
 
-  // 5. Diagnostic color wipe test: flashes Black -> Red -> Green -> Blue
-  // If you see these colors, SPI is 100% active and receiving data!
-  Serial.println("📺 [TFT] Diagnostic test wipe (Black -> Red -> Green -> Blue)...");
-  tft.fillScreen(0x0000); // Black (proves crystals can polarize)
-  delay(120);
-  tft.fillScreen(0xF800); // Red
-  delay(120);
-  tft.fillScreen(0x07E0); // Green
-  delay(120);
-  tft.fillScreen(0x001F); // Blue
-  delay(120);
-
-  // 6. Draw the production boot splash
-  drawBootSplash();
-  Serial.println("✅ [TFT] Boot splash rendered successfully.");
+  // 5. Polarize liquid crystals to black, then render live dashboard immediately
+  tft.fillScreen(0x0000); // Black fill primes and polarizes LCD crystal shutter
+  delay(80);
+  baseDrawn = false;
+  drawStaticDashboard(curTheme.modeName);
+  Serial.println("✅ [TFT] Direct Live Dashboard rendered successfully (boot screen eliminated).");
 }
 
 // ─── Silent Zero-Wipe TFT Wake Guard (Prevents White Screen after Relay/Light Surge without Screen Wipe) ───
@@ -252,6 +244,7 @@ void healTftDisplay(const String& mode) {
   // 2. Silently assert Sleep Out (0x11) and Display ON (0x29) WITHOUT touching 0xB6/0x36 or clearing GRAM!
   tft.startWrite();
   tft.writeCommand(0x11); // Sleep Out (wakes internal VGH/VGL charge pumps if brownout occurred)
+  delay(20);              // Mandatory >= 5ms wait after 0x11 before sending 0x29 (ILI9341 Section 8.2.12)
   tft.writeCommand(0x29); // Display ON (keeps liquid crystal shutter active)
   tft.endWrite();
 
@@ -262,62 +255,15 @@ void healTftDisplay(const String& mode) {
   prevLight = -1;
 }
 
-// ─── Boot Splash Screen (320x240 Landscape) ───
+// ─── Boot Splash & Checklist Stubs (Completely Removed from Screen) ───
 void drawBootSplash() {
-  tft.fillScreen(COLOR_BG);
-  
-  // Outer decorative border
-  tft.drawRect(4, 4, 312, 232, COLOR_CARD_BORDER);
-
-  // Logo / Header
-  tft.setTextDatum(textdatum_t::top_center);
-  tft.setTextColor(COLOR_EMERALD, COLOR_BG);
-  tft.setFont(nullptr);
-  tft.setTextSize(3);
-  tft.drawString("KABUTECH", 160, 14);
-
-  tft.setTextSize(1);
-  tft.setTextColor(COLOR_MUTED_GREEN, COLOR_BG);
-  tft.drawString("HIYAS AUTOMATION - Oyster Mushroom Environment", 160, 42);
-
-  // Divider line
-  tft.drawLine(24, 54, 296, 54, COLOR_CARD_BORDER);
-
-  // Status Checklist Box
-  tft.fillRoundRect(20, 62, 280, 145, 6, COLOR_CARD_BG);
-  tft.drawRoundRect(20, 62, 280, 145, 6, COLOR_CARD_BORDER);
-
-  tft.setTextDatum(textdatum_t::top_left);
-  tft.setTextColor(COLOR_WHITE, COLOR_CARD_BG);
-  tft.drawString("Hardware & Cloud Boot Checklist:", 32, 70);
-
-  // Footer
-  tft.setTextDatum(textdatum_t::bottom_center);
-  tft.setTextColor(COLOR_MUTED, COLOR_BG);
-  tft.drawString("Firmware v1.0.0 (ESP32-S3) | Landscape 320x240", 160, 226);
+  // Empty stub: boot screen completely removed per user request
 }
 
-// ─── Update Boot Checklist Item ───
-static int bootStepY = 92;
 void updateBootStep(const char* label, bool success) {
-  if (bootStepY > 185) return;
-
-  tft.setTextDatum(textdatum_t::top_left);
-  tft.setFont(nullptr);
-  tft.setTextSize(1);
-
-  if (success) {
-    tft.setTextColor(COLOR_EMERALD, COLOR_CARD_BG);
-    tft.drawString("[OK]", 32, bootStepY);
-  } else {
-    tft.setTextColor(COLOR_RED, COLOR_CARD_BG);
-    tft.drawString("[FAIL]", 32, bootStepY);
-  }
-
-  tft.setTextColor(COLOR_WHITE, COLOR_CARD_BG);
-  tft.drawString(label, 74, bootStepY);
-  bootStepY += 20;
-  delay(120);
+  // Empty stub: boot checklist completely removed per user request
+  (void)label;
+  (void)success;
 }
 
 // ─── Cloud Reconnecting Screen (320x240 Landscape) ───
@@ -397,18 +343,21 @@ void drawStaticDashboard(const String& mode) {
     prevThemeMode = mode;
     curTheme = getThemeForMode(mode);
   }
+
+  // 1. Fill entire screen with the mode background (Purple for TIMED, Emerald Yellow for MANUAL, Forest Green for AUTO)
   tft.fillScreen(curTheme.bg);
 
-  // Top header divider line (Y: 26)
+  // 2. Top header divider line (Y: 26)
   tft.drawLine(0, 26, 320, 26, curTheme.cardBorder);
 
-  // Static Brand Header (Left)
+  // 3. Static Brand Header (Left)
   tft.setFont(nullptr);
   tft.setTextDatum(textdatum_t::middle_left);
   tft.setTextSize(2);
   tft.setTextColor(curTheme.primary, curTheme.bg);
   tft.drawString("KABUTECH", 8, 13);
 
+  // 4. Draw the 4 Parameter Widget Cards with curTheme.cardBg (Purple when TIMED, Emerald Yellow when MANUAL!)
   // Card 1: Temp (Col 1, Row 1) -> X: 6, Y: 30, W: 152, H: 82
   tft.fillRoundRect(6, 30, 152, 82, 6, curTheme.cardBg);
   tft.drawRoundRect(6, 30, 152, 82, 6, curTheme.cardBorder);
@@ -425,9 +374,26 @@ void drawStaticDashboard(const String& mode) {
   tft.fillRoundRect(162, 116, 152, 82, 6, curTheme.cardBg);
   tft.drawRoundRect(162, 116, 152, 82, 6, curTheme.cardBorder);
 
-  // Bottom Actuator & Info Container (Y: 202 to 236)
+  // 5. Bottom Actuator & Info Container (Y: 202 to 236)
   tft.fillRoundRect(6, 202, 308, 32, 6, curTheme.cardBg);
   tft.drawRoundRect(6, 202, 308, 32, 6, curTheme.cardBorder);
+
+  // 6. Card Titles in new theme subText color
+  tft.setTextDatum(textdatum_t::top_left);
+  tft.setTextSize(1);
+  tft.setTextColor(curTheme.subText, curTheme.cardBg);
+  tft.drawString("TEMPERATURE", 14, 36);
+  tft.drawString("HUMIDITY",    170, 36);
+  tft.drawString("CO2 LEVEL",   14, 122);
+  tft.drawString("LIGHT LEVEL", 170, 122);
+
+  // 7. Target Ranges in muted color
+  tft.setTextDatum(textdatum_t::bottom_left);
+  tft.setTextColor(COLOR_MUTED, curTheme.cardBg);
+  tft.drawString("Target: 18 - 25 °C", 16, 30 + 82 - 6);
+  tft.drawString("Target: 80 - 95 %",  172, 30 + 82 - 6);
+  tft.drawString("Target: < 1000 ppm", 16, 116 + 82 - 6);
+  tft.drawString("Target: 150-1000 lx", 172, 116 + 82 - 6);
 
   // Invalidate previous cache to force immediate redraw of dynamic cards & chips on new theme
   prevT = -999.0;
@@ -450,15 +416,12 @@ void drawMetricCard(int x, int y, int w, int h,
                     const char* title, const char* valStr, const char* unit,
                     const char* pillText, uint16_t pillColor,
                     const char* targetRange) {
+  (void)title;
+  (void)targetRange;
+  (void)h;
   tft.setFont(nullptr);
 
-  // 1. Title (Top Left)
-  tft.setTextDatum(textdatum_t::top_left);
-  tft.setTextSize(1);
-  tft.setTextColor(curTheme.subText, curTheme.cardBg);
-  tft.drawString(title, x + 8, y + 6);
-
-  // 2. Status Pill (Top Right)
+  // 1. Status Pill (Top Right)
   int pillW = 54;
   int pillH = 14;
   int pillX = x + w - pillW - 6;
@@ -471,7 +434,7 @@ void drawMetricCard(int x, int y, int w, int h,
   tft.setTextColor(pillColor, COLOR_DARK_SLATE);
   tft.drawString(pillText, pillX + (pillW / 2), pillY + (pillH / 2));
 
-  // 3. Main Numeric Readout (Center Left)
+  // 2. Main Numeric Readout (Center Left)
   tft.fillRect(x + 6, y + 23, w - 12, 32, curTheme.cardBg);
 
   tft.setTextDatum(textdatum_t::middle_left);
@@ -484,12 +447,6 @@ void drawMetricCard(int x, int y, int w, int h,
   tft.setTextSize(1);
   tft.setTextColor(COLOR_MUTED, curTheme.cardBg);
   tft.drawString(unit, x + unitOffsetX, y + 34);
-
-  // 4. Target Range (Bottom)
-  tft.setTextDatum(textdatum_t::bottom_left);
-  tft.setTextSize(1);
-  tft.setTextColor(COLOR_MUTED, curTheme.cardBg);
-  tft.drawString(targetRange, x + 10, y + h - 6);
 }
 
 // ─── Helper: Draw an Actuator Chip ───
@@ -521,6 +478,7 @@ void drawDashboard(float temp, float hum, int light, int co2,
   // Silent zero-flicker MIPI DCS guard: ensures Sleep Out (0x11) and Display ON (0x29)
   tft.startWrite();
   tft.writeCommand(0x11); // Sleep Out
+  delay(5);               // Mandatory >= 5ms wait after 0x11 before 0x29 (ILI9341 Section 8.2.12)
   tft.writeCommand(0x29); // Display ON
   tft.endWrite();
 
