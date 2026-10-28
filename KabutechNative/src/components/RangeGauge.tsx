@@ -6,6 +6,7 @@ import tw from '../tailwind';
 import { useResponsive } from '../utils/responsive';
 import { ParamRange, ACTIVE_PROFILE } from '../config/cropProfiles';
 import { evaluateParam, ParamKey } from '../utils/environmentRanges';
+import AwwSnapOfflineView from './AwwSnapOfflineView';
 
 interface Props {
   scaleMin: number;
@@ -127,6 +128,7 @@ export default React.memo(function RangeGauge({
   const reverseRotateAnim = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
+    if (isOffline) return;
     const rotateLoop = Animated.loop(
       Animated.timing(rotateAnim, {
         toValue: 1,
@@ -166,6 +168,22 @@ export default React.memo(function RangeGauge({
   const valueFontSize = isSmallDevice ? 42 : isLargeDevice ? 54 : 48;
   const valueLineHeight = isSmallDevice ? 48 : isLargeDevice ? 62 : 54;
   const unitFontSize = isSmallDevice ? 18 : isLargeDevice ? 24 : 21;
+
+  if (isOffline) {
+    return (
+      <View style={tw`items-center justify-center relative mt-4 sm:mt-6 mb-6 sm:mb-8 w-full px-5`}>
+        <AwwSnapOfflineView
+          variant="control"
+          title="Aw, Snap!"
+          subtitle={`Live ${label} gauge is unavailable while the controller is offline. Hardware runs autonomous AI locally.`}
+          metricLabel={label}
+          unit={unit}
+          targetRange={bandMin !== undefined && bandMax !== undefined ? `${bandMin}–${bandMax} ${unit}` : undefined}
+          isDarkMode={isDarkMode}
+        />
+      </View>
+    );
+  }
 
   return (
     <View style={tw`items-center justify-center relative mt-6 sm:mt-8 mb-8 sm:mb-10`}>

@@ -8,6 +8,7 @@ import { hapticSelection } from '../utils/haptics';
 import { useResponsive } from '../utils/responsive';
 import { ChamberEvaluation, ParamEvaluation } from '../utils/environmentRanges';
 import { showToast } from './CustomToast'; // Toast notifications
+import AwwSnapOfflineView from './AwwSnapOfflineView';
 
 interface Props {
   evaluation: ChamberEvaluation;
@@ -194,271 +195,283 @@ export default React.memo(function ChamberStatusHero({
         </TouchableOpacity>
       </View>
 
-      {/* 2. Modern 4-Quadrant Status Dial */}
-      <TouchableOpacity
-        activeOpacity={0.92}
-        onPress={() => {
-          hapticSelection();
-          setIsSpecModalOpen(true);
-        }}
-        style={tw`items-center justify-center my-1.5`}
-      >
-        <View style={{ width: ringSize, height: ringSize, alignItems: 'center', justifyContent: 'center', position: 'relative' }}>
-          <Svg width={ringSize} height={ringSize}>
-            <Defs>
-              {/* Vibrant High-End Gradients */}
-              <SvgGradient id="gradEmerald" x1="0" y1="0" x2="1" y2="1">
-                <Stop offset="0%" stopColor="#059669" />
-                <Stop offset="100%" stopColor="#34d399" />
-              </SvgGradient>
-
-              <SvgGradient id="gradAmber" x1="0" y1="0" x2="1" y2="1">
-                <Stop offset="0%" stopColor="#d97706" />
-                <Stop offset="100%" stopColor="#fbbf24" />
-              </SvgGradient>
-
-              <SvgGradient id="gradRose" x1="0" y1="0" x2="1" y2="1">
-                <Stop offset="0%" stopColor="#dc2626" />
-                <Stop offset="100%" stopColor="#f87171" />
-              </SvgGradient>
-            </Defs>
-
-            {/* Faint Outer Guide Track */}
-            <Circle
-              cx={ringSize / 2}
-              cy={ringSize / 2}
-              r={radius + strokeWidth / 2 + 2}
-              stroke={isDarkMode ? 'rgba(51, 65, 85, 0.25)' : 'rgba(203, 213, 225, 0.35)'}
-              strokeWidth={1}
-              fill="none"
-            />
-
-            {/* Inset Ambient Guide Track */}
-            <Circle
-              cx={ringSize / 2}
-              cy={ringSize / 2}
-              r={radius - strokeWidth / 2 - 2}
-              stroke={isDarkMode ? 'rgba(51, 65, 85, 0.25)' : 'rgba(203, 213, 225, 0.35)'}
-              strokeWidth={1}
-              fill="none"
-            />
-
-            {/* High-End Vector Track Circle */}
-            <Circle
-              cx={ringSize / 2}
-              cy={ringSize / 2}
-              r={radius}
-              stroke={isDarkMode ? 'rgba(30, 41, 59, 0.9)' : 'rgba(241, 245, 249, 1)'}
-              strokeWidth={strokeWidth}
-              fill="none"
-            />
-
-            {/* 4 Floating Quadrant Arcs */}
-            {segments.map((seg) => {
-              const strokeVal = getSegmentStroke(seg.eval);
-              const rotation = seg.baseDeg + gapAngleDeg / 2;
-              return (
-                <Circle
-                  key={seg.key}
-                  cx={ringSize / 2}
-                  cy={ringSize / 2}
-                  r={radius}
-                  stroke={strokeVal}
-                  strokeWidth={strokeWidth}
-                  strokeDasharray={`${arcLength} ${circumference - arcLength}`}
-                  strokeLinecap="round"
-                  fill="none"
-                  origin={`${ringSize / 2}, ${ringSize / 2}`}
-                  rotation={rotation}
-                />
-              );
-            })}
-          </Svg>
-
-          {/* Inner Glass Bezel Plate for Modern Tactile Depth */}
-          <View
-            pointerEvents="none"
-            style={[
-              tw`absolute rounded-full items-center justify-center border shadow-sm`,
-              {
-                width: ringSize - (strokeWidth * 2 + 10),
-                height: ringSize - (strokeWidth * 2 + 10),
-                backgroundColor: '#ffffff',
-                borderColor: '#e2e8f0',
-              },
-            ]}
+      {/* 2. Modern 4-Quadrant Status Dial OR Offline Aww Snap State */}
+      {isOffline ? (
+        <View style={tw`items-center justify-center my-2`}>
+          <AwwSnapOfflineView
+            variant="dashboard"
+            title="Aw, Snap!"
+            subtitle="Chamber telemetry is paused. Parameters in range cannot be evaluated while the controller is offline."
+            isDarkMode={isDarkMode}
+            onPressSpecs={() => setIsSpecModalOpen(true)}
+            freshnessText={formatFreshness()}
           />
+        </View>
+      ) : (
+        <TouchableOpacity
+          activeOpacity={0.92}
+          onPress={() => {
+            hapticSelection();
+            setIsSpecModalOpen(true);
+          }}
+          style={tw`items-center justify-center my-1.5`}
+        >
+          <View style={{ width: ringSize, height: ringSize, alignItems: 'center', justifyContent: 'center', position: 'relative' }}>
+            <Svg width={ringSize} height={ringSize}>
+              <Defs>
+                {/* Vibrant High-End Gradients */}
+                <SvgGradient id="gradEmerald" x1="0" y1="0" x2="1" y2="1">
+                  <Stop offset="0%" stopColor="#059669" />
+                  <Stop offset="100%" stopColor="#34d399" />
+                </SvgGradient>
 
-          {/* Center Typography: Clean, Modern, Minimal (Middle pill removed as requested) */}
-          <View style={tw`absolute items-center justify-center px-4`}>
-            <Text
+                <SvgGradient id="gradAmber" x1="0" y1="0" x2="1" y2="1">
+                  <Stop offset="0%" stopColor="#d97706" />
+                  <Stop offset="100%" stopColor="#fbbf24" />
+                </SvgGradient>
+
+                <SvgGradient id="gradRose" x1="0" y1="0" x2="1" y2="1">
+                  <Stop offset="0%" stopColor="#dc2626" />
+                  <Stop offset="100%" stopColor="#f87171" />
+                </SvgGradient>
+              </Defs>
+
+              {/* Faint Outer Guide Track */}
+              <Circle
+                cx={ringSize / 2}
+                cy={ringSize / 2}
+                r={radius + strokeWidth / 2 + 2}
+                stroke={isDarkMode ? 'rgba(51, 65, 85, 0.25)' : 'rgba(203, 213, 225, 0.35)'}
+                strokeWidth={1}
+                fill="none"
+              />
+
+              {/* Inset Ambient Guide Track */}
+              <Circle
+                cx={ringSize / 2}
+                cy={ringSize / 2}
+                r={radius - strokeWidth / 2 - 2}
+                stroke={isDarkMode ? 'rgba(51, 65, 85, 0.25)' : 'rgba(203, 213, 225, 0.35)'}
+                strokeWidth={1}
+                fill="none"
+              />
+
+              {/* High-End Vector Track Circle */}
+              <Circle
+                cx={ringSize / 2}
+                cy={ringSize / 2}
+                r={radius}
+                stroke={isDarkMode ? 'rgba(30, 41, 59, 0.9)' : 'rgba(241, 245, 249, 1)'}
+                strokeWidth={strokeWidth}
+                fill="none"
+              />
+
+              {/* 4 Floating Quadrant Arcs */}
+              {segments.map((seg) => {
+                const strokeVal = getSegmentStroke(seg.eval);
+                const rotation = seg.baseDeg + gapAngleDeg / 2;
+                return (
+                  <Circle
+                    key={seg.key}
+                    cx={ringSize / 2}
+                    cy={ringSize / 2}
+                    r={radius}
+                    stroke={strokeVal}
+                    strokeWidth={strokeWidth}
+                    strokeDasharray={`${arcLength} ${circumference - arcLength}`}
+                    strokeLinecap="round"
+                    fill="none"
+                    origin={`${ringSize / 2}, ${ringSize / 2}`}
+                    rotation={rotation}
+                  />
+                );
+              })}
+            </Svg>
+
+            {/* Inner Glass Bezel Plate for Modern Tactile Depth */}
+            <View
+              pointerEvents="none"
               style={[
-                tw`text-[9.5px] uppercase tracking-wider text-slate-400 mb-0.5`,
-                { fontFamily: 'PlusJakartaSans_700Bold' }
+                tw`absolute rounded-full items-center justify-center border shadow-sm`,
+                {
+                  width: ringSize - (strokeWidth * 2 + 10),
+                  height: ringSize - (strokeWidth * 2 + 10),
+                  backgroundColor: '#ffffff',
+                  borderColor: '#e2e8f0',
+                },
               ]}
-            >
-              Parameters In Range
-            </Text>
+            />
 
-            <View style={tw`flex-row items-baseline justify-center`}>
+            {/* Center Typography: Clean, Modern, Minimal (Middle pill removed as requested) */}
+            <View style={tw`absolute items-center justify-center px-4`}>
               <Text
                 style={[
-                  {
-                    color: '#0f172a', // Solid deep black, never grey
-                    fontSize: isSmallDevice ? 46 : 52,
-                    fontFamily: 'PlusJakartaSans_800ExtraBold',
-                    letterSpacing: -1.8,
-                    lineHeight: isSmallDevice ? 50 : 56,
-                  }
-                ]}
-              >
-                {isOffline ? '--' : inRangeCount}
-              </Text>
-              <Text
-                style={[
-                  tw`text-xl sm:text-2xl text-slate-400 ml-1`,
+                  tw`text-[9.5px] uppercase tracking-wider text-slate-400 mb-0.5`,
                   { fontFamily: 'PlusJakartaSans_700Bold' }
                 ]}
               >
-                /{total}
+                Parameters In Range
+              </Text>
+
+              <View style={tw`flex-row items-baseline justify-center`}>
+                <Text
+                  style={[
+                    {
+                      color: '#0f172a', // Solid deep black, never grey
+                      fontSize: isSmallDevice ? 46 : 52,
+                      fontFamily: 'PlusJakartaSans_800ExtraBold',
+                      letterSpacing: -1.8,
+                      lineHeight: isSmallDevice ? 50 : 56,
+                    }
+                  ]}
+                >
+                  {inRangeCount}
+                </Text>
+                <Text
+                  style={[
+                    tw`text-xl sm:text-2xl text-slate-400 ml-1`,
+                    { fontFamily: 'PlusJakartaSans_700Bold' }
+                  ]}
+                >
+                  /{total}
+                </Text>
+              </View>
+            </View>
+
+            {/* 4 Symmetrical Quadrant Flags INSIDE the Circle (Moved inward towards the middle) */}
+            {/* Top-Left: Temp */}
+            <View
+              style={[
+                tw`absolute flex-row items-center`,
+                {
+                  top: isSmallDevice ? 56 : 60,
+                  left: isSmallDevice ? 56 : 62,
+                }
+              ]}
+            >
+              <MaterialCommunityIcons
+                name="flag-variant"
+                size={12}
+                color={tempBadge.dotColor}
+                style={{ marginRight: 3 }}
+              />
+              <Text style={[tw`text-[10px] text-slate-800 font-extrabold`, { fontFamily: 'PlusJakartaSans_800ExtraBold', letterSpacing: -0.2 }]}>
+                Temp
+              </Text>
+              <Text style={[tw`text-[9.5px] font-bold ml-1`, { color: tempBadge.textColor, fontFamily: 'PlusJakartaSans_700Bold' }]}>
+                {tempBadge.statusText}
+              </Text>
+            </View>
+
+            {/* Top-Right: Hum */}
+            <View
+              style={[
+                tw`absolute flex-row items-center`,
+                {
+                  top: isSmallDevice ? 56 : 60,
+                  right: isSmallDevice ? 56 : 62,
+                }
+              ]}
+            >
+              <MaterialCommunityIcons
+                name="flag-variant"
+                size={12}
+                color={humBadge.dotColor}
+                style={{ marginRight: 3 }}
+              />
+              <Text style={[tw`text-[10px] text-slate-800 font-extrabold`, { fontFamily: 'PlusJakartaSans_800ExtraBold', letterSpacing: -0.2 }]}>
+                Hum
+              </Text>
+              <Text style={[tw`text-[9.5px] font-bold ml-1`, { color: humBadge.textColor, fontFamily: 'PlusJakartaSans_700Bold' }]}>
+                {humBadge.statusText}
+              </Text>
+            </View>
+
+            {/* Bottom-Left: CO2 */}
+            <View
+              style={[
+                tw`absolute flex-row items-center`,
+                {
+                  bottom: isSmallDevice ? 56 : 60,
+                  left: isSmallDevice ? 56 : 62,
+                }
+              ]}
+            >
+              <MaterialCommunityIcons
+                name="flag-variant"
+                size={12}
+                color={co2Badge.dotColor}
+                style={{ marginRight: 3 }}
+              />
+              <Text style={[tw`text-[10px] text-slate-800 font-extrabold`, { fontFamily: 'PlusJakartaSans_800ExtraBold', letterSpacing: -0.2 }]}>
+                CO₂
+              </Text>
+              <Text style={[tw`text-[9.5px] font-bold ml-1`, { color: co2Badge.textColor, fontFamily: 'PlusJakartaSans_700Bold' }]}>
+                {co2Badge.statusText}
+              </Text>
+            </View>
+
+            {/* Bottom-Right: Light */}
+            <View
+              style={[
+                tw`absolute flex-row items-center`,
+                {
+                  bottom: isSmallDevice ? 56 : 60,
+                  right: isSmallDevice ? 56 : 62,
+                }
+              ]}
+            >
+              <MaterialCommunityIcons
+                name="flag-variant"
+                size={12}
+                color={lightBadge.dotColor}
+                style={{ marginRight: 3 }}
+              />
+              <Text style={[tw`text-[10px] text-slate-800 font-extrabold`, { fontFamily: 'PlusJakartaSans_800ExtraBold', letterSpacing: -0.2 }]}>
+                Light
+              </Text>
+              <Text style={[tw`text-[9.5px] font-bold ml-1`, { color: lightBadge.textColor, fontFamily: 'PlusJakartaSans_700Bold' }]}>
+                {lightBadge.statusText}
               </Text>
             </View>
           </View>
 
-          {/* 4 Symmetrical Quadrant Flags INSIDE the Circle (Moved inward towards the middle) */}
-          {/* Top-Left: Temp */}
-          <View
-            style={[
-              tw`absolute flex-row items-center`,
-              {
-                top: isSmallDevice ? 56 : 60,
-                left: isSmallDevice ? 56 : 62,
-              }
-            ]}
-          >
-            <MaterialCommunityIcons
-              name="flag-variant"
-              size={12}
-              color={tempBadge.dotColor}
-              style={{ marginRight: 3 }}
-            />
-            <Text style={[tw`text-[10px] text-slate-800 font-extrabold`, { fontFamily: 'PlusJakartaSans_800ExtraBold', letterSpacing: -0.2 }]}>
-              Temp
-            </Text>
-            <Text style={[tw`text-[9.5px] font-bold ml-1`, { color: tempBadge.textColor, fontFamily: 'PlusJakartaSans_700Bold' }]}>
-              {tempBadge.statusText}
-            </Text>
-          </View>
-
-          {/* Top-Right: Hum */}
-          <View
-            style={[
-              tw`absolute flex-row items-center`,
-              {
-                top: isSmallDevice ? 56 : 60,
-                right: isSmallDevice ? 56 : 62,
-              }
-            ]}
-          >
-            <MaterialCommunityIcons
-              name="flag-variant"
-              size={12}
-              color={humBadge.dotColor}
-              style={{ marginRight: 3 }}
-            />
-            <Text style={[tw`text-[10px] text-slate-800 font-extrabold`, { fontFamily: 'PlusJakartaSans_800ExtraBold', letterSpacing: -0.2 }]}>
-              Hum
-            </Text>
-            <Text style={[tw`text-[9.5px] font-bold ml-1`, { color: humBadge.textColor, fontFamily: 'PlusJakartaSans_700Bold' }]}>
-              {humBadge.statusText}
-            </Text>
-          </View>
-
-          {/* Bottom-Left: CO2 */}
-          <View
-            style={[
-              tw`absolute flex-row items-center`,
-              {
-                bottom: isSmallDevice ? 56 : 60,
-                left: isSmallDevice ? 56 : 62,
-              }
-            ]}
-          >
-            <MaterialCommunityIcons
-              name="flag-variant"
-              size={12}
-              color={co2Badge.dotColor}
-              style={{ marginRight: 3 }}
-            />
-            <Text style={[tw`text-[10px] text-slate-800 font-extrabold`, { fontFamily: 'PlusJakartaSans_800ExtraBold', letterSpacing: -0.2 }]}>
-              CO₂
-            </Text>
-            <Text style={[tw`text-[9.5px] font-bold ml-1`, { color: co2Badge.textColor, fontFamily: 'PlusJakartaSans_700Bold' }]}>
-              {co2Badge.statusText}
-            </Text>
-          </View>
-
-          {/* Bottom-Right: Light */}
-          <View
-            style={[
-              tw`absolute flex-row items-center`,
-              {
-                bottom: isSmallDevice ? 56 : 60,
-                right: isSmallDevice ? 56 : 62,
-              }
-            ]}
-          >
-            <MaterialCommunityIcons
-              name="flag-variant"
-              size={12}
-              color={lightBadge.dotColor}
-              style={{ marginRight: 3 }}
-            />
-            <Text style={[tw`text-[10px] text-slate-800 font-extrabold`, { fontFamily: 'PlusJakartaSans_800ExtraBold', letterSpacing: -0.2 }]}>
-              Light
-            </Text>
-            <Text style={[tw`text-[9.5px] font-bold ml-1`, { color: lightBadge.textColor, fontFamily: 'PlusJakartaSans_700Bold' }]}>
-              {lightBadge.statusText}
-            </Text>
-          </View>
-        </View>
-
-        {/* Sleek Subtitle Row */}
-        <View style={tw`items-center mt-2 px-3`}>
-          <Text
-            numberOfLines={1}
-            style={[
-              tw`text-xs text-center`,
-              isOffline
-                ? tw`text-slate-400 dark:text-slate-500`
-                : (inRangeCount === 4 ? tw`text-emerald-700 dark:text-emerald-400` : tw`text-slate-700 dark:text-slate-300`),
-              { fontFamily: 'PlusJakartaSans_700Bold' }
-            ]}
-          >
-            {summary}
-          </Text>
-
-          <View style={tw`flex-row items-center gap-1.5 mt-1`}>
+          {/* Sleek Subtitle Row */}
+          <View style={tw`items-center mt-2 px-3`}>
             <Text
+              numberOfLines={1}
               style={[
-                tw`text-[10.5px] text-slate-400 dark:text-slate-400`,
-                { fontFamily: 'PlusJakartaSans_500Medium' }
-              ]}
-            >
-              {formatFreshness()}
-            </Text>
-            <Text style={tw`text-slate-300 dark:text-slate-600`}>•</Text>
-            <Text
-              style={[
-                tw`text-[10.5px] text-emerald-600 dark:text-emerald-400`,
+                tw`text-xs text-center`,
+                inRangeCount === 4 ? tw`text-emerald-700 dark:text-emerald-400` : tw`text-slate-700 dark:text-slate-300`,
                 { fontFamily: 'PlusJakartaSans_700Bold' }
               ]}
             >
-              Crop Specs ℹ️
+              {summary}
             </Text>
+
+            <View style={tw`flex-row items-center gap-1.5 mt-1`}>
+              <Text
+                style={[
+                  tw`text-[10.5px] text-slate-400 dark:text-slate-400`,
+                  { fontFamily: 'PlusJakartaSans_500Medium' }
+                ]}
+              >
+                {formatFreshness()}
+              </Text>
+              <Text style={tw`text-slate-300 dark:text-slate-600`}>•</Text>
+              <Text
+                style={[
+                  tw`text-[10.5px] text-emerald-600 dark:text-emerald-400`,
+                  { fontFamily: 'PlusJakartaSans_700Bold' }
+                ]}
+              >
+                Crop Specs ℹ️
+              </Text>
+            </View>
           </View>
-        </View>
-      </TouchableOpacity>
+        </TouchableOpacity>
+      )}
+
 
       {/* 3. Crop Profile Specifications Modal (Thesis-Ready Literature Inspector) */}
       <Modal
@@ -481,10 +494,10 @@ export default React.memo(function ChamberStatusHero({
             <View style={tw`flex-row justify-between items-center pb-3 border-b border-slate-200 dark:border-slate-800`}>
               <View>
                 <Text style={[tw`text-lg font-bold text-slate-900 dark:text-white`, { fontFamily: 'PlusJakartaSans_800ExtraBold' }]}>
-                  {cropProfile.name}
+                  {cropProfile?.name || 'Crop Profile'}
                 </Text>
                 <Text style={[tw`text-xs italic text-slate-500 dark:text-slate-400`, { fontFamily: 'PlusJakartaSans_500Medium' }]}>
-                  {cropProfile.scientificName} • {cropProfile.stage.toUpperCase()} Stage
+                  {cropProfile?.scientificName || 'Baseline'} • {cropProfile?.stage ? cropProfile.stage.toUpperCase() : 'ACTIVE'} Stage
                 </Text>
               </View>
               <TouchableOpacity

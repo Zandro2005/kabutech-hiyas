@@ -134,7 +134,7 @@ bool scd4xReady  = false;
 // 25 kHz (40µs period) gives the slow RC rising edge plenty of time to reach 3.3V logic HIGH.
 #define I2C_LONG_CABLE_CLOCK  50000  // 50 kHz: Fast, responsive, with 2x rise-time margin for cables
 #define I2C_WIRE_TIMEOUT_MS   100    // 100ms: Low latency timeout to prevent loop freezing
-#define SENSOR_HOLD_TIME_MS   3000   // 3s: Fast fault response (bridges momentary 1-2s wire noise)
+#define SENSOR_HOLD_TIME_MS   4000   // 4s: Bridges hot-unplug contact bounce while keeping fault response under 7s
 
 // ─── TCA9548A I2C Multiplexer Configuration ───
 // Eliminates 10-meter cable capacitance by isolating each sensor line onto its own branch.
@@ -145,15 +145,34 @@ bool scd4xReady  = false;
 #define TCA_CH_LIGHT          1       // Channel 1: BH1750 (Ambient Light)
 #define TCA_CH_SCD41          2       // Channel 2: Sensirion SCD41 (True CO2)
 
+void recoverI2CBus();
+
 bool tcaPresent = false;
+uint8_t currentTcaChannel = 255;
 
 // Helper: Select TCA9548A Channel (0 to 7). Safely bypasses if TCA is not detected.
-void tcaSelect(uint8_t channel) {
+bool tcaSelect(uint8_t channel) {
 #if USE_TCA9548A
-  if (!tcaPresent || channel > 7) return;
+  if (!tcaPresent || channel > 7) return true;
+  if (currentTcaChannel == channel) return true;
+
   Wire.beginTransmission(TCA9548A_ADDR);
   Wire.write(1 << channel);
-  Wire.endTransmission();
+  uint8_t err = Wire.endTransmission();
+  if (err != 0) {
+    // If TCA communication failed, unjam the bus and retry switching
+    recoverI2CBus();
+    Wire.beginTransmission(TCA9548A_ADDR);
+    Wire.write(1 << channel);
+    err = Wire.endTransmission();
+    if (err != 0) {
+      return false;
+    }
+  }
+  currentTcaChannel = channel;
+  return true;
+#else
+  return true;
 #endif
 }
 
@@ -164,6 +183,7 @@ void tcaDisableAll() {
   Wire.beginTransmission(TCA9548A_ADDR);
   Wire.write(0x00);
   Wire.endTransmission();
+  currentTcaChannel = 255;
 #endif
 }
 
@@ -1083,7 +1103,13 @@ void recoverI2CBus() {
 // ── Read SHT3x: Temperature (°C) and Humidity (% RH) ──
 SHTReading readSHT3x() {
   SHTReading r;
-  tcaSelect(TCA_CH_SHT31);
+  if (!tcaSelect(TCA_CH_SHT31)) {
+    r.temperature = -999.0;
+    r.humidity    = -999.0;
+    r.valid       = false;
+    return r;
+  }
+
   static unsigned long lastShtReinit = 0;
   if (!sht31Ready && (millis() - lastShtReinit >= 3000)) {
     lastShtReinit = millis();
@@ -1119,11 +1145,12 @@ SHTReading readSHT3x() {
 
   // If SDA line is physically stuck LOW by an unresponsive slave, recover the bus
   shtRawMisses++;
+  if (shtRawMisses >= 2) {
+    sht31Ready = false;
+    shtRawMisses = 0;
+  }
   if (digitalRead(I2C_SDA_PIN) == LOW) {
     recoverI2CBus();
-    sht31Ready = false;
-    bh1750Ready = false;
-    shtRawMisses = 0;
   }
 
   // Hold previous reading for up to 3s (bridges momentary noise, then immediately faults)
@@ -1142,20 +1169,29 @@ SHTReading readSHT3x() {
 // ── Read BH1750: Ambient Light (lux) ──
 LightReading readBH1750() {
   LightReading r;
-  tcaSelect(TCA_CH_LIGHT);
+  if (!tcaSelect(TCA_CH_LIGHT)) {
+    r.lux   = -999;
+    r.valid = false;
+    return r;
+  }
+
   static unsigned long lastBhReinit = 0;
-  if (!bh1750Ready && (millis() - lastBhReinit >= 3000)) {
-    lastBhReinit = millis();
-    if (lightMeter.begin(BH1750::CONTINUOUS_HIGH_RES_MODE)) {
-      bh1750Ready = true;
-    } else {
+  if (!bh1750Ready) {
+    if (millis() - lastBhReinit >= 3000) {
+      lastBhReinit = millis();
+      if (lightMeter.begin(BH1750::CONTINUOUS_HIGH_RES_MODE)) {
+        bh1750Ready = true;
+      }
+    }
+    // If sensor is offline/unplugged, DO NOT attempt readLightLevel() to avoid jamming I2C bus!
+    if (!bh1750Ready) {
       if (lastValidLight >= 0 && lastLightSuccessTime > 0 && (millis() - lastLightSuccessTime < SENSOR_HOLD_TIME_MS)) {
         r.lux   = lastValidLight;
         r.valid = true;
-        return r;
+      } else {
+        r.lux   = -999;
+        r.valid = false;
       }
-      r.lux   = -999;
-      r.valid = false;
       return r;
     }
   }
@@ -1170,11 +1206,12 @@ LightReading readBH1750() {
     r.valid = true;
   } else {
     bh1750RawMisses++;
+    if (bh1750RawMisses >= 2) {
+      bh1750Ready = false; // Mark offline so it stops spamming requests to unplugged sensor
+      bh1750RawMisses = 0;
+    }
     if (digitalRead(I2C_SDA_PIN) == LOW) {
       recoverI2CBus();
-      sht31Ready = false;
-      bh1750Ready = false;
-      bh1750RawMisses = 0;
     }
     if (lastValidLight >= 0 && lastLightSuccessTime > 0 && (millis() - lastLightSuccessTime < SENSOR_HOLD_TIME_MS)) {
       r.lux   = lastValidLight;
@@ -1198,7 +1235,11 @@ static unsigned long lastRecoveryAttempt = 0;
 CO2Reading readSCD41() {
   CO2Reading r;
   unsigned long now = millis();
-  tcaSelect(TCA_CH_SCD41);
+  if (!tcaSelect(TCA_CH_SCD41)) {
+    r.ppm   = -999;
+    r.valid = false;
+    return r;
+  }
 
   // 1. Safe Auto-Recovery: Only restart if sensor is completely stalled for >60s with a 30s cooldown
   if (!scd4xReady || (lastCO2SuccessTime > 0 && (now - lastCO2SuccessTime > SCD41_RECOVERY_TIMEOUT))) {
@@ -1246,10 +1287,10 @@ CO2Reading readSCD41() {
         return r;
       }
     }
-    if (error != 0 || digitalRead(I2C_SDA_PIN) == LOW) {
+    // Only unjam the bus if the line is physically held LOW by a stuck slave
+    if (digitalRead(I2C_SDA_PIN) == LOW) {
       recoverI2CBus();
-      sht31Ready = false;
-      bh1750Ready = false;
+      scd4xReady = false;
     }
   }
 
@@ -1892,8 +1933,6 @@ void loop() {
     if (digitalRead(I2C_SDA_PIN) == LOW) {
       Serial.println("⚡ [I2C Watchdog] Bus stuck LOW before cycle (actuator spike). Unjamming...");
       recoverI2CBus();
-      sht31Ready = false;
-      bh1750Ready = false;
     }
 
     // 1. Read SHT3x
