@@ -19,6 +19,18 @@ export interface SensorData {
   ai_pred_hum_10m?: number;
   ai_pred_co2_10m?: number;
   ai_pred_light_10m?: number;
+  status_temp?: 'OK' | 'FAULT' | 'INIT' | string;
+  status_hum?: 'OK' | 'FAULT' | 'INIT' | string;
+  status_light?: 'OK' | 'FAULT' | 'INIT' | string;
+  status_co2?: 'OK' | 'FAULT' | 'INIT' | string;
+  reason_temp?: string;
+  reason_hum?: string;
+  reason_light?: string;
+  reason_co2?: string;
+  ai_chan_temp_valid?: boolean;
+  ai_chan_hum_valid?: boolean;
+  ai_chan_co2_valid?: boolean;
+  ai_chan_light_valid?: boolean;
   mode?: string;
   actuator_fans?: boolean;
   actuator_fanIn?: boolean;

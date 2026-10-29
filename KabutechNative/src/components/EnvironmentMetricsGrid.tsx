@@ -1,6 +1,6 @@
 import React from 'react';
 import { View, Text, TouchableOpacity } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
+import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import tw from '../tailwind';
 import { useTheme } from '../context/ThemeContext';
 import { hapticSelection } from '../utils/haptics';
@@ -26,10 +26,10 @@ export default React.memo(function EnvironmentMetricsGrid({ temp, hum, light, co
   const health = useSensorHealth();
 
   const isControllerOff = !health.isControllerOnline;
-  const isTempFault = !isControllerOff && (health.tempError || temp === -999 || temp <= 0);
-  const isHumFault = !isControllerOff && (health.humError || hum === -999 || hum <= 0);
-  const isLightFault = !isControllerOff && (health.lightError || light === -999 || light < 0);
-  const isCo2Fault = !isControllerOff && (health.co2Error || co2 === -999 || co2 < 0);
+  const isTempFault = !isControllerOff && health.tempError;
+  const isHumFault = !isControllerOff && health.humError;
+  const isLightFault = !isControllerOff && health.lightError;
+  const isCo2Fault = !isControllerOff && health.co2Error;
 
   const tempEval = evaluateParam('temp', temp, isControllerOff || isTempFault, ACTIVE_PROFILE);
   const humEval = evaluateParam('hum', hum, isControllerOff || isHumFault, ACTIVE_PROFILE);
@@ -86,11 +86,19 @@ export default React.memo(function EnvironmentMetricsGrid({ temp, hum, light, co
 
   const activeCount = isControllerOff ? 0 : [!isTempFault, !isHumFault, !isLightFault, !isCo2Fault].filter(Boolean).length;
 
+  const plainIconColor = isDarkMode ? '#94a3b8' : '#64748b';
+  const plainIconBg = isDarkMode ? 'rgba(255, 255, 255, 0.05)' : '#f8fafc';
+  const plainIconBorder = isDarkMode ? 'rgba(255, 255, 255, 0.08)' : '#e2e8f0';
+
   const metrics = [
     {
       id: 'temp' as const,
       title: 'Temperature',
       name: 'Temperature',
+      icon: 'thermometer' as const,
+      iconColor: plainIconColor,
+      iconBg: plainIconBg,
+      iconBorder: plainIconBorder,
       eval: tempEval,
       status: getBadgeStyle(tempEval),
       targetRange: `${ACTIVE_PROFILE.temp.min ?? 18} – ${ACTIVE_PROFILE.temp.max ?? 25} °C`,
@@ -99,6 +107,10 @@ export default React.memo(function EnvironmentMetricsGrid({ temp, hum, light, co
       id: 'hum' as const,
       title: 'Humidity',
       name: 'Humidity',
+      icon: 'water-percent' as const,
+      iconColor: plainIconColor,
+      iconBg: plainIconBg,
+      iconBorder: plainIconBorder,
       eval: humEval,
       status: getBadgeStyle(humEval),
       targetRange: `${ACTIVE_PROFILE.hum.min ?? 80} – ${ACTIVE_PROFILE.hum.max ?? 95} %`,
@@ -107,6 +119,10 @@ export default React.memo(function EnvironmentMetricsGrid({ temp, hum, light, co
       id: 'co2' as const,
       title: 'CO2',
       name: 'CO2 Level',
+      icon: 'molecule-co2' as const,
+      iconColor: plainIconColor,
+      iconBg: plainIconBg,
+      iconBorder: plainIconBorder,
       eval: co2Eval,
       status: getBadgeStyle(co2Eval),
       targetRange: `< ${(ACTIVE_PROFILE.co2.max ?? 1000).toLocaleString()} ppm`,
@@ -115,6 +131,10 @@ export default React.memo(function EnvironmentMetricsGrid({ temp, hum, light, co
       id: 'light' as const,
       title: 'Light',
       name: 'Light Level',
+      icon: 'white-balance-sunny' as const,
+      iconColor: plainIconColor,
+      iconBg: plainIconBg,
+      iconBorder: plainIconBorder,
       eval: lightEval,
       status: getBadgeStyle(lightEval),
       targetRange: `${ACTIVE_PROFILE.light.min ?? 150} – ${(ACTIVE_PROFILE.light.max ?? 1000).toLocaleString()} lx`,
@@ -172,8 +192,8 @@ export default React.memo(function EnvironmentMetricsGrid({ temp, hum, light, co
         )}
       </View>
 
-      {/* 2x2 Minimal Clean Grid */}
-      <View style={tw`flex-row flex-wrap justify-between gap-y-3`}>
+      {/* 2x2 Clean Expanded Grid with Icons */}
+      <View style={tw`flex-row flex-wrap justify-between gap-y-3.5`}>
         {metrics.map((item) => {
           const isItemFault = item.eval.state === 'fault';
 
@@ -183,42 +203,48 @@ export default React.memo(function EnvironmentMetricsGrid({ temp, hum, light, co
               activeOpacity={isStaff ? 1 : 0.78}
               onPress={() => handleCardPress(item.id)}
               style={[
-                tw`rounded-[24px] p-4 border justify-between bg-white dark:bg-slate-900 border-slate-200/70 dark:border-slate-800`,
+                tw`rounded-[26px] p-4.5 sm:p-5 border justify-between bg-white dark:bg-slate-900 border-slate-200/80 dark:border-slate-800`,
                 isItemFault && tw`opacity-80`,
                 { 
                   width: '48.5%', 
-                  minHeight: isSmallDevice ? 118 : 126,
+                  minHeight: isSmallDevice ? 152 : 164,
                   shadowColor: '#0f172a',
-                  shadowOffset: { width: 0, height: 2 },
-                  shadowOpacity: isDarkMode ? 0 : 0.03,
-                  shadowRadius: 6,
-                  elevation: 1.5
+                  shadowOffset: { width: 0, height: 4 },
+                  shadowOpacity: isDarkMode ? 0 : 0.04,
+                  shadowRadius: 10,
+                  elevation: 2
                 }
               ]}
             >
-              {/* Top Row: Clean Title + Minimal Status Badge */}
+              {/* Top Row: Signature Icon Container (Left) + Status Pill Badge (Right) */}
               <View style={tw`flex-row justify-between items-center`}>
-                <Text 
-                  numberOfLines={1}
+                <View 
                   style={[
-                    tw`text-[12.5px] sm:text-[13.5px] text-slate-800 dark:text-slate-100 tracking-tight shrink mr-1`,
-                    { fontFamily: 'PlusJakartaSans_700Bold' }
+                    tw`w-10 h-10 sm:w-11 sm:h-11 rounded-[14px] items-center justify-center border`,
+                    { 
+                      backgroundColor: item.iconBg,
+                      borderColor: item.iconBorder
+                    }
                   ]}
                 >
-                  {item.title}
-                </Text>
+                  <MaterialCommunityIcons 
+                    name={item.icon} 
+                    size={isSmallDevice ? 20 : 23} 
+                    color={item.iconColor} 
+                  />
+                </View>
 
                 <View 
                   style={[
-                    tw`flex-row items-center px-1.5 sm:px-2 py-0.5 rounded-full shrink-0`,
+                    tw`flex-row items-center px-2 py-1 rounded-full shrink-0 border border-transparent`,
                     { backgroundColor: item.status.badgeBg }
                   ]}
                 >
-                  <View style={[tw`w-1.5 h-1.5 rounded-full mr-1`, { backgroundColor: item.status.dotColor }]} />
+                  <View style={[tw`w-1.5 h-1.5 rounded-full mr-1.5`, { backgroundColor: item.status.dotColor }]} />
                   <Text 
                     numberOfLines={1}
                     style={[
-                      tw`text-[9.5px] sm:text-[10px]`,
+                      tw`text-[10px] sm:text-[10.5px]`,
                       { 
                         fontFamily: 'PlusJakartaSans_700Bold',
                         color: item.status.badgeText
@@ -230,51 +256,62 @@ export default React.memo(function EnvironmentMetricsGrid({ temp, hum, light, co
                 </View>
               </View>
 
-              {/* Middle: Big Hero Value */}
-              <View style={tw`my-auto py-1`}>
+              {/* Middle: Metric Title + Big Hero Value */}
+              <View style={tw`my-auto py-1.5`}>
+                <Text 
+                  numberOfLines={1}
+                  style={[
+                    tw`text-[12.5px] sm:text-[13.5px] text-slate-500 dark:text-slate-400 mb-1`,
+                    { fontFamily: 'PlusJakartaSans_700Bold' }
+                  ]}
+                >
+                  {item.title}
+                </Text>
+
                 <View style={tw`flex-row items-baseline`}>
                   <Text 
                     style={[
                       tw`${isItemFault ? 'text-slate-400 dark:text-slate-500' : 'text-slate-900 dark:text-white'}`, 
                       { 
-                        fontSize: isSmallDevice ? 26 : 30, 
+                        fontSize: isSmallDevice ? 30 : 34, 
                         fontFamily: 'PlusJakartaSans_800ExtraBold', 
-                        letterSpacing: -0.6,
-                        lineHeight: isSmallDevice ? 30 : 36
+                        letterSpacing: -0.8,
+                        lineHeight: isSmallDevice ? 34 : 40
                       }
                     ]}
                   >
                     {item.eval.formattedValue}
                   </Text>
                   {isControllerOff ? (
-                    <Text style={[tw`text-[11px] ml-1.5 text-slate-400 dark:text-slate-500`, { fontFamily: 'PlusJakartaSans_700Bold' }]}>
+                    <Text style={[tw`text-xs ml-1.5 text-slate-400 dark:text-slate-500`, { fontFamily: 'PlusJakartaSans_700Bold' }]}>
                       Offline
                     </Text>
                   ) : isItemFault ? (
-                    <Text style={[tw`text-[11px] ml-1.5 text-slate-400 dark:text-slate-500`, { fontFamily: 'PlusJakartaSans_700Bold' }]}>
+                    <Text style={[tw`text-xs ml-1.5 text-slate-400 dark:text-slate-500`, { fontFamily: 'PlusJakartaSans_700Bold' }]}>
                       Fault
                     </Text>
                   ) : (
-                    <Text style={[tw`text-xs text-slate-400 dark:text-slate-500 ml-1.5`, { fontFamily: 'PlusJakartaSans_700Bold' }]}>
+                    <Text style={[tw`text-xs sm:text-sm text-slate-400 dark:text-slate-500 ml-1.5`, { fontFamily: 'PlusJakartaSans_700Bold' }]}>
                       {item.eval.unit}
                     </Text>
                   )}
                 </View>
               </View>
 
-              {/* Bottom: Target Optimal Range Benchmark (Borderless) */}
-              <View style={tw`flex-row items-center justify-between`}>
+              {/* Bottom: Target Optimal Range Benchmark */}
+              <View style={tw`flex-row items-center justify-between pt-2 border-t border-slate-100 dark:border-slate-800/70`}>
                 <Text 
                   style={[
-                    tw`text-[10px] text-slate-400 dark:text-slate-500 uppercase tracking-wider`, 
+                    tw`text-[9.5px] sm:text-[10px] text-slate-400 dark:text-slate-500 uppercase tracking-wider`, 
                     { fontFamily: 'PlusJakartaSans_700Bold' }
                   ]}
                 >
                   Optimal
                 </Text>
                 <Text 
+                  numberOfLines={1}
                   style={[
-                    tw`${isItemFault ? 'text-slate-400 dark:text-slate-500' : 'text-slate-600 dark:text-slate-300'} text-[11px]`, 
+                    tw`${isItemFault ? 'text-slate-400 dark:text-slate-500' : 'text-slate-600 dark:text-slate-300'} text-[11px] sm:text-[11.5px]`, 
                     { fontFamily: 'PlusJakartaSans_700Bold' }
                   ]}
                 >

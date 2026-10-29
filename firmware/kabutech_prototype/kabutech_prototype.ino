@@ -49,17 +49,20 @@
 #include <SensirionI2cScd4x.h>
 #include <time.h>
 
+// ─── Single Source of Truth: Sensor State & Debouncing ───
+#include "sensor_state.h"
+
+// ─── Edge AI Forecaster (Edge Impulse) — see edge_forecast.h & tinyml/EDGE_IMPULSE_TUTORIAL.md ───
+#define ENABLE_EDGE_AI  1       // 1 = active on-device TinyML forecasting
+#define CSV_LOG_MODE    0       // 1 = print CSV lines for tinyml/record_real_data.py
+#include "edge_forecast.h"
+
 // ─── TFT SPI Display Driver (LovyanGFX ILI9341 240x320) ───
 // 4 MHz SPI Clock: Eliminates ringing/crosstalk over 30cm extension wires (fixes white screen)
 #define TFT_SPI_FREQ    4000000
 // Orientation: 1 = Landscape Upright (Header at TOP, Left-to-Right normal text)
 #define TFT_ROTATION    7
 #include "tft_display.h"
-
-// ─── Edge AI Forecaster (Edge Impulse) — see edge_forecast.h & tinyml/EDGE_IMPULSE_TUTORIAL.md ───
-#define ENABLE_EDGE_AI  1       // 1 = active on-device TinyML forecasting
-#define CSV_LOG_MODE    0       // 1 = print CSV lines for tinyml/record_real_data.py
-#include "edge_forecast.h"
 
 // ─── Addons for Firebase token management ───
 #include <addons/TokenHelper.h>
@@ -157,32 +160,61 @@ inline bool i2cProbeAddress(uint8_t addr) {
   return (Wire.endTransmission() == 0);
 }
 
+// Debounced probe: a lone NACK caused by relay EMI / cable noise must NOT be read as "unplugged".
+// Tries up to `tries` times (2 ms apart); returns true on the first ACK.
+// A truly unplugged device NACKs every attempt, so the extra cost is only ~4 ms and only when absent.
+bool i2cProbeRetry(uint8_t addr, uint8_t tries = 3) {
+  for (uint8_t i = 0; i < tries; i++) {
+    if (i2cProbeAddress(addr)) return true;
+    if (i + 1 < tries) delay(2);
+  }
+  return false;
+}
+
 bool tcaPresent = false;
 uint8_t currentTcaChannel = 255;
 
 // Helper: Select TCA9548A Channel (0 to 7). Safely bypasses if TCA is not detected.
+// The channel register is ALWAYS re-written (never cached): if the TCA9548A power-on-resets from a
+// brown-out / relay spike, its channels silently close and every sensor would look unplugged at once.
 bool tcaSelect(uint8_t channel) {
 #if USE_TCA9548A
   if (!tcaPresent || channel > 7) return true;
-  if (currentTcaChannel == channel) return true;
 
-  Wire.beginTransmission(TCA9548A_ADDR);
-  Wire.write(1 << channel);
-  uint8_t err = Wire.endTransmission();
-  if (err != 0) {
-    // If TCA communication failed, retry once cleanly without resetting bus & other sensors
+  uint8_t err = 1;
+  for (uint8_t attempt = 0; attempt < 2 && err != 0; attempt++) {
     Wire.beginTransmission(TCA9548A_ADDR);
     Wire.write(1 << channel);
     err = Wire.endTransmission();
-    if (err != 0) {
-      return false;
-    }
+  }
+  if (err != 0) {
+    currentTcaChannel = 255;
+    return false;
   }
   currentTcaChannel = channel;
   delayMicroseconds(500); // Allow 10m branch line capacitance to settle
   return true;
 #else
   return true;
+#endif
+}
+
+// Periodically re-detects the TCA9548A so a multiplexer that was missing/reset/replugged is picked up
+// again (and a removed one falls back to direct-bus mode) without needing a reboot.
+void tcaMaintain() {
+#if USE_TCA9548A
+  static unsigned long lastCheck = 0;
+  unsigned long now = millis();
+  if (now - lastCheck < 5000) return;
+  lastCheck = now;
+
+  bool present = i2cProbeRetry(TCA9548A_ADDR, 3);
+  if (present != tcaPresent) {
+    tcaPresent = present;
+    currentTcaChannel = 255;
+    Serial.println(present ? "ℹ️ [TCA9548A] Multiplexer re-detected at 0x70 — channel isolation active."
+                           : "⚠️ [TCA9548A] Multiplexer lost — falling back to direct shared I2C bus mode.");
+  }
 #endif
 }
 
@@ -203,30 +235,46 @@ float lastValidHum   = -999.0;
 int   lastValidLight = -999;
 int   lastValidCO2   = -999;
 
-// Dual-redundancy: SCD41 also reads integrated temperature & humidity
-float scdBackupTemp  = -999.0;
-float scdBackupHum   = -999.0;
-
 unsigned long lastSHTSuccessTime   = 0;
 unsigned long lastLightSuccessTime = 0;
 unsigned long lastCO2SuccessTime   = 0;
-unsigned long lastScdBackupTime    = 0;
+
+// ── Single Source of Truth: Sensor Snapshot & FreeRTOS SMP Spinlock ──
+static portMUX_TYPE sensorStateMux = portMUX_INITIALIZER_UNLOCKED;
+SensorSnapshot g_sensorSnapshot = {
+  { S_INIT, R_NOT_PRESENT, -999.0f, 0, 0, 0 },
+  { S_INIT, R_NOT_PRESENT, -999.0f, 0, 0, 0 },
+  { S_INIT, R_NOT_PRESENT, -999.0f, 0, 0, 0 },
+  { S_INIT, R_NOT_PRESENT, -999.0f, 0, 0, 0 },
+  0
+};
+
+inline SensorSnapshot getSensorSnapshot() {
+  SensorSnapshot snap;
+  portENTER_CRITICAL(&sensorStateMux);
+  snap = g_sensorSnapshot;
+  portEXIT_CRITICAL(&sensorStateMux);
+  return snap;
+}
 
 // ── Sensor Reading Structures ──
 struct SHTReading {
   float temperature;
   float humidity;
   bool valid;
+  FaultReason reason;
 };
 
 struct LightReading {
   int lux;
   bool valid;
+  FaultReason reason;
 };
 
 struct CO2Reading {
   int ppm;
   bool valid;
+  FaultReason reason;
 };
 
 SHTReading readSHT3x();
@@ -280,18 +328,14 @@ volatile float currentHum   = -999.0;
 volatile int   currentLight = -999;
 volatile int   currentCO2   = -999;
 
-// Fault flags
-volatile bool shtFault   = true;
-volatile bool lightFault = true;
-volatile bool co2Fault   = true;
+// Fault flags (initialized false; in boot grace period, status is S_INIT rather than FAULT)
+volatile bool shtFault   = false;
+volatile bool lightFault = false;
+volatile bool co2Fault   = false;
 
 // Debouncing streaks (consecutive reads to latch/clear fault)
-#define STREAK_TO_LATCH_FAULT 4      // 4 consecutive failed reads (4s) required to latch FAULT
+#define STREAK_TO_LATCH_FAULT 2      // 2 consecutive failed reads (2s) required to latch FAULT
 #define STREAK_TO_CLEAR_FAULT 2      // 2 consecutive valid reads to clear FAULT
-
-int shtFailStreak = 0,   shtValidStreak = 0;
-int lightFailStreak = 0, lightValidStreak = 0;
-int co2FailStreak = 0,   co2ValidStreak = 0;
 
 // Hourly history accumulators
 double hourlyTempSum   = 0.0;
@@ -319,7 +363,7 @@ volatile unsigned long lastWifiReconnectTime = 0;   // Tracker for Wi-Fi associa
 // ─── Actuator Anti-Chatter Dwell Timers & Streaks (Biological Range & Relay Protection) ───
 #define ACTUATOR_MIN_ON_TIME_MS   6000    // Minimum ON dwell time: 6 seconds (prevents relay chatter)
 #define ACTUATOR_MIN_OFF_TIME_MS  5000    // Minimum OFF dwell time: 5 seconds (prevents rapid re-triggering)
-#define ACTUATOR_TRIGGER_STREAK   2       // Require 2 consecutive cycles to confirm state transition
+#define ACTUATOR_TRIGGER_STREAK   1       // Immediate responsive actuation on confirmed demand
 
 unsigned long lastFanToggleTime    = 0;
 int fanOnDemandStreak              = 0;
@@ -474,11 +518,17 @@ void extractPushTokensFromJson(FirebaseJson *json) {
 void runAutoRegulation() {
   if (stateMode != "AUTO") return;
 
-  // Sensor validity checks
-  bool isTempValid  = (!shtFault   && currentTemp > -50 && currentTemp != -999 && currentTemp != 0);
-  bool isHumValid   = (!shtFault   && currentHum > 0    && currentHum != -999);
-  bool isLightValid = (!lightFault && currentLight >= 0 && currentLight != -999);
-  bool isCo2Valid   = (!co2Fault   && currentCO2 > 0    && currentCO2 != -999);
+  unsigned long nowMs = millis();
+  SensorSnapshot snap = getSensorSnapshot();
+  bool isTempValid  = (snap.temp.status == S_OK || (snap.temp.status == S_INIT && snap.temp.value > -50.0f));
+  bool isHumValid   = (snap.hum.status == S_OK || (snap.hum.status == S_INIT && snap.hum.value >= 0.0f));
+  bool isLightValid = (snap.light.status == S_OK || (snap.light.status == S_INIT && snap.light.value >= 0.0f));
+  bool isCo2Valid   = (snap.co2.status == S_OK || (snap.co2.status == S_INIT && snap.co2.value > 0.0f));
+
+  float currentT = snap.temp.value;
+  float currentH = snap.hum.value;
+  int   currentL = (int)snap.light.value;
+  int   currentC = (int)snap.co2.value;
 
   bool nextExhaust = stateExhaust;
   bool nextIntake  = stateIntake;
@@ -486,51 +536,69 @@ void runAutoRegulation() {
   bool nextLight   = stateLight;
 
   // Cold lockout: if temp < 16.0 °C, lock fans OFF to prevent chilling the mushroom mycelium
-  bool isTempCold = (isTempValid && currentTemp < 16.0);
+  bool isTempCold = (isTempValid && currentT < 16.0);
 
   // 1. High Temperature Cooling (Oyster Optimal: 18.0 - 25.0 °C)
-  // Model Predictive Control (MPC): Prediction is aligned to actuators with robust hysteresis
+  // Model Predictive Control (MPC): Activates cooling if current OR predicted temp exceeds 25.0 °C
   bool needFansForTemp = false;
   if (isTempValid) {
-    if (aiReady) {
+    if (aiReady && aiChannelValid[0]) {
       if (stateExhaust) {
         // Maintain cooling until BOTH current and predicted temp return to safe optimal range
-        needFansForTemp = (currentTemp > 24.5) || (predTemp10m > 24.5);
+        needFansForTemp = (currentT > 24.2) || (predTemp10m > 24.5);
       } else {
-        // Pre-emptive cooling triggers ONLY if chamber is warm (>= 24.0 °C) AND forecast predicts overshoot (>= 25.5 °C)
-        // Or if current measured temperature exceeds 25.0 °C
-        needFansForTemp = (currentTemp > 25.0) || (predTemp10m >= 25.5 && currentTemp >= 24.0);
+        // Trigger fans immediately if CURRENT temp > 25.0 OR PREDICTED temp > 25.0!
+        needFansForTemp = (currentT > 25.0) || (predTemp10m > 25.0);
       }
     } else {
-      needFansForTemp = stateExhaust ? (currentTemp > 24.2) : (currentTemp > 25.0);
+      needFansForTemp = stateExhaust ? (currentT > 24.2) : (currentT > 25.0);
     }
   }
 
-  // 2. CO2 Ventilation (Bellettini et al., 2019 / Oyster Optimal: < 1000 ppm, grace <= 1150 ppm)
+  // 2. CO2 Ventilation (Oyster Optimal: < 1000 ppm)
   bool needFansForCo2 = false;
+  static unsigned long co2FaultStartMs = 0;
+
   if (isCo2Valid) {
-    if (aiReady) {
+    co2FaultStartMs = 0;
+    if (aiReady && aiChannelValid[2]) {
       if (stateExhaust) {
-        needFansForCo2 = (currentCO2 > 1000) || (predCO2_10m > 1050);
+        needFansForCo2 = (currentC > 950) || (predCO2_10m > 950);
       } else {
-        needFansForCo2 = (currentCO2 > 1150) || (predCO2_10m > 1200 && currentCO2 > 950);
+        needFansForCo2 = (currentC > 1000) || (predCO2_10m > 1000);
       }
     } else {
-      needFansForCo2 = stateExhaust ? (currentCO2 > 1000) : (currentCO2 > 1150);
+      needFansForCo2 = stateExhaust ? (currentC > 950) : (currentC > 1000);
     }
+  } else if (snap.co2.status == S_FAULT) {
+    // FAIL-SAFE PURGE (F3): Emergency ventilation ONLY if CO2 sensor is continuously faulted
+    // for at least 20 minutes (prevents chamber suffocation in an unmonitored grow room).
+    // NEVER activates immediately on sensor disconnect or during bench testing!
+    if (co2FaultStartMs == 0) {
+      co2FaultStartMs = nowMs;
+    }
+    if (nowMs - co2FaultStartMs >= 1200000UL) {
+      unsigned long elapsedSinceCycle = (nowMs - co2FaultStartMs) % 1200000UL;
+      if (elapsedSinceCycle < 120000UL) { // First 2 minutes of every 20-min cycle
+        needFansForCo2 = true;
+      }
+    }
+  } else {
+    co2FaultStartMs = 0;
   }
 
-  // 3. High Humidity Purge Exhaust (Islam et al., 2022 / Oyster Optimal: 80 - 95 % RH)
+  // 3. High Humidity Purge Exhaust (Oyster Optimal: 80 - 95 % RH)
   bool needFansForHum = false;
   if (isHumValid) {
-    if (aiReady) {
+    if (aiReady && aiChannelValid[1]) {
       if (stateExhaust) {
-        needFansForHum = (currentHum > 96.0) || (predHum10m > 96.0);
+        needFansForHum = (currentH > 92.0) || (predHum10m > 93.0);
       } else {
-        needFansForHum = (currentHum >= 100.0) || (predHum10m >= 100.0 && currentHum >= 97.0);
+        // Trigger exhaust fans if current humidity > 95.0% OR predicted > 95.0%!
+        needFansForHum = (currentH > 95.0) || (predHum10m > 95.0);
       }
     } else {
-      needFansForHum = stateExhaust ? (currentHum > 96.0) : (currentHum >= 100.0);
+      needFansForHum = stateExhaust ? (currentH > 92.0) : (currentH > 95.0);
     }
   }
 
@@ -544,7 +612,6 @@ void runAutoRegulation() {
     fanOnDemandStreak = 0;
   }
 
-  unsigned long nowMs = millis();
   if (!stateExhaust) {
     if (fanOnDemandStreak >= ACTUATOR_TRIGGER_STREAK && (lastFanToggleTime == 0 || (nowMs - lastFanToggleTime >= ACTUATOR_MIN_OFF_TIME_MS))) {
       nextExhaust = true;
@@ -567,15 +634,20 @@ void runAutoRegulation() {
   // 4. Ultrasonic Misters (Islam et al., 2022 / Oyster Optimal: 80 - 95 % RH)
   bool needMister = false;
   if (isHumValid) {
-    if (aiReady) {
+    if (aiReady && aiChannelValid[1]) {
       if (stateMister) {
-        needMister = (currentHum < 80.0) || (predHum10m < 80.0);
+        // Maintain misting until humidity is safely inside optimal range (88%)
+        needMister = (currentH < 88.0) || (predHum10m < 85.0);
       } else {
-        needMister = (currentHum < 75.0) || (predHum10m < 74.0 && currentHum < 78.0);
+        // Trigger misting immediately if CURRENT humidity < 80% OR PREDICTED < 80%!
+        needMister = (currentH < 80.0) || (predHum10m < 80.0);
       }
     } else {
-      needMister = stateMister ? (currentHum < 85.0) : (currentHum < 75.0);
+      needMister = stateMister ? (currentH < 88.0) : (currentH < 80.0);
     }
+  } else {
+    // FAIL-SAFE: Never run ultrasonic mister blind when humidity is unverified (prevents flooding)
+    needMister = false;
   }
 
   // Combined Mister Actuation with Dwell Timing & Confirmation Streaks
@@ -603,17 +675,12 @@ void runAutoRegulation() {
   }
 
   // 5. Grow Lights Photoperiod / Illumination (Bellettini et al., 2019 / Oyster Optimal: 150 - 1000 lx)
-  // Anti-chatter Biological Hysteresis:
-  // - Turns ON when light < 150 lx (chamber is dark / below optimal fruiting threshold)
-  // - MAINTAINS light ON throughout optimal range (150 - 1000 lx)
-  // - Turns OFF only if light exceeds >= 1000 lx (intense ambient daylight)
-  // - Edge AI integration: if predLight10m >= 1000 lx, turns off early (sunrise incoming)
   if (isLightValid) {
-    bool aiSunHigh  = (aiReady && predLight10m >= 1000.0 && currentLight >= 800);
-    bool aiDarkDrop = (aiReady && predLight10m < 150.0 && currentLight < 250);
+    bool aiSunHigh  = (aiReady && aiChannelValid[3] && predLight10m >= 1000.0 && currentL >= 800);
+    bool aiDarkDrop = (aiReady && aiChannelValid[3] && predLight10m < 150.0 && currentL < 250);
 
     if (!stateLight) {
-      if (currentLight < LIGHT_ON_THRESHOLD || aiDarkDrop) {
+      if (currentL < LIGHT_ON_THRESHOLD || aiDarkDrop) {
         lightLowStreak++;
         lightHighStreak = 0;
       } else {
@@ -625,7 +692,7 @@ void runAutoRegulation() {
       }
     } else {
       // Light is currently ON
-      if (currentLight >= LIGHT_OFF_THRESHOLD || aiSunHigh) {
+      if (currentL >= LIGHT_OFF_THRESHOLD || aiSunHigh) {
         lightHighStreak++;
         lightLowStreak = 0;
       } else {
@@ -638,17 +705,25 @@ void runAutoRegulation() {
         nextLight = true; // Hold ON during minimum dwell period
       }
     }
+  } else if (snap.light.status == S_FAULT) {
+    // FAIL-SAFE (F2): If light sensor faults, follow 12h photoperiod timer (06:00 to 18:00 ON) or OFF (never stuck ON indefinitely)
+    struct tm timeinfo;
+    if (getLocalTime(&timeinfo, 10) && timeinfo.tm_year > 120) {
+      nextLight = (timeinfo.tm_hour >= 6 && timeinfo.tm_hour < 18);
+    } else {
+      nextLight = false;
+    }
   }
 
   // 6. Dynamic Edge AI Action Label
   if (aiReady) {
-    if (isTempValid && currentTemp <= 25.0 && predTemp10m >= 25.5 && currentTemp >= 24.0) {
+    if (isTempValid && aiChannelValid[0] && currentT <= 25.0 && predTemp10m > 25.0) {
       aiAction = "preempt_exhaust_temp";
-    } else if (isCo2Valid && currentCO2 <= 1150 && predCO2_10m > 1200 && currentCO2 > 950) {
+    } else if (isCo2Valid && aiChannelValid[2] && currentC <= 1000 && predCO2_10m > 1000) {
       aiAction = "preempt_exhaust_co2";
-    } else if (isHumValid && currentHum < 100.0 && predHum10m >= 100.0 && currentHum >= 97.0) {
+    } else if (isHumValid && aiChannelValid[1] && currentH <= 95.0 && predHum10m > 95.0) {
       aiAction = "preempt_exhaust_hum";
-    } else if (isHumValid && currentHum >= 75.0 && predHum10m < 74.0 && currentHum < 78.0) {
+    } else if (isHumValid && aiChannelValid[1] && currentH >= 80.0 && predHum10m < 80.0) {
       aiAction = "preempt_mister";
     } else if (nextExhaust) {
       if (needFansForTemp)      aiAction = "cooling";
@@ -1130,53 +1205,32 @@ void recoverI2CBus() {
 // ── Read SHT3x: Temperature (°C) and Humidity (% RH) ──
 SHTReading readSHT3x() {
   SHTReading r;
+  r.temperature = -999.0;
+  r.humidity    = -999.0;
+  r.valid       = false;
+  r.reason      = R_NONE;
   unsigned long now = millis();
 
   if (!tcaSelect(TCA_CH_SHT31)) {
-    // Dual-Redundancy Fallback: SCD41 integrated temp & humidity if SHT line unavailable
-    // ONLY allowed if SCD41 is NOT in fault and backup is fresh!
-    if (!co2Fault && scdBackupTemp > -50.0 && scdBackupHum > 0.0 && (now - lastScdBackupTime < 15000)) {
-      r.temperature = scdBackupTemp;
-      r.humidity    = scdBackupHum;
-      r.valid       = true;
-      return r;
-    }
-    r.temperature = -999.0;
-    r.humidity    = -999.0;
-    r.valid       = false;
+    r.reason = R_BUS;
     return r;
   }
 
-  // Fast hardware presence probe (~0.2ms): Verify SHT31 acknowledges before attempting transactions
+  // Debounced hardware presence probe (3 tries, 2 ms apart): a lone relay-EMI NACK is not "unplugged"
   uint8_t shtAddr = 0x44;
-  bool shtPresent = i2cProbeAddress(0x44);
+  bool shtPresent = i2cProbeRetry(0x44);
   if (!shtPresent) {
     shtAddr = 0x45;
-    shtPresent = i2cProbeAddress(0x45);
+    shtPresent = i2cProbeRetry(0x45);
   }
 
   if (!shtPresent) {
+    // SHT31 physically unplugged or disconnected: immediately signal unready and invalid
     sht31Ready = false;
 #if USE_TCA9548A
     if (tcaPresent) tcaDisableAll();
 #endif
-    // 1. Hold previous reading across momentary noise / unplug
-    if (lastValidTemp > -50.0 && lastSHTSuccessTime > 0 && (now - lastSHTSuccessTime < SENSOR_HOLD_TIME_MS)) {
-      r.temperature = lastValidTemp;
-      r.humidity    = lastValidHum;
-      r.valid       = true;
-      return r;
-    }
-    // 2. Dual-Redundancy Fallback: SCD41 integrated temp & humidity if SCD41 is valid & not faulted
-    if (!co2Fault && scdBackupTemp > -50.0 && scdBackupHum > 0.0 && (now - lastScdBackupTime < 15000)) {
-      r.temperature = scdBackupTemp;
-      r.humidity    = scdBackupHum;
-      r.valid       = true;
-      return r;
-    }
-    r.temperature = -999.0;
-    r.humidity    = -999.0;
-    r.valid       = false;
+    r.reason = R_NOT_PRESENT;
     return r;
   }
 
@@ -1197,8 +1251,14 @@ SHTReading readSHT3x() {
     if (sht31.readBoth(&t, &h)) {
       if (!isnan(t) && !isnan(h) && t >= -20.0 && t <= 80.0 && h >= 1.0 && h <= 100.0) {
         success = true;
+      } else {
+        r.reason = R_OUT_OF_RANGE;
       }
+    } else {
+      r.reason = R_READ_FAIL;
     }
+  } else {
+    r.reason = R_READ_FAIL;
   }
 
   static int shtRawMisses = 0;
@@ -1210,53 +1270,49 @@ SHTReading readSHT3x() {
     r.temperature = lastValidTemp;
     r.humidity    = lastValidHum;
     r.valid       = true;
+    r.reason      = R_NONE;
     return r;
   }
 
-  // Handle missed read on present sensor
+  // Handle missed read on present sensor (e.g. momentary CRC glitch while sensor is still connected)
   shtRawMisses++;
   if (shtRawMisses >= 6) {
     sht31Ready = false;
     shtRawMisses = 0;
   }
 
-  // 1. Hold previous reading across momentary noise / relay switching spikes
+  // Hold previous reading ONLY across momentary noise / relay switching spikes on a connected sensor
   if (lastValidTemp > -50.0 && lastSHTSuccessTime > 0 && (now - lastSHTSuccessTime < SENSOR_HOLD_TIME_MS)) {
     r.temperature = lastValidTemp;
     r.humidity    = lastValidHum;
     r.valid       = true;
+    r.reason      = R_NONE;
     return r;
   }
 
-  // 2. Dual-Redundancy Fallback: SCD41 backup ONLY if SCD41 is healthy and not in fault
-  if (!co2Fault && scdBackupTemp > -50.0 && scdBackupHum > 0.0 && (now - lastScdBackupTime < 15000)) {
-    r.temperature = scdBackupTemp;
-    r.humidity    = scdBackupHum;
-    r.valid       = true;
-    return r;
-  }
-
-  r.temperature = -999.0;
-  r.humidity    = -999.0;
-  r.valid       = false;
+  if (r.reason == R_NONE) r.reason = R_READ_FAIL;
   return r;
 }
 
 // ── Read BH1750: Ambient Light (lux) ──
 LightReading readBH1750() {
   LightReading r;
+  r.lux    = -999;
+  r.valid  = false;
+  r.reason = R_NONE;
   unsigned long now = millis();
 
   if (!tcaSelect(TCA_CH_LIGHT)) {
-    r.lux   = -999;
-    r.valid = false;
+    r.reason = R_BUS;
     return r;
   }
 
-  // Fast hardware presence probe (~0.2ms)
-  bool bhPresent = i2cProbeAddress(0x23);
+  // Debounced hardware presence probe (3 tries, 2 ms apart): a lone relay-EMI NACK is not "unplugged"
+  uint8_t bhAddr = 0x23;
+  bool bhPresent = i2cProbeRetry(0x23);
   if (!bhPresent) {
-    bhPresent = i2cProbeAddress(0x5C);
+    bhAddr = 0x5C;
+    bhPresent = i2cProbeRetry(0x5C);
   }
 
   if (!bhPresent) {
@@ -1264,13 +1320,7 @@ LightReading readBH1750() {
 #if USE_TCA9548A
     if (tcaPresent) tcaDisableAll();
 #endif
-    if (lastValidLight >= 0 && lastLightSuccessTime > 0 && (now - lastLightSuccessTime < SENSOR_HOLD_TIME_MS)) {
-      r.lux   = lastValidLight;
-      r.valid = true;
-    } else {
-      r.lux   = -999;
-      r.valid = false;
-    }
+    r.reason = R_NOT_PRESENT;
     return r;
   }
 
@@ -1278,18 +1328,12 @@ LightReading readBH1750() {
   if (!bh1750Ready) {
     if (now - lastBhReinit >= 1000) {
       lastBhReinit = now;
-      if (lightMeter.begin(BH1750::CONTINUOUS_HIGH_RES_MODE)) {
+      if (lightMeter.begin(BH1750::CONTINUOUS_HIGH_RES_MODE, bhAddr)) {
         bh1750Ready = true;
       }
     }
     if (!bh1750Ready) {
-      if (lastValidLight >= 0 && lastLightSuccessTime > 0 && (now - lastLightSuccessTime < SENSOR_HOLD_TIME_MS)) {
-        r.lux   = lastValidLight;
-        r.valid = true;
-      } else {
-        r.lux   = -999;
-        r.valid = false;
-      }
+      r.reason = R_READ_FAIL;
       return r;
     }
   }
@@ -1300,8 +1344,9 @@ LightReading readBH1750() {
     bh1750RawMisses = 0;
     lastValidLight = (int)constrain(lux, 0.0, 65535.0);
     lastLightSuccessTime = now;
-    r.lux   = lastValidLight;
-    r.valid = true;
+    r.lux    = lastValidLight;
+    r.valid  = true;
+    r.reason = R_NONE;
   } else {
     bh1750RawMisses++;
     if (bh1750RawMisses >= 6) {
@@ -1309,11 +1354,11 @@ LightReading readBH1750() {
       bh1750RawMisses = 0;
     }
     if (lastValidLight >= 0 && lastLightSuccessTime > 0 && (now - lastLightSuccessTime < SENSOR_HOLD_TIME_MS)) {
-      r.lux   = lastValidLight;
-      r.valid = true;
+      r.lux    = lastValidLight;
+      r.valid  = true;
+      r.reason = R_NONE;
     } else {
-      r.lux   = -999;
-      r.valid = false;
+      r.reason = R_READ_FAIL;
     }
   }
   return r;
@@ -1326,61 +1371,65 @@ static unsigned long lastRecoveryAttempt = 0;
 
 CO2Reading readSCD41() {
   CO2Reading r;
+  r.ppm    = -999;
+  r.valid  = false;
+  r.reason = R_NONE;
   unsigned long now = millis();
   if (!tcaSelect(TCA_CH_SCD41)) {
-    r.ppm   = -999;
-    r.valid = false;
+    r.reason = R_BUS;
     return r;
   }
 
-  // Fast hardware presence probe (~0.2ms): Verify SCD41 is physically plugged in
-  bool scdPresent = i2cProbeAddress(0x62);
+  // Debounced hardware presence probe (3 tries, 2 ms apart): a lone relay-EMI NACK is not "unplugged"
+  bool scdPresent = i2cProbeRetry(0x62);
+  static uint8_t  recStep   = 0;   // Non-blocking recovery state machine (0 = idle)
+  static unsigned long recNextAt = 0;
   if (!scdPresent) {
     // Sensor is physically unplugged or disconnected: exit immediately without blocking or resetting bus!
     scd4xReady = false;
+    recStep = 0;
 #if USE_TCA9548A
     if (tcaPresent) tcaDisableAll();
 #endif
-    // If recently unplugged, hold buffer bridges temporary wire jostle
-    if (lastValidCO2 > 0 && lastCO2SuccessTime > 0 && (now - lastCO2SuccessTime < SCD41_HOLD_TIME_MS)) {
-      r.ppm   = lastValidCO2;
-      r.valid = true;
-      return r;
-    }
-    r.ppm   = -999;
-    r.valid = false;
+    r.reason = R_NOT_PRESENT;
     return r;
   }
 
-  // 1. Safe Auto-Recovery: Restart sensor ONLY if physically present and stalled >30s or uninitialized
+  // 1. Safe Auto-Recovery: Restart sensor ONLY if physically present and stalled >30s or uninitialized.
+  //    Runs as a state machine advanced one step per read cycle, so the main loop is never stalled
+  //    by the external settling delays (wake 20ms, stop 500ms, reinit 20ms, ASC 10ms).
   bool isStalled = (lastCO2SuccessTime > 0 && (now - lastCO2SuccessTime > SCD41_RECOVERY_TIMEOUT)) ||
                    (lastCO2SuccessTime == 0 && !scd4xReady && (now - bootTime > 15000));
-  if (!scd4xReady || isStalled) {
-    if (lastRecoveryAttempt == 0 || (now - lastRecoveryAttempt >= SCD41_RECOVERY_COOLDOWN)) {
-      lastRecoveryAttempt = now;
-      Serial.println("🔄 [SCD41] Sensor present but unready/stalled. Restarting periodic measurement...");
-      scd4x.wakeUp();
-      delay(20);
-      scd4x.stopPeriodicMeasurement();
-      delay(500); // 500ms required by Sensirion before restart
-      scd4x.reinit();
-      delay(20);
-      scd4x.setAutomaticSelfCalibrationEnabled(0); // Keep ASC disabled in mushroom grow room
-      delay(10);
-      if (scd4x.startPeriodicMeasurement() == 0) {
-        scd4xReady = true;
-        if (lastCO2SuccessTime > 0) {
-          lastCO2SuccessTime = now;
+  if (recStep == 0 && (!scd4xReady || isStalled) &&
+      (lastRecoveryAttempt == 0 || (now - lastRecoveryAttempt >= SCD41_RECOVERY_COOLDOWN))) {
+    lastRecoveryAttempt = now;
+    recStep   = 1;
+    recNextAt = now;
+    Serial.println("🔄 [SCD41] Sensor present but unready/stalled. Restarting periodic measurement...");
+  }
+  if (recStep != 0 && (long)(now - recNextAt) >= 0) {
+    switch (recStep) {
+      case 1: scd4x.wakeUp();                              recNextAt = now + 20;  recStep = 2; break;
+      case 2: scd4xReady = false; scd4x.stopPeriodicMeasurement(); recNextAt = now + 500; recStep = 3; break;
+      case 3: scd4x.reinit();                              recNextAt = now + 20;  recStep = 4; break;
+      case 4: scd4x.setAutomaticSelfCalibrationEnabled(0); recNextAt = now + 10;  recStep = 5; break; // ASC stays disabled in grow room
+      case 5:
+        if (scd4x.startPeriodicMeasurement() == 0) {
+          scd4xReady = true;
+          if (lastCO2SuccessTime > 0) {
+            lastCO2SuccessTime = now;
+          }
+          Serial.println("✅ [SCD41] Successfully restarted periodic measurement (ASC disabled)!");
+        } else {
+          Serial.println("❌ [SCD41] Failed to restart periodic measurement. Retrying in 10s...");
         }
-        Serial.println("✅ [SCD41] Successfully restarted periodic measurement (ASC disabled)!");
-      } else {
-        Serial.println("❌ [SCD41] Failed to restart periodic measurement. Retrying in 10s...");
-      }
+        recStep = 0;
+        break;
     }
   }
 
-  // 2. Check if a new 5-second sample is available
-  if (scd4xReady) {
+  // 2. Check if a new 5-second sample is available (skipped while a recovery is in progress)
+  if (scd4xReady && recStep == 0) {
     bool isDataReady = false;
     uint16_t error = scd4x.getDataReadyStatus(isDataReady);
     
@@ -1393,15 +1442,9 @@ CO2Reading readSCD41() {
       if (error == 0 && co2 > 0 && co2 <= 5000) {
         lastValidCO2 = (int)co2;
         lastCO2SuccessTime = now;
-        if (!isnan(temp) && temp > -20.0 && temp < 80.0) {
-          scdBackupTemp = temp;
-        }
-        if (!isnan(hum) && hum > 0.0 && hum <= 100.0) {
-          scdBackupHum = hum;
-        }
-        lastScdBackupTime = now;
-        r.ppm   = lastValidCO2;
-        r.valid = true;
+        r.ppm    = lastValidCO2;
+        r.valid  = true;
+        r.reason = R_NONE;
         return r;
       }
     }
@@ -1409,20 +1452,23 @@ CO2Reading readSCD41() {
 
   // 3. Keep latest reading active across 5-second sampling cycles (up to 45s)
   if (lastValidCO2 > 0 && lastCO2SuccessTime > 0 && (now - lastCO2SuccessTime < SCD41_HOLD_TIME_MS)) {
-    r.ppm   = lastValidCO2;
-    r.valid = true;
+    r.ppm    = lastValidCO2;
+    r.valid  = true;
+    r.reason = R_NONE;
     return r;
   }
 
   // 4. Initial boot warmup grace period (SCD41 optical measurement requires 10-15s, only if present)
   if (now - bootTime < 15000 && scdPresent) {
-    r.ppm   = (lastValidCO2 > 0) ? lastValidCO2 : 500;
-    r.valid = true; // Still warming up, do not flag fault
+    r.ppm    = (lastValidCO2 > 0) ? lastValidCO2 : 500;
+    r.valid  = false; // Warming up; enters S_INIT rather than S_FAULT
+    r.reason = R_NONE;
     return r;
   }
 
-  r.ppm   = -999;
-  r.valid = false;
+  r.ppm    = -999;
+  r.valid  = false;
+  r.reason = isStalled ? R_STALLED : R_READ_FAIL;
   return r;
 }
 
@@ -1430,8 +1476,7 @@ CO2Reading readSCD41() {
 //  FIREBASE PUSH FUNCTION (RUNS ON CORE 0)
 // ═══════════════════════════════════════════════
 
-void pushToFirebase(float temp, float hum, int light, int co2,
-                    bool shtErr, bool lightErr, bool co2Err) {
+void pushToFirebase(const SensorSnapshot& snap) {
   if (!Firebase.ready()) {
     Serial.println("   ⏳ Firebase not ready yet...");
     return;
@@ -1460,11 +1505,16 @@ void pushToFirebase(float temp, float hum, int light, int co2,
     cloudOpInFlight = false;
   }
 
-  // Strictly push -999 whenever a sensor is faulted or unplugged
-  float sendTemp = shtErr ? -999.0 : temp;
-  float sendHum  = shtErr ? -999.0 : hum;
-  int sendLight  = lightErr ? -999 : light;
-  int sendCO2    = co2Err ? -999 : co2;
+  float sendTemp = (snap.temp.status == S_OK)  ? snap.temp.value  : -999.0f;
+  float sendHum  = (snap.hum.status == S_OK)   ? snap.hum.value   : -999.0f;
+  int   sendLight = (snap.light.status == S_OK) ? (int)snap.light.value : -999;
+  int   sendCO2   = (snap.co2.status == S_OK)   ? (int)snap.co2.value   : -999;
+
+  bool tempErr  = (snap.temp.status == S_FAULT);
+  bool humErr   = (snap.hum.status == S_FAULT);
+  bool lightErr = (snap.light.status == S_FAULT);
+  bool co2Err   = (snap.co2.status == S_FAULT);
+  bool shtErr   = tempErr || humErr;
 
   FirebaseJson json;
   json.set("temperature", sendTemp);
@@ -1476,10 +1526,20 @@ void pushToFirebase(float temp, float hum, int light, int co2,
 
   // Error flags (dht_error maintained for mobile app backward-compatibility)
   json.set("dht_error", shtErr);
-  json.set("temp_error", shtErr);
-  json.set("hum_error", shtErr);
+  json.set("temp_error", tempErr);
+  json.set("hum_error", humErr);
   json.set("light_error", lightErr);
   json.set("co2_error", co2Err);
+
+  // Modern structured status & fault reason for the mobile app
+  json.set("status_temp", (int)snap.temp.status);
+  json.set("status_hum", (int)snap.hum.status);
+  json.set("status_light", (int)snap.light.status);
+  json.set("status_co2", (int)snap.co2.status);
+  json.set("reason_temp", (int)snap.temp.reason);
+  json.set("reason_hum", (int)snap.hum.reason);
+  json.set("reason_light", (int)snap.light.reason);
+  json.set("reason_co2", (int)snap.co2.reason);
 
   // Live hardware actuator states so the mobile app stays in 100% sync
   json.set("actuator_fans", stateExhaust);
@@ -1491,10 +1551,10 @@ void pushToFirebase(float temp, float hum, int light, int co2,
   // Edge AI +10 min forecast (Edge Impulse model on the ESP32)
   json.set("ai_ready", aiReady);
   json.set("ai_action", aiAction);
-  json.set("ai_pred_temp_10m",  aiReady ? predTemp10m  : -999.0);
-  json.set("ai_pred_hum_10m",   aiReady ? predHum10m   : -999.0);
-  json.set("ai_pred_co2_10m",   aiReady ? predCO2_10m  : -999.0);
-  json.set("ai_pred_light_10m", aiReady ? predLight10m : -999.0);
+  json.set("ai_pred_temp_10m",  (aiReady && aiChannelValid[0]) ? predTemp10m  : -999.0);
+  json.set("ai_pred_hum_10m",   (aiReady && aiChannelValid[1]) ? predHum10m   : -999.0);
+  json.set("ai_pred_co2_10m",   (aiReady && aiChannelValid[2]) ? predCO2_10m  : -999.0);
+  json.set("ai_pred_light_10m", (aiReady && aiChannelValid[3]) ? predLight10m : -999.0);
 
   FirebaseJson ts;
   ts.set(".sv", "timestamp");
@@ -1538,6 +1598,26 @@ void pushToFirebase(float temp, float hum, int light, int co2,
       Serial.printf("   ⚠️ [Network Jitter] Transient slow push (%lu ms). WAN still reachable, retrying next cycle...\n", pushDuration);
     }
   }
+}
+
+// Backward-compatible overload accepting individual scalar values and boolean error flags
+inline void pushToFirebase(float temp, float hum, int light, int co2,
+                           bool shtErr, bool lightErr, bool co2Err) {
+  SensorSnapshot snap;
+  snap.temp.status  = shtErr ? S_FAULT : S_OK;
+  snap.temp.reason  = shtErr ? R_NOT_PRESENT : R_NONE;
+  snap.temp.value   = temp;
+  snap.hum.status   = shtErr ? S_FAULT : S_OK;
+  snap.hum.reason   = shtErr ? R_NOT_PRESENT : R_NONE;
+  snap.hum.value    = hum;
+  snap.light.status = lightErr ? S_FAULT : S_OK;
+  snap.light.reason = lightErr ? R_NOT_PRESENT : R_NONE;
+  snap.light.value  = (float)light;
+  snap.co2.status   = co2Err ? S_FAULT : S_OK;
+  snap.co2.reason   = co2Err ? R_NOT_PRESENT : R_NONE;
+  snap.co2.value    = (float)co2;
+  snap.seq          = 0;
+  pushToFirebase(snap);
 }
 
 // ═══════════════════════════════════════════════
@@ -1634,19 +1714,25 @@ void pushHourlyHistory() {
 
   String historyPath = String("/kabutech/sensors/history/") + dateStr + "/" + hourStr;
 
-  float avgTemp  = (hourlySHTCount > 0)   ? (float)(hourlyTempSum / hourlySHTCount) : currentTemp;
-  float avgHum   = (hourlySHTCount > 0)   ? (float)(hourlyHumSum / hourlySHTCount)   : currentHum;
-  int   avgLight = (hourlyLightCount > 0) ? (int)(hourlyLightSum / hourlyLightCount) : currentLight;
-  int   avgCO2   = (hourlyCO2Count > 0)   ? (int)(hourlyCO2Sum / hourlyCO2Count)     : currentCO2;
-
   FirebaseJson historyJson;
   FirebaseJson ts;
   ts.set(".sv", "timestamp");
   historyJson.set("timestamp", ts);
-  historyJson.set("temp", avgTemp);
-  historyJson.set("hum", avgHum);
-  historyJson.set("light", avgLight);
-  historyJson.set("co2", avgCO2);
+
+  if (hourlySHTCount > 0) {
+    float avgTemp = (float)(hourlyTempSum / hourlySHTCount);
+    float avgHum  = (float)(hourlyHumSum / hourlySHTCount);
+    historyJson.set("temp", avgTemp);
+    historyJson.set("hum", avgHum);
+  }
+  if (hourlyLightCount > 0) {
+    int avgLight = (int)(hourlyLightSum / hourlyLightCount);
+    historyJson.set("light", avgLight);
+  }
+  if (hourlyCO2Count > 0) {
+    int avgCO2 = (int)(hourlyCO2Sum / hourlyCO2Count);
+    historyJson.set("co2", avgCO2);
+  }
 
   Serial.printf("   📅 Logging hourly history to %s...\n", historyPath.c_str());
 
@@ -1689,7 +1775,10 @@ bool espNotified_HumLow     = false;
 bool espNotified_Co2High    = false;
 bool espNotified_LightHigh  = false;
 bool espNotified_LightLow   = false;
-bool espNotified_SensorErr  = false;
+// Per-sensor fault notification latches (0 = Temp/Hum, 1 = Light, 2 = CO2) + re-notify cooldown
+bool espNotified_SensorFault[3]        = { false, false, false };
+unsigned long espLastSensorFaultPush[3] = { 0, 0, 0 };
+#define SENSOR_FAULT_RENOTIFY_MS 600000UL  // 10 min: a flapping cable can notify at most once per window
 
 void sendExpoPushFromEsp32(const char* alertId, const char* title, const char* body) {
   if (pushTokenCount <= 0 || !isSysOnline || slowInternetDetected || WiFi.status() != WL_CONNECTED) return;
@@ -1697,11 +1786,11 @@ void sendExpoPushFromEsp32(const char* alertId, const char* title, const char* b
 
   WiFiClientSecure client;
   client.setInsecure(); // Fast TLS handshake to exp.host without CA bundle overhead
-  client.setTimeout(2);
+  client.setTimeout(4000);
 
   HTTPClient https;
-  https.setConnectTimeout(1500);
-  https.setTimeout(2000);
+  https.setConnectTimeout(3000);
+  https.setTimeout(4000);
 
   if (https.begin(client, "https://exp.host/--/api/v2/push/send")) {
     https.addHeader("Accept", "application/json");
@@ -1716,6 +1805,7 @@ void sendExpoPushFromEsp32(const char* alertId, const char* title, const char* b
       payload += "\"channelId\":\"kabutech-alerts\",";
       payload += "\"title\":\"" + String(title) + "\",";
       payload += "\"body\":\"" + String(body) + "\",";
+      payload += "\"_displayInForeground\":true,";
       payload += "\"data\":{\"alertId\":\"" + String(alertId) + "\",\"source\":\"esp32\"}}";
     }
     payload += "]";
@@ -1727,19 +1817,20 @@ void sendExpoPushFromEsp32(const char* alertId, const char* title, const char* b
   }
 }
 
-void evaluateAndDispatchEsp32PushAlerts() {
+void evaluateAndDispatchEsp32PushAlerts(const SensorSnapshot& snap) {
   // Wait 10s after boot for initial sensor warmup & first Push Token sync
   if (millis() < 10000 || pushTokenCount <= 0 || !isSysOnline || slowInternetDetected) return;
 
   char bodyBuf[64];
 
   // 1. Temperature Alerts (Optimal: 18 - 25 °C)
-  if (!shtFault && currentTemp > -50 && currentTemp != -999) {
-    if (currentTemp > 25.0) {
+  if (snap.temp.status == S_OK) {
+    float temp = snap.temp.value;
+    if (temp > 25.0) {
       if (!espNotified_TempHigh) {
         espNotified_TempHigh = true;
-        bool isCrit = (currentTemp > 27.0);
-        snprintf(bodyBuf, sizeof(bodyBuf), "%.1f°C (Target: 18 - 25 °C)", currentTemp);
+        bool isCrit = (temp > 27.0);
+        snprintf(bodyBuf, sizeof(bodyBuf), "%.1f°C (Target: 18 - 25 °C)", temp);
         sendExpoPushFromEsp32(
           isCrit ? "temp-critical-high" : "temp-high",
           isCrit ? "Critically High Temp" : "Temperature Above Crop Range",
@@ -1750,11 +1841,11 @@ void evaluateAndDispatchEsp32PushAlerts() {
       espNotified_TempHigh = false; // Re-arm immediately when normal
     }
 
-    if (currentTemp < 18.0) {
+    if (temp < 18.0) {
       if (!espNotified_TempLow) {
         espNotified_TempLow = true;
-        bool isCrit = (currentTemp < 16.0);
-        snprintf(bodyBuf, sizeof(bodyBuf), "%.1f°C (Target: 18 - 25 °C)", currentTemp);
+        bool isCrit = (temp < 16.0);
+        snprintf(bodyBuf, sizeof(bodyBuf), "%.1f°C (Target: 18 - 25 °C)", temp);
         sendExpoPushFromEsp32(
           isCrit ? "temp-critical-low" : "temp-low",
           isCrit ? "Critically Low Temp" : "Temperature Below Crop Range",
@@ -1767,12 +1858,13 @@ void evaluateAndDispatchEsp32PushAlerts() {
   }
 
   // 2. Humidity Alerts (Optimal: 80 - 95 %)
-  if (!shtFault && currentHum > 0 && currentHum != -999) {
-    if (currentHum > 95.0) {
+  if (snap.hum.status == S_OK) {
+    float hum = snap.hum.value;
+    if (hum > 95.0) {
       if (!espNotified_HumHigh) {
         espNotified_HumHigh = true;
-        bool isCrit = (currentHum >= 100.0);
-        snprintf(bodyBuf, sizeof(bodyBuf), "%d%% (Target: 80 - 95 %%)", (int)round(currentHum));
+        bool isCrit = (hum >= 100.0);
+        snprintf(bodyBuf, sizeof(bodyBuf), "%d%% (Target: 80 - 95 %%)", (int)round(hum));
         sendExpoPushFromEsp32(
           isCrit ? "hum-critical-high" : "hum-high",
           isCrit ? "Excessive Humidity Alert" : "Humidity Above Crop Range",
@@ -1783,11 +1875,11 @@ void evaluateAndDispatchEsp32PushAlerts() {
       espNotified_HumHigh = false;
     }
 
-    if (currentHum < 80.0) {
+    if (hum < 80.0) {
       if (!espNotified_HumLow) {
         espNotified_HumLow = true;
-        bool isCrit = (currentHum < 75.0);
-        snprintf(bodyBuf, sizeof(bodyBuf), "%d%% (Target: 80 - 95 %%)", (int)round(currentHum));
+        bool isCrit = (hum < 75.0);
+        snprintf(bodyBuf, sizeof(bodyBuf), "%d%% (Target: 80 - 95 %%)", (int)round(hum));
         sendExpoPushFromEsp32(
           isCrit ? "hum-critical-low" : "hum-low",
           isCrit ? "Critically Low Humidity" : "Humidity Below Crop Range",
@@ -1800,12 +1892,13 @@ void evaluateAndDispatchEsp32PushAlerts() {
   }
 
   // 3. CO2 Alerts (Optimal: < 1000 ppm)
-  if (!co2Fault && currentCO2 > 0 && currentCO2 != -999) {
-    if (currentCO2 > 1000) {
+  if (snap.co2.status == S_OK) {
+    int co2 = (int)snap.co2.value;
+    if (co2 > 1000) {
       if (!espNotified_Co2High) {
         espNotified_Co2High = true;
-        bool isCrit = (currentCO2 > 1150);
-        snprintf(bodyBuf, sizeof(bodyBuf), "%d ppm (Target: < 1000 ppm)", currentCO2);
+        bool isCrit = (co2 > 1150);
+        snprintf(bodyBuf, sizeof(bodyBuf), "%d ppm (Target: < 1000 ppm)", co2);
         sendExpoPushFromEsp32(
           isCrit ? "co2-critical" : "co2-elevated",
           isCrit ? "Critically High CO2" : "CO2 Above Crop Range",
@@ -1818,21 +1911,22 @@ void evaluateAndDispatchEsp32PushAlerts() {
   }
 
   // 4. Light Alerts (Optimal: 150 - 1000 lx)
-  if (!lightFault && currentLight >= 0 && currentLight != -999) {
-    if (currentLight > 1000) {
+  if (snap.light.status == S_OK) {
+    int light = (int)snap.light.value;
+    if (light > 1000) {
       if (!espNotified_LightHigh) {
         espNotified_LightHigh = true;
-        snprintf(bodyBuf, sizeof(bodyBuf), "%d lx (Target: 150 - 1000 lx)", currentLight);
+        snprintf(bodyBuf, sizeof(bodyBuf), "%d lx (Target: 150 - 1000 lx)", light);
         sendExpoPushFromEsp32("light-high", "Light Above Crop Range", bodyBuf);
       }
     } else {
       espNotified_LightHigh = false;
     }
 
-    if (currentLight < 150) {
+    if (light < 150) {
       if (!espNotified_LightLow) {
         espNotified_LightLow = true;
-        snprintf(bodyBuf, sizeof(bodyBuf), "%d lx (Target: 150 - 1000 lx)", currentLight);
+        snprintf(bodyBuf, sizeof(bodyBuf), "%d lx (Target: 150 - 1000 lx)", light);
         sendExpoPushFromEsp32("light-low", "Light Below Crop Range", bodyBuf);
       }
     } else {
@@ -1840,23 +1934,36 @@ void evaluateAndDispatchEsp32PushAlerts() {
     }
   }
 
-  // 5. Sensor Hardware Fault Alert (after 15s boot grace)
+  // 5. Sensor Hardware Fault Alert (after 15s boot grace) — evaluated PER SENSOR so a later fault on a
+  //    second sensor is never masked by an earlier one, and a recovered sensor re-arms independently.
   if (millis() > 15000) {
-    bool anyFault = shtFault || lightFault || co2Fault;
-    if (anyFault) {
-      if (!espNotified_SensorErr) {
-        espNotified_SensorErr = true;
-        String faultNames = "";
-        if (shtFault) faultNames += "Temp/Hum";
-        if (co2Fault) { if (faultNames.length() > 0) faultNames += ", "; faultNames += "CO2"; }
-        if (lightFault) { if (faultNames.length() > 0) faultNames += ", "; faultNames += "Light"; }
-        snprintf(bodyBuf, sizeof(bodyBuf), "%s (Target: Nominal)", faultNames.c_str());
-        sendExpoPushFromEsp32("sensor-disconnected", "Sensor Fault", bodyBuf);
+    const bool faults[3]      = { (snap.temp.status == S_FAULT || snap.hum.status == S_FAULT),
+                                  (snap.light.status == S_FAULT),
+                                  (snap.co2.status == S_FAULT) };
+    const char* sensorName[3] = { "Temp/Hum", "Light", "CO2" };
+    for (int i = 0; i < 3; i++) {
+      if (faults[i]) {
+        bool cooledDown = (espLastSensorFaultPush[i] == 0) ||
+                          (millis() - espLastSensorFaultPush[i] >= SENSOR_FAULT_RENOTIFY_MS);
+        if (!espNotified_SensorFault[i] && cooledDown) {
+          espNotified_SensorFault[i] = true;
+          espLastSensorFaultPush[i]  = millis();
+          snprintf(bodyBuf, sizeof(bodyBuf), "%s sensor not responding (Target: Nominal)", sensorName[i]);
+          sendExpoPushFromEsp32("sensor-disconnected", "Sensor Fault", bodyBuf);
+        }
+      } else {
+        if (espNotified_SensorFault[i]) {
+          snprintf(bodyBuf, sizeof(bodyBuf), "%s sensor restored (Readings Nominal)", sensorName[i]);
+          sendExpoPushFromEsp32("sensor-restored", "Sensor Restored", bodyBuf);
+        }
+        espNotified_SensorFault[i] = false; // sensor recovered -> re-arm (cooldown still applies)
       }
-    } else {
-      espNotified_SensorErr = false;
     }
   }
+}
+
+inline void evaluateAndDispatchEsp32PushAlerts() {
+  evaluateAndDispatchEsp32PushAlerts(getSensorSnapshot());
 }
 
 // ═══════════════════════════════════════════════
@@ -1953,23 +2060,23 @@ void cloudTask(void *pvParameters) {
     // 4. Push Live Sensor & Actuator Telemetry every 2s (and qualify internet stability via single fbdo session)
     if (firebaseInitialized && (long)(now - firebaseBackoffUntil) >= 0 && (now - lastFirebasePush >= FIREBASE_PUSH_INTERVAL)) {
       lastFirebasePush = now;
-      pushToFirebase(currentTemp, currentHum, currentLight, currentCO2,
-                     shtFault, lightFault, co2Fault);
+      SensorSnapshot snap = getSensorSnapshot();
+      pushToFirebase(snap);
 
       // Dispatch 24/7 high-priority remote push notifications for every active alert (fires even when app is closed)
-      evaluateAndDispatchEsp32PushAlerts();
+      evaluateAndDispatchEsp32PushAlerts(snap);
 
-      if (!shtFault && currentTemp > 0 && currentHum > 0) {
-        hourlyTempSum += currentTemp;
-        hourlyHumSum  += currentHum;
+      if (snap.temp.status == S_OK && snap.hum.status == S_OK) {
+        hourlyTempSum += snap.temp.value;
+        hourlyHumSum  += snap.hum.value;
         hourlySHTCount++;
       }
-      if (!lightFault && currentLight >= 0) {
-        hourlyLightSum += currentLight;
+      if (snap.light.status == S_OK) {
+        hourlyLightSum += snap.light.value;
         hourlyLightCount++;
       }
-      if (!co2Fault && currentCO2 > 0) {
-        hourlyCO2Sum += currentCO2;
+      if (snap.co2.status == S_OK) {
+        hourlyCO2Sum += snap.co2.value;
         hourlyCO2Count++;
       }
     }
@@ -2054,65 +2161,40 @@ void loop() {
   if (now - lastSerialPrint >= SERIAL_PRINT_INTERVAL) {
     lastSerialPrint = now;
 
+    // Keep the TCA9548A multiplexer state honest (re-detect after a reset / replug)
+    tcaMaintain();
+
+    // Write ordering note (Core 0 reads these without a lock): on LATCH set the flag first, on CLEAR
+    // publish the value first, so a push can never observe "no error" together with a -999 value.
+
     // 1. Read SHT3x
     SHTReading shtData = readSHT3x();
-    if (shtData.valid) {
-      shtFailStreak = 0;
-      shtValidStreak++;
-      if (shtValidStreak >= STREAK_TO_CLEAR_FAULT) {
-        shtFault    = false;
-        currentTemp = shtData.temperature;
-        currentHum  = shtData.humidity;
-      }
-    } else {
-      shtValidStreak = 0;
-      shtFailStreak++;
-      if (shtFailStreak >= STREAK_TO_LATCH_FAULT) {
-        shtFault    = true;
-        currentTemp = -999.0;
-        currentHum  = -999.0;
-      }
-    }
 
     // 2. Read BH1750 (5ms I2C bus settling delay)
     delay(5);
     LightReading lightData = readBH1750();
-    if (lightData.valid) {
-      lightFailStreak = 0;
-      lightValidStreak++;
-      if (lightValidStreak >= STREAK_TO_CLEAR_FAULT) {
-        lightFault   = false;
-        currentLight = lightData.lux;
-      }
-    } else {
-      lightValidStreak = 0;
-      lightFailStreak++;
-      if (lightFailStreak >= STREAK_TO_LATCH_FAULT) {
-        lightFault   = true;
-        currentLight = -999;
-      }
-    }
 
     // 3. Read SCD41 (5ms I2C bus settling delay)
     delay(5);
     CO2Reading co2Data = readSCD41();
-    if (co2Data.valid) {
-      co2FailStreak = 0;
-      co2ValidStreak++;
-      if (co2ValidStreak >= STREAK_TO_CLEAR_FAULT) {
-        if (co2Data.ppm > 0) {
-          co2Fault   = false;
-          currentCO2 = co2Data.ppm;
-        }
-      }
-    } else {
-      co2ValidStreak = 0;
-      co2FailStreak++;
-      if (co2FailStreak >= STREAK_TO_LATCH_FAULT) {
-        co2Fault   = true;
-        currentCO2 = -999;
-      }
-    }
+
+    // ── Update Single-Source-of-Truth Sensor Snapshot under SMP spinlock ──
+    portENTER_CRITICAL(&sensorStateMux);
+    updateSensorChannel(g_sensorSnapshot.temp,  shtData.valid,   shtData.temperature, shtData.reason,   STREAK_TO_LATCH_FAULT, STREAK_TO_CLEAR_FAULT, now, 0, 15000);
+    updateSensorChannel(g_sensorSnapshot.hum,   shtData.valid,   shtData.humidity,    shtData.reason,   STREAK_TO_LATCH_FAULT, STREAK_TO_CLEAR_FAULT, now, 0, 15000);
+    updateSensorChannel(g_sensorSnapshot.light, lightData.valid, (float)lightData.lux,lightData.reason, STREAK_TO_LATCH_FAULT, STREAK_TO_CLEAR_FAULT, now, 0, 15000);
+    updateSensorChannel(g_sensorSnapshot.co2,   co2Data.valid,   (float)co2Data.ppm,  co2Data.reason,   STREAK_TO_LATCH_FAULT, STREAK_TO_CLEAR_FAULT, now, 0, 15000);
+    g_sensorSnapshot.seq++;
+
+    // Mirror to legacy globals for backward compatibility and logging
+    currentTemp  = (g_sensorSnapshot.temp.status == S_OK)  ? g_sensorSnapshot.temp.value  : -999.0f;
+    currentHum   = (g_sensorSnapshot.hum.status == S_OK)   ? g_sensorSnapshot.hum.value   : -999.0f;
+    currentLight = (g_sensorSnapshot.light.status == S_OK) ? (int)g_sensorSnapshot.light.value : -999;
+    currentCO2   = (g_sensorSnapshot.co2.status == S_OK)   ? (int)g_sensorSnapshot.co2.value   : -999;
+    shtFault     = (g_sensorSnapshot.temp.status == S_FAULT || g_sensorSnapshot.hum.status == S_FAULT);
+    lightFault   = (g_sensorSnapshot.light.status == S_FAULT);
+    co2Fault     = (g_sensorSnapshot.co2.status == S_FAULT);
+    portEXIT_CRITICAL(&sensorStateMux);
 
     // Proactive bus health check: Recover I2C ONLY if ALL sensors fail concurrently for 6 consecutive cycles
     // (Protects working sensors so one missing sensor never triggers false bus recovery or disrupts others)
@@ -2194,8 +2276,7 @@ void loop() {
       tftNeedsPrimaryHeal = false;
       tftSpiBusy = true;
       healTftDisplay(stateMode);
-      drawDashboard(currentTemp, currentHum, currentLight, currentCO2,
-                    shtFault, lightFault, co2Fault,
+      drawDashboard(getSensorSnapshot(),
                     stateExhaust, stateIntake, stateMister, stateLight,
                     stateMode, isSysOnline, isSysOnline && firebaseReady,
                     aiReady, aiAction);
@@ -2207,8 +2288,7 @@ void loop() {
       tftNeedsSecondaryHeal = false;
       tftSpiBusy = true;
       healTftDisplay(stateMode);
-      drawDashboard(currentTemp, currentHum, currentLight, currentCO2,
-                    shtFault, lightFault, co2Fault,
+      drawDashboard(getSensorSnapshot(),
                     stateExhaust, stateIntake, stateMister, stateLight,
                     stateMode, isSysOnline, isSysOnline && firebaseReady,
                     aiReady, aiAction);
@@ -2219,8 +2299,7 @@ void loop() {
     else if (now - lastDisplayRefresh >= DISPLAY_REFRESH_INTERVAL) {
       lastDisplayRefresh = now;
       tftSpiBusy = true;
-      drawDashboard(currentTemp, currentHum, currentLight, currentCO2,
-                    shtFault, lightFault, co2Fault,
+      drawDashboard(getSensorSnapshot(),
                     stateExhaust, stateIntake, stateMister, stateLight,
                     stateMode, isSysOnline, isSysOnline && firebaseReady,
                     aiReady, aiAction);

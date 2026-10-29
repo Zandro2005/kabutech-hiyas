@@ -39,7 +39,10 @@
 #endif
 
 // ─── Public state (read by runAutoRegulation / pushToFirebase / Serial) ───
-bool  aiReady       = false;      // true once a valid forecast exists
+bool  aiReady       = false;      // true once a valid forecast exists (>= 2 healthy input channels)
+// Per-channel forecast validity (0=temp, 1=hum, 2=co2, 3=light). A forecast for a channel whose
+// sensor is faulty is INVALID even when aiReady is true; consumers must check both.
+bool  aiChannelValid[4] = { false, false, false, false };
 float predTemp10m   = -999.0f;
 float predHum10m    = -999.0f;
 float predCO2_10m   = -999.0f;
@@ -51,8 +54,7 @@ unsigned long aiLastInferenceUs = 0;
 static float  efBuf[EF_WINDOW][EF_N_SENSORS];
 static int    efHead      = 0;      // next write slot
 static int    efCount     = 0;      // samples stored (<= EF_WINDOW)
-static int    efHeldCount = 0;      // samples in window that reused a stale value
-static bool   efHeld[EF_WINDOW];
+static bool   efChanBad[EF_N_SENSORS] = { false, false, false, false };  // channel's sensor currently faulty
 static float  efLastGood[EF_N_SENSORS] = { -999.0f, -999.0f, -999.0f, -999.0f };
 static unsigned long efLastSample = 0;
 
@@ -114,17 +116,18 @@ static void efRunInference() {
   float rawPredCO2   = max(400.0f, efBuf[newest][2] + d[2]);
   float rawPredLight = max(0.0f, efBuf[newest][3] + d[3]);
 
-  // Smooth prediction outputs to prevent rapid spike jump/flicker
-  if (aiReady && predTemp10m > -500.0f) {
-    predTemp10m  = 0.70f * predTemp10m  + 0.30f * rawPredTemp;
-    predHum10m   = 0.70f * predHum10m   + 0.30f * rawPredHum;
-    predCO2_10m  = 0.70f * predCO2_10m  + 0.30f * rawPredCO2;
-    predLight10m = 0.70f * predLight10m + 0.30f * rawPredLight;
-  } else {
-    predTemp10m  = rawPredTemp;
-    predHum10m   = rawPredHum;
-    predCO2_10m  = rawPredCO2;
-    predLight10m = rawPredLight;
+  // Per-channel smoothing: each channel smooths independently so a faulty channel (published as
+  // -999) never resets the smoothing of the healthy ones. Faulty channels get an INVALID forecast.
+  float rawPred[EF_N_SENSORS] = { rawPredTemp, rawPredHum, rawPredCO2, rawPredLight };
+  float* pred[EF_N_SENSORS]   = { &predTemp10m, &predHum10m, &predCO2_10m, &predLight10m };
+  for (int s = 0; s < EF_N_SENSORS; s++) {
+    if (efChanBad[s]) {
+      *pred[s] = -999.0f;
+      aiChannelValid[s] = false;
+    } else {
+      *pred[s] = (*pred[s] > -500.0f) ? (0.70f * (*pred[s]) + 0.30f * rawPred[s]) : rawPred[s];
+      aiChannelValid[s] = true;
+    }
   }
   aiReady = true;
 
@@ -139,30 +142,47 @@ void edgeForecastTick(unsigned long now, float temp, float hum, int co2, int lig
   float vals[EF_N_SENSORS] = { temp, hum, (float)co2, (float)light };
   bool  bad[EF_N_SENSORS]  = { shtErr || temp <= -50, shtErr || hum <= 0, co2Err || co2 <= 0, lightErr || light < 0 };
 
-  bool held = false;
+  // ── Per-channel isolation ──
+  // A faulty channel is replaced by its last good value (or the training mean if it was never good)
+  // ONLY so the fixed-size model input stays well-formed. Its own forecast is published as invalid,
+  // and the healthy channels keep getting forecasts. One unplugged sensor must never disable the AI
+  // for the others (previously: never-good channel => AI never started; held >50% => AI off for all).
+  int goodCount = 0;
+  float* predPtrs[EF_N_SENSORS] = { &predTemp10m, &predHum10m, &predCO2_10m, &predLight10m };
   for (int s = 0; s < EF_N_SENSORS; s++) {
+    efChanBad[s] = bad[s];
     if (bad[s]) {
-      if (efLastGood[s] <= -999.0f) return;   // never had a good value yet -> skip sample
-      vals[s] = efLastGood[s];
-      held = true;
+      vals[s] = (efLastGood[s] > -900.0f) ? efLastGood[s] : EF_IN_MEAN[s];
+      *predPtrs[s] = -999.0f;
+      aiChannelValid[s] = false;
     } else {
       efLastGood[s] = vals[s];
+      goodCount++;
     }
   }
 
-  // Check if standard 30-second sample period has elapsed
-  bool isPeriodicSample = (efLastSample == 0 || (now - efLastSample >= EF_STEP_MS));
+  // Fewer than 2 healthy inputs: the window would be mostly fabricated -> don't record, don't infer.
+  // Reset the window so the first healthy reading after recovery re-seeds it instantly.
+  if (goodCount < 2) {
+    efCount = 0;
+    efHead  = 0;
+    aiReady = false;
+    for (int s = 0; s < EF_N_SENSORS; s++) aiChannelValid[s] = false;
+    aiAction = (millis() < 20000) ? "warming_up" : "sensor_fault";
+    return;
+  }
+  bool anyBad = (goodCount < EF_N_SENSORS);
 
-  // Check if sudden environmental spike occurred (Fast-Track Event Trigger)
+  // Check if standard 30-second sample period has elapsed (an empty window always samples immediately)
+  bool isPeriodicSample = (efCount == 0 || efLastSample == 0 || (now - efLastSample >= EF_STEP_MS));
+
+  // Check if sudden environmental spike occurred (Fast-Track Event Trigger) on any HEALTHY channel
   bool isFastSpike = false;
-  if (!isPeriodicSample && efCount == EF_WINDOW && !held && (now - lastFastInferenceTime >= FAST_TRIGGER_MIN_INTERVAL)) {
+  if (!isPeriodicSample && efCount == EF_WINDOW && (now - lastFastInferenceTime >= FAST_TRIGGER_MIN_INTERVAL)) {
     if (lastInferredVals[0] > -500.0f) {
-      float dTemp = fabsf(vals[0] - lastInferredVals[0]);
-      float dHum  = fabsf(vals[1] - lastInferredVals[1]);
-      float dCo2  = fabsf(vals[2] - lastInferredVals[2]);
-
-      if (dTemp >= FAST_TRIGGER_TEMP_DELTA || dHum >= FAST_TRIGGER_HUM_DELTA || dCo2 >= FAST_TRIGGER_CO2_DELTA) {
-        isFastSpike = true;
+      const float spikeThr[3] = { FAST_TRIGGER_TEMP_DELTA, FAST_TRIGGER_HUM_DELTA, FAST_TRIGGER_CO2_DELTA };
+      for (int s = 0; s < 3; s++) {
+        if (!efChanBad[s] && fabsf(vals[s] - lastInferredVals[s]) >= spikeThr[s]) isFastSpike = true;
       }
     }
   }
@@ -175,29 +195,24 @@ void edgeForecastTick(unsigned long now, float temp, float hum, int co2, int lig
   }
 
 #if CSV_LOG_MODE
-  if (!held && isPeriodicSample) {
+  if (!anyBad && isPeriodicSample) {
     Serial.printf("CSV:%lu,%.2f,%.2f,%d,%d\n", now, vals[0], vals[1], (int)vals[2], (int)vals[3]);
   }
 #endif
 
   // ── Fast Warm-Up Seeding ──
-  // If this is our very first valid sample, seed all 20 slots with it!
+  // If this is our very first usable sample, seed all 20 slots with it!
   // This lets the AI activate immediately rather than waiting 10 full minutes.
-  if (efCount == 0 && !held) {
+  if (efCount == 0) {
     for (int i = 0; i < EF_WINDOW; i++) {
       for (int s = 0; s < EF_N_SENSORS; s++) efBuf[i][s] = vals[s];
-      efHeld[i] = false;
     }
     efCount = EF_WINDOW;
-    efHeldCount = 0;
     efHead = 0;
     Serial.println("⚡ [Edge AI] Buffer fast-seeded with first live reading! AI active immediately.");
   } else if (isPeriodicSample) {
     // Normal 30s cadence: advance ring buffer to next time slot
-    if (efCount == EF_WINDOW && efHeld[efHead]) efHeldCount--;   // overwriting a held slot
     for (int s = 0; s < EF_N_SENSORS; s++) efBuf[efHead][s] = vals[s];
-    efHeld[efHead] = held;
-    if (held) efHeldCount++;
     efHead = (efHead + 1) % EF_WINDOW;
     if (efCount < EF_WINDOW) efCount++;
   } else if (isFastSpike) {
@@ -212,12 +227,8 @@ void edgeForecastTick(unsigned long now, float temp, float hum, int co2, int lig
 
   if (efCount < EF_WINDOW) {
     aiReady = false;
+    for (int s = 0; s < EF_N_SENSORS; s++) aiChannelValid[s] = false;
     aiAction = "warming_up";
-    return;
-  }
-  if (efHeldCount > EF_WINDOW / 2) {          // too many stale readings -> don't trust it
-    aiReady = false;
-    aiAction = "sensor_fault";
     return;
   }
 
@@ -231,6 +242,7 @@ void edgeForecastTick(unsigned long now, float temp, float hum, int co2, int lig
   efRunInference();
 #else
   aiReady = false;
+  for (int s = 0; s < EF_N_SENSORS; s++) aiChannelValid[s] = false;
   aiAction = "disabled";
 #endif
 }

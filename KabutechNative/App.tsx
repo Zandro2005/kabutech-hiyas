@@ -5,6 +5,7 @@ import AppNavigator from './src/navigation/AppNavigator';
 import { StatusBar } from 'expo-status-bar';
 import * as Font from 'expo-font';
 import * as SplashScreen from 'expo-splash-screen';
+import * as Notifications from 'expo-notifications';
 
 // Keep the splash screen visible while we fetch resources safely
 SplashScreen.preventAutoHideAsync().catch(() => {});
@@ -127,6 +128,13 @@ export default function App() {
       }
     }
     configureNavBar();
+
+    const responseSub = Notifications.addNotificationResponseReceivedListener((response) => {
+      console.log('Notification tapped from lock screen / closed state:', response?.notification?.request?.content?.title);
+    });
+    return () => {
+      responseSub.remove();
+    };
   }, []);
 
   if (!fontsLoaded) {

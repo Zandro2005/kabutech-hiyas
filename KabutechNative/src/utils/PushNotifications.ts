@@ -139,6 +139,8 @@ export async function sendPushNotification(expoPushToken: string, title: string,
     data: data,
     channelId: ALERT_CHANNEL_ID,
     priority: 'high',
+    badge: 1,
+    _displayInForeground: true,
   };
 
   try {
@@ -156,6 +158,28 @@ export async function sendPushNotification(expoPushToken: string, title: string,
   } catch (error) {
     console.error('Error sending push notification:', error);
   }
+}
+
+/**
+ * Schedules a high-priority system alert to fire after a short delay (default 5s).
+ * This allows the user to test that notifications pop up even when the app is completely closed or locked!
+ */
+export async function scheduleClosedAppTestNotification(seconds: number = 5) {
+  await ensureNotificationChannels();
+  return Notifications.scheduleNotificationAsync({
+    content: {
+      title: '🚨 KabuTech Test Alert',
+      body: 'Verified: Notifications work even when the app is closed or locked!',
+      sound: 'default',
+      priority: Notifications.AndroidNotificationPriority.MAX,
+      vibrate: [0, 800, 300, 800],
+      color: '#ef4444',
+      data: { test: true, timestamp: Date.now() },
+    },
+    trigger: {
+      seconds,
+    } as any,
+  });
 }
 
 /**

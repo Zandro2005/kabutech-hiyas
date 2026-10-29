@@ -24,6 +24,15 @@
 #define LGFX_USE_V1
 #include <LovyanGFX.hpp>
 #include <time.h>
+#include "sensor_state.h"
+
+// ─── External TinyML Edge AI forecast state (from edge_forecast.h) ───
+extern bool  aiReady;
+extern bool  aiChannelValid[4];
+extern float predTemp10m;
+extern float predHum10m;
+extern float predCO2_10m;
+extern float predLight10m;
 
 #ifndef TFT_ROTATION
 // Screen Orientation: 1 = Landscape (Header TOP, Normal Left-to-Right Text)
@@ -109,7 +118,7 @@ struct DashboardTheme {
 static const DashboardTheme THEME_AUTO = {
   0x0122,  // #032514 Deep Forest Green
   0x09C4,  // #0A3A22 Card Surface (Deep Emerald Green)
-  0x0A86,  // #105231 Card Outline
+  0x2570,  // #237B4C Crisp Visible Card Outline & Divider
   0x15D0,  // #10B981 Vibrant Emerald
   0x6776,  // #6EE7B7 Light Mint Text
   0x08C2,  // Dark Forest Idle Chip
@@ -153,20 +162,29 @@ inline DashboardTheme getThemeForMode(const String& mode) {
 }
 
 // Track previous values to eliminate screen redraw flicker
-static float prevT = -999.0;
-static float prevH = -999.0;
-static int   prevC = -999;
-static int   prevL = -999;
-static int   prevExh = -1;
-static int   prevInt = -1;
-static int   prevMist = -1;
-static int   prevLight = -1;
-static String prevMode = "";
-static bool  prevWifi = false;
-static bool  prevFb = false;
-static int   prevMinute = -1;
+static float   prevT           = -999.0;
+static float   prevH           = -999.0;
+static int     prevC           = -999;
+static int     prevL           = -999;
+static uint8_t prevTempStatus  = 255;
+static uint8_t prevHumStatus   = 255;
+static uint8_t prevLightStatus = 255;
+static uint8_t prevCo2Status   = 255;
+static float   prevPredT       = -999.0f;
+static float   prevPredH       = -999.0f;
+static float   prevPredC       = -999.0f;
+static float   prevPredL       = -999.0f;
+static bool    prevAiRdy       = false;
+static int     prevExh         = -1;
+static int     prevInt         = -1;
+static int     prevMist        = -1;
+static int     prevLight       = -1;
+static String  prevMode        = "";
+static bool    prevWifi        = false;
+static bool    prevFb          = false;
+static int     prevMinute      = -1;
 static unsigned long lastUptimeDraw = 0;
-static bool  baseDrawn = false;
+static bool    baseDrawn       = false;
 static uint8_t currentTftRotation = TFT_ROTATION;
 
 // ─── Forward Declarations ───
@@ -347,8 +365,9 @@ void drawStaticDashboard(const String& mode) {
   // 1. Fill entire screen with the mode background (Purple for TIMED, Emerald Yellow for MANUAL, Forest Green for AUTO)
   tft.fillScreen(curTheme.bg);
 
-  // 2. Top header divider line (Y: 26)
-  tft.drawLine(0, 26, 320, 26, curTheme.cardBorder);
+  // 2. Top header divider line (2px for high visibility)
+  tft.drawFastHLine(0, 26, 320, curTheme.cardBorder);
+  tft.drawFastHLine(0, 27, 320, curTheme.cardBorder);
 
   // 3. Static Brand Header (Left)
   tft.setFont(nullptr);
@@ -387,13 +406,6 @@ void drawStaticDashboard(const String& mode) {
   tft.drawString("CO2 LEVEL",   14, 122);
   tft.drawString("LIGHT LEVEL", 170, 122);
 
-  // 7. Target Ranges in muted color
-  tft.setTextDatum(textdatum_t::bottom_left);
-  tft.setTextColor(COLOR_MUTED, curTheme.cardBg);
-  tft.drawString("Target: 18 - 25 °C", 16, 30 + 82 - 6);
-  tft.drawString("Target: 80 - 95 %",  172, 30 + 82 - 6);
-  tft.drawString("Target: < 1000 ppm", 16, 116 + 82 - 6);
-  tft.drawString("Target: 150-1000 lx", 172, 116 + 82 - 6);
 
   // Invalidate previous cache to force immediate redraw of dynamic cards & chips on new theme
   prevT = -999.0;
@@ -408,45 +420,98 @@ void drawStaticDashboard(const String& mode) {
   lastUptimeDraw = 0;
   prevMode = "";
 
+  // Reset forecast cache on theme redraw
+  prevPredT = -999.0f;
+  prevPredH = -999.0f;
+  prevPredC = -999.0f;
+  prevPredL = -999.0f;
+  prevAiRdy = false;
+
   baseDrawn = true;
 }
 
+// ─── Helper: Draw Large Numeric Value with Size 3 Integers and Size 2 Decimals ───
+static void drawBayValue(int startX, int baseY, const char* str, uint16_t color) {
+  if (!str || str[0] == '\0') str = "--";
+  tft.setTextDatum(textdatum_t::bottom_left);
+  tft.setTextColor(color, curTheme.cardBg);
+
+  const char* dot = strchr(str, '.');
+  if (dot != nullptr) {
+    char intPart[8];
+    int intLen = dot - str;
+    if (intLen > 7) intLen = 7;
+    strncpy(intPart, str, intLen);
+    intPart[intLen] = '\0';
+
+    tft.setTextSize(3);
+    tft.drawString(intPart, startX, baseY);
+
+    tft.setTextSize(2);
+    tft.drawString(dot, startX + (intLen * 18), baseY - 2);
+  } else {
+    int len = strlen(str);
+    int sz = (len >= 4) ? 2 : 3;
+    tft.setTextSize(sz);
+    tft.drawString(str, startX, baseY);
+  }
+}
+
 // ─── Helper: Draw an Environmental Metric Card (Landscape 152x82) ───
+// 2-Bay Big-Number Widget: Left = LIVE (Size 3 White), Right = PRED (Size 3 Distinct Color)
 void drawMetricCard(int x, int y, int w, int h,
                     const char* title, const char* valStr, const char* unit,
                     const char* pillText, uint16_t pillColor,
-                    const char* targetRange) {
+                    const char* targetRange = nullptr,
+                    const char* predValStr = nullptr, uint16_t predValColor = COLOR_CYAN) {
   (void)title;
   (void)targetRange;
   (void)h;
   tft.setFont(nullptr);
 
-  // 1. Status Pill (Top Right)
-  int pillW = 54;
-  int pillH = 14;
+  // 1. Sleek Compact Status Pill (Top Right)
+  const char* dispPill = (strcmp(pillText, "OPTIMAL") == 0) ? "OPT" : pillText;
+  int pillW = strlen(dispPill) * 6 + 6;
+  int pillH = 11;
   int pillX = x + w - pillW - 6;
-  int pillY = y + 5;
-  tft.fillRoundRect(pillX, pillY, pillW, pillH, 4, COLOR_DARK_SLATE);
-  tft.drawRoundRect(pillX, pillY, pillW, pillH, 4, pillColor);
+  int pillY = y + 4;
+
+  // Clear pill zone in case previous text was wider
+  tft.fillRect(x + w - 56, y + 3, 52, 14, curTheme.cardBg);
+  tft.fillRoundRect(pillX, pillY, pillW, pillH, 3, COLOR_DARK_SLATE);
+  tft.drawRoundRect(pillX, pillY, pillW, pillH, 3, pillColor);
 
   tft.setTextDatum(textdatum_t::middle_center);
   tft.setTextSize(1);
   tft.setTextColor(pillColor, COLOR_DARK_SLATE);
-  tft.drawString(pillText, pillX + (pillW / 2), pillY + (pillH / 2));
+  tft.drawString(dispPill, pillX + (pillW / 2), pillY + (pillH / 2));
 
-  // 2. Main Numeric Readout (Center Left)
-  tft.fillRect(x + 6, y + 23, w - 12, 32, curTheme.cardBg);
+  // 2. Clear Middle & Bottom Content Area (Y: y + 17 to y + 78, 61px height)
+  tft.fillRect(x + 4, y + 17, w - 8, 61, curTheme.cardBg);
 
-  tft.setTextDatum(textdatum_t::middle_left);
-  tft.setTextSize(3); // Large bold readout
-  tft.setTextColor(COLOR_WHITE, curTheme.cardBg);
-  tft.drawString(valStr, x + 10, y + 38);
+  // 3. Crisp, Highly Visible 2px Center Divider between LIVE (Left Bay) and PRED (Right Bay)
+  tft.fillRect(x + 75, y + 18, 2, 58, COLOR_MUTED);
 
-  // Unit symbol right next to number
-  int unitOffsetX = (strlen(valStr) >= 4) ? 88 : 72;
+  // 4. Left Bay: LIVE Reading (Sub-label with unit, then Big Size 3 Number)
+  tft.setTextDatum(textdatum_t::top_left);
   tft.setTextSize(1);
   tft.setTextColor(COLOR_MUTED, curTheme.cardBg);
-  tft.drawString(unit, x + unitOffsetX, y + 34);
+  char liveLabel[16];
+  snprintf(liveLabel, sizeof(liveLabel), "LIVE %s", unit);
+  tft.drawString(liveLabel, x + 8, y + 20);
+
+  drawBayValue(x + 8, y + 66, valStr, COLOR_WHITE);
+
+  // 5. Right Bay: PREDICTED Reading (Sub-label with unit, then Big Size 3 Number in Distinct Color)
+  tft.setTextDatum(textdatum_t::top_left);
+  tft.setTextSize(1);
+  tft.setTextColor(COLOR_CYAN, curTheme.cardBg);
+  char predLabel[16];
+  snprintf(predLabel, sizeof(predLabel), "PRED %s", unit);
+  tft.drawString(predLabel, x + 82, y + 20);
+
+  const char* pStr = predValStr ? predValStr : "--";
+  drawBayValue(x + 82, y + 66, pStr, predValStr ? predValColor : COLOR_MUTED);
 }
 
 // ─── Helper: Draw an Actuator Chip ───
@@ -465,9 +530,8 @@ void drawActuatorChip(int x, int y, int w, int h, const char* label, bool active
   tft.drawString(label, x + (w / 2), y + (h / 2));
 }
 
-// ─── Main Non-Blocking Landscape Dashboard Update ───
-void drawDashboard(float temp, float hum, int light, int co2,
-                   bool shtErr, bool lightErr, bool co2Err,
+// ─── Main Non-Blocking Landscape Dashboard Update (Snapshot-Driven) ───
+void drawDashboard(const SensorSnapshot& snap,
                    bool exhOn, bool intOn, bool mistOn, bool lightOn,
                    const String& mode, bool wifiOk, bool fbOk,
                    bool aiActive, const char* aiAct) {
@@ -501,24 +565,22 @@ void drawDashboard(float temp, float hum, int light, int co2,
 
   // ── Calculate In-Range Count exactly matching mobile app dashboard ──
   int inRangeCount = 0;
-  // Literature Oyster Fruiting Target Bands (matching environmentRanges.ts evaluateParam):
-  // Temp: 18 - 25 °C
-  // Hum:  80 - 95 %
-  // CO2:  < 1000 ppm
-  // Light: 150 - 1000 lx
-  bool tempInRange  = (!shtErr   && temp >= 18.0 && temp <= 25.0);
-  bool humInRange   = (!shtErr   && hum >= 80.0  && hum <= 95.0);
-  bool co2InRange   = (!co2Err   && co2 > 0      && co2 <= 1000);
-  bool lightInRange = (!lightErr && light >= 150 && light <= 1000);
+  bool tempInRange  = (snap.temp.status == S_OK  && snap.temp.value >= 18.0 && snap.temp.value <= 25.0);
+  bool humInRange   = (snap.hum.status == S_OK   && snap.hum.value >= 80.0  && snap.hum.value <= 95.0);
+  bool co2InRange   = (snap.co2.status == S_OK   && snap.co2.value > 0      && snap.co2.value <= 1000);
+  bool lightInRange = (snap.light.status == S_OK && snap.light.value >= 150 && snap.light.value <= 1000);
 
   if (tempInRange) inRangeCount++;
   if (humInRange) inRangeCount++;
   if (co2InRange) inRangeCount++;
   if (lightInRange) inRangeCount++;
 
-  bool hasFault = shtErr || lightErr || co2Err || temp <= -900 || hum <= -900 || (millis() >= 15000 && co2 <= 0);
+  bool hasFault = (snap.temp.status == S_FAULT || snap.hum.status == S_FAULT ||
+                   snap.light.status == S_FAULT || snap.co2.status == S_FAULT);
+  bool hasInit  = (snap.temp.status == S_INIT || snap.hum.status == S_INIT ||
+                   snap.light.status == S_INIT || snap.co2.status == S_INIT);
 
-  // Center Status: e.g. "4/4 IN RANGE", "3/4 IN RANGE", "1/4 IN RANGE"
+  // Center Status: e.g. "4/4 IN RANGE", "3/4 IN RANGE", "1/4 IN RANGE", or "3/4 | INIT"
   tft.setTextDatum(textdatum_t::middle_center);
   tft.setTextSize(1);
   tft.fillRect(110, 4, 114, 18, curTheme.bg);
@@ -527,6 +589,9 @@ void drawDashboard(float temp, float hum, int light, int co2,
   if (hasFault) {
     snprintf(statusBuf, sizeof(statusBuf), "%d/4 | FAULT", inRangeCount);
     tft.setTextColor(COLOR_AMBER, curTheme.bg);
+  } else if (hasInit) {
+    snprintf(statusBuf, sizeof(statusBuf), "%d/4 | INIT", inRangeCount);
+    tft.setTextColor(COLOR_CYAN, curTheme.bg);
   } else if (inRangeCount == 4) {
     snprintf(statusBuf, sizeof(statusBuf), "4/4 IN RANGE");
     tft.setTextColor(curTheme.primary, curTheme.bg);
@@ -575,18 +640,25 @@ void drawDashboard(float temp, float hum, int light, int co2,
   // 2. ENVIRONMENTAL CARDS (2x2 Grid)
 
   // ── Temperature Card (X: 6, Y: 30) ──
-  // Target: 18 - 25 °C (Grace buffer: 16 - 27 °C)
-  if (temp != prevT || shtErr) {
-    prevT = temp;
+  bool predTChanged = (aiReady != prevAiRdy) || (aiReady && abs(predTemp10m - prevPredT) >= 0.1f);
+  if (snap.temp.value != prevT || snap.temp.status != prevTempStatus || predTChanged) {
+    prevT = snap.temp.value;
+    prevTempStatus = snap.temp.status;
+    prevPredT = predTemp10m;
     char valBuf[10];
     const char* pillTxt = "OPTIMAL";
     uint16_t pillCol = COLOR_EMERALD;
 
-    if (shtErr || temp <= -900) {
+    if (snap.temp.status == S_INIT) {
+      snprintf(valBuf, sizeof(valBuf), "...");
+      pillTxt = "INIT";
+      pillCol = COLOR_CYAN;
+    } else if (snap.temp.status == S_FAULT) {
       snprintf(valBuf, sizeof(valBuf), "--");
       pillTxt = "FAULT";
       pillCol = COLOR_MUTED;
     } else {
+      float temp = snap.temp.value;
       snprintf(valBuf, sizeof(valBuf), "%.1f", temp);
       if (temp < 18.0) {
         pillTxt = (temp < 16.0) ? "CRIT" : "LOW";
@@ -595,26 +667,50 @@ void drawDashboard(float temp, float hum, int light, int co2,
         pillTxt = (temp > 27.0) ? "CRIT" : "HIGH";
         pillCol = (temp > 27.0) ? COLOR_RED : COLOR_AMBER;
       } else {
-        pillTxt = "OPTIMAL";
+        pillTxt = "OPT";
         pillCol = COLOR_EMERALD;
       }
     }
-    drawMetricCard(6, 30, 152, 82, "TEMPERATURE", valBuf, "°C", pillTxt, pillCol, "Target: 18 - 25 °C");
+
+    char predBuf[12];
+    uint16_t predCol = COLOR_CYAN;
+    if (!aiReady) {
+      snprintf(predBuf, sizeof(predBuf), "...");
+      predCol = COLOR_MUTED;
+    } else if (!aiChannelValid[0] || snap.temp.status == S_FAULT) {
+      snprintf(predBuf, sizeof(predBuf), "--");
+      predCol = COLOR_MUTED;
+    } else {
+      snprintf(predBuf, sizeof(predBuf), "%.1f", predTemp10m);
+      if (predTemp10m < 18.0f || predTemp10m > 25.0f) {
+        predCol = (predTemp10m < 16.0f || predTemp10m > 27.0f) ? COLOR_RED : COLOR_AMBER;
+      } else {
+        predCol = COLOR_CYAN;
+      }
+    }
+    drawMetricCard(6, 30, 152, 82, "TEMPERATURE", valBuf, "°C", pillTxt, pillCol, nullptr, predBuf, predCol);
   }
 
   // ── Humidity Card (X: 162, Y: 30) ──
-  // Target: 80 - 95 % (Grace buffer: 75 - 100 %)
-  if (hum != prevH || shtErr) {
-    prevH = hum;
+  bool predHChanged = (aiReady != prevAiRdy) || (aiReady && abs(predHum10m - prevPredH) >= 0.5f);
+  if (snap.hum.value != prevH || snap.hum.status != prevHumStatus || predHChanged) {
+    prevH = snap.hum.value;
+    prevHumStatus = snap.hum.status;
+    prevPredH = predHum10m;
     char valBuf[10];
-    const char* pillTxt = "OPTIMAL";
+    const char* pillTxt = "OPT";
     uint16_t pillCol = COLOR_EMERALD;
 
-    if (shtErr || hum <= -900) {
+    if (snap.hum.status == S_INIT) {
+      snprintf(valBuf, sizeof(valBuf), "...");
+      pillTxt = "INIT";
+      pillCol = COLOR_CYAN;
+    } else if (snap.hum.status == S_FAULT) {
       snprintf(valBuf, sizeof(valBuf), "--");
       pillTxt = "FAULT";
       pillCol = COLOR_MUTED;
     } else {
+      float hum = snap.hum.value;
       snprintf(valBuf, sizeof(valBuf), "%d", (int)round(hum));
       if (hum < 80.0) {
         pillTxt = (hum < 75.0) ? "DRY" : "LOW";
@@ -623,32 +719,50 @@ void drawDashboard(float temp, float hum, int light, int co2,
         pillTxt = "SAT";
         pillCol = COLOR_AMBER;
       } else {
-        pillTxt = "OPTIMAL";
+        pillTxt = "OPT";
         pillCol = COLOR_EMERALD;
       }
     }
-    drawMetricCard(162, 30, 152, 82, "HUMIDITY", valBuf, "%", pillTxt, pillCol, "Target: 80 - 95 %");
+
+    char predBuf[12];
+    uint16_t predCol = COLOR_CYAN;
+    if (!aiReady) {
+      snprintf(predBuf, sizeof(predBuf), "...");
+      predCol = COLOR_MUTED;
+    } else if (!aiChannelValid[1] || snap.hum.status == S_FAULT) {
+      snprintf(predBuf, sizeof(predBuf), "--");
+      predCol = COLOR_MUTED;
+    } else {
+      snprintf(predBuf, sizeof(predBuf), "%d", (int)round(predHum10m));
+      if (predHum10m < 80.0f || predHum10m > 95.0f) {
+        predCol = (predHum10m < 75.0f) ? COLOR_RED : COLOR_AMBER;
+      } else {
+        predCol = COLOR_CYAN;
+      }
+    }
+    drawMetricCard(162, 30, 152, 82, "HUMIDITY", valBuf, "%", pillTxt, pillCol, nullptr, predBuf, predCol);
   }
 
   // ── CO2 Card (X: 6, Y: 116) ──
-  // Target: < 1000 ppm (Grace buffer: <= 1150 ppm)
-  if (co2 != prevC || co2Err) {
-    prevC = co2;
+  bool predCChanged = (aiReady != prevAiRdy) || (aiReady && abs(predCO2_10m - prevPredC) >= 5.0f);
+  if (snap.co2.value != prevC || snap.co2.status != prevCo2Status || predCChanged) {
+    prevC = snap.co2.value;
+    prevCo2Status = snap.co2.status;
+    prevPredC = predCO2_10m;
     char valBuf[10];
-    const char* pillTxt = "OPTIMAL";
+    const char* pillTxt = "OPT";
     uint16_t pillCol = COLOR_EMERALD;
 
-    if (co2Err || co2 <= 0) {
-      if (millis() < 15000 && co2 <= 0) {
-        snprintf(valBuf, sizeof(valBuf), "...");
-        pillTxt = "WARM";
-        pillCol = COLOR_CYAN;
-      } else {
-        snprintf(valBuf, sizeof(valBuf), "--");
-        pillTxt = "FAULT";
-        pillCol = COLOR_MUTED;
-      }
+    if (snap.co2.status == S_INIT) {
+      snprintf(valBuf, sizeof(valBuf), "...");
+      pillTxt = "WARM";
+      pillCol = COLOR_CYAN;
+    } else if (snap.co2.status == S_FAULT) {
+      snprintf(valBuf, sizeof(valBuf), "--");
+      pillTxt = "FAULT";
+      pillCol = COLOR_MUTED;
     } else {
+      int co2 = (int)snap.co2.value;
       snprintf(valBuf, sizeof(valBuf), "%d", co2);
       if (co2 > 1150) {
         pillTxt = (co2 > 1500) ? "CRIT" : "HIGH";
@@ -657,26 +771,50 @@ void drawDashboard(float temp, float hum, int light, int co2,
         pillTxt = "HIGH";
         pillCol = COLOR_AMBER;
       } else {
-        pillTxt = "OPTIMAL";
+        pillTxt = "OPT";
         pillCol = COLOR_EMERALD;
       }
     }
-    drawMetricCard(6, 116, 152, 82, "CO2 LEVEL", valBuf, "ppm", pillTxt, pillCol, "Target: < 1000 ppm");
+
+    char predBuf[12];
+    uint16_t predCol = COLOR_CYAN;
+    if (!aiReady) {
+      snprintf(predBuf, sizeof(predBuf), "...");
+      predCol = COLOR_MUTED;
+    } else if (!aiChannelValid[2] || snap.co2.status == S_FAULT) {
+      snprintf(predBuf, sizeof(predBuf), "--");
+      predCol = COLOR_MUTED;
+    } else {
+      snprintf(predBuf, sizeof(predBuf), "%d", (int)round(predCO2_10m));
+      if (predCO2_10m > 1000.0f) {
+        predCol = (predCO2_10m > 1150.0f) ? COLOR_RED : COLOR_AMBER;
+      } else {
+        predCol = COLOR_CYAN;
+      }
+    }
+    drawMetricCard(6, 116, 152, 82, "CO2 LEVEL", valBuf, "ppm", pillTxt, pillCol, nullptr, predBuf, predCol);
   }
 
   // ── Light Card (X: 162, Y: 116) ──
-  // Target: 150 - 1000 lx (Grace buffer: 100 - 1050 lx)
-  if (light != prevL || lightErr) {
-    prevL = light;
+  bool predLChanged = (aiReady != prevAiRdy) || (aiReady && abs(predLight10m - prevPredL) >= 10.0f);
+  if (snap.light.value != prevL || snap.light.status != prevLightStatus || predLChanged) {
+    prevL = snap.light.value;
+    prevLightStatus = snap.light.status;
+    prevPredL = predLight10m;
     char valBuf[10];
-    const char* pillTxt = "OPTIMAL";
+    const char* pillTxt = "OPT";
     uint16_t pillCol = COLOR_EMERALD;
 
-    if (lightErr || light < 0) {
+    if (snap.light.status == S_INIT) {
+      snprintf(valBuf, sizeof(valBuf), "...");
+      pillTxt = "INIT";
+      pillCol = COLOR_CYAN;
+    } else if (snap.light.status == S_FAULT) {
       snprintf(valBuf, sizeof(valBuf), "--");
       pillTxt = "FAULT";
       pillCol = COLOR_MUTED;
     } else {
+      int light = (int)snap.light.value;
       snprintf(valBuf, sizeof(valBuf), "%d", light);
       if (light < 150) {
         pillTxt = (light < 100) ? "DARK" : "LOW";
@@ -685,12 +823,31 @@ void drawDashboard(float temp, float hum, int light, int co2,
         pillTxt = "HIGH";
         pillCol = COLOR_AMBER;
       } else {
-        pillTxt = "OPTIMAL";
+        pillTxt = "OPT";
         pillCol = COLOR_EMERALD;
       }
     }
-    drawMetricCard(162, 116, 152, 82, "LIGHT LEVEL", valBuf, "lx", pillTxt, pillCol, "Target: 150-1000 lx");
+
+    char predBuf[12];
+    uint16_t predCol = COLOR_CYAN;
+    if (!aiReady) {
+      snprintf(predBuf, sizeof(predBuf), "...");
+      predCol = COLOR_MUTED;
+    } else if (!aiChannelValid[3] || snap.light.status == S_FAULT) {
+      snprintf(predBuf, sizeof(predBuf), "--");
+      predCol = COLOR_MUTED;
+    } else {
+      snprintf(predBuf, sizeof(predBuf), "%d", (int)round(predLight10m));
+      if (predLight10m < 150.0f || predLight10m > 1000.0f) {
+        predCol = (predLight10m < 100.0f) ? COLOR_RED : COLOR_AMBER;
+      } else {
+        predCol = COLOR_CYAN;
+      }
+    }
+    drawMetricCard(162, 116, 152, 82, "LIGHT LEVEL", valBuf, "lx", pillTxt, pillCol, nullptr, predBuf, predCol);
   }
+
+  prevAiRdy = aiReady;
 
   // 3. ACTUATOR STATUS CHIPS (Y: 207, H: 22) - Dynamic theme primary active color
   if (exhOn != prevExh || intOn != prevInt || mistOn != prevMist || lightOn != prevLight) {
@@ -752,4 +909,27 @@ void drawDashboard(float temp, float hum, int light, int co2,
 
   // Ensure SPI Chip Select (GPIO 10) is deselected HIGH when idle so relay EMI cannot clock into ILI9341
   digitalWrite(10, HIGH);
+}
+
+// Backward-compatible overload accepting individual scalar values and boolean error flags
+inline void drawDashboard(float temp, float hum, int light, int co2,
+                          bool shtErr, bool lightErr, bool co2Err,
+                          bool exhOn, bool intOn, bool mistOn, bool lightOn,
+                          const String& mode, bool wifiOk, bool fbOk,
+                          bool aiActive, const char* aiAct) {
+  SensorSnapshot snap;
+  snap.temp.status  = shtErr ? S_FAULT : S_OK;
+  snap.temp.reason  = shtErr ? R_NOT_PRESENT : R_NONE;
+  snap.temp.value   = temp;
+  snap.hum.status   = shtErr ? S_FAULT : S_OK;
+  snap.hum.reason   = shtErr ? R_NOT_PRESENT : R_NONE;
+  snap.hum.value    = hum;
+  snap.light.status = lightErr ? S_FAULT : S_OK;
+  snap.light.reason = lightErr ? R_NOT_PRESENT : R_NONE;
+  snap.light.value  = (float)light;
+  snap.co2.status   = co2Err ? S_FAULT : S_OK;
+  snap.co2.reason   = co2Err ? R_NOT_PRESENT : R_NONE;
+  snap.co2.value    = (float)co2;
+  snap.seq          = 0;
+  drawDashboard(snap, exhOn, intOn, mistOn, lightOn, mode, wifiOk, fbOk, aiActive, aiAct);
 }

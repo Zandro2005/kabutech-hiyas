@@ -118,43 +118,45 @@ export function useSensorHealth(): SensorHealthStatus {
   // Helper to check for error flags (handles boolean, string "true", number 1)
   const isErr = (val: any) => val === true || val === 'true' || val === 1;
 
-  // Individual sensor error checks:
-  // Synchronous and immediate detection when an unplugged sensor reports -999 or error flag:
-  const dhtError = !isControllerOnline || 
-    isErr(sensors?.dht_error) || 
-    isErr(sensors?.temp_error) || 
-    isErr(sensors?.hum_error) ||
+  // Individual sensor hardware error checks (decoupled from controller network reachability):
+  // Synchronous and immediate detection when an unplugged sensor reports -999, error flag, or FAULT status.
+  const tempError =
+    sensors?.status_temp === 'FAULT' ||
+    isErr(sensors?.temp_error) ||
     sensors?.temperature === -999 ||
-    sensors?.humidity === -999 ||
     typeof sensors?.temperature !== 'number' ||
-    typeof sensors?.humidity !== 'number';
+    isNaN(sensors.temperature) ||
+    sensors.temperature <= 0 ||
+    sensors.temperature > 60;
 
-  const tempError = dhtError || 
-    isNaN(sensors.temperature) || 
-    sensors.temperature <= 0 || 
-    sensors.temperature > 60 || 
-    sensors.temperature === -999;
+  const humError =
+    sensors?.status_hum === 'FAULT' ||
+    isErr(sensors?.hum_error) ||
+    sensors?.humidity === -999 ||
+    typeof sensors?.humidity !== 'number' ||
+    isNaN(sensors.humidity) ||
+    sensors.humidity <= 0 ||
+    sensors.humidity > 100;
 
-  const humError = dhtError || 
-    isNaN(sensors.humidity) || 
-    sensors.humidity <= 0 || 
-    sensors.humidity > 100 || 
-    sensors.humidity === -999;
+  // SHT3x combined sensor flag for legacy callers
+  const dhtError = tempError || humError || isErr(sensors?.dht_error);
 
-  const lightError = !isControllerOnline || 
-    isErr(sensors?.light_error) || 
-    typeof sensors?.light !== 'number' || 
-    isNaN(sensors.light) || 
-    sensors.light === -999 || 
+  const lightError =
+    sensors?.status_light === 'FAULT' ||
+    isErr(sensors?.light_error) ||
+    sensors?.light === -999 ||
+    typeof sensors?.light !== 'number' ||
+    isNaN(sensors.light) ||
     sensors.light < 0;
 
-  const co2Error = !isControllerOnline || 
-    isErr(sensors?.co2_error) || 
-    typeof sensors?.co2 !== 'number' || 
-    isNaN(sensors.co2) || 
-    sensors.co2 < 300 || 
-    sensors.co2 > 5000 || 
-    sensors.co2 === -999;
+  const co2Error =
+    sensors?.status_co2 === 'FAULT' ||
+    isErr(sensors?.co2_error) ||
+    sensors?.co2 === -999 ||
+    typeof sensors?.co2 !== 'number' ||
+    isNaN(sensors.co2) ||
+    sensors.co2 < 300 ||
+    sensors.co2 > 5000;
 
   // Water level sensor is temporarily removed from hardware/code
   const waterError = false;

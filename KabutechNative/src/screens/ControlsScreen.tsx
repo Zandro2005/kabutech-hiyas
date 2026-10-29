@@ -76,10 +76,10 @@ export default function ControlsScreen() {
   const light = typeof sensors.light === 'number' ? sensors.light : 71;
   const co2 = typeof sensors.co2 === 'number' ? sensors.co2 : 583;
 
-  const isTempDisconnected = health.tempError || temp === -999 || temp <= 0;
-  const isHumDisconnected = health.humError || hum === -999 || hum <= 0;
-  const isLightDisconnected = health.lightError || light === -999 || light < 0;
-  const isCo2Disconnected = health.co2Error || co2 === -999 || co2 < 0;
+  const isTempDisconnected = health.tempError;
+  const isHumDisconnected = health.humError;
+  const isLightDisconnected = health.lightError;
+  const isCo2Disconnected = health.co2Error;
 
   const isOffline = !health.isControllerOnline;
 
