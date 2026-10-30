@@ -99,22 +99,44 @@ describe('scheduleLogic - computeAutoDecision and hysteresis', () => {
     expect(decisionLow.reasons.misters).toContain('Islam et al. (2022)');
 
     // 3. Rises back to 76% (>= 75%, optimal) -> turns OFF
-    const decisionTargetReached = computeAutoDecision({ ...sensorsInGrace, humidity: 76.0 }, { misters: true });
+    const decisionTargetReached = computeAutoDecision({ ...sensorsInGrace, humidity: 76.0 }, { misters: true, mistersHum: true });
     expect(decisionTargetReached.states.misters).toBe(false);
   });
 
-  it('blocks misters and raises mistersBlocked reason when water level is <= 15%', () => {
-    const sensors = {
+  it('turns misters ON when temperature exceeds optimal ceiling (> 25.0°C) for evaporative cooling and turns OFF at <= 24.2°C', () => {
+    // 1. Humidity optimal (88%), temp spikes to 26.5°C (> 25.0°C) -> misters turn ON for evaporative cooling
+    const sensorsHot = {
+      temperature: 26.5,
+      humidity: 88.0,
+      light: 600,
+      co2: 600,
+      waterLevel: 80,
+    };
+    const decisionHot = computeAutoDecision(sensorsHot, { misters: false });
+    expect(decisionHot.states.misters).toBe(true);
+    expect(decisionHot.states.mistersTemp).toBe(true);
+    expect(decisionHot.states.mistersHum).toBe(false);
+    expect(decisionHot.reasons.misters).toContain('evaporative cooling active');
+
+    // 2. Cooled down to 24.0°C (<= 24.2°C) -> misters turn OFF
+    const sensorsCooled = { ...sensorsHot, temperature: 24.0 };
+    const decisionCooled = computeAutoDecision(sensorsCooled, { misters: true, mistersTemp: true });
+    expect(decisionCooled.states.misters).toBe(false);
+    expect(decisionCooled.states.mistersTemp).toBe(false);
+  });
+
+  it('bypasses water level detection so misters run without hardware water sensor installed', () => {
+    const sensorsNoWater = {
       temperature: 24.0,
       humidity: 70.0,
       light: 600,
       co2: 600,
-      waterLevel: 10, // Dangerous low water!
+      waterLevel: 0, // Uninstalled / zero reading
     };
 
-    const decision = computeAutoDecision(sensors, { misters: false });
-    expect(decision.states.misters).toBe(false);
-    expect(decision.reasons.mistersBlocked).toContain('misting paused to protect pump');
+    const decision = computeAutoDecision(sensorsNoWater, { misters: false });
+    expect(decision.states.misters).toBe(true);
+    expect(decision.reasons.mistersBlocked).toBeUndefined();
   });
 
   it('turns lights ON when dark (< 150 lx), maintains ON in optimal band (150 - 1000 lx), and turns OFF when too bright (>= 1000 lx)', () => {

@@ -112,6 +112,8 @@ export interface AutoDecisionResult {
     fansTemp?: boolean;
     fansHum?: boolean;
     misters: boolean;
+    mistersHum?: boolean;
+    mistersTemp?: boolean;
     lights: boolean;
     valve: boolean;
     co2: boolean;
@@ -183,7 +185,7 @@ export const computeAutoDecision = (
   const isHumValid = currentHum > 0 && currentHum !== -999;
   const isLightValid = currentLight >= 0 && currentLight !== -999;
   const isCo2Valid = currentCO2 > 0 && currentCO2 !== -999;
-  const isWaterSafe = currentWater > 15; // Low water safety threshold to protect mister pump
+  const isWaterSafe = true; // Hardware water level sensor omitted/not installed for now
 
   const reasons: AutoDecisionResult['reasons'] = {};
 
@@ -212,6 +214,20 @@ export const computeAutoDecision = (
       : prevFans && currentHum > bands.exhaustHumOff)
   );
 
+  const prevMistersHum = Boolean(
+    isPreviousDevices &&
+    (actualPrev?.mistersHum !== undefined
+      ? actualPrev.mistersHum
+      : prevMisters && currentHum < bands.misterOff)
+  );
+
+  const prevMistersTemp = Boolean(
+    isPreviousDevices &&
+    (actualPrev?.mistersTemp !== undefined
+      ? actualPrev.mistersTemp
+      : prevMisters && currentTemp > bands.misterTempOff)
+  );
+
   // 1. CO₂ PURGING & AIR VENTILATION (Exhaust Fans with Hysteresis & Grace)
   // ON at >= 1150 ppm, turns OFF when <= 1000 ppm (returns to optimal target)
   const needFansForCo2 = isCo2Valid && (prevFansCo2 ? currentCO2 > bands.exhaustCo2Off : currentCO2 >= bands.exhaustCo2On);
@@ -220,24 +236,38 @@ export const computeAutoDecision = (
   // High humidity exhaust: ON at >= 100%, turns OFF when <= 95% (returns to normal crop range)
   const needFansForHum = isHumValid && (prevFansHum ? currentHum > bands.exhaustHumOff : currentHum >= bands.exhaustHumOn);
 
-  // Misters: ON when hum < 75%, turns OFF when >= 84% (safely inside optimal 80-95% band)
-  const needMistersForHum = isHumValid && (prevMisters ? currentHum < bands.misterOff : currentHum < bands.misterOn);
+  // Misters: ON when hum < 75%, turns OFF when >= 75% (safely inside optimal 80-95% band)
+  const needMistersForHum = isHumValid && (prevMistersHum ? currentHum < bands.misterOff : currentHum < bands.misterOn);
 
+  // 3. TEMPERATURE REGULATION (Exhaust Fans & Evaporative Misters with Hysteresis & Grace)
+  // Fans: ON when temp > 25.0 °C, turns OFF when <= 24.2 °C (returns to safe optimal zone)
+  const needFansForTemp = isTempValid && (prevFansTemp ? currentTemp > bands.exhaustTempOff : currentTemp > bands.exhaustTempOn);
+
+  // Misters for Cooling: ON when temp > 25.0 °C, turns OFF when <= 24.2 °C (evaporative cooling)
+  const needMistersForTemp = isTempValid && (prevMistersTemp ? currentTemp > bands.misterTempOff : currentTemp > bands.misterTempOn);
+
+  // 4. UNIFIED MISTER STATE (Low Humidity OR High Temp Cooling)
   let misters = false;
-  if (needMistersForHum) {
+  let mistersHum = false;
+  let mistersTemp = false;
+  if (needMistersForHum || needMistersForTemp) {
     if (isWaterSafe) {
       misters = true;
-      reasons.misters = `Humidity ${Math.round(currentHum)}% below research threshold (< ${bands.misterOn}%) - Islam et al. (2022)`;
+      mistersHum = needMistersForHum;
+      mistersTemp = needMistersForTemp;
+      if (needMistersForTemp && needMistersForHum) {
+        reasons.misters = `Temp ${currentTemp.toFixed(1)}°C & humidity ${Math.round(currentHum)}%: evaporative cooling and humidification active`;
+      } else if (needMistersForTemp) {
+        reasons.misters = `Temp ${currentTemp.toFixed(1)}°C exceeds research ceiling (> ${bands.misterTempOn}°C): evaporative cooling active`;
+      } else {
+        reasons.misters = `Humidity ${Math.round(currentHum)}% below research threshold (< ${bands.misterOn}%) - Islam et al. (2022)`;
+      }
     } else {
       reasons.mistersBlocked = `Water at ${Math.round(currentWater)}%: misting paused to protect pump`;
     }
   }
 
-  // 3. TEMPERATURE REGULATION (Exhaust Fans with Hysteresis & Grace)
-  // ON when temp > 27.0 °C, turns OFF when <= 26.0 °C (returns to safe optimal zone; avoids tropical lock-on)
-  const needFansForTemp = isTempValid && (prevFansTemp ? currentTemp > bands.exhaustTempOff : currentTemp > bands.exhaustTempOn);
-
-  // 4. UNIFIED EXHAUST FAN STATE
+  // 5. UNIFIED EXHAUST FAN STATE
   let fans = false;
   let fansCo2 = false;
   let fansTemp = false;
@@ -284,6 +314,8 @@ export const computeAutoDecision = (
       fansTemp,
       fansHum,
       misters,
+      mistersHum,
+      mistersTemp,
       lights,
       valve,
       co2,

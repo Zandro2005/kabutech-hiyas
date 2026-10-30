@@ -127,7 +127,7 @@ describe('AwwSnapOfflineView and Environmental Widgets', () => {
         <RangeGauge
           scaleMin={0}
           scaleMax={50}
-          band={{ min: 18, max: 25 }}
+          band={{ min: 18, max: 25 } as any}
           current={24}
           color="#3b82f6"
           unit="°C"

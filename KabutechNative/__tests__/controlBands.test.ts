@@ -8,6 +8,8 @@ describe('controlBands - getControlBands', () => {
     // Temperature: Max 25°C ON, 24.2°C OFF (hysteresis cooling)
     expect(bands.exhaustTempOn).toBe(25.0);
     expect(bands.exhaustTempOff).toBe(24.2);
+    expect(bands.misterTempOn).toBe(25.0);
+    expect(bands.misterTempOff).toBe(24.2);
     expect(bands.tempColdBelow).toBe(16.0); // 18°C - 2.0°C grace
 
     // Humidity: Min 80% - 5% grace = 75% ON, 75% OFF

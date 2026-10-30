@@ -5,14 +5,16 @@ import { ACTIVE_PROFILE, CropProfile } from './cropProfiles';
  * Derived dynamically from the literature crop profile.
  */
 export interface ControlBands {
-  exhaustTempOn: number;  // Temp above which exhaust fan turns ON (27.0 °C)
-  exhaustTempOff: number; // Temp below which exhaust fan turns OFF (25.0 °C)
+  exhaustTempOn: number;  // Temp above which exhaust fan turns ON (25.0 °C)
+  exhaustTempOff: number; // Temp below which exhaust fan turns OFF (24.2 °C)
+  misterTempOn: number;   // Temp above which misters turn ON for evaporative cooling (25.0 °C)
+  misterTempOff: number;  // Temp below which misters turn OFF (24.2 °C)
   exhaustCo2On: number;   // CO2 above which exhaust fan turns ON (1150 ppm)
-  exhaustCo2Off: number;  // CO2 below which exhaust fan turns OFF (900 ppm)
+  exhaustCo2Off: number;  // CO2 below which exhaust fan turns OFF (1150 ppm)
   exhaustHumOn: number;   // Hum above which exhaust fan turns ON (100 %)
-  exhaustHumOff: number;  // Hum below which exhaust fan turns OFF (92 %)
+  exhaustHumOff: number;  // Hum below which exhaust fan turns OFF (100 %)
   misterOn: number;       // Hum below which misters turn ON (75 %)
-  misterOff: number;      // Hum above which misters turn OFF (88 %)
+  misterOff: number;      // Hum above which misters turn OFF (75 %)
   lightsOn: number;       // Light below which grow lights turn ON (150 lx)
   lightsOff: number;      // Light above which grow lights turn OFF (1000 lx)
   tempColdBelow: number;  // Temp below which fans are locked OFF to retain heat (16.0 °C)
@@ -37,6 +39,8 @@ export const getControlBands = (p: CropProfile = ACTIVE_PROFILE): ControlBands =
   return {
     exhaustTempOn: tempMax,                    // 25.0 °C (ON when exceeding 25°C optimal ceiling)
     exhaustTempOff: tempMax - 0.8,             // 24.2 °C (OFF once safely cooled into optimal band)
+    misterTempOn: tempMax,                     // 25.0 °C (ON for evaporative cooling when hot)
+    misterTempOff: tempMax - 0.8,              // 24.2 °C (OFF once safely cooled into optimal band)
     exhaustCo2On: co2Max + co2Grace,           // 1150 ppm (ON beyond grace)
     exhaustCo2Off: co2Max + co2Grace,          // 1150 ppm (OFF as soon as returned to optimal <= 1150 ppm)
     exhaustHumOn: humMax + humGrace,           // 100 % (ON only if 100% saturated)

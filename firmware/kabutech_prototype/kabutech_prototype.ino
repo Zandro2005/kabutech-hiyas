@@ -73,8 +73,8 @@
 // ═══════════════════════════════════════════════
 
 // WiFi Credentials
-#define WIFI_SSID       "bok"
-#define WIFI_PASSWORD   "00000000"
+#define WIFI_SSID       "Zandrix"
+#define WIFI_PASSWORD   "0907133ado"
 
 // Firebase Project Config
 #define API_KEY         "AIzaSyA3rB7rKIrfdJzCnFdnGvk25n0rd_hHI7M"
@@ -105,11 +105,11 @@
 
 // ═══════════════════════════════════════════════
 //  SENSOR CALIBRATION OFFSETS
-//  Compensates for ESP32 / breadboard self-heating
+//  Stock Factory Calibration (0.0 offset)
 // ═══════════════════════════════════════════════
 
-#define TEMP_OFFSET     -10.0    // Adjust temperature in °C (e.g. -3.0 lowers reading by 3°C)
-#define HUM_OFFSET       +15.0    // Adjust humidity in % RH (e.g. +2.0 or 0.0)
+#define TEMP_OFFSET       0.0    // Stock factory calibration (no offset)
+#define HUM_OFFSET        0.0    // Stock factory calibration (no offset)
 
 // ═══════════════════════════════════════════════
 //  TIMING CONFIG
@@ -540,20 +540,22 @@ void runAutoRegulation() {
 
   // 1. High Temperature Cooling (Oyster Optimal: 18.0 - 25.0 °C)
   // Model Predictive Control (MPC): Activates cooling if current OR predicted temp exceeds 25.0 °C
-  bool needFansForTemp = false;
+  bool needCoolingForTemp = false;
   if (isTempValid) {
+    bool coolingActive = (stateExhaust || stateMister);
     if (aiReady && aiChannelValid[0]) {
-      if (stateExhaust) {
+      if (coolingActive) {
         // Maintain cooling until BOTH current and predicted temp return to safe optimal range
-        needFansForTemp = (currentT > 24.2) || (predTemp10m > 24.5);
+        needCoolingForTemp = (currentT > 24.2) || (predTemp10m > 24.5);
       } else {
-        // Trigger fans immediately if CURRENT temp > 25.0 OR PREDICTED temp > 25.0!
-        needFansForTemp = (currentT > 25.0) || (predTemp10m > 25.0);
+        // Trigger cooling immediately if CURRENT temp > 25.0 OR PREDICTED temp > 25.0!
+        needCoolingForTemp = (currentT > 25.0) || (predTemp10m > 25.0);
       }
     } else {
-      needFansForTemp = stateExhaust ? (currentT > 24.2) : (currentT > 25.0);
+      needCoolingForTemp = coolingActive ? (currentT > 24.2) : (currentT > 25.0);
     }
   }
+  bool needFansForTemp = needCoolingForTemp;
 
   // 2. CO2 Ventilation (Oyster Optimal: < 1000 ppm)
   bool needFansForCo2 = false;
@@ -631,24 +633,28 @@ void runAutoRegulation() {
     }
   }
 
-  // 4. Ultrasonic Misters (Islam et al., 2022 / Oyster Optimal: 80 - 95 % RH)
-  bool needMister = false;
+  // 4. Ultrasonic Misters (Islam et al., 2022 / Oyster Optimal: 80 - 95 % RH & High-Temp Evaporative Cooling)
+  bool needMisterForHum = false;
   if (isHumValid) {
     if (aiReady && aiChannelValid[1]) {
       if (stateMister) {
         // Maintain misting until humidity is safely inside optimal range (88%)
-        needMister = (currentH < 88.0) || (predHum10m < 85.0);
+        needMisterForHum = (currentH < 88.0) || (predHum10m < 85.0);
       } else {
         // Trigger misting immediately if CURRENT humidity < 80% OR PREDICTED < 80%!
-        needMister = (currentH < 80.0) || (predHum10m < 80.0);
+        needMisterForHum = (currentH < 80.0) || (predHum10m < 80.0);
       }
     } else {
-      needMister = stateMister ? (currentH < 88.0) : (currentH < 80.0);
+      needMisterForHum = stateMister ? (currentH < 88.0) : (currentH < 80.0);
     }
   } else {
     // FAIL-SAFE: Never run ultrasonic mister blind when humidity is unverified (prevents flooding)
-    needMister = false;
+    needMisterForHum = false;
   }
+
+  // Evaporative Cooling: Misters activate in synergy with fans when temperature is high (> 25.0 °C)
+  bool needMisterForTemp = !isTempCold && needCoolingForTemp;
+  bool needMister = needMisterForHum || needMisterForTemp;
 
   // Combined Mister Actuation with Dwell Timing & Confirmation Streaks
   if (needMister) {
