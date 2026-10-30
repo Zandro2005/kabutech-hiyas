@@ -73,8 +73,8 @@
 // ═══════════════════════════════════════════════
 
 // WiFi Credentials
-#define WIFI_SSID       "Zandrix"
-#define WIFI_PASSWORD   "0907133ado"
+#define WIFI_SSID       "bok"
+#define WIFI_PASSWORD   "00000000"
 
 // Firebase Project Config
 #define API_KEY         "AIzaSyA3rB7rKIrfdJzCnFdnGvk25n0rd_hHI7M"

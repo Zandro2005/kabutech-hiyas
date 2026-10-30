@@ -1,60 +1,73 @@
 # 🖥️ TFT Display UI & Graphics Engine
 
 > **Source Header:** [firmware/kabutech_prototype/tft_display.h](file:///c:/Users/ADMIN/Documents/kabutech-hiyas-main/firmware/kabutech_prototype/tft_display.h)  
-> **Driver:** LovyanGFX library  
-> **Hardware:** 3.2" 240×320 SPI Color TFT (ILI9341 controller)  
-> **Orientation:** Landscape Upright (Rotation 7)
+> **Driver Library:** LovyanGFX  
+> **Hardware:** 3.2" 240×320 SPI Color TFT Display (ILI9341 controller)  
+> **Orientation:** Landscape Upright (Rotation `7`)
 
 ---
 
 ## 📌 Hardware Pin Connections
 
-To eliminate white-screen glitching and SPI ringing over 30cm ribbon wires, the SPI bus is tuned to **4 MHz**:
+To eliminate white-screen glitching, bus ringing, and crosstalk over 30cm ribbon wires, the SPI bus clock is configured at **4 MHz**:
 
-| TFT Pin | Function | ESP32-S3 Pin | Note |
+| TFT Pin | Function | ESP32-S3 Pin | Description |
 | :--- | :--- | :--- | :--- |
 | **`VCC`** | Power | `5V / VIN` | Direct to 5V rail |
 | **`GND`** | Ground | `GND` | Common ground rail |
-| **`CS`** | Chip Select | **GPIO 10** | Active LOW |
-| **`RESET`** | Hardware Reset | **GPIO 6** | Controlled on boot |
-| **`DC`** | Data / Command | **GPIO 15** | Command vs Data toggle |
+| **`CS`** | Chip Select | **GPIO 10** | Active LOW chip select |
+| **`RESET`** | Hardware Reset | **GPIO 6** | Controlled reset on power-up |
+| **`DC`** | Data / Command | **GPIO 15** | Register vs pixel data selector |
 | **`SDI / MOSI`**| SPI Data In | **GPIO 17** | Master Out Slave In |
-| **`SCK`** | SPI Clock | **GPIO 18** | Master Clock (4 MHz) |
-| **`LED`** | Backlight | **GPIO 7** | PWM / 3.3V power |
+| **`SCK`** | SPI Clock | **GPIO 18** | Master SPI Clock (4 MHz) |
+| **`LED`** | Backlight | **GPIO 2** | Backlight power control / PWM |
 
 ---
 
-## 🎨 Screen Layout & Widgets
+## 🎨 Dynamic Mode Color Themes
 
-The 240×320 landscape screen is split into three main regions:
+The on-screen color theme changes automatically to give the grower immediate situational awareness from across the room:
+
+| Operational Mode | Primary Accent Color | Background Style | Meaning |
+| :--- | :--- | :--- | :--- |
+| **`AUTO`** | **Emerald Green** (`0x07E0`) | Deep Slate Dark | Autonomous regulation active. |
+| **`MANUAL`** | **Vibrant Amber / Orange** | High Contrast Dark | User override engaged via app. |
+| **`SCHEDULE`** | **Electric Cyan / Blue** | Deep Slate Dark | Running programmed timer windows. |
+| **`FAULT / ALARM`** | **Crimson Red** | Flashing Header | Sensor fault or extreme threshold breach. |
+
+---
+
+## 🖥️ Screen Layout & Widget Architecture
+
+The 240×320 landscape canvas is partitioned into three functional tiers:
 
 ```
 ┌────────────────────────────────────────────────────────────┐
 │ 🍄 KABUTECH HIYAS    [● ONLINE]  [WIFI: -54 dBm]  [12:30]  │  <-- Header Bar (30px)
 ├───────────────────────────────┬────────────────────────────┤
 │   TEMPERATURE      HUMIDITY   │      ACTUATORS STATUS      │
-│     23.8 °C         88.5 %    │  [FAN IN]   OFF            │  <-- Telemetry Grid
-│   (Target: 24.0)  (Target: 90)│  [EXHAUST]  ON             │      & Live Relays
+│     23.8 °C         88.5 %    │  [FAN IN]   OFF            │  <-- Live Telemetry Cards
+│   (Target: 24.0)  (Target: 90)│  [EXHAUST]  ON             │      & Hardware Relay Matrix
 ├───────────────────────────────┤  [MISTER]   ON             │
 │       CO2            LIGHT    │  [LIGHTS]   ON (Auto)      │
 │     780 ppm         420 lux   │                            │
 ├───────────────────────────────┴────────────────────────────┤
-│ 🔮 AI Forecast (+10m): Temp 24.2°C | RH 91.0% | CO2 810ppm │  <-- Predictive Footer
+│ 🔮 AI Forecast (+10m): Temp 24.1°C | RH 90.8% | CO2 810ppm │  <-- Predictive AI Footer
 └────────────────────────────────────────────────────────────┘
 ```
 
 ### 1. Header Bar
-- **App Title & Mushroom Icon**
-- **Connection Badge**: Green dot for Cloud Connected, Orange for Reconnecting, Grey for Offline.
-- **Wi-Fi Signal Indicator**: Shows RSSI value in dBm.
+* **Branding & Chamber Identifier**: Displays "KABUTECH HIYAS".
+* **Connection Badge**: Green dot for Cloud Connected, Orange for Reconnecting, Red/Grey for Local Failsafe.
+* **Wi-Fi Signal Strength**: Real-time RSSI readout in dBm.
 
-### 2. Telemetry Cards (Dynamic Color Alerting)
-- **Green**: Reading is within the safe biological fruiting band.
-- **Amber / Yellow**: Reading in warning tier (e.g. humidity drifting below 80%).
-- **Red**: Critical fault (e.g. CO₂ > 1,500 ppm or Temp > 28°C).
+### 2. Telemetry Cards (Color-Coded Health Dials)
+* **Green (Nominal)**: Parameter within safe biological oyster fruiting band.
+* **Amber (Warning)**: Parameter drifting near tolerance limit.
+* **Red (Critical)**: Active breach (e.g. CO₂ > 1,200 ppm or Temp > 27°C).
 
 ### 3. Predictive Edge AI Footer
-- Shows on-device real-time predictions from `edge_forecast.h`, giving operators immediate visual confirmation of upcoming climate trends.
+* Renders real-time predictions generated by `edge_forecast.h`, confirming whether upcoming temperature, humidity, or CO₂ drift warrants early actuation.
 
 ---
-*Return to [[firmware_architecture|Firmware Architecture]] | [[prototype_guide|Prototype Guide]] | [[index|Dashboard]]*
+*Return to [[firmware_architecture|Firmware Architecture]] | [[prototype_guide|Prototype Guide]] | [[current_project_state|Current Project State]] | [[index|Dashboard]]*

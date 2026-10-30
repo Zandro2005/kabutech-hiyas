@@ -1,6 +1,6 @@
 # 📐 Hardware Schematics & Pinout Specifications
 
-> **System:** ESP32-S3 Automation Hub with Isolated Relay Drivers & I2C Sensor Bus  
+> **System:** ESP32-S3 Automation Hub with Isolated Relays, I2C Sensor Bus & SPI Display  
 > **Schematic Diagram:** `docs/attachments/kabutech_hiyas_schematic.png`
 
 ---
@@ -12,42 +12,42 @@
 
 ---
 
-## 🔌 Connector Pinouts (GX16 Aviation Ports)
+## 📌 Pin Allocations: Active Prototype vs. Production Enclosure
 
-The enclosure utilizes keyed GX16 aviation screw-lock circular connectors to prevent miswiring:
+To support smooth transition from breadboard validation to final enclosure fabrication, pin assignments are cross-referenced below:
 
-| Port | Connector Type | Function | Terminal Wiring Details |
+### 1. Active Breadboard Prototype Pinout (Current Firmware)
+
+| Subsystem | Signal Name | ESP32-S3 Pin | Physical Connection |
 | :--- | :--- | :--- | :--- |
-| **`[POWER]`** | IP68 Cable Gland | 220V AC Grid Mains | Pin 1: Live (L), Pin 2: Neutral (N), Pin 3: Earth Ground (E) |
-| **`[WATER]`** | Push-Fit 3/8" Quick-Connect | Pressurized Water Supply | Direct to internal 12V DC Normally-Closed Solenoid Valve |
-| **`[PROBE]`** | GX16 4-Pin Female | Hanging Sensor Probe | Pin 1: **3.3V DC**, Pin 2: **GND**, Pin 3: **SDA (GPIO 4)**, Pin 4: **SCL (GPIO 5)** |
-| **`[FAN 1]`** | GX16 4-Pin Male | 120mm Exhaust Fan | Pin 1: 12V (+), Pin 2: Relay 1 NO, Pin 3: GND, Pin 4: Earth |
-| **`[FAN 2]`** | GX16 4-Pin Male | 120mm Intake Fan | Pin 1: 12V (+), Pin 2: Relay 4 NO, Pin 3: GND, Pin 4: Earth |
-| **`[MIST]`**  | GX16 4-Pin Male | High-Pressure Mist Pump | Pin 1: 12V (+), Pin 2: Relay 2 NO, Pin 3: GND, Pin 4: Earth |
-| **`[LIGHT]`** | GX16 4-Pin Male | Grow Light LED Array | Pin 1: 12V (+), Pin 2: Relay 3 NO, Pin 3: GND, Pin 4: Earth |
+| **I2C Bus** | `SDA` | **GPIO 4** | SHT31-D, BH1750, SCD41 (Shared Data) |
+| **I2C Bus** | `SCL` | **GPIO 5** | SHT31-D, BH1750, SCD41 (Shared Clock) |
+| **Actuators** | Fan Intake | **GPIO 9** | Air In LED / Relay Driver 1 |
+| **Actuators** | Mister / Fogger | **GPIO 11** | Mister LED / Relay Driver 2 (Valve runs in parallel) |
+| **Actuators** | Grow Lights | **GPIO 12** | Grow Light LED / Relay Driver 3 |
+| **Actuators** | Fan Exhaust | **GPIO 13** | Air Out LED / Relay Driver 4 |
+| **TFT SPI** | `TFT_CS` | **GPIO 10** | 3.2" ILI9341 Chip Select |
+| **TFT SPI** | `TFT_DC` | **GPIO 15** | 3.2" ILI9341 Data / Command |
+| **TFT SPI** | `TFT_RST` | **GPIO 6** | 3.2" ILI9341 Hardware Reset |
+| **TFT SPI** | `TFT_MOSI` | **GPIO 17** | 3.2" ILI9341 SDI / MOSI Data |
+| **TFT SPI** | `TFT_SCK` | **GPIO 18** | 3.2" ILI9341 SPI Clock |
+| **TFT SPI** | `TFT_LED` | **GPIO 2** | Backlight Control |
 
 ---
 
-## 📌 Microcontroller Pin Allocation (ESP32-S3)
+### 2. Final Industrial Enclosure Ports (GX16 Aviation Connectors)
 
-### Digital I2C Sensor Bus
-- **GPIO 4**: `SDA` (Shared by SHT31-D, BH1750, SCD41, and SSD1306 OLED)
-- **GPIO 5**: `SCL` (Shared I2C Clock, 100 kHz standard mode)
+Keyed circular connectors prevent accidental reverse-polarity or misconnection during farm cleaning:
 
-### Actuator Relay Outputs (Active LOW / Optocoupled)
-- **GPIO 9**: `RELAY 1` — Exhaust Fan (Air evacuation)
-- **GPIO 10**: `RELAY 2` — Intake Fan (Fresh oxygen)
-- **GPIO 11**: `RELAY 3` — Ultrasonic Mister / High-Pressure Pump
-- **GPIO 12**: `RELAY 4` — LED Fruiting Light Strip
-- **GPIO 13**: `RELAY 5` — Solenoid Water Valve
-
-### Auxiliary Sensors & User Interface
-- **GPIO 14**: Water Level Sensor (XKC-Y25 capacitive digital input)
-- **GPIO 15**: Water Flow Sensor (YF-S201 Hall interrupt counter)
-- **GPIO 16**: Auto / Manual Panel Rotary Switch
-- **GPIO 17**: Enclosure Reset / Wi-Fi Pairing Button
-- **GPIO 18**: Status LED — Wi-Fi Blue
-- **GPIO 19**: Status LED — Alarm Red
+| Port Label | Connector Type | Attached Device | Terminal Wiring Details |
+| :--- | :--- | :--- | :--- |
+| **`[POWER]`** | IP68 Cable Gland | 220V AC Grid Mains | Pin 1: Live (L), Pin 2: Neutral (N), Pin 3: Earth Ground (E) |
+| **`[WATER]`** | Push-Fit 3/8" Quick-Connect | High-Pressure Mist Line | Connects to internal 12V Normally-Closed Solenoid Valve |
+| **`[PROBE]`** | GX16 4-Pin Female | Hanging Sensor Probe | Pin 1: **3.3V DC**, Pin 2: **GND**, Pin 3: **SDA (GPIO 4)**, Pin 4: **SCL (GPIO 5)** |
+| **`[FAN 1]`** | GX16 4-Pin Male | 120mm Exhaust Fan | Pin 1: 12V (+), Pin 2: Relay NO, Pin 3: GND, Pin 4: Earth |
+| **`[FAN 2]`** | GX16 4-Pin Male | 120mm Intake Fan | Pin 1: 12V (+), Pin 2: Relay NO, Pin 3: GND, Pin 4: Earth |
+| **`[MIST]`**  | GX16 4-Pin Male | High-Pressure Mist Pump | Pin 1: 12V (+), Pin 2: Relay NO, Pin 3: GND, Pin 4: Earth |
+| **`[LIGHT]`** | GX16 4-Pin Male | Fruiting LED Array | Pin 1: 12V (+), Pin 2: Relay NO, Pin 3: GND, Pin 4: Earth |
 
 ---
 
@@ -61,4 +61,4 @@ The enclosure utilizes keyed GX16 aviation screw-lock circular connectors to pre
    - 5A blade fuse on 12V DC power bus.
 
 ---
-*Return to [[controller_enclosure|Controller Enclosure]] | [[bill_of_materials|Bill of Materials]] | [[index|Dashboard]]*
+*Return to [[controller_enclosure|Controller Enclosure]] | [[bill_of_materials|Bill of Materials]] | [[current_project_state|Current Project State]] | [[index|Dashboard]]*
