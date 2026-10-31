@@ -67,6 +67,7 @@ Welcome to the complete knowledge base, technical documentation, and thesis repo
 - **[[biological_baselines|Biological Baselines]]**: Empirical parameter thresholds for temperature, humidity, CO₂, and lighting based on *P. ostreatus* literature.
 
 ### 📐 [[schematics_and_pinouts|02 — Hardware & Electronics]]
+- **[[sensor_calibration_and_validation|Sensor Calibration & Empirical Validation]]**: Factory calibration traceability (Sensirion/ROHM), agricultural accuracy comparison matrix, and defense script.
 - **[[schematics_and_pinouts|Schematics & Pinouts]]**: Active breadboard pinout vs production GX16 aviation connector assignments.
 - **[[bill_of_materials|Bill of Materials & Shopping List]]**: 55+ items, ₱15,000 budget breakdown, Shopee/Lazada sourcing specs.
 - **[[sensor_probe_design|Sensor Probe Design]]**: Multi-plate meteorological radiation shield, PTFE hydrophobic membrane disc, exploded views.

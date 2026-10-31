@@ -34,6 +34,7 @@ import { ref, update } from 'firebase/database';
 import { db } from '../services/firebase';
 import tw from '../tailwind';
 import { useSensors, useSettings } from '../hooks/useFirebaseData';
+import { useSensorHealth } from '../hooks/useSensorHealth';
 import { useTheme } from '../context/ThemeContext';
 import { evaluateChamber } from '../utils/environmentRanges';
 import { ACTIVE_PROFILE } from '../config/cropProfiles';
@@ -86,6 +87,8 @@ export default function ReportScreen() {
   const insets = useSafeAreaInsets();
   const sensors = useSensors();
   const settings = useSettings();
+  const health = useSensorHealth();
+  const isControllerOffline = !health.isControllerOnline;
   const { isDarkMode } = useTheme();
   const { width } = useResponsive();
 
@@ -102,10 +105,11 @@ export default function ReportScreen() {
   const [showSuggestionsModal, setShowSuggestionsModal] = useState(false);
 
   // Edge AI live status from ESP32
-  const isPreempting = Boolean(sensors?.ai_action && sensors.ai_action !== 'none');
-  const isAiReady = Boolean(sensors?.ai_ready);
+  const isPreempting = !isControllerOffline && Boolean(sensors?.ai_action && sensors.ai_action !== 'none');
+  const isAiReady = !isControllerOffline && Boolean(sensors?.ai_ready);
 
   const preemptLabel = useMemo(() => {
+    if (isControllerOffline) return 'Operating autonomously in offline mode';
     switch (sensors?.ai_action) {
       case 'preempt_exhaust_temp':
         return 'Cooling temp spike ahead';
@@ -116,7 +120,7 @@ export default function ReportScreen() {
       default:
         return 'Pre-empting spike (+10m)';
     }
-  }, [sensors?.ai_action]);
+  }, [isControllerOffline, sensors?.ai_action]);
 
   // Pulse animation for alert dots
   const pulseAnim = useRef(new Animated.Value(1)).current;
@@ -133,32 +137,32 @@ export default function ReportScreen() {
 
 
 
-  // Sensor inputs
-  const liveTemp = typeof sensors.temperature === 'number' && sensors.temperature > 0 && sensors.temperature !== -999 ? sensors.temperature : 0;
-  const liveHum = typeof sensors.humidity === 'number' && sensors.humidity > 0 && sensors.humidity !== -999 ? sensors.humidity : 0;
-  const liveLight = typeof sensors.light === 'number' && sensors.light >= 0 && sensors.light !== -999 ? sensors.light : 0;
-  const liveCo2 = typeof sensors.co2 === 'number' && sensors.co2 > 0 && sensors.co2 !== -999 ? sensors.co2 : 0;
+  // Sensor inputs (Strictly nullified/zeroed when controller is offline to hide stale numbers)
+  const liveTemp = (!isControllerOffline && typeof sensors.temperature === 'number' && sensors.temperature > 0 && sensors.temperature !== -999) ? sensors.temperature : 0;
+  const liveHum = (!isControllerOffline && typeof sensors.humidity === 'number' && sensors.humidity > 0 && sensors.humidity !== -999) ? sensors.humidity : 0;
+  const liveLight = (!isControllerOffline && typeof sensors.light === 'number' && sensors.light >= 0 && sensors.light !== -999) ? sensors.light : -999;
+  const liveCo2 = (!isControllerOffline && typeof sensors.co2 === 'number' && sensors.co2 > 0 && sensors.co2 !== -999) ? sensors.co2 : 0;
 
   const targetTemp = settings?.setpoints?.temperature ?? 28.0;
   const targetHum = settings?.setpoints?.humidity ?? 85;
   const targetLight = settings?.setpoints?.light ?? 580;
   const targetCo2 = settings?.setpoints?.co2 ?? 690;
 
-  // TinyML Edge AI predictions received from ESP32
-  const aiReady = Boolean(sensors?.ai_ready);
-  const aiPredTemp = (typeof sensors?.ai_pred_temp_10m === 'number' && sensors.ai_pred_temp_10m !== -999) ? sensors.ai_pred_temp_10m : null;
-  const aiPredHum = (typeof sensors?.ai_pred_hum_10m === 'number' && sensors.ai_pred_hum_10m !== -999) ? sensors.ai_pred_hum_10m : null;
-  const aiPredCo2 = (typeof sensors?.ai_pred_co2_10m === 'number' && sensors.ai_pred_co2_10m !== -999) ? sensors.ai_pred_co2_10m : null;
-  const aiPredLight = (typeof sensors?.ai_pred_light_10m === 'number' && sensors.ai_pred_light_10m !== -999) ? sensors.ai_pred_light_10m : null;
+  // TinyML Edge AI predictions received from ESP32 (nullified when offline)
+  const aiReady = !isControllerOffline && Boolean(sensors?.ai_ready);
+  const aiPredTemp = (!isControllerOffline && typeof sensors?.ai_pred_temp_10m === 'number' && sensors.ai_pred_temp_10m !== -999) ? sensors.ai_pred_temp_10m : null;
+  const aiPredHum = (!isControllerOffline && typeof sensors?.ai_pred_hum_10m === 'number' && sensors.ai_pred_hum_10m !== -999) ? sensors.ai_pred_hum_10m : null;
+  const aiPredCo2 = (!isControllerOffline && typeof sensors?.ai_pred_co2_10m === 'number' && sensors.ai_pred_co2_10m !== -999) ? sensors.ai_pred_co2_10m : null;
+  const aiPredLight = (!isControllerOffline && typeof sensors?.ai_pred_light_10m === 'number' && sensors.ai_pred_light_10m !== -999) ? sensors.ai_pred_light_10m : null;
 
-  const tempVariance = Number((liveTemp - targetTemp).toFixed(1));
-  const humVariance = Number((liveHum - targetHum).toFixed(1));
-  const co2Variance = Number((liveCo2 - targetCo2).toFixed(0));
+  const tempVariance = liveTemp > 0 ? Number((liveTemp - targetTemp).toFixed(1)) : 0;
+  const humVariance = liveHum > 0 ? Number((liveHum - targetHum).toFixed(1)) : 0;
+  const co2Variance = liveCo2 > 0 ? Number((liveCo2 - targetCo2).toFixed(0)) : 0;
 
   const isTempCritical = liveTemp > 0 && tempVariance > 1.8;
   const isHumCritical = liveHum > 0 && humVariance < -12;
   const isCo2Critical = liveCo2 > 0 && co2Variance > 180;
-  const hasCriticalRisk = isTempCritical || isHumCritical || isCo2Critical;
+  const hasCriticalRisk = !isControllerOffline && (isTempCritical || isHumCritical || isCo2Critical);
 
   const chamberEval = useMemo(() => {
     return evaluateChamber(
@@ -168,10 +172,12 @@ export default function ReportScreen() {
         light: liveLight >= 0 ? liveLight : null,
         co2: liveCo2 > 0 ? liveCo2 : null,
       },
-      {},
+      {
+        isControllerOffline,
+      },
       ACTIVE_PROFILE
     );
-  }, [liveTemp, liveHum, liveLight, liveCo2]);
+  }, [liveTemp, liveHum, liveLight, liveCo2, isControllerOffline]);
 
   // Dynamic projections backed by real Edge AI TinyML
   const futureValues = useMemo(() => {
@@ -278,6 +284,19 @@ export default function ReportScreen() {
   }, [liveTemp, liveHum, liveLight, liveCo2, targetTemp, targetHum, targetLight, targetCo2, isTempCritical, isHumCritical, isCo2Critical, aiPredTemp, aiPredHum, aiPredLight, aiPredCo2, sensors.light]);
 
   const activeMetricData = useMemo(() => {
+    if (isControllerOffline) {
+      return {
+        name: activeMetric === 'temp' ? 'Temperature' : activeMetric === 'hum' ? 'Humidity' : activeMetric === 'light' ? 'Light Level' : 'CO₂',
+        unit: activeMetric === 'temp' ? '°C' : activeMetric === 'hum' ? '%' : activeMetric === 'light' ? 'lx' : 'ppm',
+        live: '--',
+        pred: '--',
+        ai10m: '--',
+        target: '--',
+        variance: '--',
+        isCritical: false,
+        hasSensor: false,
+      };
+    }
     switch (activeMetric) {
       case 'temp':
         return {
@@ -328,7 +347,7 @@ export default function ReportScreen() {
           hasSensor: liveCo2 > 0,
         };
     }
-  }, [activeMetric, liveTemp, liveHum, liveLight, liveCo2, targetTemp, targetHum, targetLight, targetCo2, tempVariance, humVariance, co2Variance, futureValues, aiPredTemp, aiPredHum, aiPredLight, aiPredCo2, isTempCritical, isHumCritical, isCo2Critical, sensors.light]);
+  }, [activeMetric, isControllerOffline, liveTemp, liveHum, liveLight, liveCo2, targetTemp, targetHum, targetLight, targetCo2, tempVariance, humVariance, co2Variance, futureValues, aiPredTemp, aiPredHum, aiPredLight, aiPredCo2, isTempCritical, isHumCritical, isCo2Critical, sensors.light]);
 
   const handleResync = () => {
     if (isScanning) return;
@@ -348,6 +367,26 @@ export default function ReportScreen() {
 
   // Forecast Chart calculations
   const chartData = useMemo(() => {
+    const unit =
+      activeMetric === 'temp'
+        ? '°C'
+        : activeMetric === 'hum'
+        ? '%'
+        : activeMetric === 'light'
+        ? 'lx'
+        : 'ppm';
+
+    if (isControllerOffline) {
+      return {
+        unit,
+        points: [],
+        minVal: 0,
+        maxVal: 100,
+        targetVal: 0,
+        hasSensor: false,
+      };
+    }
+
     const pointCount = activeHorizon === '2H' ? 9 : activeHorizon === '6H' ? 13 : 13;
     const intervalMinutes = activeHorizon === '2H' ? 15 : activeHorizon === '6H' ? 30 : 120;
 
@@ -367,14 +406,6 @@ export default function ReportScreen() {
         : activeMetric === 'light'
         ? targetLight
         : targetCo2;
-    const unit =
-      activeMetric === 'temp'
-        ? '°C'
-        : activeMetric === 'hum'
-        ? '%'
-        : activeMetric === 'light'
-        ? 'lx'
-        : 'ppm';
 
     const hasSensor =
       activeMetric === 'temp' ? liveTemp > 0 :
@@ -449,7 +480,7 @@ export default function ReportScreen() {
     });
 
     return { points, unit, targetVal, hasSensor };
-  }, [activeHorizon, activeMetric, liveTemp, liveHum, liveLight, liveCo2, targetTemp, targetHum, targetLight, targetCo2, aiPredTemp, aiPredHum, aiPredLight, aiPredCo2, sensors.light]);
+  }, [activeHorizon, activeMetric, isControllerOffline, liveTemp, liveHum, liveLight, liveCo2, targetTemp, targetHum, targetLight, targetCo2, aiPredTemp, aiPredHum, aiPredLight, aiPredCo2, sensors.light]);
 
   const yAxisWidth = 46;
   const chartHeight = 220;
@@ -570,7 +601,9 @@ export default function ReportScreen() {
     }
   }, [showSuggestionsModal, translateY]);
 
-  const activeScrubPoint = scrubIndex !== null ? chartData.points[scrubIndex] : chartData.points[chartData.points.length - 1];
+  const activeScrubPoint = (chartData.points.length > 0)
+    ? (scrubIndex !== null && chartData.points[scrubIndex] ? chartData.points[scrubIndex] : chartData.points[chartData.points.length - 1])
+    : { timeLabel: '--', fullTimeLabel: '--', val: '--', rawVal: 0, relLabel: '--', index: 0 };
 
   const handleBack = () => {
     hapticLight();
@@ -602,15 +635,36 @@ export default function ReportScreen() {
 
             <View style={tw`flex-row items-center gap-2`}>
               <Text style={[tw`text-[20px] text-slate-900 dark:text-white`, { fontFamily: 'PlusJakartaSans_800ExtraBold' }]}>
-                Prediction Hub
+                {isControllerOffline ? 'Prediction Hub' : 'Prediction Hub'}
               </Text>
-              <Animated.View
+              <View
                 style={[
-                  tw`w-2 h-2 rounded-full`,
-                  hasCriticalRisk ? tw`bg-rose-500` : tw`bg-emerald-500`,
-                  { transform: [{ scale: pulseAnim }] },
+                  tw`px-2 py-0.5 rounded-full border flex-row items-center gap-1`,
+                  isControllerOffline
+                    ? tw`bg-amber-50 dark:bg-amber-950/40 border-amber-300 dark:border-amber-700`
+                    : hasCriticalRisk
+                    ? tw`bg-rose-50 dark:bg-rose-950/40 border-rose-300 dark:border-rose-700`
+                    : tw`bg-emerald-50 dark:bg-emerald-950/40 border-emerald-200 dark:border-emerald-800`,
                 ]}
-              />
+              >
+                <View
+                  style={[
+                    tw`w-1.5 h-1.5 rounded-full`,
+                    { backgroundColor: isControllerOffline ? '#f59e0b' : hasCriticalRisk ? '#f43f5e' : '#10b981' },
+                  ]}
+                />
+                <Text
+                  style={[
+                    tw`text-[9.5px] uppercase font-extrabold`,
+                    {
+                      color: isControllerOffline ? (isDarkMode ? '#fbbf24' : '#b45309') : hasCriticalRisk ? '#f43f5e' : (isDarkMode ? '#34d399' : '#059669'),
+                      fontFamily: 'PlusJakartaSans_800ExtraBold',
+                    },
+                  ]}
+                >
+                  {isControllerOffline ? 'Offline' : hasCriticalRisk ? 'Critical' : 'Live'}
+                </Text>
+              </View>
             </View>
           </View>
 
@@ -628,16 +682,41 @@ export default function ReportScreen() {
           </TouchableOpacity>
         </View>
 
+        {/* Dedicated Offline Notice Banner */}
+        {isControllerOffline && (
+          <View style={tw`w-full bg-amber-500/10 border border-amber-500/30 rounded-2xl p-3.5 mb-4 flex-row items-center gap-3`}>
+            <View style={tw`w-9 h-9 rounded-xl bg-amber-500/20 items-center justify-center shrink-0`}>
+              <MaterialCommunityIcons name="cloud-off-outline" size={20} color="#f59e0b" />
+            </View>
+            <View style={tw`flex-1`}>
+              <Text style={[tw`text-[12.5px] text-amber-800 dark:text-amber-300 font-bold`, { fontFamily: 'PlusJakartaSans_800ExtraBold' }]}>
+                Hardware Controller Offline
+              </Text>
+              <Text style={[tw`text-[11px] text-amber-700/80 dark:text-amber-300/80 leading-tight mt-0.5`, { fontFamily: 'PlusJakartaSans_500Medium' }]}>
+                Sensor numbers are hidden to prevent stale reading confusion. The ESP32 is actively regulating chamber actuators locally with Edge AI.
+              </Text>
+            </View>
+          </View>
+        )}
+
         {/* Top Main Card (Rock-solid View container with gradient overlay) */}
         <View
           style={[
             tw`w-full rounded-[28px] p-5 mb-4 shadow-sm overflow-hidden relative`,
-            { backgroundColor: (activeMetricData.isCritical || hasCriticalRisk) ? '#dc2626' : '#2563eb' },
+            {
+              backgroundColor: isControllerOffline
+                ? (isDarkMode ? '#334155' : '#64748b')
+                : (activeMetricData.isCritical || hasCriticalRisk)
+                ? '#dc2626'
+                : '#2563eb',
+            },
           ]}
         >
           <LinearGradient
             colors={
-              (activeMetricData.isCritical || hasCriticalRisk)
+              isControllerOffline
+                ? (isDarkMode ? ['#334155', '#1e293b'] : ['#64748b', '#475569'])
+                : (activeMetricData.isCritical || hasCriticalRisk)
                 ? ['#dc2626', '#ea580c']
                 : ['#0284c7', '#2563eb']
             }
@@ -659,13 +738,24 @@ export default function ReportScreen() {
                 ellipsizeMode="tail"
                 style={[tw`text-blue-100 text-[11px] tracking-wider uppercase`, { fontFamily: 'PlusJakartaSans_700Bold' }]}
               >
-                {activeMetricData.isCritical ? `⚠️ Critical ${activeMetricData.name} Forecast` : hasCriticalRisk ? '⚠️ Critical Anomaly' : `${activeMetricData.name} Forecast`}
+                {isControllerOffline
+                  ? `${activeMetricData.name} Telemetry`
+                  : activeMetricData.isCritical
+                  ? `⚠️ Critical ${activeMetricData.name} Forecast`
+                  : hasCriticalRisk
+                  ? '⚠️ Critical Anomaly'
+                  : `${activeMetricData.name} Forecast`}
               </Text>
             </View>
-            <View style={tw`bg-emerald-500/90 px-2.5 py-0.5 rounded-full flex-row items-center gap-1 shrink-0`}>
+            <View
+              style={[
+                tw`px-2.5 py-0.5 rounded-full flex-row items-center gap-1 shrink-0`,
+                isControllerOffline ? tw`bg-amber-500/90` : tw`bg-emerald-500/90`,
+              ]}
+            >
               <View style={tw`w-1.5 h-1.5 rounded-full bg-white`} />
               <Text style={[tw`text-white text-[9.5px] tracking-wider`, { fontFamily: 'PlusJakartaSans_800ExtraBold' }]}>
-                {aiReady ? 'TINYML ON-DEVICE' : (activeMetricData.hasSensor ? 'MODEL ACTIVE' : 'AWAITING SENSORS')}
+                {isControllerOffline ? 'CONTROLLER OFFLINE' : aiReady ? 'TINYML ON-DEVICE' : (activeMetricData.hasSensor ? 'MODEL ACTIVE' : 'AWAITING SENSORS')}
               </Text>
             </View>
           </View>
@@ -676,7 +766,11 @@ export default function ReportScreen() {
             adjustsFontSizeToFit
             style={[tw`text-white text-[26px] mb-3 text-center`, { fontFamily: 'PlusJakartaSans_800ExtraBold' }]}
           >
-            {activeMetricData.hasSensor ? `${activeMetricData.pred} Projected` : 'Awaiting Live Sensors'}
+            {isControllerOffline
+              ? 'Offline · Telemetry Hidden'
+              : activeMetricData.hasSensor
+              ? `${activeMetricData.pred} Projected`
+              : 'Awaiting Live Sensors'}
           </Text>
 
           {/* 3-Column Stats Grid: Target, Variance, +10m TinyML Forecast */}
@@ -771,7 +865,7 @@ export default function ReportScreen() {
             </View>
             <View style={tw`flex-row items-baseline gap-1`}>
               <Text style={[tw`text-xl text-slate-900 dark:text-white`, { fontFamily: 'PlusJakartaSans_800ExtraBold' }]}>
-                {aiReady ? 'TFLite INT8' : (liveTemp > 0 ? 'Active' : 'Standby')}
+                {isControllerOffline ? 'Offline' : aiReady ? 'TFLite INT8' : (liveTemp > 0 ? 'Active' : 'Standby')}
               </Text>
             </View>
           </View>
@@ -785,11 +879,13 @@ export default function ReportScreen() {
             </View>
             <View style={tw`flex-row items-baseline gap-0.5`}>
               <Text style={[tw`text-2xl text-slate-900 dark:text-white`, { fontFamily: 'PlusJakartaSans_800ExtraBold' }]}>
-                +10
+                {isControllerOffline ? '--' : '+10'}
               </Text>
-              <Text style={[tw`text-xs text-slate-500 dark:text-slate-400`, { fontFamily: 'PlusJakartaSans_700Bold' }]}>
-                min
-              </Text>
+              {!isControllerOffline && (
+                <Text style={[tw`text-xs text-slate-500 dark:text-slate-400`, { fontFamily: 'PlusJakartaSans_700Bold' }]}>
+                  min
+                </Text>
+              )}
             </View>
           </View>
         </View>
@@ -888,7 +984,21 @@ export default function ReportScreen() {
             </View>
           </View>
 
-          {/* Minimal Current Point & Target Readout */}
+          {isControllerOffline ? (
+            <View style={tw`py-10 items-center justify-center px-4`}>
+              <View style={tw`w-14 h-14 rounded-full bg-slate-100 dark:bg-slate-700/60 items-center justify-center mb-3`}>
+                <MaterialCommunityIcons name="cloud-off-outline" size={28} color={isDarkMode ? '#94a3b8' : '#64748b'} />
+              </View>
+              <Text style={[tw`text-[15px] text-slate-800 dark:text-slate-100 text-center mb-1.5`, { fontFamily: 'PlusJakartaSans_800ExtraBold' }]}>
+                Forecast Trajectory Offline
+              </Text>
+              <Text style={[tw`text-xs text-slate-500 dark:text-slate-400 text-center leading-relaxed max-w-[280px]`, { fontFamily: 'PlusJakartaSans_500Medium' }]}>
+                Sensor numbers and predictive curves are masked while offline to avoid confusion that stale numbers represent live chamber data.
+              </Text>
+            </View>
+          ) : (
+            <>
+              {/* Minimal Current Point & Target Readout */}
           <View style={tw`flex-row items-center justify-between px-1`}>
             <Text style={[tw`text-xs text-slate-500 dark:text-slate-400`, { fontFamily: 'PlusJakartaSans_600SemiBold' }]}>
               {activeScrubPoint.timeLabel} ·{' '}
@@ -1061,7 +1171,9 @@ export default function ReportScreen() {
               </View>
             </ScrollView>
           </View>
-        </View>
+        </>
+      )}
+    </View>
 
       </ScrollView>
 
@@ -1077,7 +1189,9 @@ export default function ReportScreen() {
           <View
             style={[
               tw`flex-1 flex-row items-center gap-2.5 px-3 py-2 rounded-2xl border`,
-              isPreempting
+              isControllerOffline
+                ? tw`bg-amber-50 dark:bg-amber-950/40 border-amber-300 dark:border-amber-700`
+                : isPreempting
                 ? tw`bg-amber-500/10 dark:bg-amber-500/20 border-amber-300 dark:border-amber-700`
                 : isAiReady
                 ? tw`bg-emerald-50 dark:bg-emerald-950/40 border-emerald-200 dark:border-emerald-800`
@@ -1087,7 +1201,9 @@ export default function ReportScreen() {
             <View
               style={[
                 tw`w-8 h-8 rounded-xl items-center justify-center`,
-                isPreempting
+                isControllerOffline
+                  ? tw`bg-amber-500/20`
+                  : isPreempting
                   ? tw`bg-amber-500/20`
                   : isAiReady
                   ? tw`bg-emerald-500/20`
@@ -1095,9 +1211,9 @@ export default function ReportScreen() {
               ]}
             >
               <MaterialCommunityIcons
-                name={isPreempting ? 'lightning-bolt' : isAiReady ? 'shield-check' : 'shield-sync'}
+                name={isControllerOffline ? 'shield-lock' : isPreempting ? 'lightning-bolt' : isAiReady ? 'shield-check' : 'shield-sync'}
                 size={18}
-                color={isPreempting ? '#f59e0b' : isAiReady ? '#10b981' : '#0284c7'}
+                color={isControllerOffline ? '#f59e0b' : isPreempting ? '#f59e0b' : isAiReady ? '#10b981' : '#0284c7'}
               />
             </View>
             <View style={tw`flex-1`}>
@@ -1105,7 +1221,9 @@ export default function ReportScreen() {
                 style={[
                   tw`text-[12px]`,
                   { fontFamily: 'PlusJakartaSans_800ExtraBold' },
-                  isPreempting
+                  isControllerOffline
+                    ? tw`text-amber-800 dark:text-amber-200`
+                    : isPreempting
                     ? tw`text-amber-800 dark:text-amber-200`
                     : isAiReady
                     ? tw`text-emerald-800 dark:text-emerald-200`
@@ -1113,13 +1231,15 @@ export default function ReportScreen() {
                 ]}
                 numberOfLines={1}
               >
-                {isPreempting ? '⚡ Edge AI Active' : isAiReady ? 'Edge AI Shield Active' : 'Edge AI Ready'}
+                {isControllerOffline ? 'Edge AI Standalone Active' : isPreempting ? '⚡ Edge AI Active' : isAiReady ? 'Edge AI Shield Active' : 'Edge AI Ready'}
               </Text>
               <Text
                 style={[
                   tw`text-[10px]`,
                   { fontFamily: 'PlusJakartaSans_600SemiBold' },
-                  isPreempting
+                  isControllerOffline
+                    ? tw`text-amber-600 dark:text-amber-300`
+                    : isPreempting
                     ? tw`text-amber-600 dark:text-amber-300`
                     : isAiReady
                     ? tw`text-emerald-600 dark:text-emerald-400`
@@ -1127,7 +1247,7 @@ export default function ReportScreen() {
                 ]}
                 numberOfLines={1}
               >
-                {isPreempting ? preemptLabel : isAiReady ? 'Autonomous offline protection' : 'Sampling 10m buffer'}
+                {isControllerOffline ? 'Autonomous local regulation running on ESP32' : isPreempting ? preemptLabel : isAiReady ? 'Autonomous offline protection' : 'Sampling 10m buffer'}
               </Text>
             </View>
           </View>

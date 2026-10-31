@@ -5,11 +5,20 @@
         "live": {
           ".read": "auth != null",
           ".write": "auth != null"
+        },
+        "history": {
+          ".read": "auth != null",
+          ".write": "auth != null"
         }
       },
       "settings": {
         ".read": "auth != null",
-        ".write": "auth != null && root.child('kabutech/users/' + auth.uid + '/role').val() === 'admin'"
+        ".write": "auth != null && root.child('kabutech/users/' + auth.uid + '/role').val() === 'admin'",
+        "setpoints": {
+          "devices": {
+            ".write": "auth != null"
+          }
+        }
       },
       "batches": {
         ".read": "auth != null",
@@ -57,7 +66,7 @@
       },
       "alerts": {
         ".read": "auth != null",
-        ".write": "auth != null && root.child('kabutech/users/' + auth.uid + '/role').val() === 'admin'"
+        ".write": "auth != null"
       }
     }
   }

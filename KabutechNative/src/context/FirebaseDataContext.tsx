@@ -55,7 +55,7 @@ export const FirebaseDataProvider: React.FC<{ children: React.ReactNode }> = ({ 
   const [staffTasks, setStaffTasks] = useState<StaffTask[]>([]);
   const [allUsers, setAllUsers] = useState<Record<string, UserProfile>>({});
   
-  const { user } = useAuth();
+  const { user, profile } = useAuth();
 
   useEffect(() => {
     const connectedRef = ref(db, '.info/connected');
@@ -205,7 +205,7 @@ export const FirebaseDataProvider: React.FC<{ children: React.ReactNode }> = ({ 
 
   // Continuous Bidirectional Mode Convergence & Actuator Sync Loop (App <-> ESP32 TFT)
   useEffect(() => {
-    if (!user) return;
+    if (!user || profile?.role !== 'admin') return;
     const mode = normalizeAppMode(settings?.setpoints?.mode);
 
     const syncModeAndActuators = () => {
@@ -281,7 +281,7 @@ export const FirebaseDataProvider: React.FC<{ children: React.ReactNode }> = ({ 
     syncModeAndActuators();
     const interval = setInterval(syncModeAndActuators, 2000);
     return () => clearInterval(interval);
-  }, [user?.uid, settings?.setpoints?.mode, settings?.setpoints, settings?.schedules, sensors, serverTimeOffset]);
+  }, [user?.uid, profile?.role, settings?.setpoints?.mode, settings?.setpoints, settings?.schedules, sensors, serverTimeOffset]);
 
   return (
     <ConnectionContext.Provider value={isConnected}>

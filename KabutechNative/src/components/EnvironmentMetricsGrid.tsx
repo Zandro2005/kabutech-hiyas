@@ -271,7 +271,7 @@ export default React.memo(function EnvironmentMetricsGrid({ temp, hum, light, co
                 <View style={tw`flex-row items-baseline`}>
                   <Text 
                     style={[
-                      tw`${isItemFault ? 'text-slate-400 dark:text-slate-500' : 'text-slate-900 dark:text-white'}`, 
+                      tw`${(isControllerOff || isItemFault) ? 'text-slate-400 dark:text-slate-500' : 'text-slate-900 dark:text-white'}`, 
                       { 
                         fontSize: isSmallDevice ? 30 : 34, 
                         fontFamily: 'PlusJakartaSans_800ExtraBold', 
@@ -280,7 +280,7 @@ export default React.memo(function EnvironmentMetricsGrid({ temp, hum, light, co
                       }
                     ]}
                   >
-                    {item.eval.formattedValue}
+                    {isControllerOff ? '--' : item.eval.formattedValue}
                   </Text>
                   {isControllerOff ? (
                     <Text style={[tw`text-xs ml-1.5 text-slate-400 dark:text-slate-500`, { fontFamily: 'PlusJakartaSans_700Bold' }]}>

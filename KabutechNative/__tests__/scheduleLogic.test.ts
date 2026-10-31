@@ -37,7 +37,7 @@ describe('scheduleLogic - computeAutoDecision and hysteresis', () => {
     expect(decisionCooled.states.fans).toBe(false);
   });
 
-  it('turns fans ON when CO2 exceeds research limit + grace (>= 1150 ppm) and turns OFF at <= 1150 ppm', () => {
+  it('turns fans ON when CO2 exceeds research limit + grace (>= 1150 ppm) and turns OFF at <= 1000 ppm', () => {
     // CO2 at 1200 ppm (>= 1150 ppm) -> fans ON
     const sensorsHighCO2 = {
       temperature: 24.0,
@@ -50,8 +50,12 @@ describe('scheduleLogic - computeAutoDecision and hysteresis', () => {
     expect(decision.states.fans).toBe(true);
     expect(decision.reasons.fans).toContain('Bellettini et al. (2019)');
 
-    // Drops to 1100 ppm (<= 1150 ppm, returned to optimal zone) -> turns OFF
-    const decisionCleared = computeAutoDecision({ ...sensorsHighCO2, co2: 1100 }, { fans: true, fansCo2: true });
+    // In deadband at 1100 ppm (> 1000 ppm) -> fans remain ON due to hysteresis!
+    const decisionDeadband = computeAutoDecision({ ...sensorsHighCO2, co2: 1100 }, { fans: true, fansCo2: true });
+    expect(decisionDeadband.states.fans).toBe(true);
+
+    // Drops to 980 ppm (<= 1000 ppm, returned to optimal zone) -> turns OFF
+    const decisionCleared = computeAutoDecision({ ...sensorsHighCO2, co2: 980 }, { fans: true, fansCo2: true });
     expect(decisionCleared.states.fans).toBe(false);
   });
 
@@ -80,7 +84,7 @@ describe('scheduleLogic - computeAutoDecision and hysteresis', () => {
     expect(normalizedDecision.states.fansCo2).toBe(false);
   });
 
-  it('turns misters ON when humidity drops below min - grace (< 75%) and turns OFF when optimal (>= 75%)', () => {
+  it('turns misters ON when humidity drops below min - grace (< 75%) and turns OFF when optimal (>= 82%)', () => {
     // 1. Humidity at 78% (within 75-80% grace buffer) -> stays OFF
     const sensorsInGrace = {
       temperature: 24.0,
@@ -98,8 +102,12 @@ describe('scheduleLogic - computeAutoDecision and hysteresis', () => {
     expect(decisionLow.states.misters).toBe(true);
     expect(decisionLow.reasons.misters).toContain('Islam et al. (2022)');
 
-    // 3. Rises back to 76% (>= 75%, optimal) -> turns OFF
-    const decisionTargetReached = computeAutoDecision({ ...sensorsInGrace, humidity: 76.0 }, { misters: true, mistersHum: true });
+    // In deadband at 78% (< 82%) -> misters stay ON due to hysteresis!
+    const decisionDeadband = computeAutoDecision({ ...sensorsInGrace, humidity: 78.0 }, { misters: true, mistersHum: true });
+    expect(decisionDeadband.states.misters).toBe(true);
+
+    // 3. Rises back to 83% (>= 82%, optimal) -> turns OFF
+    const decisionTargetReached = computeAutoDecision({ ...sensorsInGrace, humidity: 83.0 }, { misters: true, mistersHum: true });
     expect(decisionTargetReached.states.misters).toBe(false);
   });
 

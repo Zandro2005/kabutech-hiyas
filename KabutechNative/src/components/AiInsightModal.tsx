@@ -21,11 +21,23 @@ export default function AiInsightModal({ visible, onClose }: AiInsightModalProps
   const { isDarkMode } = useTheme();
   const sensors = useSensors();
   const settings = useSettings();
+  const health = useSensorHealth();
+  const isOffline = !health.isControllerOnline;
   const isAuto = String(settings?.setpoints?.mode).toLowerCase() === 'auto';
+
+  const currentHum = (!isOffline && typeof sensors.humidity === 'number' && sensors.humidity > 0 && sensors.humidity !== -999) ? sensors.humidity : null;
+  const predHum = (!isOffline && typeof sensors.ai_pred_hum_10m === 'number' && sensors.ai_pred_hum_10m !== -999) ? sensors.ai_pred_hum_10m : currentHum;
+
+  const dropRateText = isOffline ? '--' : currentHum !== null && predHum !== null ? `${(predHum - currentHum).toFixed(1)}% / 10m` : '--';
+  const expectedText = isOffline ? '--' : predHum !== null ? `${Math.round(predHum)}%` : '--';
 
   const navigation = useNavigation<NativeStackNavigationProp<GlobalNavigationParamList>>();
   
   const handleActivateMisters = async () => {
+    if (isOffline) {
+      showToast({ type: 'info', text1: 'Controller Offline', text2: 'Edge AI manages actuators locally.' });
+      return;
+    }
     try {
       await update(ref(db, `kabutech/settings/setpoints`), {
         mode: 'manual',
@@ -71,9 +83,15 @@ export default function AiInsightModal({ visible, onClose }: AiInsightModalProps
           {/* Content */}
           <View style={tw`p-6`}>
             <View style={tw`flex-row items-start gap-3 mb-6`}>
-              <MaterialCommunityIcons name="alert-circle-outline" size={24} color="#f59e0b" />
+              <MaterialCommunityIcons
+                name={isOffline ? 'cloud-off-outline' : 'alert-circle-outline'}
+                size={24}
+                color={isOffline ? '#64748b' : '#f59e0b'}
+              />
               <Text style={[tw`flex-1 text-sm text-slate-700 dark:text-slate-300 leading-relaxed`, { fontFamily: 'PlusJakartaSans_700Bold' }]}>
-                Based on historical temperature rises and current airflow, humidity levels are projecting a steep drop below the optimal 80% threshold within the next 2 hours.
+                {isOffline
+                  ? 'Controller is currently offline. Sensor numbers are hidden until reconnected. Hardware Edge AI is regulating the chamber locally.'
+                  : 'Based on historical temperature rises and current airflow, humidity levels are projecting a steep drop below the optimal 80% threshold within the next 2 hours.'}
               </Text>
             </View>
 
@@ -81,28 +99,32 @@ export default function AiInsightModal({ visible, onClose }: AiInsightModalProps
             <View style={tw`bg-slate-50 dark:bg-slate-800 rounded-2xl p-4 mb-6 border border-slate-100 dark:border-slate-700`}>
               <View style={tw`flex-row justify-between items-center mb-3`}>
                 <Text style={[tw`text-xs text-slate-500 dark:text-slate-400`, { fontFamily: 'PlusJakartaSans_700Bold' }]}>Current Drop Rate</Text>
-                <Text style={[tw`text-sm text-red-500`, { fontFamily: 'PlusJakartaSans_800ExtraBold' }]}>-2.4% / hr</Text>
+                <Text style={[tw`text-sm ${isOffline ? 'text-slate-400' : 'text-red-500'}`, { fontFamily: 'PlusJakartaSans_800ExtraBold' }]}>{dropRateText}</Text>
               </View>
               <View style={tw`w-full h-[1px] bg-slate-200 dark:bg-slate-700 mb-3`} />
               <View style={tw`flex-row justify-between items-center mb-3`}>
                 <Text style={[tw`text-xs text-slate-500 dark:text-slate-400`, { fontFamily: 'PlusJakartaSans_700Bold' }]}>Expected in 2h</Text>
-                <Text style={[tw`text-sm text-slate-800 dark:text-white`, { fontFamily: 'PlusJakartaSans_800ExtraBold' }]}>73.2%</Text>
+                <Text style={[tw`text-sm text-slate-800 dark:text-white`, { fontFamily: 'PlusJakartaSans_800ExtraBold' }]}>{expectedText}</Text>
               </View>
               <View style={tw`w-full h-[1px] bg-slate-200 dark:bg-slate-700 mb-3`} />
               <View style={tw`flex-row justify-between items-center`}>
                 <Text style={[tw`text-xs text-slate-500 dark:text-slate-400`, { fontFamily: 'PlusJakartaSans_700Bold' }]}>Optimal Threshold</Text>
-                <Text style={[tw`text-sm text-emerald-500`, { fontFamily: 'PlusJakartaSans_800ExtraBold' }]}>80.0%</Text>
+                <Text style={[tw`text-sm text-emerald-500`, { fontFamily: 'PlusJakartaSans_800ExtraBold' }]}>{isOffline ? '--' : '80.0%'}</Text>
               </View>
             </View>
 
             {/* Action Buttons */}
             <TouchableOpacity hitSlop={{ top: 15, bottom: 15, left: 15, right: 15 }}  
               onPress={handleActivateMisters}
-              style={tw`w-full bg-blue-500 py-3.5 rounded-xl items-center justify-center flex-row gap-2 mb-3 shadow-sm`}
+              disabled={isOffline}
+              style={[
+                tw`w-full py-3.5 rounded-xl items-center justify-center flex-row gap-2 mb-3 shadow-sm`,
+                isOffline ? tw`bg-slate-400 dark:bg-slate-700` : tw`bg-blue-500`,
+              ]}
             >
               <MaterialCommunityIcons name="water" size={18} color="white" />
               <Text style={[tw`text-white text-sm tracking-wide`, { fontFamily: 'PlusJakartaSans_800ExtraBold' }]}>
-                Activate Misters Now
+                {isOffline ? 'Offline (Local AI Active)' : 'Activate Misters Now'}
               </Text>
             </TouchableOpacity>
 

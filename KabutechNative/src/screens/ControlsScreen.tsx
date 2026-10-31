@@ -71,17 +71,22 @@ export default function ControlsScreen() {
     };
   }, []);
 
-  const temp = typeof sensors.temperature === 'number' ? sensors.temperature : 32.8;
-  const hum = typeof sensors.humidity === 'number' ? sensors.humidity : 51;
-  const light = typeof sensors.light === 'number' ? sensors.light : 71;
-  const co2 = typeof sensors.co2 === 'number' ? sensors.co2 : 583;
-
-  const isTempDisconnected = health.tempError;
-  const isHumDisconnected = health.humError;
-  const isLightDisconnected = health.lightError;
-  const isCo2Disconnected = health.co2Error;
-
   const isOffline = !health.isControllerOnline;
+
+  const isTempValid = !isOffline && !health.tempError && typeof sensors.temperature === 'number' && sensors.temperature !== -999 && sensors.temperature > 0;
+  const isHumValid = !isOffline && !health.humError && typeof sensors.humidity === 'number' && sensors.humidity !== -999 && sensors.humidity > 0;
+  const isLightValid = !isOffline && !health.lightError && typeof sensors.light === 'number' && sensors.light !== -999 && sensors.light >= 0;
+  const isCo2Valid = !isOffline && !health.co2Error && typeof sensors.co2 === 'number' && sensors.co2 !== -999 && sensors.co2 > 0;
+
+  const temp = isTempValid ? sensors.temperature : null;
+  const hum = isHumValid ? sensors.humidity : null;
+  const light = isLightValid ? sensors.light : null;
+  const co2 = isCo2Valid ? sensors.co2 : null;
+
+  const isTempDisconnected = isOffline || health.tempError || temp === null;
+  const isHumDisconnected = isOffline || health.humError || hum === null;
+  const isLightDisconnected = isOffline || health.lightError || light === null;
+  const isCo2Disconnected = isOffline || health.co2Error || co2 === null;
 
   const cloudNormalizedMode = normalizeAppMode(settings?.setpoints?.mode);
 

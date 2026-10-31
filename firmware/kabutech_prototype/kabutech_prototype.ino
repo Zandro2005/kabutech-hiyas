@@ -361,8 +361,8 @@ volatile unsigned long lastSuccessfulCloudSync = 0; // Tracks last verified 2-wa
 volatile unsigned long lastWifiReconnectTime = 0;   // Tracker for Wi-Fi association timestamp
 
 // ─── Actuator Anti-Chatter Dwell Timers & Streaks (Biological Range & Relay Protection) ───
-#define ACTUATOR_MIN_ON_TIME_MS   6000    // Minimum ON dwell time: 6 seconds (prevents relay chatter)
-#define ACTUATOR_MIN_OFF_TIME_MS  5000    // Minimum OFF dwell time: 5 seconds (prevents rapid re-triggering)
+#define ACTUATOR_MIN_ON_TIME_MS   2000    // Minimum ON dwell time: 2 seconds (user-configured 2s relay delay)
+#define ACTUATOR_MIN_OFF_TIME_MS  2000    // Minimum OFF dwell time: 2 seconds (user-configured 2s relay delay)
 #define ACTUATOR_TRIGGER_STREAK   1       // Immediate responsive actuation on confirmed demand
 
 unsigned long lastFanToggleTime    = 0;
@@ -373,16 +373,38 @@ unsigned long lastMisterToggleTime = 0;
 int misterOnDemandStreak           = 0;
 int misterOffDemandStreak          = 0;
 
+// Mister Safety Timers: Protect ultrasonic ceramic discs & prevent mushroom blotch
+#define MISTER_MAX_CONTINUOUS_RUN_MS  900000UL  // 15 minutes continuous runtime limit
+#define MISTER_BREATHER_PAUSE_MS     180000UL  // 3 minutes transducer cool-down pause
+unsigned long misterContinuousRunStart = 0;
+unsigned long misterBreatherStart      = 0;
+
 // ─── Grow Light Hysteresis & Dwell Timers (Biological Range: 150 - 1000 lx) ───
 #define LIGHT_ON_THRESHOLD      150     // Turn ON when ambient light drops below 150 lx (Low/Dark)
 #define LIGHT_OFF_THRESHOLD     1000    // Turn OFF when light reaches >= 1000 lx (High/Too Bright)
-#define LIGHT_MIN_ON_TIME_MS    6000    // Minimum ON dwell time: 6 seconds (prevents relay flicker)
-#define LIGHT_MIN_OFF_TIME_MS   4000    // Minimum OFF dwell time: 4 seconds (prevents instant re-triggering)
+#define LIGHT_MIN_ON_TIME_MS    2000    // Minimum ON dwell time: 2 seconds (user-configured 2s relay delay)
+#define LIGHT_MIN_OFF_TIME_MS   2000    // Minimum OFF dwell time: 2 seconds (user-configured 2s relay delay)
 #define LIGHT_TRIGGER_STREAK    2       // Require 2 consecutive seconds to confirm state transition
 
 unsigned long lastLightToggleTime = 0;
 int lightLowStreak  = 0;
 int lightHighStreak = 0;
+
+// Thread-safe mode lock for Core 0 & Core 1
+portMUX_TYPE stateModeMux = portMUX_INITIALIZER_UNLOCKED;
+
+inline String getSafeMode() {
+  portENTER_CRITICAL(&stateModeMux);
+  String m = stateMode;
+  portEXIT_CRITICAL(&stateModeMux);
+  return m;
+}
+
+inline void setSafeMode(const String& newMode) {
+  portENTER_CRITICAL(&stateModeMux);
+  stateMode = newMode;
+  portEXIT_CRITICAL(&stateModeMux);
+}
 
 // Network & Cloud Status Globals
 volatile bool isSysOnline          = false;
@@ -437,6 +459,9 @@ void applyActuator(const String& key, bool state) {
     if (stateExhaust != state) {
       shieldTftBeforeRelaySwitch();
       stateExhaust = state;
+      lastFanToggleTime = millis();
+      fanOnDemandStreak = 0;
+      fanOffDemandStreak = 0;
       digitalWrite(PIN_FAN_EXHAUST, state ? HIGH : LOW);
       lastActuatorSwitchTime = millis();
       Serial.printf("   🌀 [Actuator] Exhaust Fan (GPIO %d) -> %s\n", PIN_FAN_EXHAUST, state ? "ON" : "OFF");
@@ -455,6 +480,14 @@ void applyActuator(const String& key, bool state) {
     if (stateMister != state) {
       shieldTftBeforeRelaySwitch();
       stateMister = state;
+      lastMisterToggleTime = millis();
+      misterOnDemandStreak = 0;
+      misterOffDemandStreak = 0;
+      if (state) {
+        misterContinuousRunStart = millis();
+      } else {
+        misterContinuousRunStart = 0;
+      }
       digitalWrite(PIN_MISTER, state ? HIGH : LOW);
       lastActuatorSwitchTime = millis();
       Serial.printf("   💧 [Actuator] Misters (GPIO %d) -> %s\n", PIN_MISTER, state ? "ON" : "OFF");
@@ -516,7 +549,7 @@ void extractPushTokensFromJson(FirebaseJson *json) {
 // ═══════════════════════════════════════════════
 
 void runAutoRegulation() {
-  if (stateMode != "AUTO") return;
+  if (getSafeMode() != "AUTO") return;
 
   unsigned long nowMs = millis();
   SensorSnapshot snap = getSensorSnapshot();
@@ -653,8 +686,20 @@ void runAutoRegulation() {
   }
 
   // Evaporative Cooling: Misters activate in synergy with fans when temperature is high (> 25.0 °C)
-  bool needMisterForTemp = !isTempCold && needCoolingForTemp;
+  // Saturation guard: If RH >= 97%, misting for cooling must be blocked to prevent waterlogging & blotch
+  bool coolingMisterBlockedByHum = (currentH >= 97.0);
+  bool needMisterForTemp = !isTempCold && needCoolingForTemp && !coolingMisterBlockedByHum;
   bool needMister = needMisterForHum || needMisterForTemp;
+
+  // Enforce 15-minute continuous mist limit & 3-minute breather pause (piezo disc protection)
+  if (stateMister && misterContinuousRunStart > 0 && (nowMs - misterContinuousRunStart >= MISTER_MAX_CONTINUOUS_RUN_MS)) {
+    needMister = false;
+    misterBreatherStart = nowMs;
+    Serial.println("⚠️ [Mister Safety] 15-min continuous mist limit reached. Entering 3-min breather pause.");
+  }
+  if (misterBreatherStart > 0 && (nowMs - misterBreatherStart < MISTER_BREATHER_PAUSE_MS)) {
+    needMister = false; // Hold OFF during breather pause
+  }
 
   // Combined Mister Actuation with Dwell Timing & Confirmation Streaks
   if (needMister) {
@@ -768,6 +813,11 @@ void runAutoRegulation() {
       lastMisterToggleTime = nowMs;
       misterOnDemandStreak = 0;
       misterOffDemandStreak = 0;
+      if (nextMister) {
+        misterContinuousRunStart = nowMs;
+      } else {
+        misterContinuousRunStart = 0;
+      }
     }
     if (lightChanged) {
       lastLightToggleTime = nowMs;
@@ -962,16 +1012,16 @@ bool resyncCloudSetpoints(bool forceRestartStream) {
         stableCloudStreak = STABLE_RECOVERY_STREAK;
       }
 
-      if (fetchedMode != stateMode) {
-        stateMode = fetchedMode;
-        curTheme = getThemeForMode(stateMode);
+      if (fetchedMode != getSafeMode()) {
+        setSafeMode(fetchedMode);
+        curTheme = getThemeForMode(fetchedMode);
         baseDrawn = false;
         lastDisplayRefresh = 0;
-        Serial.printf("✅ [Cloud Sync] Restored App Mode: %s (%lu ms)\n", stateMode.c_str(), syncDuration);
+        Serial.printf("✅ [Cloud Sync] Restored App Mode: %s (%lu ms)\n", fetchedMode.c_str(), syncDuration);
       }
 
       // In MANUAL and TIMED modes, synchronize hardware actuators with cloud setpoints
-      if (stateMode != "AUTO") {
+      if (getSafeMode() != "AUTO") {
         if (json->get(d, "devices/fans") || json->get(d, "fans")) applyActuator("fans", d.to<bool>());
         if (json->get(d, "devices/exhaust") || json->get(d, "exhaust")) applyActuator("exhaust", d.to<bool>());
         if (json->get(d, "devices/fanOut") || json->get(d, "fanOut")) applyActuator("fanOut", d.to<bool>());
@@ -1000,8 +1050,8 @@ bool resyncCloudSetpoints(bool forceRestartStream) {
   isSysOnline = false;
   firebaseReady = false;
   needsCloudResync = true;
-  if (stateMode != "AUTO") {
-    stateMode = "AUTO";
+  if (getSafeMode() != "AUTO") {
+    setSafeMode("AUTO");
     curTheme = getThemeForMode("AUTO");
     baseDrawn = false;
     lastDisplayRefresh = 0;
@@ -1495,7 +1545,7 @@ void pushToFirebase(const SensorSnapshot& snap) {
   }
 
   // Sync AUTO mode actuator states if queued by Core 1
-  if (pendingAutoDeviceSync && stateMode == "AUTO") {
+  if (pendingAutoDeviceSync && getSafeMode() == "AUTO") {
     pendingAutoDeviceSync = false;
     FirebaseJson devJson;
     devJson.set("fans",    stateExhaust);
@@ -1593,8 +1643,8 @@ void pushToFirebase(const SensorSnapshot& snap) {
       slowInternetDetected = true;
       offlineFailsafeActive = true;
       needsCloudResync = true;
-      if (stateMode != "AUTO") {
-        stateMode = "AUTO";
+      if (getSafeMode() != "AUTO") {
+        setSafeMode("AUTO");
         curTheme = getThemeForMode("AUTO");
         baseDrawn = false;
         lastDisplayRefresh = 0;
@@ -1660,8 +1710,8 @@ void sendHeartbeat() {
       slowInternetDetected = true;
       offlineFailsafeActive = true;
       needsCloudResync = true;
-      if (stateMode != "AUTO") {
-        stateMode = "AUTO";
+      if (getSafeMode() != "AUTO") {
+        setSafeMode("AUTO");
         curTheme = getThemeForMode("AUTO");
         baseDrawn = false;
         lastDisplayRefresh = 0;
@@ -1781,6 +1831,16 @@ bool espNotified_HumLow     = false;
 bool espNotified_Co2High    = false;
 bool espNotified_LightHigh  = false;
 bool espNotified_LightLow   = false;
+
+#define ALERT_COOLDOWN_MS 300000UL // 5 minutes cooldown between repeated threshold alerts
+unsigned long espLastAlertPush_TempHigh  = 0;
+unsigned long espLastAlertPush_TempLow   = 0;
+unsigned long espLastAlertPush_HumHigh   = 0;
+unsigned long espLastAlertPush_HumLow    = 0;
+unsigned long espLastAlertPush_Co2High   = 0;
+unsigned long espLastAlertPush_LightHigh = 0;
+unsigned long espLastAlertPush_LightLow  = 0;
+
 // Per-sensor fault notification latches (0 = Temp/Hum, 1 = Light, 2 = CO2) + re-notify cooldown
 bool espNotified_SensorFault[3]        = { false, false, false };
 unsigned long espLastSensorFaultPush[3] = { 0, 0, 0 };
@@ -1828,13 +1888,16 @@ void evaluateAndDispatchEsp32PushAlerts(const SensorSnapshot& snap) {
   if (millis() < 10000 || pushTokenCount <= 0 || !isSysOnline || slowInternetDetected) return;
 
   char bodyBuf[64];
+  unsigned long now = millis();
 
   // 1. Temperature Alerts (Optimal: 18 - 25 °C)
   if (snap.temp.status == S_OK) {
     float temp = snap.temp.value;
     if (temp > 25.0) {
-      if (!espNotified_TempHigh) {
+      bool cooledDown = (espLastAlertPush_TempHigh == 0) || (now - espLastAlertPush_TempHigh >= ALERT_COOLDOWN_MS);
+      if (!espNotified_TempHigh && cooledDown) {
         espNotified_TempHigh = true;
+        espLastAlertPush_TempHigh = now;
         bool isCrit = (temp > 27.0);
         snprintf(bodyBuf, sizeof(bodyBuf), "%.1f°C (Target: 18 - 25 °C)", temp);
         sendExpoPushFromEsp32(
@@ -1843,13 +1906,15 @@ void evaluateAndDispatchEsp32PushAlerts(const SensorSnapshot& snap) {
           bodyBuf
         );
       }
-    } else {
-      espNotified_TempHigh = false; // Re-arm immediately when normal
+    } else if (temp <= 24.5) {
+      espNotified_TempHigh = false; // Re-arm with 0.5°C hysteresis
     }
 
     if (temp < 18.0) {
-      if (!espNotified_TempLow) {
+      bool cooledDown = (espLastAlertPush_TempLow == 0) || (now - espLastAlertPush_TempLow >= ALERT_COOLDOWN_MS);
+      if (!espNotified_TempLow && cooledDown) {
         espNotified_TempLow = true;
+        espLastAlertPush_TempLow = now;
         bool isCrit = (temp < 16.0);
         snprintf(bodyBuf, sizeof(bodyBuf), "%.1f°C (Target: 18 - 25 °C)", temp);
         sendExpoPushFromEsp32(
@@ -1858,8 +1923,8 @@ void evaluateAndDispatchEsp32PushAlerts(const SensorSnapshot& snap) {
           bodyBuf
         );
       }
-    } else {
-      espNotified_TempLow = false; // Re-arm immediately when normal
+    } else if (temp >= 18.5) {
+      espNotified_TempLow = false; // Re-arm with 0.5°C hysteresis
     }
   }
 
@@ -1867,8 +1932,10 @@ void evaluateAndDispatchEsp32PushAlerts(const SensorSnapshot& snap) {
   if (snap.hum.status == S_OK) {
     float hum = snap.hum.value;
     if (hum > 95.0) {
-      if (!espNotified_HumHigh) {
+      bool cooledDown = (espLastAlertPush_HumHigh == 0) || (now - espLastAlertPush_HumHigh >= ALERT_COOLDOWN_MS);
+      if (!espNotified_HumHigh && cooledDown) {
         espNotified_HumHigh = true;
+        espLastAlertPush_HumHigh = now;
         bool isCrit = (hum >= 100.0);
         snprintf(bodyBuf, sizeof(bodyBuf), "%d%% (Target: 80 - 95 %%)", (int)round(hum));
         sendExpoPushFromEsp32(
@@ -1877,13 +1944,15 @@ void evaluateAndDispatchEsp32PushAlerts(const SensorSnapshot& snap) {
           bodyBuf
         );
       }
-    } else {
-      espNotified_HumHigh = false;
+    } else if (hum <= 93.0) {
+      espNotified_HumHigh = false; // Re-arm with 2% hysteresis
     }
 
     if (hum < 80.0) {
-      if (!espNotified_HumLow) {
+      bool cooledDown = (espLastAlertPush_HumLow == 0) || (now - espLastAlertPush_HumLow >= ALERT_COOLDOWN_MS);
+      if (!espNotified_HumLow && cooledDown) {
         espNotified_HumLow = true;
+        espLastAlertPush_HumLow = now;
         bool isCrit = (hum < 75.0);
         snprintf(bodyBuf, sizeof(bodyBuf), "%d%% (Target: 80 - 95 %%)", (int)round(hum));
         sendExpoPushFromEsp32(
@@ -1892,8 +1961,8 @@ void evaluateAndDispatchEsp32PushAlerts(const SensorSnapshot& snap) {
           bodyBuf
         );
       }
-    } else {
-      espNotified_HumLow = false;
+    } else if (hum >= 82.0) {
+      espNotified_HumLow = false; // Re-arm with 2% hysteresis
     }
   }
 
@@ -1901,8 +1970,10 @@ void evaluateAndDispatchEsp32PushAlerts(const SensorSnapshot& snap) {
   if (snap.co2.status == S_OK) {
     int co2 = (int)snap.co2.value;
     if (co2 > 1000) {
-      if (!espNotified_Co2High) {
+      bool cooledDown = (espLastAlertPush_Co2High == 0) || (now - espLastAlertPush_Co2High >= ALERT_COOLDOWN_MS);
+      if (!espNotified_Co2High && cooledDown) {
         espNotified_Co2High = true;
+        espLastAlertPush_Co2High = now;
         bool isCrit = (co2 > 1150);
         snprintf(bodyBuf, sizeof(bodyBuf), "%d ppm (Target: < 1000 ppm)", co2);
         sendExpoPushFromEsp32(
@@ -1911,8 +1982,8 @@ void evaluateAndDispatchEsp32PushAlerts(const SensorSnapshot& snap) {
           bodyBuf
         );
       }
-    } else {
-      espNotified_Co2High = false;
+    } else if (co2 <= 950) {
+      espNotified_Co2High = false; // Re-arm with 50 ppm hysteresis
     }
   }
 
@@ -1920,23 +1991,27 @@ void evaluateAndDispatchEsp32PushAlerts(const SensorSnapshot& snap) {
   if (snap.light.status == S_OK) {
     int light = (int)snap.light.value;
     if (light > 1000) {
-      if (!espNotified_LightHigh) {
+      bool cooledDown = (espLastAlertPush_LightHigh == 0) || (now - espLastAlertPush_LightHigh >= ALERT_COOLDOWN_MS);
+      if (!espNotified_LightHigh && cooledDown) {
         espNotified_LightHigh = true;
+        espLastAlertPush_LightHigh = now;
         snprintf(bodyBuf, sizeof(bodyBuf), "%d lx (Target: 150 - 1000 lx)", light);
         sendExpoPushFromEsp32("light-high", "Light Above Crop Range", bodyBuf);
       }
-    } else {
-      espNotified_LightHigh = false;
+    } else if (light <= 950) {
+      espNotified_LightHigh = false; // Re-arm with 50 lx hysteresis
     }
 
     if (light < 150) {
-      if (!espNotified_LightLow) {
+      bool cooledDown = (espLastAlertPush_LightLow == 0) || (now - espLastAlertPush_LightLow >= ALERT_COOLDOWN_MS);
+      if (!espNotified_LightLow && cooledDown) {
         espNotified_LightLow = true;
+        espLastAlertPush_LightLow = now;
         snprintf(bodyBuf, sizeof(bodyBuf), "%d lx (Target: 150 - 1000 lx)", light);
         sendExpoPushFromEsp32("light-low", "Light Below Crop Range", bodyBuf);
       }
-    } else {
-      espNotified_LightLow = false;
+    } else if (light >= 170) {
+      espNotified_LightLow = false; // Re-arm with 20 lx hysteresis
     }
   }
 
@@ -1997,8 +2072,8 @@ void cloudTask(void *pvParameters) {
         slowInternetDetected = true;
         offlineFailsafeActive = true;
         needsCloudResync = true;
-        if (stateMode != "AUTO") {
-          stateMode = "AUTO";
+        if (getSafeMode() != "AUTO") {
+          setSafeMode("AUTO");
           curTheme = getThemeForMode("AUTO");
           baseDrawn = false;
           lastDisplayRefresh = 0;
@@ -2047,8 +2122,8 @@ void cloudTask(void *pvParameters) {
         isSysOnline = false;
         firebaseReady = false;
         needsCloudResync = true;
-        if (stateMode != "AUTO") {
-          stateMode = "AUTO";
+        if (getSafeMode() != "AUTO") {
+          setSafeMode("AUTO");
           curTheme = getThemeForMode("AUTO");
           baseDrawn = false;
           lastDisplayRefresh = 0;
@@ -2148,8 +2223,8 @@ void loop() {
 
   // ── Network Liveness & Online/Local Indicator ──
   if (!isSysOnline) {
-    if (stateMode != "AUTO") {
-      stateMode = "AUTO";
+    if (getSafeMode() != "AUTO") {
+      setSafeMode("AUTO");
       curTheme = getThemeForMode("AUTO");
       baseDrawn = false;
       lastDisplayRefresh = 0;
@@ -2238,8 +2313,9 @@ void loop() {
       Serial.printf("   🌬️  CO₂ Level:    %d ppm (Sensirion NDIR)\n", currentCO2);
     }
 
+    String currentSafeMode = getSafeMode();
     Serial.printf("   🔥 ESP32 Chip Temp: %.1f °C | Cloud: %s | Mode: %s\n",
-                  temperatureRead(), isSysOnline ? "ONLINE" : "LOCAL", stateMode.c_str());
+                  temperatureRead(), isSysOnline ? "ONLINE" : "LOCAL", currentSafeMode.c_str());
     Serial.println("──────────────────────────────────────────────────────");
 
     // ── Edge AI: sample every 30 s into the ring buffer and forecast +10 min ──
@@ -2249,7 +2325,7 @@ void loop() {
     // ── Local Autonomous Environmental Regulation (AUTO Mode) ──
     runAutoRegulation();
 
-    if (stateMode == "AUTO") {
+    if (currentSafeMode == "AUTO") {
       if (stateExhaust) {
         Serial.printf("   🌀 Exhaust Fans:  ON  [%s | T=%.1f°C (Pred:%.1f) | CO2=%d (Pred:%.0f) | H=%.1f%% (Pred:%.1f%%)]\n",
                       aiAction, currentTemp, aiReady ? predTemp10m : currentTemp,
@@ -2277,14 +2353,15 @@ void loop() {
     digitalWrite(TFT_RST_PIN, HIGH);
     digitalWrite(TFT_LED_PIN, HIGH);
   } else {
+    String currentSafeMode = getSafeMode();
     // 1. Primary post-actuation heal at +120ms: restores ILI9341 registers & repaints full screen after relay surge
     if (tftNeedsPrimaryHeal && sinceRelaySwitch >= RELAY_EMI_QUIET_MS) {
       tftNeedsPrimaryHeal = false;
       tftSpiBusy = true;
-      healTftDisplay(stateMode);
+      healTftDisplay(currentSafeMode);
       drawDashboard(getSensorSnapshot(),
                     stateExhaust, stateIntake, stateMister, stateLight,
-                    stateMode, isSysOnline, isSysOnline && firebaseReady,
+                    currentSafeMode, isSysOnline, isSysOnline && firebaseReady,
                     aiReady, aiAction);
       tftSpiBusy = false;
       lastDisplayRefresh = millis();
@@ -2293,10 +2370,10 @@ void loop() {
     else if (tftNeedsSecondaryHeal && sinceRelaySwitch >= 600) {
       tftNeedsSecondaryHeal = false;
       tftSpiBusy = true;
-      healTftDisplay(stateMode);
+      healTftDisplay(currentSafeMode);
       drawDashboard(getSensorSnapshot(),
                     stateExhaust, stateIntake, stateMister, stateLight,
-                    stateMode, isSysOnline, isSysOnline && firebaseReady,
+                    currentSafeMode, isSysOnline, isSysOnline && firebaseReady,
                     aiReady, aiAction);
       tftSpiBusy = false;
       lastDisplayRefresh = millis();
@@ -2307,7 +2384,7 @@ void loop() {
       tftSpiBusy = true;
       drawDashboard(getSensorSnapshot(),
                     stateExhaust, stateIntake, stateMister, stateLight,
-                    stateMode, isSysOnline, isSysOnline && firebaseReady,
+                    currentSafeMode, isSysOnline, isSysOnline && firebaseReady,
                     aiReady, aiAction);
       tftSpiBusy = false;
     }

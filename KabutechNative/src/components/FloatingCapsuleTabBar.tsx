@@ -8,6 +8,7 @@ import tw from '../tailwind';
 import { useTheme } from '../context/ThemeContext';
 import { useEnvironmentAlerts } from '../hooks/useEnvironmentAlerts';
 import { useStaffTasks } from '../hooks/useFirebaseData';
+import { useSensorHealth } from '../hooks/useSensorHealth';
 import { useAuth } from '../context/AuthContext';
 import { useTabBar } from '../context/TabBarContext';
 import { hapticLight } from '../utils/haptics';
@@ -73,6 +74,8 @@ export default function FloatingCapsuleTabBar({
   const envAlerts = useEnvironmentAlerts();
   const { user } = useAuth();
   const allTasks = useStaffTasks();
+  const health = useSensorHealth();
+  const isControllerOffline = !health.isControllerOnline;
   const { isTabBarVisible, showTabBar } = useTabBar();
 
   const translateY = useRef(new Animated.Value(0)).current;
@@ -220,7 +223,9 @@ export default function FloatingCapsuleTabBar({
                     style={[
                       tw`rounded-full items-center justify-center`,
                       {
-                        shadowColor: isDarkMode ? '#34d399' : '#059669',
+                        shadowColor: isControllerOffline
+                          ? (isDarkMode ? '#64748b' : '#94a3b8')
+                          : (isDarkMode ? '#34d399' : '#059669'),
                         shadowOffset: { width: 0, height: 6 },
                         shadowOpacity: isDarkMode ? 0.55 : 0.38,
                         shadowRadius: 10,
@@ -229,7 +234,11 @@ export default function FloatingCapsuleTabBar({
                     ]}
                   >
                     <LinearGradient
-                      colors={isDarkMode ? ['#34d399', '#059669'] : ['#10b981', '#047857']}
+                      colors={
+                        isControllerOffline
+                          ? (isDarkMode ? ['#475569', '#334155'] : ['#94a3b8', '#64748b'])
+                          : (isDarkMode ? ['#34d399', '#059669'] : ['#10b981', '#047857'])
+                      }
                       start={{ x: 0, y: 0 }}
                       end={{ x: 1, y: 1 }}
                       style={[
@@ -245,6 +254,25 @@ export default function FloatingCapsuleTabBar({
                         color="#ffffff"
                       />
                     </LinearGradient>
+
+                    {/* Offline Pill Badge */}
+                    {isControllerOffline && (
+                      <View
+                        style={[
+                          tw`absolute -top-1 -right-2 px-1.5 py-0.5 rounded-full border border-white dark:border-slate-900 z-10`,
+                          { backgroundColor: '#f59e0b' },
+                        ]}
+                      >
+                        <Text
+                          style={[
+                            tw`text-[7.5px] text-white uppercase`,
+                            { fontFamily: 'PlusJakartaSans_800ExtraBold' },
+                          ]}
+                        >
+                          Offline
+                        </Text>
+                      </View>
+                    )}
                   </View>
 
                   {/* Tab Label */}
@@ -254,11 +282,13 @@ export default function FloatingCapsuleTabBar({
                       tw`text-[11px] mt-1 tracking-tight font-extrabold`,
                       {
                         fontFamily: 'PlusJakartaSans_800ExtraBold',
-                        color: isDarkMode ? '#34d399' : '#047857',
+                        color: isControllerOffline
+                          ? (isDarkMode ? '#94a3b8' : '#64748b')
+                          : (isDarkMode ? '#34d399' : '#047857'),
                       },
                     ]}
                   >
-                    {config.label}
+                    {isControllerOffline ? 'AI Hub (Offline)' : config.label}
                   </Text>
                 </View>
               </TouchableOpacity>

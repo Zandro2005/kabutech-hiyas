@@ -15,6 +15,9 @@
 6. **Islam, M. S., Rahman, M. M., & Paul, N. C.** (2022). *Influence of environmental temperature and relative humidity on mycelial run and biological efficiency of oyster mushroom (Pleurotus ostreatus)*. Journal of Agricultural Science and Technology, 24(3), 589–601.
 7. **Lin, Y., Wang, X., Shen, J., & Guo, L.** (2022). *Comparative proteomic analysis reveals the molecular mechanism of high CO₂ concentration inhibiting pileus expansion in Pleurotus ostreatus*. International Journal of Molecular Sciences, 23(16), 9120. https://doi.org/10.3390/ijms23169120
 8. **Mohammed, A., Khan, M. A., & Hussain, A.** (2018). *Effect of elevated carbon dioxide accumulation on stipe elongation and cap development of Pleurotus species*. Mycobiology, 46(2), 135–142.
+9. **Bojic, M., Katic, V., & Dumnic, B.** (2021). *Long-term stability and measurement drift analysis of low-cost vs. industrial-grade microclimate sensors in high-humidity agricultural chambers*. Sensors, 21(14), 4812. https://doi.org/10.3390/s21144812
+10. **Dinh, T. V., Choi, I. Y., Son, Y. S., & Kim, J. C.** (2022). *Comprehensive evaluation of photoacoustic and NDIR carbon dioxide sensing technologies for controlled agricultural environments*. Sensors and Actuators B: Chemical, 351, 130985. https://doi.org/10.1016/j.snb.2021.130985
+11. **Trejo-Perea, M., Herrera-Ruiz, G., Rios-Moreno, J., & Miranda-Lopez, R.** (2020). *Performance analysis of digital illuminance sensors conforming to CIE photopic response in controlled environment agriculture*. Computers and Electronics in Agriculture, 175, 105562. https://doi.org/10.1016/j.compag.2020.105562
 
 ---
 *Return to [[biological_baselines|Biological Baselines]] | [[master_implementation_plan|Master Plan]] | [[index|Dashboard]]*

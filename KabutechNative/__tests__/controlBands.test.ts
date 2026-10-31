@@ -12,17 +12,17 @@ describe('controlBands - getControlBands', () => {
     expect(bands.misterTempOff).toBe(24.2);
     expect(bands.tempColdBelow).toBe(16.0); // 18°C - 2.0°C grace
 
-    // Humidity: Min 80% - 5% grace = 75% ON, 75% OFF
+    // Humidity: Min 80% - 5% grace = 75% ON, 82% OFF (hysteresis band)
     expect(bands.misterOn).toBe(75);
-    expect(bands.misterOff).toBe(75);
+    expect(bands.misterOff).toBe(82);
 
-    // High Humidity exhaust: 95% + 5% grace = 100% ON, 100% OFF
+    // High Humidity exhaust: 95% + 5% grace = 100% ON, 94% OFF (hysteresis band)
     expect(bands.exhaustHumOn).toBe(100);
-    expect(bands.exhaustHumOff).toBe(100);
+    expect(bands.exhaustHumOff).toBe(94);
 
-    // CO2: Max 1000 + 150 grace = 1150 ppm ON, 1150 ppm OFF
+    // CO2: Max 1000 + 150 grace = 1150 ppm ON, 1000 ppm OFF (hysteresis band)
     expect(bands.exhaustCo2On).toBe(1150);
-    expect(bands.exhaustCo2Off).toBe(1150);
+    expect(bands.exhaustCo2Off).toBe(1000);
 
     // Light: 150 lx ON (dark), 1000 lx OFF (scorching ceiling)
     expect(bands.lightsOn).toBe(150);
